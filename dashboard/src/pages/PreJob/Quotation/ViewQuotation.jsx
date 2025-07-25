@@ -681,7 +681,7 @@ const ViewQuotation = () => {
         {state.selectedQuotation && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-gray-800">Company Details</h3>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
               <p><strong>Quotation ID:</strong> {state.selectedQuotation.id}</p>
               <p><strong>RFQ ID:</strong> {state.selectedQuotation.rfq || 'N/A'}</p>
               <p><strong>Company Name:</strong> {state.selectedQuotation.company_name || 'N/A'}</p>
@@ -694,13 +694,13 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">Contact Details</h3>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
               <p><strong>Contact Name:</strong> {state.selectedQuotation.point_of_contact_name || 'N/A'}</p>
               <p><strong>Contact Email:</strong> {state.selectedQuotation.point_of_contact_email || 'N/A'}</p>
               <p><strong>Contact Phone:</strong> {state.selectedQuotation.point_of_contact_phone || 'N/A'}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">Assignment & Status</h3>
+              <h3 className="text-lg font-medium text-black">Assignment & Status</h3>
               <p>
                 <strong>Assigned Sales Person:</strong>{' '}
                 {state.teamMembers.find(m => m.id === state.selectedQuotation.assigned_sales_person)?.name || 'N/A'}
@@ -729,7 +729,7 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">Items</h3>
+              <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedQuotation.items &&
               Array.isArray(state.selectedQuotation.items) &&
               state.selectedQuotation.items.length > 0 ? (
@@ -783,7 +783,7 @@ const ViewQuotation = () => {
             </div>
             {state.selectedQuotation.purchase_orders && state.selectedQuotation.purchase_orders.length > 0 && (
               <div>
-                <h3 className="text-lg font-medium text-gray-800">Purchase Orders</h3>
+                <h3 className="text-lg font-medium text-black">Purchase Orders</h3>
                 {state.selectedQuotation.purchase_orders.map((po, index) => (
                   <div key={po.id} className="mb-4">
                     <p><strong>PO ID:</strong> {po.id} ({po.order_type})</p>
@@ -916,7 +916,7 @@ const ViewQuotation = () => {
         <div className="space-y-4">
           {state.partialOrders.map((po, index) => (
             <div key={po.id} className="border p-4 rounded-md">
-              <h3 className="text-md font-medium text-gray-800">Partial Order {index + 1} (ID: {po.id})</h3>
+              <h3 className="text-md font-medium text-black">Partial Order {index + 1} (ID: {po.id})</h3>
               <div className="mt-2">
                 <label
                   htmlFor={`clientPoNumber-${po.id}`}

@@ -24,7 +24,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
             <div className="flex items-center justify-end">
               <button
                 onClick={onClose}
-                className="text-gray-800 hover:text-indigo-600 transition-colors rounded-full w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300"
+                className="text-black hover:text-indigo-600 transition-colors rounded-full w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300"
               >
                 x
               </button>
@@ -41,7 +41,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
               </button>
               <button
                 onClick={() => onSelect('existing')}
-                className="bg-gray-200 text-gray-800 p-3 rounded-lg hover:bg-gray-300 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
+                className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
               >
                 Existing Client
               </button>

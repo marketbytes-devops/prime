@@ -60,7 +60,7 @@ const Topbar = ({ toggleSidebar, isSidebarOpen, isAuthenticated, setIsAuthentica
               localStorage.removeItem('refresh_token');
               setIsAuthenticated(false);
             }}
-            className="flex items-center space-x-2 px-4 py-2 rounded text-sm text-gray-800 hover:bg-indigo-500 hover:text-gray-100 transition-colors duration-300 opacity-90"
+            className="flex items-center space-x-2 px-4 py-2 rounded text-sm text-black hover:bg-indigo-500 hover:text-gray-100 transition-colors duration-300 opacity-90"
           >
             <LogOut size={12} />
             <span>Logout</span>

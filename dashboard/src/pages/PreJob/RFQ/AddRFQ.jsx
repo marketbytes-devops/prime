@@ -578,7 +578,7 @@ const AddRFQ = () => {
           </Button>
           <Button
             onClick={() => handleClientSelect("existing")}
-            className="bg-gray-200 text-gray-800 p-3 rounded-lg hover:bg-gray-300 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
+            className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
           >
             Existing Client
           </Button>
@@ -659,7 +659,7 @@ const AddRFQ = () => {
                       value={formData[field.name] || ""}
                       readOnly
                       disabled
-                      className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-gray-800 cursor-not-allowed text-sm"
+                      className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-black cursor-not-allowed text-sm"
                     />
                   </div>
                 ))}
@@ -672,7 +672,7 @@ const AddRFQ = () => {
                   value={formData.rfq_channel || ""}
                   readOnly
                   disabled
-                  className="w-full p-2 border border-gray-300 rounded bg-gray-100 text-gray-800 cursor-not-allowed text-sm"
+                  className="w-full p-2 border border-gray-300 rounded bg-gray-100 text-black cursor-not-allowed text-sm"
                 />
               </div>
 

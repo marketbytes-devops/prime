@@ -32,7 +32,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800">Dashboard</h2>
+      <h2 className="text-2xl font-semibold mb-4 text-black">Dashboard</h2>
       <p className="text-gray-600 mb-6">Welcome to the Admin Dashboard. Monitor your RFQs and Quotations below.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

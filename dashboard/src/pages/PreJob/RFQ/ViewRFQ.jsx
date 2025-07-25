@@ -463,7 +463,7 @@ const ViewRFQ = () => {
         {state.selectedRfq && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-gray-800">
+              <h3 className="text-lg font-medium text-black">
                 Company Details
               </h3>
               <p>
@@ -494,7 +494,7 @@ const ViewRFQ = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">
+              <h3 className="text-lg font-medium text-black">
                 Contact Details
               </h3>
               <p>
@@ -511,7 +511,7 @@ const ViewRFQ = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">
+              <h3 className="text-lg font-medium text-black">
                 Assignment & Status
               </h3>
               <p>
@@ -537,7 +537,7 @@ const ViewRFQ = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-800">Items</h3>
+              <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedRfq.items &&
               Array.isArray(state.selectedRfq.items) &&
               state.selectedRfq.items.length > 0 ? (

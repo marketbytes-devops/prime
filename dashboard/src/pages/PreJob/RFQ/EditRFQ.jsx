@@ -265,7 +265,7 @@ const EditRFQ = () => {
   const renderForm = () => (
     <div className="grid gap-6">
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-gray-800">Company Details</h3>
+        <h3 className="text-xl font-semibold text-black">Company Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -329,7 +329,7 @@ const EditRFQ = () => {
       </div>
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-gray-800">RFQ Channel</h3>
+        <h3 className="text-xl font-semibold text-black">RFQ Channel</h3>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             RFQ Channel
@@ -353,7 +353,7 @@ const EditRFQ = () => {
       </div>
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-gray-800">Point of Contact</h3>
+        <h3 className="text-xl font-semibold text-black">Point of Contact</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -405,7 +405,7 @@ const EditRFQ = () => {
       </div>
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-gray-800">Assignment & Due Date</h3>
+        <h3 className="text-xl font-semibold text-black">Assignment & Due Date</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -444,7 +444,7 @@ const EditRFQ = () => {
       </div>
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-gray-800">RFQ Status</h3>
+        <h3 className="text-xl font-semibold text-black">RFQ Status</h3>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             RFQ Status
@@ -465,7 +465,7 @@ const EditRFQ = () => {
       </div>
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
-        <h3 className="text-xl font-semibold text-gray-800">Items</h3>
+        <h3 className="text-xl font-semibold text-black">Items</h3>
         {state.items.map((item, index) => (
           <div key={index} className="border p-4 rounded-md bg-gray-50 shadow mb-4">
             <h4 className="text-sm font-semibold mb-2">Item {index + 1}</h4>

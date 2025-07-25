@@ -238,7 +238,7 @@ const ExistingClient = () => {
                       type={field.type || "text"}
                       value={formData[field.name] || ""}
                       disabled
-                      className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-gray-800 cursor-not-allowed text-sm"
+                      className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-black cursor-not-allowed text-sm"
                     />
                   </div>
                 ))}
