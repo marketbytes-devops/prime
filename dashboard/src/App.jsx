@@ -99,7 +99,7 @@ function App() {
           element: <ViewQuotation />,
         },
         {
-          path: "/edit-quotation",
+          path: "/edit-quotation/:id",
           element: <EditQuotation />,
         },
       ],

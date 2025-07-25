@@ -29,6 +29,7 @@ const EditRFQ = () => {
     point_of_contact_phone: '',
     assigned_sales_person: '',
     due_date_for_quotation: '',
+    rfq_status: '',
     items: [{ item: '', quantity: '', unit: '', unit_price: '' }],
     channels: [],
     teamMembers: [],
@@ -41,14 +42,13 @@ const EditRFQ = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [rfqRes, channelsRes, teamsRes, itemsRes, unitsRes] =
-          await Promise.all([
-            apiClient.get(`rfqs/${id}/`),
-            apiClient.get('channels/'),
-            apiClient.get('teams/'),
-            apiClient.get('items/'),
-            apiClient.get('units/'),
-          ]);
+        const [rfqRes, channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
+          apiClient.get(`rfqs/${id}/`),
+          apiClient.get('channels/'),
+          apiClient.get('teams/'),
+          apiClient.get('items/'),
+          apiClient.get('units/'),
+        ]);
         console.log('RFQ data:', rfqRes.data, 'Items:', rfqRes.data.items);
         setState(prev => ({
           ...prev,
@@ -62,6 +62,7 @@ const EditRFQ = () => {
           point_of_contact_phone: rfqRes.data.point_of_contact_phone || '',
           assigned_sales_person: rfqRes.data.assigned_sales_person || '',
           due_date_for_quotation: rfqRes.data.due_date_for_quotation || '',
+          rfq_status: rfqRes.data.rfq_status || 'Processing',
           items: rfqRes.data.items && rfqRes.data.items.length
             ? rfqRes.data.items.map(item => ({
                 item: item.item || '',
@@ -99,6 +100,7 @@ const EditRFQ = () => {
     point_of_contact_phone: state.point_of_contact_phone || null,
     assigned_sales_person: state.assigned_sales_person || null,
     due_date_for_quotation: state.due_date_for_quotation || null,
+    rfq_status: state.rfq_status || null,
     items: state.items.map(item => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -106,6 +108,43 @@ const EditRFQ = () => {
       unit_price: item.unit_price ? parseFloat(item.unit_price) : null,
     })),
   }), [
+    state.company_name,
+    state.company_address,
+    state.company_phone,
+    state.company_email,
+    state.rfq_channel,
+    state.point_of_contact_name,
+    state.point_of_contact_email,
+    state.point_of_contact_phone,
+    state.assigned_sales_person,
+    state.due_date_for_quotation,
+    state.rfq_status,
+    state.items,
+  ]);
+
+  const buildQuotationPayload = useCallback(() => ({
+    rfq: id,
+    company_name: state.company_name || null,
+    company_address: state.company_address || null,
+    company_phone: state.company_phone || null,
+    company_email: state.company_email || null,
+    rfq_channel: state.rfq_channel || null,
+    point_of_contact_name: state.point_of_contact_name || null,
+    point_of_contact_email: state.point_of_contact_email || null,
+    point_of_contact_phone: state.point_of_contact_phone || null,
+    assigned_sales_person: state.assigned_sales_person || null,
+    due_date_for_quotation: state.due_date_for_quotation || null,
+    quotation_status: 'Pending',
+    followup_frequency: '24_hours',
+    remarks: '',
+    items: state.items.map(item => ({
+      item: item.item || null,
+      quantity: item.quantity ? parseInt(item.quantity) : null,
+      unit: item.unit || null,
+      unit_price: item.unit_price ? parseFloat(item.unit_price) : null,
+    })),
+  }), [
+    id,
     state.company_name,
     state.company_address,
     state.company_phone,
@@ -148,6 +187,7 @@ const EditRFQ = () => {
     state.point_of_contact_phone,
     state.assigned_sales_person,
     state.due_date_for_quotation,
+    state.rfq_status,
     state.items,
     autosave,
     state.loading,
@@ -186,7 +226,8 @@ const EditRFQ = () => {
       state.point_of_contact_email &&
       state.point_of_contact_phone &&
       state.assigned_sales_person &&
-      state.due_date_for_quotation;
+      state.due_date_for_quotation &&
+      state.rfq_status;
 
     const isItemsValid = state.items.every(
       item =>
@@ -209,6 +250,11 @@ const EditRFQ = () => {
       const rfqPayload = buildRfqPayload();
       console.log('Updating RFQ:', rfqPayload);
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
+      if (isQuotation) {
+        const quotationPayload = buildQuotationPayload();
+        console.log('Creating Quotation:', quotationPayload);
+        await apiClient.post('/quotations/', quotationPayload);
+      }
       navigate(isQuotation ? '/view-quotation' : '/view-rfq');
     } catch (error) {
       console.error('Error submitting:', error);
@@ -397,6 +443,27 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h3 className="text-xl font-semibold text-gray-800">RFQ Status</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            RFQ Status
+          </label>
+          <select
+            value={state.rfq_status || ''}
+            onChange={e =>
+              setState(prev => ({ ...prev, rfq_status: e.target.value }))
+            }
+            className="w-full p-2 border rounded-md focus:outline-indigo-600"
+            required
+          >
+            <option value="">Select Status</option>
+            <option value="Processing">Processing</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      </div>
+
       <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
         <h3 className="text-xl font-semibold text-gray-800">Items</h3>
         {state.items.map((item, index) => (
@@ -460,9 +527,7 @@ const EditRFQ = () => {
                   type="number"
                   placeholder="Enter unit price"
                   value={item.unit_price || ''}
-                  onChange={e =>
-                    handleItemChange(index, 'unit_price', e.target.value)
-                  }
+                  onChange={e => handleItemChange(index, 'unit_price', e.target.value)}
                   min={0}
                   step="0.01"
                   required={isQuotation}
