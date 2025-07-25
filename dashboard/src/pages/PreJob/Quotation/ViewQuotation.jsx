@@ -19,10 +19,6 @@ const ViewQuotation = () => {
     itemsPerPage: 20,
     isModalOpen: false,
     selectedQuotation: null,
-    editQuotation: null,
-    editQuotationStatus: '',
-    editFollowupFrequency: '',
-    editRemarks: '',
   });
 
   useEffect(() => {
@@ -177,10 +173,6 @@ const ViewQuotation = () => {
       ...prev,
       isModalOpen: true,
       selectedQuotation: quotation,
-      editQuotation: quotation,
-      editQuotationStatus: quotation.quotation_status || 'Pending',
-      editFollowupFrequency: quotation.followup_frequency || '24_hours',
-      editRemarks: quotation.remarks || '',
     }));
   };
 
@@ -189,37 +181,23 @@ const ViewQuotation = () => {
       ...prev,
       isModalOpen: false,
       selectedQuotation: null,
-      editQuotation: null,
-      editQuotationStatus: '',
-      editFollowupFrequency: '',
-      editRemarks: '',
     }));
   };
 
-  const handleUpdateQuotation = async () => {
+  const handleUpdateField = async (id, field, value) => {
     try {
-      const updatePayload = {
-        quotation_status: state.editQuotationStatus,
-        followup_frequency: state.editFollowupFrequency,
-        remarks: state.editRemarks,
-      };
-      console.log('Updating Quotation:', updatePayload);
-      await apiClient.patch(`/quotations/${state.editQuotation.id}/`, updatePayload);
-      const response = await apiClient.get('/quotations/');
+      const updatePayload = { [field]: value || null };
+      console.log(`Updating Quotation ${id}:`, updatePayload);
+      await apiClient.patch(`/quotations/${id}/`, updatePayload);
       setState(prev => ({
         ...prev,
-        quotations: response.data || [],
-        isModalOpen: false,
-        selectedQuotation: null,
-        editQuotation: null,
-        editQuotationStatus: '',
-        editFollowupFrequency: '',
-        editRemarks: '',
+        quotations: prev.quotations.map(quotation =>
+          quotation.id === id ? { ...quotation, [field]: value } : quotation
+        ),
       }));
-      alert('Quotation updated successfully.');
     } catch (error) {
-      console.error('Error updating quotation:', error);
-      alert('Failed to update quotation.');
+      console.error(`Error updating ${field}:`, error);
+      alert(`Failed to update ${field}.`);
     }
   };
 
@@ -340,6 +318,15 @@ const ViewQuotation = () => {
                   Quotation Status
                 </th>
                 <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                  Next Follow-up Date
+                </th>
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                  Follow-up Frequency
+                </th>
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                  Remarks
+                </th>
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
                   Actions
                 </th>
               </tr>
@@ -348,7 +335,7 @@ const ViewQuotation = () => {
               {currentQuotations.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="7"
+                    colSpan="10"
                     className="border p-2 text-center text-sm text-gray-500"
                   >
                     No quotations found.
@@ -368,7 +355,35 @@ const ViewQuotation = () => {
                         m => m.id === quotation.assigned_sales_person
                       )?.name || 'N/A'}
                     </td>
-                    <td className="border p-2">{quotation.quotation_status || 'N/A'}</td>
+                    <td className="border p-2">
+                      <select
+                        value={quotation.quotation_status || 'Pending'}
+                        onChange={e =>
+                          handleUpdateField(quotation.id, 'quotation_status', e.target.value)
+                        }
+                        className="p-1 border rounded-md focus:outline-indigo-600"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="PO Created">PO Created</option>
+                      </select>
+                    </td>
+                    <td className="border p-2">
+                      {quotation.next_followup_date
+                        ? new Date(quotation.next_followup_date).toLocaleDateString()
+                        : 'N/A'}
+                    </td>
+                    <td className="border p-2">{quotation.followup_frequency || 'N/A'}</td>
+                    <td className="border p-2">
+                      <InputField
+                        type="text"
+                        value={quotation.remarks || ''}
+                        onChange={e =>
+                          handleUpdateField(quotation.id, 'remarks', e.target.value)
+                        }
+                        className="w-full p-1"
+                      />
+                    </td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
@@ -489,18 +504,7 @@ const ViewQuotation = () => {
                 {new Date(state.selectedQuotation.created_at).toLocaleDateString()}
               </p>
               <p>
-                <strong>Quotation Status:</strong>{' '}
-                <select
-                  value={state.editQuotationStatus}
-                  onChange={e =>
-                    setState(prev => ({ ...prev, editQuotationStatus: e.target.value }))
-                  }
-                  className="p-2 border rounded-md focus:outline-indigo-600"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="PO Created">PO Created</option>
-                </select>
+                <strong>Quotation Status:</strong> {state.selectedQuotation.quotation_status || 'N/A'}
               </p>
               <p>
                 <strong>Next Follow-up Date:</strong>{' '}
@@ -509,30 +513,10 @@ const ViewQuotation = () => {
                   : 'N/A'}
               </p>
               <p>
-                <strong>Follow-up Frequency:</strong>{' '}
-                <select
-                  value={state.editFollowupFrequency}
-                  onChange={e =>
-                    setState(prev => ({ ...prev, editFollowupFrequency: e.target.value }))
-                  }
-                  className="p-2 border rounded-md focus:outline-indigo-600"
-                >
-                  <option value="24_hours">24 Hours</option>
-                  <option value="3_days">3 Days</option>
-                  <option value="7_days">7 Days</option>
-                  <option value="every_7th_day">Every 7th Day</option>
-                </select>
+                <strong>Follow-up Frequency:</strong> {state.selectedQuotation.followup_frequency || 'N/A'}
               </p>
               <p>
-                <strong>Remarks:</strong>{' '}
-                <InputField
-                  type="text"
-                  value={state.editRemarks}
-                  onChange={e =>
-                    setState(prev => ({ ...prev, editRemarks: e.target.value }))
-                  }
-                  className="w-full"
-                />
+                <strong>Remarks:</strong> {state.selectedQuotation.remarks || 'N/A'}
               </p>
             </div>
             <div>
@@ -579,12 +563,6 @@ const ViewQuotation = () => {
               )}
             </div>
             <div className="flex justify-end gap-2">
-              <Button
-                onClick={handleUpdateQuotation}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                Update
-              </Button>
               <Button
                 onClick={closeModal}
                 className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
