@@ -8,6 +8,7 @@ from series.models import NumberSeries
 from django.db.models import Max
 from django.utils import timezone
 from datetime import timedelta
+import json
 
 class RFQItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
@@ -175,6 +176,13 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        # If items are sent as a JSON string in FormData, parse it
+        if not items_data and 'items' in self.context['request'].POST:
+            try:
+                items_data = json.loads(self.context['request'].POST.get('items', '[]'))
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("Invalid JSON format for items.")
+
         quotation = validated_data['quotation']
         purchase_order = PurchaseOrder.objects.create(**validated_data)
 
@@ -187,9 +195,16 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                     unit=item.unit,
                     unit_price=item.unit_price
                 )
-        else:
+        else:  # partial order
             for item_data in items_data:
-                PurchaseOrderItem.objects.create(purchase_order=purchase_order, **item_data)
+                PurchaseOrderItem.objects.create(
+                    purchase_order=purchase_order,
+                    item=Item.objects.get(id=item_data['item']) if item_data.get('item') else None,
+                    quantity=item_data.get('quantity'),
+                    unit=Unit.objects.get(id=item_data['unit']) if item_data.get('unit') else None,
+                    unit_price=item_data.get('unit_price')
+                )
+
         quotation_items = set(quotation.items.values_list('id', flat=True))
         po_items = set(
             PurchaseOrderItem.objects.filter(
@@ -201,14 +216,3 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             quotation.save()
 
         return purchase_order
-
-    def update(self, instance, validated_data):
-        items_data = validated_data.pop('items', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if items_data is not None:
-            instance.items.all().delete()
-            for item_data in items_data:
-                PurchaseOrderItem.objects.create(purchase_order=instance, **item_data)
-        return instance

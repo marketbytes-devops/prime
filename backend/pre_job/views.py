@@ -57,7 +57,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         quotation_id = self.request.query_params.get('quotation_id')
         if quotation_id:
-            queryset = queryset.filter(quotation_id=quotation_id)
+            queryset = queryset.filter(quotation_id=quotation_id).prefetch_related('items')
         return queryset
 
     def destroy(self, request, *args, **kwargs):

@@ -24,7 +24,7 @@ const ViewQuotation = () => {
     isFullOrderModalOpen: false,
     isUploadPoModalOpen: false,
     partialOrders: [],
-    poUploads: {}, // { poId: { clientPoNumber: '', poFile: null } }
+    poUploads: {},
   });
 
   useEffect(() => {
