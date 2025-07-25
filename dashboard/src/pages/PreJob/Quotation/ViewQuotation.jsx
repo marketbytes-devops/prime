@@ -452,11 +452,8 @@ const ViewQuotation = () => {
     }
   };
 
-  const hasBothOrderTypes = quotation => {
-    if (!quotation.purchase_orders) return false;
-    const hasFull = quotation.purchase_orders.some(po => po.order_type === 'full');
-    const hasPartial = quotation.purchase_orders.some(po => po.order_type === 'partial');
-    return hasFull && hasPartial;
+  const hasAnyOrder = quotation => {
+    return quotation.purchase_orders && quotation.purchase_orders.length > 0;
   };
 
   return (
@@ -599,40 +596,42 @@ const ViewQuotation = () => {
                         >
                           View Details
                         </Button>
-                        <Button
-                          onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                        >
-                          Edit
-                        </Button>
+                        {!hasAnyOrder(quotation) && (
+                          <>
+                            <Button
+                              onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
+                              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleConvertToPO(quotation.id)}
+                              disabled={quotation.quotation_status !== 'Approved'}
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                quotation.quotation_status === 'Approved'
+                                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              }`}
+                            >
+                              Convert to PO
+                            </Button>
+                          </>
+                        )}
                         <Button
                           onClick={() => handlePrint(quotation)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           Print
                         </Button>
-                        {hasBothOrderTypes(quotation) ? null : quotation.purchase_orders?.some(
-                          po => po.order_type === 'partial'
-                        ) ? (
-                          <Button
-                            onClick={() => handleUploadPO(quotation.id)}
-                            className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
-                          >
-                            Upload PO
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => handleConvertToPO(quotation.id)}
-                            disabled={quotation.quotation_status !== 'Approved'}
-                            className={`px-3 py-1 rounded-md text-sm ${
-                              quotation.quotation_status === 'Approved'
-                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
-                          >
-                            Convert to PO
-                          </Button>
-                        )}
+                        {quotation.purchase_orders?.some(po => po.order_type === 'partial') &&
+                          !hasAnyOrder(quotation) && (
+                            <Button
+                              onClick={() => handleUploadPO(quotation.id)}
+                              className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
+                            >
+                              Upload PO
+                            </Button>
+                          )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"

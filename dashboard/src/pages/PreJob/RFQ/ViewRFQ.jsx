@@ -21,68 +21,85 @@ const ViewRFQ = () => {
     selectedRfq: null,
   });
 
+  const fetchRFQs = async () => {
+    try {
+      const [rfqsRes, channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
+        apiClient.get('rfqs/'),
+        apiClient.get('channels/'),
+        apiClient.get('teams/'),
+        apiClient.get('items/'),
+        apiClient.get('units/'),
+      ]);
+      
+      // Fetch quotations for each RFQ to check if they have been converted
+      const rfqsWithQuotationStatus = await Promise.all(
+        rfqsRes.data.map(async (rfq) => {
+          try {
+            const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
+            return { ...rfq, hasQuotation: quotationRes.data.length > 0 };
+          } catch (error) {
+            console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
+            return { ...rfq, hasQuotation: false };
+          }
+        })
+      );
+
+      setState(prev => ({
+        ...prev,
+        rfqs: rfqsWithQuotationStatus || [],
+        channels: channelsRes.data || [],
+        teamMembers: teamsRes.data || [],
+        itemsList: itemsRes.data || [],
+        units: unitsRes.data || [],
+      }));
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      alert('Failed to load RFQs.');
+    }
+  };
+
   useEffect(() => {
-    Promise.all([
-      apiClient.get('rfqs/'),
-      apiClient.get('channels/'),
-      apiClient.get('teams/'),
-      apiClient.get('items/'),
-      apiClient.get('units/'),
-    ])
-      .then(([rfqsRes, channelsRes, teamsRes, itemsRes, unitsRes]) => {
-        console.log('RFQs data:', rfqsRes.data); 
-        setState(prev => ({
-          ...prev,
-          rfqs: rfqsRes.data || [],
-          channels: channelsRes.data || [],
-          teamMembers: teamsRes.data || [],
-          itemsList: itemsRes.data || [],
-          units: unitsRes.data || [],
-        }));
-      })
-      .catch(error => console.error('Error fetching data:', error));
+    fetchRFQs();
   }, []);
 
   const handleDelete = async id => {
-      if (window.confirm('Are you sure you want to delete this RFQ?')) {
-          try {
-              await apiClient.delete(`rfqs/${id}/`);
-              const response = await apiClient.get('rfqs/');
-              setState(prev => ({
-                  ...prev,
-                  rfqs: response.data || [],
-                  currentPage: 1,
-              }));
-          } catch (error) {
-              console.error('Error deleting RFQ:', error);
-          }
+    if (window.confirm('Are you sure you want to delete this RFQ?')) {
+      try {
+        await apiClient.delete(`rfqs/${id}/`);
+        await fetchRFQs(); // Refresh RFQ list
+      } catch (error) {
+        console.error('Error deleting RFQ:', error);
+        alert('Failed to delete RFQ.');
       }
+    }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
       const rfqResponse = await apiClient.get(`rfqs/${id}/`);
       const currentRfq = rfqResponse.data;
-      console.log('Current RFQ data for PATCH:', currentRfq);
       const payload = {
         rfq_status: newStatus,
-        items: currentRfq.items || [], 
+        items: currentRfq.items || [],
       };
-      console.log('PATCH payload:', payload); 
       await apiClient.patch(`rfqs/${id}/`, payload);
-      const response = await apiClient.get('rfqs/');
-      setState(prev => ({
-        ...prev,
-        rfqs: response.data || [],
-      }));
+      await fetchRFQs(); // Refresh RFQ list
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status.');
     }
   };
 
-  const handleConvertToQuotation = rfq => {
-    navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
+  const handleConvertToQuotation = async rfq => {
+    try {
+      // Navigate to edit page with quotation flag
+      navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
+      // After navigation, refresh RFQs to update hasQuotation status
+      await fetchRFQs();
+    } catch (error) {
+      console.error('Error initiating quotation conversion:', error);
+      alert('Failed to initiate quotation conversion.');
+    }
   };
 
   const handlePrint = rfq => {
@@ -186,7 +203,6 @@ const ViewRFQ = () => {
   };
 
   const openModal = rfq => {
-    console.log('Opening modal for RFQ:', rfq, 'Items:', rfq.items); // Debug RFQ and items
     setState(prev => ({
       ...prev,
       isModalOpen: true,
@@ -370,14 +386,23 @@ const ViewRFQ = () => {
                         </Button>
                         <Button
                           onClick={() => handleConvertToQuotation(rfq)}
-                          disabled={rfq.rfq_status !== 'Completed'}
-                          className="px-3 py-1 rounded-md text-sm bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                          disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            rfq.rfq_status === 'Completed' && !rfq.hasQuotation
+                              ? 'bg-purple-600 text-white hover:bg-purple-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Convert to Quotation
                         </Button>
                         <Button
                           onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          disabled={rfq.hasQuotation}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            !rfq.hasQuotation
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Edit
                         </Button>
