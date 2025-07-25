@@ -66,7 +66,7 @@ class Quotation(models.Model):
         return f"Quotation {self.id} - {self.company_name or 'Unnamed'}"
 
     def save(self, *args, **kwargs):
-        if not self.next_followup_date:
+        if not self.next_followup_date or 'followup_frequency' in kwargs.get('update_fields', []):
             today = self.created_at.date() if self.created_at else timezone.now().date()
             if self.followup_frequency == '24_hours':
                 self.next_followup_date = today + timedelta(days=1)
@@ -78,7 +78,6 @@ class Quotation(models.Model):
                 self.next_followup_date = today + timedelta(days=7)
         super().save(*args, **kwargs)
 
-
 class QuotationItem(models.Model):
     quotation = models.ForeignKey(Quotation, related_name='items', on_delete=models.CASCADE)
     item = models.ForeignKey('item.Item', on_delete=models.SET_NULL, null=True, blank=True)
@@ -88,3 +87,27 @@ class QuotationItem(models.Model):
 
     def __str__(self):
         return f"{self.item} - {self.quotation}"
+
+class PurchaseOrder(models.Model):
+    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='purchase_orders')
+    order_type = models.CharField(
+        max_length=20,
+        choices=[('full', 'Full'), ('partial', 'Partial')],
+        default='full'
+    )
+    client_po_number = models.CharField(max_length=100, blank=True, null=True)
+    po_file = models.FileField(upload_to='po_files/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"PO {self.id} - {self.quotation.company_name or 'Unnamed'} ({self.order_type})"
+
+class PurchaseOrderItem(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, related_name='items', on_delete=models.CASCADE)
+    item = models.ForeignKey('item.Item', on_delete=models.SET_NULL, null=True, blank=True)
+    quantity = models.PositiveIntegerField(null=True, blank=True)
+    unit = models.ForeignKey('unit.Unit', on_delete=models.SET_NULL, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.item} - {self.purchase_order}"

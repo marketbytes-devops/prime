@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
@@ -7,6 +7,7 @@ import Modal from '../../../components/Modal';
 
 const ViewQuotation = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [state, setState] = useState({
     quotations: [],
     channels: [],
@@ -21,20 +22,20 @@ const ViewQuotation = () => {
     selectedQuotation: null,
     isPoModalOpen: false,
     isFullOrderModalOpen: false,
-    clientPoNumber: '',
-    poFile: null,
+    isUploadPoModalOpen: false,
+    partialOrders: [],
+    poUploads: {}, // { poId: { clientPoNumber: '', poFile: null } }
   });
 
   useEffect(() => {
     Promise.all([
       apiClient.get('/quotations/'),
-      apiClient.get('channels/'),
-      apiClient.get('teams/'),
-      apiClient.get('items/'),
-      apiClient.get('units/'),
+      apiClient.get('/channels/'),
+      apiClient.get('/teams/'),
+      apiClient.get('/items/'),
+      apiClient.get('/units/'),
     ])
       .then(([quotationsRes, channelsRes, teamsRes, itemsRes, unitsRes]) => {
-        console.log('Quotations data:', quotationsRes.data);
         setState(prev => ({
           ...prev,
           quotations: quotationsRes.data || [],
@@ -49,6 +50,33 @@ const ViewQuotation = () => {
         alert('Failed to load quotations.');
       });
   }, []);
+
+  useEffect(() => {
+    if (state.isModalOpen && state.selectedQuotation) {
+      apiClient.get(`/purchase-orders/?quotation_id=${state.selectedQuotation.id}`)
+        .then(response => {
+          setState(prev => ({
+            ...prev,
+            selectedQuotation: { ...prev.selectedQuotation, purchase_orders: response.data },
+          }));
+        })
+        .catch(error => console.error('Error fetching POs:', error));
+    }
+  }, [state.isModalOpen, state.selectedQuotation]);
+
+  useEffect(() => {
+    if (location.state?.refresh) {
+      apiClient.get('/quotations/')
+        .then(response => {
+          setState(prev => ({
+            ...prev,
+            quotations: response.data || [],
+            currentPage: 1,
+          }));
+        })
+        .catch(error => console.error('Error refreshing quotations:', error));
+    }
+  }, [location.state]);
 
   const handleDelete = async id => {
     if (window.confirm('Are you sure you want to delete this quotation?')) {
@@ -75,14 +103,32 @@ const ViewQuotation = () => {
     }));
   };
 
-  const handlePoOption = (option) => {
+  const handleUploadPO = id => {
+    apiClient.get(`/purchase-orders/?quotation_id=${id}`)
+      .then(response => {
+        setState(prev => ({
+          ...prev,
+          isUploadPoModalOpen: true,
+          selectedQuotation: prev.quotations.find(q => q.id === id),
+          partialOrders: response.data.filter(po => po.order_type === 'partial'),
+          poUploads: response.data.reduce((acc, po) => ({
+            ...acc,
+            [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null },
+          }), {}),
+        }));
+      })
+      .catch(error => {
+        console.error('Error fetching partial orders:', error);
+        alert('Failed to load partial orders.');
+      });
+  };
+
+  const handlePoOption = option => {
     if (option === 'full') {
       setState(prev => ({
         ...prev,
         isPoModalOpen: false,
         isFullOrderModalOpen: true,
-        clientPoNumber: '',
-        poFile: null,
       }));
     } else if (option === 'partial') {
       navigate('/pre-job/partial-order-selection', {
@@ -95,11 +141,8 @@ const ViewQuotation = () => {
   const handleFullOrderSubmit = async () => {
     try {
       const formData = new FormData();
-      formData.append('quotation_id', state.selectedQuotation.id);
-      formData.append('client_po_number', state.clientPoNumber);
-      if (state.poFile) {
-        formData.append('po_file', state.poFile);
-      }
+      formData.append('quotation', state.selectedQuotation.id);
+      formData.append('order_type', 'full');
 
       await apiClient.post('/purchase-orders/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -111,13 +154,40 @@ const ViewQuotation = () => {
         quotations: response.data || [],
         isFullOrderModalOpen: false,
         selectedQuotation: null,
-        clientPoNumber: '',
-        poFile: null,
       }));
-      alert('Purchase Order created successfully.');
+      alert('Full Purchase Order created successfully.');
     } catch (error) {
       console.error('Error creating PO:', error);
-      alert('Failed to create Purchase Order.');
+      alert('Failed to create Full Purchase Order.');
+    }
+  };
+
+  const handlePoUploadSubmit = async () => {
+    try {
+      for (const poId of Object.keys(state.poUploads)) {
+        const { clientPoNumber, poFile } = state.poUploads[poId];
+        if (clientPoNumber || poFile) {
+          const formData = new FormData();
+          if (clientPoNumber) formData.append('client_po_number', clientPoNumber);
+          if (poFile) formData.append('po_file', poFile);
+          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        }
+      }
+      const response = await apiClient.get('/quotations/');
+      setState(prev => ({
+        ...prev,
+        quotations: response.data || [],
+        isUploadPoModalOpen: false,
+        selectedQuotation: null,
+        partialOrders: [],
+        poUploads: {},
+      }));
+      alert('PO details uploaded successfully.');
+    } catch (error) {
+      console.error('Error uploading PO details:', error);
+      alert('Failed to upload PO details.');
     }
   };
 
@@ -207,6 +277,65 @@ const ViewQuotation = () => {
               }
             </table>
           </div>
+          ${
+            quotation.purchase_orders && quotation.purchase_orders.length > 0
+              ? `
+          <div style="margin-top: 20px;">
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Orders</h2>
+            ${quotation.purchase_orders
+              .map(
+                (po, index) => `
+                <div style="margin-bottom: 20px;">
+                  <h3 style="font-size: 1.1rem; font-weight: 600;">Purchase Order ${index + 1} (ID: ${po.id}, Type: ${po.order_type})</h3>
+                  <p><strong>Client PO Number:</strong> ${po.client_po_number || 'N/A'}</p>
+                  <p><strong>PO File:</strong> ${po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : 'N/A'}</p>
+                  <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+                  <table border="1" style="width: 100%; border-collapse: collapse;">
+                    <tr style="background-color: #f2f2f2;">
+                      <th style="padding: 8px; text-align: left;">Item</th>
+                      <th style="padding: 8px; text-align: left;">Quantity</th>
+                      <th style="padding: 8px; text-align: left;">Unit</th>
+                      <th style="padding: 8px; text-align: left;">Unit Price</th>
+                      <th style="padding: 8px; text-align: left;">Total Price</th>
+                    </tr>
+                    ${
+                      po.items && po.items.length > 0
+                        ? po.items
+                            .map(
+                              item => `
+                              <tr>
+                                <td style="padding: 8px;">${
+                                  state.itemsList.find(i => i.id === item.item)?.name || 'N/A'
+                                }</td>
+                                <td style="padding: 8px; text-align: center;">${
+                                  item.quantity || 'N/A'
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  state.units.find(u => u.id === item.unit)?.name || 'N/A'
+                                }</td>
+                                <td style="padding: 8px; text-align: right;">$${
+                                  item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
+                                }</td>
+                                <td style="padding: 8px; text-align: right;">$${
+                                  item.quantity && item.unit_price
+                                    ? Number(item.quantity * item.unit_price).toFixed(2)
+                                    : '0.00'
+                                }</td>
+                              </tr>
+                            `
+                            )
+                            .join('')
+                        : '<tr><td colspan="5" style="padding: 8px; text-align: center;">No items added.</td></tr>'
+                    }
+                  </table>
+                </div>
+              `
+              )
+              .join('')}
+          </div>
+          `
+              : ''
+          }
         </body>
       </html>
     `);
@@ -215,7 +344,6 @@ const ViewQuotation = () => {
   };
 
   const openModal = quotation => {
-    console.log('Opening modal for Quotation:', quotation, 'Items:', quotation.items);
     setState(prev => ({
       ...prev,
       isModalOpen: true,
@@ -244,15 +372,22 @@ const ViewQuotation = () => {
       ...prev,
       isFullOrderModalOpen: false,
       selectedQuotation: null,
-      clientPoNumber: '',
-      poFile: null,
+    }));
+  };
+
+  const closeUploadPoModal = () => {
+    setState(prev => ({
+      ...prev,
+      isUploadPoModalOpen: false,
+      selectedQuotation: null,
+      partialOrders: [],
+      poUploads: {},
     }));
   };
 
   const handleUpdateField = async (id, field, value) => {
     try {
       const updatePayload = { [field]: value || null };
-      console.log(`Updating Quotation ${id}:`, updatePayload);
       await apiClient.patch(`/quotations/${id}/`, updatePayload);
       setState(prev => ({
         ...prev,
@@ -315,6 +450,13 @@ const ViewQuotation = () => {
     if (state.currentPage > 1) {
       setState(prev => ({ ...prev, currentPage: prev.currentPage - 1 }));
     }
+  };
+
+  const hasBothOrderTypes = quotation => {
+    if (!quotation.purchase_orders) return false;
+    const hasFull = quotation.purchase_orders.some(po => po.order_type === 'full');
+    const hasPartial = quotation.purchase_orders.some(po => po.order_type === 'partial');
+    return hasFull && hasPartial;
   };
 
   return (
@@ -469,17 +611,28 @@ const ViewQuotation = () => {
                         >
                           Print
                         </Button>
-                        <Button
-                          onClick={() => handleConvertToPO(quotation.id)}
-                          disabled={quotation.quotation_status !== 'Approved'}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            quotation.quotation_status === 'Approved'
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Convert to PO
-                        </Button>
+                        {hasBothOrderTypes(quotation) ? null : quotation.purchase_orders?.some(
+                          po => po.order_type === 'partial'
+                        ) ? (
+                          <Button
+                            onClick={() => handleUploadPO(quotation.id)}
+                            className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
+                          >
+                            Upload PO
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleConvertToPO(quotation.id)}
+                            disabled={quotation.quotation_status !== 'Approved'}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              quotation.quotation_status === 'Approved'
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Convert to PO
+                          </Button>
+                        )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
@@ -627,6 +780,59 @@ const ViewQuotation = () => {
                 <p className="text-gray-500">No items available.</p>
               )}
             </div>
+            {state.selectedQuotation.purchase_orders && state.selectedQuotation.purchase_orders.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-800">Purchase Orders</h3>
+                {state.selectedQuotation.purchase_orders.map((po, index) => (
+                  <div key={po.id} className="mb-4">
+                    <p><strong>PO ID:</strong> {po.id} ({po.order_type})</p>
+                    <p><strong>Client PO Number:</strong> {po.client_po_number || 'N/A'}</p>
+                    <p><strong>PO File:</strong> {po.po_file ? <a href={po.po_file} target="_blank" rel="noopener noreferrer">View File</a> : 'N/A'}</p>
+                    <p><strong>Created:</strong> {new Date(po.created_at).toLocaleDateString()}</p>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Item</th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit</th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit Price</th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Total Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {po.items && po.items.length > 0 ? (
+                          po.items.map(item => (
+                            <tr key={item.id} className="border">
+                              <td className="border p-2">
+                                {state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}
+                              </td>
+                              <td className="border p-2">{item.quantity || 'N/A'}</td>
+                              <td className="border p-2">
+                                {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
+                              </td>
+                              <td className="border p-2">
+                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                              </td>
+                              <td className="border p-2">
+                                ${item.quantity && item.unit_price
+                                  ? Number(item.quantity * item.unit_price).toFixed(2)
+                                  : '0.00'}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="5" className="border p-2 text-center text-sm text-gray-500">
+                              No items added.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 onClick={closeModal}
@@ -675,54 +881,88 @@ const ViewQuotation = () => {
         title="Create Full Order PO"
       >
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="clientPoNumber"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Client PO Number
-            </label>
-            <InputField
-              type="text"
-              id="clientPoNumber"
-              value={state.clientPoNumber}
-              onChange={e =>
-                setState(prev => ({ ...prev, clientPoNumber: e.target.value }))
-              }
-              className="w-full"
-              placeholder="Enter Client PO Number"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="poFile"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Upload PO File
-            </label>
-            <input
-              type="file"
-              id="poFile"
-              onChange={e =>
-                setState(prev => ({ ...prev, poFile: e.target.files[0] }))
-              }
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleFullOrderSubmit}
-              disabled={!state.clientPoNumber}
-              className={`px-4 py-2 rounded-md ${
-                state.clientPoNumber
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             >
               Submit
             </Button>
             <Button
               onClick={closeFullOrderModal}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={state.isUploadPoModalOpen}
+        onClose={closeUploadPoModal}
+        title="Upload PO Details"
+      >
+        <div className="space-y-4">
+          {state.partialOrders.map((po, index) => (
+            <div key={po.id} className="border p-4 rounded-md">
+              <h3 className="text-md font-medium text-gray-800">Partial Order {index + 1} (ID: {po.id})</h3>
+              <div className="mt-2">
+                <label
+                  htmlFor={`clientPoNumber-${po.id}`}
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Client PO Number
+                </label>
+                <InputField
+                  type="text"
+                  id={`clientPoNumber-${po.id}`}
+                  value={state.poUploads[po.id]?.clientPoNumber || ''}
+                  onChange={e =>
+                    setState(prev => ({
+                      ...prev,
+                      poUploads: {
+                        ...prev.poUploads,
+                        [po.id]: { ...prev.poUploads[po.id], clientPoNumber: e.target.value },
+                      },
+                    }))
+                  }
+                  className="w-full"
+                  placeholder="Enter Client PO Number (optional)"
+                />
+              </div>
+              <div className="mt-2">
+                <label
+                  htmlFor={`poFile-${po.id}`}
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Upload PO File
+                </label>
+                <input
+                  type="file"
+                  id={`poFile-${po.id}`}
+                  onChange={e =>
+                    setState(prev => ({
+                      ...prev,
+                      poUploads: {
+                        ...prev.poUploads,
+                        [po.id]: { ...prev.poUploads[po.id], poFile: e.target.files[0] },
+                      },
+                    }))
+                  }
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={handlePoUploadSubmit}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            >
+              Save
+            </Button>
+            <Button
+              onClick={closeUploadPoModal}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel

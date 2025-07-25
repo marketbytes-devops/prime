@@ -27,7 +27,7 @@ const InputField = ({
       min={min}
       step={step}
       required={required}
-      className={`w-full p-2 border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-200 transition-colors ${className || ''}`}
+      className={`w-full px-2 py-2 placeholder:text-sm text-md border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-200 transition-colors ${className || ''}`}
     />
   );
 };

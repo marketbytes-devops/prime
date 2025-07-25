@@ -30,7 +30,7 @@ const ViewRFQ = () => {
       apiClient.get('units/'),
     ])
       .then(([rfqsRes, channelsRes, teamsRes, itemsRes, unitsRes]) => {
-        console.log('RFQs data:', rfqsRes.data); // Debug API response
+        console.log('RFQs data:', rfqsRes.data); 
         setState(prev => ({
           ...prev,
           rfqs: rfqsRes.data || [],

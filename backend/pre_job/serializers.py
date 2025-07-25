@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RFQ, RFQItem, Quotation, QuotationItem
+from .models import RFQ, RFQItem, Quotation, QuotationItem, PurchaseOrder, PurchaseOrderItem
 from item.models import Item
 from unit.models import Unit
 from channels.models import RFQChannel
@@ -37,6 +37,20 @@ class QuotationItemSerializer(serializers.ModelSerializer):
             return obj.quantity * obj.unit_price
         return 0
 
+class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
+    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
+    total_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = ['id', 'item', 'quantity', 'unit', 'unit_price', 'total_price']
+
+    def get_total_price(self, obj):
+        if obj.quantity and obj.unit_price:
+            return obj.quantity * obj.unit_price
+        return 0
+
 class RFQSerializer(serializers.ModelSerializer):
     rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
     assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
@@ -49,7 +63,7 @@ class RFQSerializer(serializers.ModelSerializer):
             'id', 'company_name', 'company_address', 'company_phone', 'company_email',
             'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
-            'rfq_status', 'series_number', 'created_at', 'items'
+            'series_number', 'created_at', 'items', 'rfq_status'
         ]
 
     def create(self, validated_data):
@@ -89,6 +103,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     items = QuotationItemSerializer(many=True, required=True)
     quotation_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created')], required=False)
     followup_frequency = serializers.ChoiceField(choices=[('24_hours', '24 Hours'), ('3_days', '3 Days'), ('7_days', '7 Days'), ('every_7th_day', 'Every 7th Day')], required=False)
+    purchase_orders = serializers.SerializerMethodField()
 
     class Meta:
         model = Quotation
@@ -97,8 +112,12 @@ class QuotationSerializer(serializers.ModelSerializer):
             'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
             'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
-            'series_number', 'created_at', 'items'
+            'series_number', 'created_at', 'items', 'purchase_orders'
         ]
+
+    def get_purchase_orders(self, obj):
+        pos = PurchaseOrder.objects.filter(quotation=obj)
+        return PurchaseOrderSerializer(pos, many=True).data
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
@@ -138,4 +157,58 @@ class QuotationSerializer(serializers.ModelSerializer):
             instance.items.all().delete()
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
+        return instance
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all())
+    items = PurchaseOrderItemSerializer(many=True, required=False)
+    order_type = serializers.ChoiceField(choices=[('full', 'Full'), ('partial', 'Partial')], default='full')
+    client_po_number = serializers.CharField(max_length=100, allow_blank=True, required=False)
+    po_file = serializers.FileField(required=False, allow_null=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            'id', 'quotation', 'order_type', 'client_po_number', 'po_file',
+            'created_at', 'items'
+        ]
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        quotation = validated_data['quotation']
+        purchase_order = PurchaseOrder.objects.create(**validated_data)
+
+        if validated_data['order_type'] == 'full':
+            for item in quotation.items.all():
+                PurchaseOrderItem.objects.create(
+                    purchase_order=purchase_order,
+                    item=item.item,
+                    quantity=item.quantity,
+                    unit=item.unit,
+                    unit_price=item.unit_price
+                )
+        else:
+            for item_data in items_data:
+                PurchaseOrderItem.objects.create(purchase_order=purchase_order, **item_data)
+        quotation_items = set(quotation.items.values_list('id', flat=True))
+        po_items = set(
+            PurchaseOrderItem.objects.filter(
+                purchase_order__quotation=quotation
+            ).values_list('item_id', flat=True)
+        )
+        if quotation_items.issubset(po_items):
+            quotation.quotation_status = 'PO Created'
+            quotation.save()
+
+        return purchase_order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                PurchaseOrderItem.objects.create(purchase_order=instance, **item_data)
         return instance
