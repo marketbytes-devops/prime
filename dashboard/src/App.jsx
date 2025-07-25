@@ -20,6 +20,7 @@ import Team from "./pages/AdditionalSettings/Team";
 import Channels from "./pages/AdditionalSettings/Channels";
 import Series from "./pages/AdditionalSettings/Series";
 import Unit from "./pages/AdditionalSettings/Unit";
+import PartialOrderSelection from "./pages/PreJob/Quotation/PartialOrderSelection";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -101,6 +102,10 @@ function App() {
         {
           path: "/edit-quotation/:id",
           element: <EditQuotation />,
+        },
+        {
+          path: "/pre-job/partial-order-selection",
+          element: <PartialOrderSelection />,
         },
       ],
     },

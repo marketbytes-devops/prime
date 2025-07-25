@@ -19,6 +19,10 @@ const ViewQuotation = () => {
     itemsPerPage: 20,
     isModalOpen: false,
     selectedQuotation: null,
+    isPoModalOpen: false,
+    isFullOrderModalOpen: false,
+    clientPoNumber: '',
+    poFile: null,
   });
 
   useEffect(() => {
@@ -63,14 +67,57 @@ const ViewQuotation = () => {
     }
   };
 
-  const handleConvertToPO = async id => {
+  const handleConvertToPO = id => {
+    setState(prev => ({
+      ...prev,
+      isPoModalOpen: true,
+      selectedQuotation: prev.quotations.find(q => q.id === id),
+    }));
+  };
+
+  const handlePoOption = (option) => {
+    if (option === 'full') {
+      setState(prev => ({
+        ...prev,
+        isPoModalOpen: false,
+        isFullOrderModalOpen: true,
+        clientPoNumber: '',
+        poFile: null,
+      }));
+    } else if (option === 'partial') {
+      navigate('/pre-job/partial-order-selection', {
+        state: { quotationData: state.selectedQuotation },
+      });
+      setState(prev => ({ ...prev, isPoModalOpen: false }));
+    }
+  };
+
+  const handleFullOrderSubmit = async () => {
     try {
-      // Placeholder for POST /purchase-orders/
-      console.log('Converting to PO:', id);
-      alert('Convert to PO not implemented.');
+      const formData = new FormData();
+      formData.append('quotation_id', state.selectedQuotation.id);
+      formData.append('client_po_number', state.clientPoNumber);
+      if (state.poFile) {
+        formData.append('po_file', state.poFile);
+      }
+
+      await apiClient.post('/purchase-orders/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const response = await apiClient.get('/quotations/');
+      setState(prev => ({
+        ...prev,
+        quotations: response.data || [],
+        isFullOrderModalOpen: false,
+        selectedQuotation: null,
+        clientPoNumber: '',
+        poFile: null,
+      }));
+      alert('Purchase Order created successfully.');
     } catch (error) {
-      console.error('Error converting to PO:', error);
-      alert('Failed to convert to PO.');
+      console.error('Error creating PO:', error);
+      alert('Failed to create Purchase Order.');
     }
   };
 
@@ -181,6 +228,24 @@ const ViewQuotation = () => {
       ...prev,
       isModalOpen: false,
       selectedQuotation: null,
+    }));
+  };
+
+  const closePoModal = () => {
+    setState(prev => ({
+      ...prev,
+      isPoModalOpen: false,
+      selectedQuotation: null,
+    }));
+  };
+
+  const closeFullOrderModal = () => {
+    setState(prev => ({
+      ...prev,
+      isFullOrderModalOpen: false,
+      selectedQuotation: null,
+      clientPoNumber: '',
+      poFile: null,
     }));
   };
 
@@ -572,6 +637,98 @@ const ViewQuotation = () => {
             </div>
           </div>
         )}
+      </Modal>
+      <Modal
+        isOpen={state.isPoModalOpen}
+        onClose={closePoModal}
+        title="Convert to Purchase Order"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700">Select an option to convert Quotation ID {state.selectedQuotation?.id} to a Purchase Order:</p>
+          <div className="flex justify-center gap-4">
+            <Button
+              onClick={() => handlePoOption('full')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Full Order
+            </Button>
+            <Button
+              onClick={() => handlePoOption('partial')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Partial Order
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={closePoModal}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={state.isFullOrderModalOpen}
+        onClose={closeFullOrderModal}
+        title="Create Full Order PO"
+      >
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="clientPoNumber"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Client PO Number
+            </label>
+            <InputField
+              type="text"
+              id="clientPoNumber"
+              value={state.clientPoNumber}
+              onChange={e =>
+                setState(prev => ({ ...prev, clientPoNumber: e.target.value }))
+              }
+              className="w-full"
+              placeholder="Enter Client PO Number"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="poFile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Upload PO File
+            </label>
+            <input
+              type="file"
+              id="poFile"
+              onChange={e =>
+                setState(prev => ({ ...prev, poFile: e.target.files[0] }))
+              }
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={handleFullOrderSubmit}
+              disabled={!state.clientPoNumber}
+              className={`px-4 py-2 rounded-md ${
+                state.clientPoNumber
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Submit
+            </Button>
+            <Button
+              onClick={closeFullOrderModal}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -172,4 +172,5 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "marketbytesdevops@gmail.com")
 EMAIL_HOST_PASSWORD = os.getenv("ysydcazqvfxcewow", "ysydcazqvfxcewow")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "marketbytesdevops@gmail.com")
 
-AUTH_USER_MODEL = "authapp.CustomUser"
+AUTH_USER_MODEL = 'authapp.CustomUser'
+
