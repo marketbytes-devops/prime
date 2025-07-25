@@ -31,7 +31,6 @@ const ViewRFQ = () => {
         apiClient.get('units/'),
       ]);
       
-      // Fetch quotations for each RFQ to check if they have been converted
       const rfqsWithQuotationStatus = await Promise.all(
         rfqsRes.data.map(async (rfq) => {
           try {
@@ -66,7 +65,7 @@ const ViewRFQ = () => {
     if (window.confirm('Are you sure you want to delete this RFQ?')) {
       try {
         await apiClient.delete(`rfqs/${id}/`);
-        await fetchRFQs(); // Refresh RFQ list
+        await fetchRFQs(); 
       } catch (error) {
         console.error('Error deleting RFQ:', error);
         alert('Failed to delete RFQ.');
@@ -83,7 +82,7 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
-      await fetchRFQs(); // Refresh RFQ list
+      await fetchRFQs(); 
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status.');
@@ -92,9 +91,7 @@ const ViewRFQ = () => {
 
   const handleConvertToQuotation = async rfq => {
     try {
-      // Navigate to edit page with quotation flag
       navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
-      // After navigation, refresh RFQs to update hasQuotation status
       await fetchRFQs();
     } catch (error) {
       console.error('Error initiating quotation conversion:', error);
@@ -316,25 +313,25 @@ const ViewRFQ = () => {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-fit border-collapse">
+          <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Sl No
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   RFQ Number
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Created Date
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Assigned Sales Person
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[150px]">
                   Status
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Actions
                 </th>
               </tr>
@@ -344,7 +341,7 @@ const ViewRFQ = () => {
                 <tr>
                   <td
                     colSpan="6"
-                    className="border p-2 text-center text-gray-500"
+                    className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No RFQs found.
                   </td>
@@ -352,32 +349,32 @@ const ViewRFQ = () => {
               ) : (
                 currentRfqs.map((rfq, index) => (
                   <tr key={rfq.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {startIndex + index + 1}
                     </td>
-                    <td className="border p-2">{rfq.series_number || 'N/A'}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       {new Date(rfq.created_at).toLocaleDateString()}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {state.teamMembers.find(
                         m => m.id === rfq.assigned_sales_person
                       )?.name || 'N/A'}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
                         value={rfq.rfq_status || ''}
                         onChange={e =>
                           handleStatusChange(rfq.id, e.target.value)
                         }
-                        className="p-1 border rounded focus:outline-indigo-500"
+                        className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
-                        <option value="Processing">Processing</option>
-                        <option value="Completed">Completed</option>
+                        <option value="Processing" className="whitespace-nowrap">Processing</option>
+                        <option value="Completed" className="whitespace-nowrap">Completed</option>
                       </select>
                     </td>
-                    <td className="border p-2">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         <Button
                           onClick={() => openModal(rfq)}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
@@ -548,19 +545,19 @@ const ViewRFQ = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Item
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Quantity
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Unit
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Unit Price
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Total Price
                         </th>
                       </tr>
@@ -568,22 +565,22 @@ const ViewRFQ = () => {
                     <tbody>
                       {state.selectedRfq.items.map(item => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             {state.itemsList.find(i => i.id === item.item)?.name ||
                               'N/A'}
                           </td>
-                          <td className="border p-2">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
                             {state.units.find(u => u.id === item.unit)?.name ||
                               'N/A'}
                           </td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             $
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : 'N/A'}
                           </td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             $
                             {item.quantity && item.unit_price
                               ? Number(

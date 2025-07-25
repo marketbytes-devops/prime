@@ -233,7 +233,6 @@ const ViewQuotation = () => {
                 ? new Date(quotation.next_followup_date).toLocaleDateString()
                 : 'N/A'
             }</p>
-            <p><strong>Follow-up Frequency:</strong> ${quotation.followup_frequency || 'N/A'}</p>
             <p><strong>Remarks:</strong> ${quotation.remarks || 'N/A'}</p>
           </div>
           <div>
@@ -503,34 +502,31 @@ const ViewQuotation = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Sl No
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Quotation ID
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Company Name
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Created Date
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Assigned Sales Person
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap min-w-[150px]">
                   Quotation Status
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
-                  Follow-up Frequency
-                </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700">
+                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                   Actions
                 </th>
               </tr>
@@ -540,7 +536,7 @@ const ViewQuotation = () => {
                 <tr>
                   <td
                     colSpan="10"
-                    className="border p-2 text-center text-sm text-gray-500"
+                    className="border p-2 text-center text-sm text-gray-500 whitespace-nowrap"
                   >
                     No quotations found.
                   </td>
@@ -548,37 +544,36 @@ const ViewQuotation = () => {
               ) : (
                 currentQuotations.map((quotation, index) => (
                   <tr key={quotation.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{quotation.id}</td>
-                    <td className="border p-2">{quotation.company_name || 'N/A'}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{quotation.id}</td>
+                    <td className="border p-2 whitespace-nowrap">{quotation.company_name || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       {new Date(quotation.created_at).toLocaleDateString()}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {state.teamMembers.find(
                         m => m.id === quotation.assigned_sales_person
                       )?.name || 'N/A'}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
                         value={quotation.quotation_status || 'Pending'}
                         onChange={e =>
                           handleUpdateField(quotation.id, 'quotation_status', e.target.value)
                         }
-                        className="p-1 border rounded-md focus:outline-indigo-600"
+                        className="p-1 border rounded-md focus:outline-indigo-600 w-full"
                       >
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="PO Created">PO Created</option>
+                        <option value="Pending" className="whitespace-nowrap">Pending</option>
+                        <option value="Approved" className="whitespace-nowrap">Approved</option>
+                        <option value="PO Created" className="whitespace-nowrap">PO Created</option>
                       </select>
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {quotation.next_followup_date
                         ? new Date(quotation.next_followup_date).toLocaleDateString()
                         : 'N/A'}
                     </td>
-                    <td className="border p-2">{quotation.followup_frequency || 'N/A'}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       <InputField
                         type="text"
                         value={quotation.remarks || ''}
@@ -588,8 +583,8 @@ const ViewQuotation = () => {
                         className="w-full p-1"
                       />
                     </td>
-                    <td className="border p-2">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         <Button
                           onClick={() => openModal(quotation)}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
@@ -730,9 +725,6 @@ const ViewQuotation = () => {
                   : 'N/A'}
               </p>
               <p>
-                <strong>Follow-up Frequency:</strong> {state.selectedQuotation.followup_frequency || 'N/A'}
-              </p>
-              <p>
                 <strong>Remarks:</strong> {state.selectedQuotation.remarks || 'N/A'}
               </p>
             </div>
@@ -745,27 +737,37 @@ const ViewQuotation = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700">Item</th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit</th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700">Total Price</th>
+                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Item
+                        </th>
+                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Quantity
+                        </th>
+                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Unit
+                        </th>
+                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Unit Price
+                        </th>
+                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Total Price
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedQuotation.items.map(item => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             {state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}
                           </td>
-                          <td className="border p-2">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
                             {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
                           </td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
                           </td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">
                             ${item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(2)
                               : '0.00'}
@@ -791,28 +793,38 @@ const ViewQuotation = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-200">
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Item</th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit</th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Unit Price</th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700">Total Price</th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            Item
+                          </th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            Quantity
+                          </th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            Unit
+                          </th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            Unit Price
+                          </th>
+                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            Total Price
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {po.items && po.items.length > 0 ? (
                           po.items.map(item => (
                             <tr key={item.id} className="border">
-                              <td className="border p-2">
+                              <td className="border p-2 whitespace-nowrap">
                                 {state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}
                               </td>
-                              <td className="border p-2">{item.quantity || 'N/A'}</td>
-                              <td className="border p-2">
+                              <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                              <td className="border p-2 whitespace-nowrap">
                                 {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
                               </td>
-                              <td className="border p-2">
+                              <td className="border p-2 whitespace-nowrap">
                                 ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
                               </td>
-                              <td className="border p-2">
+                              <td className="border p-2 whitespace-nowrap">
                                 ${item.quantity && item.unit_price
                                   ? Number(item.quantity * item.unit_price).toFixed(2)
                                   : '0.00'}
@@ -821,7 +833,7 @@ const ViewQuotation = () => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan="5" className="border p-2 text-center text-sm text-gray-500">
+                            <td colSpan="5" className="border p-2 text-center text-sm text-gray-500 whitespace-nowrap">
                               No items added.
                             </td>
                           </tr>
