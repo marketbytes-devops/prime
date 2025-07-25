@@ -15,13 +15,14 @@ const ExistingClient = () => {
   const [selectedClient, setSelectedClient] = useState(rfqId ? rfqData : null);
   const [formData, setFormData] = useState({
     company_name: rfqData.company_name || "",
-    address: rfqData.address || "",
-    phone: rfqData.phone || "",
-    email: rfqData.email || "",
+    address: rfqData.company_address || "",
+    phone: rfqData.company_phone || "",
+    email: rfqData.company_email || "",
     rfq_channel: rfqData.rfq_channel || "",
-    attention_name: rfqData.attention_name || "",
-    attention_phone: rfqData.attention_phone || "",
-    attention_email: rfqData.attention_email || "",
+    rfq_channel_name: "",
+    point_of_contact_name: rfqData.point_of_contact_name || "",
+    point_of_contact_phone: rfqData.point_of_contact_phone || "",
+    point_of_contact_email: rfqData.point_of_contact_email || "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,21 +36,17 @@ const ExistingClient = () => {
       try {
         setLoading(true);
         const [clientsResponse, channelsResponse] = await Promise.all([
-          apiClient.get("/add-rfqs/"),
-          apiClient.get("/rfq-channels/"),
+          apiClient.get("/rfqs/"),
+          apiClient.get("/channels/"),
         ]);
         const clientData = Array.isArray(clientsResponse.data)
           ? clientsResponse.data
           : clientsResponse.data.results || [];
         setClients(clientData);
         setFilteredClients(
-          clientData.sort((a, b) =>
-            a.company_name.localeCompare(b.company_name)
-          )
+          clientData.sort((a, b) => a.company_name.localeCompare(b.company_name))
         );
-        setRfqChannels(
-          channelsResponse.data.map((channel) => channel.channel_name)
-        );
+        setRfqChannels(channelsResponse.data || []);
         setError(null);
       } catch (err) {
         console.error("Failed to fetch data:", err);
@@ -72,19 +69,23 @@ const ExistingClient = () => {
   }, [searchQuery, clients]);
 
   useEffect(() => {
-    if (selectedClient) {
+    if (selectedClient && rfqChannels.length > 0) {
+      const channel = rfqChannels.find(
+        (ch) => ch.id === parseInt(selectedClient.rfq_channel)
+      );
       setFormData({
         company_name: selectedClient.company_name || "",
-        address: selectedClient.address || "",
-        phone: selectedClient.phone || "",
-        email: selectedClient.email || "",
+        address: selectedClient.company_address || "",
+        phone: selectedClient.company_phone || "",
+        email: selectedClient.company_email || "",
         rfq_channel: selectedClient.rfq_channel || "",
-        attention_name: selectedClient.attention_name || "",
-        attention_phone: selectedClient.attention_phone || "",
-        attention_email: selectedClient.attention_email || "",
+        rfq_channel_name: channel ? channel.channel_name : "No channel selected",
+        point_of_contact_name: selectedClient.point_of_contact_name || "",
+        point_of_contact_phone: selectedClient.point_of_contact_phone || "",
+        point_of_contact_email: selectedClient.point_of_contact_email || "",
       });
     }
-  }, [selectedClient]);
+  }, [selectedClient, rfqChannels]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -117,20 +118,22 @@ const ExistingClient = () => {
       phone: "",
       email: "",
       rfq_channel: "",
-      attention_name: "",
-      attention_phone: "",
-      attention_email: "",
+      rfq_channel_name: "",
+      point_of_contact_name: "",
+      point_of_contact_phone: "",
+      point_of_contact_email: "",
     });
     setSearchQuery("");
+    navigate("/add-rfq"); 
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { attention_email, attention_phone, attention_name } = formData;
-    if (attention_email && !/\S+@\S+\.\S+/.test(attention_email)) {
-      toast.error("Attention Email is invalid.");
+    const { point_of_contact_email } = formData;
+    if (point_of_contact_email && !/\S+@\S+\.\S+/.test(point_of_contact_email)) {
+      toast.error("Point of Contact Email is invalid.");
       setIsSubmitting(false);
       return;
     }
@@ -144,14 +147,18 @@ const ExistingClient = () => {
     try {
       const payload = {
         ...selectedClient,
-        attention_name: attention_name || null,
-        attention_phone: attention_phone || null,
-        attention_email: attention_email || null,
+        company_address: formData.address,
+        company_phone: formData.phone,
+        company_email: formData.email,
+        rfq_channel: formData.rfq_channel,
+        point_of_contact_name: formData.point_of_contact_name || null,
+        point_of_contact_phone: formData.point_of_contact_phone || null,
+        point_of_contact_email: formData.point_of_contact_email || null,
       };
 
-      await apiClient.put(`/add-rfqs/${selectedClient.id}/`, payload);
+      await apiClient.put(`/rfqs/${selectedClient.id}/`, payload);
       toast.success("Point of Contact updated successfully!");
-      navigate("/pre-job/view-rfq");
+      navigate("/view-rfq"); 
     } catch (error) {
       console.error("Failed to update Point of Contact:", error);
       toast.error("Failed to update Point of Contact.");
@@ -166,7 +173,7 @@ const ExistingClient = () => {
         {!selectedClient && (
           <div className="mb-4 relative" ref={dropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Select Client
+              Choose Client
             </label>
             <div className="flex items-center">
               <input
@@ -178,18 +185,16 @@ const ExistingClient = () => {
                   setShowDropdown(true);
                 }}
                 onFocus={() => setShowDropdown(true)}
-                className="flex-grow p-2 border border-gray-400 rounded-l focus:outline-indigo-500 focus:ring focus:ring-indigo-500 text-sm"
+                className="flex-grow p-2 border border-gray-400 rounded-l focus:outline-indigo-600 focus:ring focus:border-indigo-600 text-sm"
               />
             </div>
-
-            {showDropdown &&
-              searchQuery &&
-              (filteredClients.length > 0 ? (
-                <ul className="absolute z-10 w-full max-w-md bg-white border border-gray-400 rounded mt-1 max-h-40 overflow-y-auto">
+            {showDropdown && searchQuery && (
+              filteredClients.length ? (
+                <ul className="absolute z-10 w-full max-w-md bg-white shadow-lg border border-gray-300 rounded mt-1 max-h-40 overflow-y-auto">
                   {filteredClients.map((client) => (
                     <li
                       key={client.id}
-                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                      className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
                       onClick={() => handleClientSelect(client)}
                     >
                       {client.company_name} (ID: {client.id})
@@ -197,44 +202,41 @@ const ExistingClient = () => {
                   ))}
                 </ul>
               ) : (
-                <p className="text-gray-600 mt-2">No clients found.</p>
-              ))}
+                <p className="text-gray-500 mt-2 text-sm">No clients found.</p>
+              )
+            )}
           </div>
         )}
 
-        {loading && <p>Loading clients...</p>}
+        {loading && <p className="text-gray-600">Loading...</p>}
         {error && <p className="text-red-500">{error}</p>}
 
-        {selectedClient && !loading && (
+        {selectedClient && (
           <div>
             <div className="flex justify-end mb-2">
               <button
                 onClick={handleCloseClientForm}
-                className="text-gray-600 hover:text-gray-900 font-bold text-xl"
-                aria-label="Close client form"
+                className="text-gray-600 hover:text-gray-900 text-lg font-bold"
+                aria-label="Close form"
               >
-                &#x2715;
+                ✕
               </button>
             </div>
 
             <form onSubmit={handleSubmit}>
-              <h3 className="text-lg font-medium mt-4 mb-2">Client Details</h3>
+              <h3 className="text-lg font-semibold mb-4">Client Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {[
                   { name: "company_name", label: "Company Name" },
                   { name: "address", label: "Company Address" },
-                  { name: "phone", label: "Company Phone" },
+                  { name: "phone", label: "Phone Number" },
                   { name: "email", label: "Company Email", type: "email" },
                 ].map((field) => (
                   <div key={field.name} className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-700">
-                      {field.label}
-                    </label>
+                    <label className="text-sm font-medium text-gray-600">{field.label}</label>
                     <input
                       type={field.type || "text"}
-                      name={field.name}
                       value={formData[field.name] || ""}
-                      readOnly
                       disabled
                       className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-gray-800 cursor-not-allowed text-sm"
                     />
@@ -242,53 +244,53 @@ const ExistingClient = () => {
                 ))}
               </div>
 
-              <h3 className="text-lg font-medium mt-4 mb-2">RFQ Channel</h3>
+              <h3 className="text-lg font-semibold mb-4">RFQ Channel</h3>
               <div className="mb-6">
                 <input
                   type="text"
-                  value={formData.rfq_channel || ""}
-                  readOnly
+                  value={formData.rfq_channel_name || "No channel selected"}
                   disabled
-                  className="w-full p-2 border border-gray-300 rounded bg-gray-100 text-gray-800 cursor-not-allowed text-sm"
+                  className="w-full p-3 border border-gray-200 rounded bg-gray-50 text-gray-700 cursor-not-allowed text-sm"
+                  placeholder="Channel Name"
                 />
               </div>
 
-              <h3 className="text-lg font-medium mt-4 mb-2">Point of Contact</h3>
+              <h3 className="text-lg font-semibold mb-4">Point of Contact</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { name: "attention_name", label: "Name" },
-                  { name: "attention_phone", label: "Phone" },
+                  { name: "point_of_contact_name", label: "Contact Name" },
+                  { name: "point_of_contact_phone", label: "Contact Phone" },
                 ].map((field) => (
                   <div key={field.name} className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-700">{field.label}</label>
+                    <label className="text-sm font-medium text-gray-600">{field.label}</label>
                     <input
                       type="text"
                       name={field.name}
                       value={formData[field.name] || ""}
                       onChange={handleInputChange}
-                      className="mt-1 p-2 border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-500 text-sm"
+                      className="mt-2 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all duration-200"
                       placeholder={`Enter ${field.label}`}
                     />
                   </div>
                 ))}
                 <div className="md:col-span-2 flex flex-col">
-                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <label className="text-sm font-medium text-gray-600">Contact Email</label>
                   <input
                     type="email"
-                    name="attention_email"
-                    value={formData.attention_email || ""}
+                    name="point_of_contact_email"
+                    value={formData.point_of_contact_email || ""}
                     onChange={handleInputChange}
-                    className="mt-1 p-2 border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-500 text-sm"
-                    placeholder="Enter Email"
+                    className="mt-2 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all duration-200"
+                    placeholder="Enter Contact Email"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-6 bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 disabled:bg-gray-400"
+                className="mt-6 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
               >
-                {isSubmitting ? "Saving..." : "Save Point of Contact"}
+                {isSubmitting ? "Saving..." : "Save Contact"}
               </button>
             </form>
           </div>

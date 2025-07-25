@@ -21,6 +21,7 @@ import Channels from "./pages/AdditionalSettings/Channels";
 import Series from "./pages/AdditionalSettings/Series";
 import Unit from "./pages/AdditionalSettings/Unit";
 import PartialOrderSelection from "./pages/PreJob/Quotation/PartialOrderSelection";
+import ExistingClient from "./components/ExistingClient";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -86,6 +87,10 @@ function App() {
         {
           path: "/add-rfq",
           element: <AddRFQ />,
+        },
+        {
+          path: "/existing-client",
+          element: <ExistingClient />,
         },
         {
           path: "/edit-rfq/:id",
