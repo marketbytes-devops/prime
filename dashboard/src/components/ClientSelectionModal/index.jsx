@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
-  if (!isOpen) return null; // Prevent rendering when isOpen is false
+  if (!isOpen) return null; 
 
   return (
     <AnimatePresence>

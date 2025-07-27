@@ -7,7 +7,7 @@ import Button from '../../../components/Button';
 const PartialOrderSelection = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { quotationData } = location.state || {};
+  const { quotationData, itemsList } = location.state || {};
   const [state, setState] = useState({
     numberOfPartialOrders: '',
     selectedItemIds: [],
@@ -55,7 +55,6 @@ const PartialOrderSelection = () => {
 
       if (selectedItemIds.length > maxItemsPerOrder) {
         toast.error(`Cannot select more than ${maxItemsPerOrder} items for this partial order.`);
-        console.warn('Max items per order exceeded:', maxItemsPerOrder);
         return prev;
       }
       console.log('Selecting item:', itemId);
@@ -63,40 +62,40 @@ const PartialOrderSelection = () => {
     });
   };
 
-    const isGenerateDisabled = () => {
-      if (!state.numberOfPartialOrders) {
-        console.log('Generate disabled: Number of partial orders not specified');
-        return true;
-      }
-      if (state.createdPartialOrders.length >= state.numberOfPartialOrders) {
-        console.log('Generate disabled: Maximum number of partial orders reached');
-        return true;
-      }
-      if (state.selectedItemIds.length === 0) {
-        console.log('Generate disabled: No items selected');
-        return true;
-      }
-      const remainingItemsCount = state.savedItems.length - state.usedItemIds.length;
-      const remainingPartialOrders = state.numberOfPartialOrders - state.createdPartialOrders.length;
-      const maxItemsPerOrder =
-        remainingPartialOrders > 1
-          ? state.savedItems.length - (state.numberOfPartialOrders - 1)
-          : remainingItemsCount;
+  const isGenerateDisabled = () => {
+    if (!state.numberOfPartialOrders) {
+      console.log('Generate disabled: Number of partial orders not specified');
+      return true;
+    }
+    if (state.createdPartialOrders.length >= state.numberOfPartialOrders) {
+      console.log('Generate disabled: Maximum number of partial orders reached');
+      return true;
+    }
+    if (state.selectedItemIds.length === 0) {
+      console.log('Generate disabled: No items selected');
+      return true;
+    }
+    const remainingItemsCount = state.savedItems.length - state.usedItemIds.length;
+    const remainingPartialOrders = state.numberOfPartialOrders - state.createdPartialOrders.length;
+    const maxItemsPerOrder =
+      remainingPartialOrders > 1
+        ? state.savedItems.length - (state.numberOfPartialOrders - 1)
+        : remainingItemsCount;
 
-      if (remainingPartialOrders > 1 && state.selectedItemIds.length > maxItemsPerOrder) {
-        console.log('Generate disabled: Too many items selected for remaining partial orders');
-        return true;
-      }
-      if (remainingPartialOrders === 1 && state.selectedItemIds.length !== remainingItemsCount) {
-        console.log('Generate disabled: Must select all remaining items for the last partial order');
-        return true;
-      }
-      if (state.selectedItemIds.some(id => state.usedItemIds.includes(id))) {
-        console.log('Generate disabled: Includes already used items');
-        return true;
-      }
-      return false;
-    };
+    if (remainingPartialOrders > 1 && state.selectedItemIds.length > maxItemsPerOrder) {
+      console.log('Generate disabled: Too many items selected for remaining partial orders');
+      return true;
+    }
+    if (remainingPartialOrders === 1 && state.selectedItemIds.length !== remainingItemsCount) {
+      console.log('Generate disabled: Must select all remaining items for the last partial order');
+      return true;
+    }
+    if (state.selectedItemIds.some(id => state.usedItemIds.includes(id))) {
+      console.log('Generate disabled: Includes already used items');
+      return true;
+    }
+    return false;
+  };
 
   const handleGeneratePartialOrder = async () => {
     console.log('Generating partial order with item IDs:', state.selectedItemIds);
@@ -104,7 +103,12 @@ const PartialOrderSelection = () => {
     const remainingPartialOrders = state.numberOfPartialOrders - state.createdPartialOrders.length;
 
     try {
-      const selectedItems = state.savedItems.filter(item => state.selectedItemIds.includes(item.id));
+      const selectedItems = state.savedItems
+        .filter(item => state.selectedItemIds.includes(item.id))
+        .map(item => ({
+          ...item,
+          name: itemsList.find(i => i.id === item.item)?.name || 'N/A',
+        }));
       if (!selectedItems.length) {
         toast.error('No valid items selected.');
         console.error('No valid items found for IDs:', state.selectedItemIds);
@@ -166,7 +170,12 @@ const PartialOrderSelection = () => {
     });
   };
 
-  const remainingItems = state.savedItems.filter(item => !state.usedItemIds.includes(item.id));
+  const remainingItems = state.savedItems
+    .filter(item => !state.usedItemIds.includes(item.id))
+    .map(item => ({
+      ...item,
+      name: itemsList.find(i => i.id === item.item)?.name || 'N/A',
+    }));
 
   if (!quotationData || !state.savedItems.length) {
     return <p className="text-red-600 text-center">No quotation data or items found.</p>;
@@ -223,7 +232,7 @@ const PartialOrderSelection = () => {
                       {order.items.map(item => (
                         <tr key={item.id} className="border-t hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-black whitespace-nowrap">
-                            {item.item_name || item.name || 'N/A'}
+                            {item.name || 'N/A'}
                           </td>
                           <td className="px-4 py-3 text-sm text-black whitespace-nowrap">
                             {item.quantity || 'N/A'}
@@ -290,7 +299,7 @@ const PartialOrderSelection = () => {
                         />
                       </td>
                       <td className="px-4 py-3 text-sm text-black whitespace-nowrap">
-                        {item.item_name || item.name || 'N/A'}
+                        {item.name || 'N/A'}
                       </td>
                       <td className="px-4 py-3 text-sm text-black whitespace-nowrap">
                         {item.quantity || 'N/A'}

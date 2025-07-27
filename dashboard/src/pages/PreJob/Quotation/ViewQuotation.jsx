@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
@@ -7,7 +7,6 @@ import Modal from '../../../components/Modal';
 
 const ViewQuotation = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [state, setState] = useState({
     quotations: [],
     channels: [],
@@ -25,69 +24,54 @@ const ViewQuotation = () => {
     isUploadPoModalOpen: false,
     partialOrders: [],
     poUploads: {},
+    fullOrderPo: { clientPoNumber: '', poFile: null },
   });
 
+  const fetchQuotations = async () => {
+    try {
+      const [quotationsRes, channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
+        apiClient.get('/quotations/'),
+        apiClient.get('/channels/'),
+        apiClient.get('/teams/'),
+        apiClient.get('/items/'),
+        apiClient.get('/units/'),
+      ]);
+
+      const quotationsWithPOs = await Promise.all(
+        quotationsRes.data.map(async (quotation) => {
+          try {
+            const poRes = await apiClient.get(`/purchase-orders/?quotation_id=${quotation.id}`);
+            return { ...quotation, purchase_orders: poRes.data || [] };
+          } catch (error) {
+            console.error(`Error fetching POs for quotation ${quotation.id}:`, error);
+            return { ...quotation, purchase_orders: [] };
+          }
+        })
+      );
+
+      setState(prev => ({
+        ...prev,
+        quotations: quotationsWithPOs || [],
+        channels: channelsRes.data || [],
+        teamMembers: teamsRes.data || [],
+        itemsList: itemsRes.data || [],
+        units: unitsRes.data || [],
+      }));
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      alert('Failed to load quotations.');
+    }
+  };
+
   useEffect(() => {
-    Promise.all([
-      apiClient.get('/quotations/'),
-      apiClient.get('/channels/'),
-      apiClient.get('/teams/'),
-      apiClient.get('/items/'),
-      apiClient.get('/units/'),
-    ])
-      .then(([quotationsRes, channelsRes, teamsRes, itemsRes, unitsRes]) => {
-        setState(prev => ({
-          ...prev,
-          quotations: quotationsRes.data || [],
-          channels: channelsRes.data || [],
-          teamMembers: teamsRes.data || [],
-          itemsList: itemsRes.data || [],
-          units: unitsRes.data || [],
-        }));
-      })
-      .catch(error => {
-        console.error('Error fetching data:', error);
-        alert('Failed to load quotations.');
-      });
+    fetchQuotations();
   }, []);
-
-  useEffect(() => {
-    if (state.isModalOpen && state.selectedQuotation) {
-      apiClient.get(`/purchase-orders/?quotation_id=${state.selectedQuotation.id}`)
-        .then(response => {
-          setState(prev => ({
-            ...prev,
-            selectedQuotation: { ...prev.selectedQuotation, purchase_orders: response.data },
-          }));
-        })
-        .catch(error => console.error('Error fetching POs:', error));
-    }
-  }, [state.isModalOpen, state.selectedQuotation]);
-
-  useEffect(() => {
-    if (location.state?.refresh) {
-      apiClient.get('/quotations/')
-        .then(response => {
-          setState(prev => ({
-            ...prev,
-            quotations: response.data || [],
-            currentPage: 1,
-          }));
-        })
-        .catch(error => console.error('Error refreshing quotations:', error));
-    }
-  }, [location.state]);
 
   const handleDelete = async id => {
     if (window.confirm('Are you sure you want to delete this quotation?')) {
       try {
         await apiClient.delete(`/quotations/${id}/`);
-        const response = await apiClient.get('/quotations/');
-        setState(prev => ({
-          ...prev,
-          quotations: response.data || [],
-          currentPage: 1,
-        }));
+        await fetchQuotations();
       } catch (error) {
         console.error('Error deleting quotation:', error);
         alert('Failed to delete quotation.');
@@ -104,23 +88,17 @@ const ViewQuotation = () => {
   };
 
   const handleUploadPO = id => {
-    apiClient.get(`/purchase-orders/?quotation_id=${id}`)
-      .then(response => {
-        setState(prev => ({
-          ...prev,
-          isUploadPoModalOpen: true,
-          selectedQuotation: prev.quotations.find(q => q.id === id),
-          partialOrders: response.data.filter(po => po.order_type === 'partial'),
-          poUploads: response.data.reduce((acc, po) => ({
-            ...acc,
-            [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null },
-          }), {}),
-        }));
-      })
-      .catch(error => {
-        console.error('Error fetching partial orders:', error);
-        alert('Failed to load partial orders.');
-      });
+    const quotation = state.quotations.find(q => q.id === id);
+    setState(prev => ({
+      ...prev,
+      isUploadPoModalOpen: true,
+      selectedQuotation: quotation,
+      partialOrders: quotation.purchase_orders.filter(po => po.order_type === 'partial'),
+      poUploads: quotation.purchase_orders.reduce((acc, po) => ({
+        ...acc,
+        [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null },
+      }), {}),
+    }));
   };
 
   const handlePoOption = option => {
@@ -132,7 +110,7 @@ const ViewQuotation = () => {
       }));
     } else if (option === 'partial') {
       navigate('/pre-job/partial-order-selection', {
-        state: { quotationData: state.selectedQuotation },
+        state: { quotationData: state.selectedQuotation, itemsList: state.itemsList },
       });
       setState(prev => ({ ...prev, isPoModalOpen: false }));
     }
@@ -143,17 +121,23 @@ const ViewQuotation = () => {
       const formData = new FormData();
       formData.append('quotation', state.selectedQuotation.id);
       formData.append('order_type', 'full');
+      if (state.fullOrderPo.clientPoNumber) {
+        formData.append('client_po_number', state.fullOrderPo.clientPoNumber);
+      }
+      if (state.fullOrderPo.poFile) {
+        formData.append('po_file', state.fullOrderPo.poFile);
+      }
 
       await apiClient.post('/purchase-orders/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const response = await apiClient.get('/quotations/');
+      await fetchQuotations();
       setState(prev => ({
         ...prev,
-        quotations: response.data || [],
         isFullOrderModalOpen: false,
         selectedQuotation: null,
+        fullOrderPo: { clientPoNumber: '', poFile: null },
       }));
       alert('Full Purchase Order created successfully.');
     } catch (error) {
@@ -175,10 +159,9 @@ const ViewQuotation = () => {
           });
         }
       }
-      const response = await apiClient.get('/quotations/');
+      await fetchQuotations();
       setState(prev => ({
         ...prev,
-        quotations: response.data || [],
         isUploadPoModalOpen: false,
         selectedQuotation: null,
         partialOrders: [],
@@ -233,6 +216,7 @@ const ViewQuotation = () => {
                 ? new Date(quotation.next_followup_date).toLocaleDateString()
                 : 'N/A'
             }</p>
+            <p><strong>Follow-up Frequency:</strong> ${quotation.followup_frequency || 'N/A'}</p>
             <p><strong>Remarks:</strong> ${quotation.remarks || 'N/A'}</p>
           </div>
           <div>
@@ -371,6 +355,7 @@ const ViewQuotation = () => {
       ...prev,
       isFullOrderModalOpen: false,
       selectedQuotation: null,
+      fullOrderPo: { clientPoNumber: '', poFile: null },
     }));
   };
 
@@ -388,12 +373,7 @@ const ViewQuotation = () => {
     try {
       const updatePayload = { [field]: value || null };
       await apiClient.patch(`/quotations/${id}/`, updatePayload);
-      setState(prev => ({
-        ...prev,
-        quotations: prev.quotations.map(quotation =>
-          quotation.id === id ? { ...quotation, [field]: value } : quotation
-        ),
-      }));
+      await fetchQuotations();
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
       alert(`Failed to update ${field}.`);
@@ -451,8 +431,11 @@ const ViewQuotation = () => {
     }
   };
 
-  const hasAnyOrder = quotation => {
-    return quotation.purchase_orders && quotation.purchase_orders.length > 0;
+  const hasBothOrderTypes = quotation => {
+    if (!quotation.purchase_orders) return false;
+    const hasFull = quotation.purchase_orders.some(po => po.order_type === 'full');
+    const hasPartial = quotation.purchase_orders.some(po => po.order_type === 'partial');
+    return hasFull && hasPartial;
   };
 
   return (
@@ -485,16 +468,16 @@ const ViewQuotation = () => {
               Sort By
             </label>
             <select
-              id="sortBy"
+              id="sort"
               value={state.sortBy}
               onChange={e =>
                 setState(prev => ({ ...prev, sortBy: e.target.value }))
               }
-              className="p-2 border rounded-md focus:outline-indigo-600"
+              className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="company_name">Company Name</option>
               <option value="rfq_id">Quotation ID</option>
-              <option value="created_at">Created Date</option>
+              <option value="created_at">Creation Date</option>
             </select>
           </div>
         </div>
@@ -502,31 +485,34 @@ const ViewQuotation = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Sl No
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Quotation ID
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Company Name
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Created Date
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Assigned Sales Person
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap min-w-[150px]">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[150px]">
                   Quotation Status
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Follow-up Frequency
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
-                <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Actions
                 </th>
               </tr>
@@ -536,7 +522,7 @@ const ViewQuotation = () => {
                 <tr>
                   <td
                     colSpan="10"
-                    className="border p-2 text-center text-sm text-gray-500 whitespace-nowrap"
+                    className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No quotations found.
                   </td>
@@ -561,11 +547,11 @@ const ViewQuotation = () => {
                         onChange={e =>
                           handleUpdateField(quotation.id, 'quotation_status', e.target.value)
                         }
-                        className="p-1 border rounded-md focus:outline-indigo-600 w-full"
+                        className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
-                        <option value="Pending" className="whitespace-nowrap">Pending</option>
-                        <option value="Approved" className="whitespace-nowrap">Approved</option>
-                        <option value="PO Created" className="whitespace-nowrap">PO Created</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="PO Created">PO Created</option>
                       </select>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -573,6 +559,7 @@ const ViewQuotation = () => {
                         ? new Date(quotation.next_followup_date).toLocaleDateString()
                         : 'N/A'}
                     </td>
+                    <td className="border p-2 whitespace-nowrap">{quotation.followup_frequency || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <InputField
                         type="text"
@@ -591,42 +578,40 @@ const ViewQuotation = () => {
                         >
                           View Details
                         </Button>
-                        {!hasAnyOrder(quotation) && (
-                          <>
-                            <Button
-                              onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
-                              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              onClick={() => handleConvertToPO(quotation.id)}
-                              disabled={quotation.quotation_status !== 'Approved'}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                quotation.quotation_status === 'Approved'
-                                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                            >
-                              Convert to PO
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </Button>
                         <Button
                           onClick={() => handlePrint(quotation)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           Print
                         </Button>
-                        {quotation.purchase_orders?.some(po => po.order_type === 'partial') &&
-                          !hasAnyOrder(quotation) && (
-                            <Button
-                              onClick={() => handleUploadPO(quotation.id)}
-                              className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
-                            >
-                              Upload PO
-                            </Button>
-                          )}
+                        {hasBothOrderTypes(quotation) ? null : quotation.purchase_orders?.some(
+                          po => po.order_type === 'partial'
+                        ) ? (
+                          <Button
+                            onClick={() => handleUploadPO(quotation.id)}
+                            className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
+                          >
+                            Upload PO
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleConvertToPO(quotation.id)}
+                            disabled={quotation.quotation_status !== 'Approved'}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              quotation.quotation_status === 'Approved'
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Convert to PO
+                          </Button>
+                        )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
@@ -725,6 +710,9 @@ const ViewQuotation = () => {
                   : 'N/A'}
               </p>
               <p>
+                <strong>Follow-up Frequency:</strong> {state.selectedQuotation.followup_frequency || 'N/A'}
+              </p>
+              <p>
                 <strong>Remarks:</strong> {state.selectedQuotation.remarks || 'N/A'}
               </p>
             </div>
@@ -737,21 +725,11 @@ const ViewQuotation = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          Item
-                        </th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          Quantity
-                        </th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          Unit Price
-                        </th>
-                        <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          Total Price
-                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -793,21 +771,11 @@ const ViewQuotation = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-200">
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                            Item
-                          </th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                            Quantity
-                          </th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                            Unit
-                          </th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                            Unit Price
-                          </th>
-                          <th className="border p-2 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
-                            Total Price
-                          </th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -844,14 +812,6 @@ const ViewQuotation = () => {
                 ))}
               </div>
             )}
-            <div className="flex justify-end gap-2">
-              <Button
-                onClick={closeModal}
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-              >
-                Close
-              </Button>
-            </div>
           </div>
         )}
       </Modal>
@@ -892,6 +852,46 @@ const ViewQuotation = () => {
         title="Create Full Order PO"
       >
         <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="clientPoNumber"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Client PO Number
+            </label>
+            <InputField
+              type="text"
+              id="clientPoNumber"
+              value={state.fullOrderPo.clientPoNumber}
+              onChange={e =>
+                setState(prev => ({
+                  ...prev,
+                  fullOrderPo: { ...prev.fullOrderPo, clientPoNumber: e.target.value },
+                }))
+              }
+              className="w-full"
+              placeholder="Enter Client PO Number (optional)"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="poFile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Upload PO File
+            </label>
+            <input
+              type="file"
+              id="poFile"
+              onChange={e =>
+                setState(prev => ({
+                  ...prev,
+                  fullOrderPo: { ...prev.fullOrderPo, poFile: e.target.files[0] },
+                }))
+              }
+              className="w-full p-2 border rounded"
+            />
+          </div>
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleFullOrderSubmit}
@@ -960,7 +960,7 @@ const ViewQuotation = () => {
                       },
                     }))
                   }
-                  className="w-full p-2 border rounded-md"
+                  className="w-full p-2 border rounded"
                 />
               </div>
             </div>
