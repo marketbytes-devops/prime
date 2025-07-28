@@ -82,7 +82,7 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
-      await fetchRFQs(); 
+      await fetchRFQs(); // Refresh data to ensure status update
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status.');
@@ -92,7 +92,7 @@ const ViewRFQ = () => {
   const handleConvertToQuotation = async rfq => {
     try {
       navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
-      await fetchRFQs();
+      await fetchRFQs(); // Refresh after navigation
     } catch (error) {
       console.error('Error initiating quotation conversion:', error);
       alert('Failed to initiate quotation conversion.');
@@ -347,78 +347,81 @@ const ViewRFQ = () => {
                   </td>
                 </tr>
               ) : (
-                currentRfqs.map((rfq, index) => (
-                  <tr key={rfq.id} className="border hover:bg-gray-50">
-                    <td className="border p-2 whitespace-nowrap">
-                      {startIndex + index + 1}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {new Date(rfq.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {state.teamMembers.find(
-                        m => m.id === rfq.assigned_sales_person
-                      )?.name || 'N/A'}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap min-w-[150px]">
-                      <select
-                        value={rfq.rfq_status || ''}
-                        onChange={e =>
-                          handleStatusChange(rfq.id, e.target.value)
-                        }
-                        className="p-1 border rounded focus:outline-indigo-500 w-full"
-                      >
-                        <option value="Processing" className="whitespace-nowrap">Processing</option>
-                        <option value="Completed" className="whitespace-nowrap">Completed</option>
-                      </select>
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => openModal(rfq)}
-                          className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                currentRfqs.map((rfq, index) => {
+                  console.log(`RFQ ${rfq.id}: Status = ${rfq.rfq_status}, hasQuotation = ${rfq.hasQuotation}`); // Debug log
+                  return (
+                    <tr key={rfq.id} className="border hover:bg-gray-50">
+                      <td className="border p-2 whitespace-nowrap">
+                        {startIndex + index + 1}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                      <td className="border p-2 whitespace-nowrap">
+                        {new Date(rfq.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        {state.teamMembers.find(
+                          m => m.id === rfq.assigned_sales_person
+                        )?.name || 'N/A'}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap min-w-[150px]">
+                        <select
+                          value={rfq.rfq_status || ''}
+                          onChange={e =>
+                            handleStatusChange(rfq.id, e.target.value)
+                          }
+                          className="p-1 border rounded focus:outline-indigo-500 w-full"
                         >
-                          View Details
-                        </Button>
-                        <Button
-                          onClick={() => handleConvertToQuotation(rfq)}
-                          disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            rfq.rfq_status === 'Completed' && !rfq.hasQuotation
-                              ? 'bg-purple-600 text-white hover:bg-purple-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Convert to Quotation
-                        </Button>
-                        <Button
-                          onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
-                          disabled={rfq.hasQuotation}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            !rfq.hasQuotation
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          onClick={() => handlePrint(rfq)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                        >
-                          Print
-                        </Button>
-                        <Button
-                          onClick={() => handleDelete(rfq.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <option value="Processing" className="whitespace-nowrap">Processing</option>
+                          <option value="Completed" className="whitespace-nowrap">Completed</option>
+                        </select>
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => openModal(rfq)}
+                            className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            onClick={() => handleConvertToQuotation(rfq)}
+                            disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              rfq.rfq_status === 'Completed' && !rfq.hasQuotation
+                                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Convert to Quotation
+                          </Button>
+                          <Button
+                            onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
+                            disabled={rfq.hasQuotation}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              !rfq.hasQuotation
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => handlePrint(rfq)}
+                            className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                          >
+                            Print
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(rfq.id)}
+                            className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -1,4 +1,3 @@
-// src/pages/PreJob/RFQ/AddRFQ.jsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../../helpers/apiClient";
@@ -29,7 +28,7 @@ const AddRFQ = () => {
     isNewClient: false,
   });
   const [isModalOpen, setIsModalOpen] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Added loading state
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -113,6 +112,9 @@ const AddRFQ = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isStepValid()) return;
+
+    setLoading(true); // Start loading when submission begins
+
     const payload = {
       company_name: state.company_name || null,
       company_address: state.company_address || null,
@@ -124,7 +126,7 @@ const AddRFQ = () => {
       point_of_contact_phone: state.point_of_contact_phone || null,
       assigned_sales_person: state.assigned_sales_person || null,
       due_date_for_quotation: state.due_date_for_quotation || null,
-      rfq_status: null,
+      rfq_status: "Processing", // Set initial status to Processing
       items: state.items.map((item) => ({
         item: item.item || null,
         quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -132,8 +134,18 @@ const AddRFQ = () => {
         unit_price: null,
       })),
     };
-    await apiClient.post("rfqs/", payload);
-    navigate("/view-rfq");
+
+    try {
+      await apiClient.post("rfqs/", payload);
+      toast.success("RFQ created successfully!");
+      navigate("/view-rfq");
+    } catch (error) {
+      console.error("Error submitting RFQ:", error);
+      setError("Failed to create RFQ. Please try again.");
+      toast.error("Failed to create RFQ.");
+    } finally {
+      setLoading(false); // Stop loading regardless of success or failure
+    }
   };
 
   const handleClientSelect = (type) => {
@@ -471,12 +483,12 @@ const AddRFQ = () => {
             ) : (
               <Button
                 type="submit"
-                disabled={!isStepValid()}
+                disabled={!isStepValid() || loading} // Disable button when loading
                 className={`bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ml-auto ${
-                  !isStepValid() ? "opacity-50 cursor-not-allowed" : ""
+                  !isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                Submit RFQ
+                {loading ? "Submitting..." : "Submit RFQ"} {/* Show loading text */}
               </Button>
             )}
           </div>

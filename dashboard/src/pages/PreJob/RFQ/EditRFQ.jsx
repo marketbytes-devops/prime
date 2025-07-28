@@ -37,6 +37,7 @@ const EditRFQ = () => {
     units: [],
     loading: true,
     lastSaved: null,
+    submitting: false, // New state for submission loading
   });
 
   useEffect(() => {
@@ -246,6 +247,7 @@ const EditRFQ = () => {
       alert('Please fill all required fields.');
       return;
     }
+    setState(prev => ({ ...prev, submitting: true })); // Start loading
     try {
       const rfqPayload = buildRfqPayload();
       console.log('Updating RFQ:', rfqPayload);
@@ -259,6 +261,8 @@ const EditRFQ = () => {
     } catch (error) {
       console.error('Error submitting:', error);
       alert('Failed to submit.');
+    } finally {
+      setState(prev => ({ ...prev, submitting: false })); // Stop loading
     }
   };
 
@@ -574,12 +578,12 @@ const EditRFQ = () => {
         <div className="flex justify-end mt-6">
           <Button
             type="submit"
-            disabled={!isFormValid()}
+            disabled={!isFormValid() || state.submitting}
             className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              !isFormValid() ? 'opacity-50 cursor-not-allowed' : ''
+              (!isFormValid() || state.submitting) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {isQuotation ? 'Submit Quotation' : 'Update RFQ'}
+            {state.submitting ? 'Submitting...' : (isQuotation ? 'Submit Quotation' : 'Update RFQ')}
           </Button>
         </div>
       </form>
