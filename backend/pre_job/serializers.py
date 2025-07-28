@@ -337,6 +337,8 @@ class QuotationSerializer(serializers.ModelSerializer):
     quotation_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created')], required=False)
     followup_frequency = serializers.ChoiceField(choices=[('24_hours', '24 Hours'), ('3_days', '3 Days'), ('7_days', '7 Days'), ('every_7th_day', 'Every 7th Day')], required=False)
     purchase_orders = serializers.SerializerMethodField()
+    assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
+    assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
 
     class Meta:
         model = Quotation
@@ -345,15 +347,311 @@ class QuotationSerializer(serializers.ModelSerializer):
             'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
             'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
-            'series_number', 'created_at', 'items', 'purchase_orders'
+            'series_number', 'created_at', 'items', 'purchase_orders',
+            'assigned_sales_person_name', 'assigned_sales_person_email'
         ]
 
     def get_purchase_orders(self, obj):
         pos = PurchaseOrder.objects.filter(quotation=obj)
         return PurchaseOrderSerializer(pos, many=True).data
 
+    def send_assignment_email(self, quotation, assigned_sales_person):
+        email_sent = False
+        if assigned_sales_person and assigned_sales_person.email:
+            subject = f'You Have Been Assigned to Quotation #{quotation.series_number}'
+            message = (
+                f'Dear {assigned_sales_person.name},\n\n'
+                f'You have been assigned to the following Quotation:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please log in to your PrimeCRM dashboard to view the details and take the necessary actions.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[assigned_sales_person.email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"Email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Quotation Assignment Notification – #{quotation.series_number}'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'We would like to inform you that the following Quotation has been assigned:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                print(f"Email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
+    def send_followup_reminder(self, quotation, assigned_sales_person):
+        email_sent = False
+        if (assigned_sales_person and assigned_sales_person.email and
+                quotation.next_followup_date == date.today() and
+                quotation.quotation_status != 'PO Created'):
+            # Email to assigned person
+            subject = f'Reminder: Quotation #{quotation.series_number} Follow-up Due Today'
+            message = (
+                f'Dear {assigned_sales_person.name},\n\n'
+                f'Your follow-up for the following Quotation is due today:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please ensure all necessary actions are completed promptly. '
+                f'Log in to your PrimeCRM dashboard for details.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[assigned_sales_person.email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"Follow-up reminder email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send follow-up reminder email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Quotation #{quotation.series_number} Follow-up Due Today Notification'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'We would like to inform you that the following Quotation has a follow-up due today:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                print(f"Follow-up reminder email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send follow-up reminder email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
+
+            # Update next_followup_date if frequency is 'every_7th_day'
+            if quotation.followup_frequency == 'every_7th_day':
+                quotation.next_followup_date = date.today() + timedelta(days=7)
+                quotation.save()
+
+        return email_sent
+
+    def send_past_due_alert(self, quotation, assigned_sales_person):
+        email_sent = False
+        if (assigned_sales_person and assigned_sales_person.email and
+                quotation.next_followup_date and
+                quotation.next_followup_date < date.today() and
+                quotation.quotation_status != 'PO Created'):
+            # Email to assigned person
+            subject = f'Alert: Quotation #{quotation.series_number} Follow-up Past Due'
+            message = (
+                f'Dear {assigned_sales_person.name},\n\n'
+                f'The follow-up date for the following Quotation has passed:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take immediate action to address this. '
+                f'Log in to your PrimeCRM dashboard for details.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[assigned_sales_person.email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"Past due alert email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send past due alert email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Quotation #{quotation.series_number} Follow-up Past Due Notification'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'We would like to inform you that the following Quotation is past due for follow-up:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                print(f"Past due alert email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send past due alert email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
+    def send_po_followup_reminder(self, quotation, assigned_sales_person):
+        email_sent = False
+        if (assigned_sales_person and assigned_sales_person.email and
+                quotation.quotation_status == 'Approved' and
+                not quotation.purchase_orders.exists() and
+                quotation.next_followup_date == date.today()):
+            # Email to assigned person
+            subject = f'Reminder: Follow-up on Purchase Order for Quotation #{quotation.series_number}'
+            message = (
+                f'Dear {assigned_sales_person.name},\n\n'
+                f'The following Quotation has been approved but no Purchase Order has been received yet:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status}\n'
+                f'------------------------------------------------------------\n'
+                f'Please follow up with the client to obtain the Purchase Order. '
+                f'Log in to your PrimeCRM dashboard for details.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[assigned_sales_person.email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"PO follow-up reminder email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send PO follow-up reminder email to Might have been assigned to a different user or email address.")
+                print(f"Failed to send PO follow-up reminder email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+        return email_sent
+
+    def send_po_past_due_alert(self, quotation, assigned_sales_person):
+        email_sent = False
+        if (assigned_sales_person and assigned_sales_person.email and
+                quotation.quotation_status == 'Approved' and
+                not quotation.purchase_orders.exists() and
+                quotation.next_followup_date and
+                quotation.next_followup_date < date.today()):
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Alert: No Purchase Order Received for Quotation #{quotation.series_number}'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'The following Quotation has been approved but no Purchase Order has been received, and the follow-up date has passed:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"PO past due alert email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send PO past due alert email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        assigned_sales_person = validated_data.pop('assigned_sales_person', None)
         try:
             quotation_series = NumberSeries.objects.get(series_name='Quotation')
         except NumberSeries.DoesNotExist:
@@ -366,15 +664,37 @@ class QuotationSerializer(serializers.ModelSerializer):
             sequence = int(max_sequence.split('-')[-1]) + 1
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
 
-        quotation = Quotation.objects.create(series_number=series_number, **validated_data)
+        # Set default followup_frequency to '24_hours' if not provided
+        if 'followup_frequency' not in validated_data:
+            validated_data['followup_frequency'] = '24_hours'
+
+        quotation = Quotation.objects.create(series_number=series_number, assigned_sales_person=assigned_sales_person, **validated_data)
         for item_data in items_data:
             QuotationItem.objects.create(quotation=quotation, **item_data)
+        
+        if assigned_sales_person:
+            email_sent = self.send_assignment_email(quotation, assigned_sales_person)
+            quotation.email_sent = email_sent
+            quotation.save()
+        
+        # Send initial follow-up reminder if applicable
+        if quotation.next_followup_date == date.today() and quotation.quotation_status != 'PO Created':
+            self.send_followup_reminder(quotation, assigned_sales_person)
+        
+        # Send PO follow-up reminder if quotation is approved and no PO exists
+        if quotation.quotation_status == 'Approved' and not quotation.purchase_orders.exists():
+            self.send_po_followup_reminder(quotation, assigned_sales_person)
+        
         return quotation
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
+        assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
+        # Update next_followup_date based on followup_frequency
         if validated_data.get('followup_frequency') and instance.followup_frequency != validated_data['followup_frequency']:
             today = timezone.now().date()
             if validated_data['followup_frequency'] == '24_hours':
@@ -385,12 +705,40 @@ class QuotationSerializer(serializers.ModelSerializer):
                 instance.next_followup_date = today + timedelta(days=7)
             elif validated_data['followup_frequency'] == 'every_7th_day':
                 instance.next_followup_date = today + timedelta(days=7)
+        
         instance.save()
+        
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
+        
+        # Send assignment email if sales person changed
+        if assigned_sales_person and (not instance.assigned_sales_person or instance.assigned_sales_person.id != assigned_sales_person.id):
+            email_sent = self.send_assignment_email(instance, assigned_sales_person)
+            instance.email_sent = email_sent
+            instance.save()
+        
+        # Send follow-up reminders and alerts
+        if instance.next_followup_date == date.today() and instance.quotation_status != 'PO Created':
+            self.send_followup_reminder(instance, assigned_sales_person)
+        
+        if instance.next_followup_date and instance.next_followup_date < date.today() and instance.quotation_status != 'PO Created':
+            self.send_past_due_alert(instance, assigned_sales_person)
+        
+        # Send PO follow-up reminder and past due alert
+        if instance.quotation_status == 'Approved' and not instance.purchase_orders.exists():
+            if instance.next_followup_date == date.today():
+                self.send_po_followup_reminder(instance, assigned_sales_person)
+            if instance.next_followup_date and instance.next_followup_date < date.today():
+                self.send_po_past_due_alert(instance, assigned_sales_person)
+        
         return instance
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['email_sent'] = getattr(instance, 'email_sent', False)
+        return representation
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all())
