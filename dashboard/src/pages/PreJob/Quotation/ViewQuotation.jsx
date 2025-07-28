@@ -219,7 +219,6 @@ const ViewQuotation = () => {
                 ? new Date(quotation.next_followup_date).toLocaleDateString()
                 : 'N/A'
             }</p>
-            <p><strong>Follow-up Frequency:</strong> ${quotation.followup_frequency || 'N/A'}</p>
             <p><strong>Remarks:</strong> ${quotation.remarks || 'N/A'}</p>
           </div>
           <div>
@@ -530,9 +529,6 @@ const ViewQuotation = () => {
                   Next Follow-up Date
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Follow-up Frequency
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -582,7 +578,6 @@ const ViewQuotation = () => {
                         ? new Date(quotation.next_followup_date).toLocaleDateString()
                         : 'N/A'}
                     </td>
-                    <td className="border p-2 whitespace-nowrap">{quotation.followup_frequency || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <InputField
                         type="text"
@@ -740,9 +735,6 @@ const ViewQuotation = () => {
                 {state.selectedQuotation.next_followup_date
                   ? new Date(state.selectedQuotation.next_followup_date).toLocaleDateString()
                   : 'N/A'}
-              </p>
-              <p>
-                <strong>Follow-up Frequency:</strong> {state.selectedQuotation.followup_frequency || 'N/A'}
               </p>
               <p>
                 <strong>Remarks:</strong> {state.selectedQuotation.remarks || 'N/A'}
