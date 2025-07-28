@@ -1,5 +1,7 @@
+// src/pages/ViewQuotation.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
@@ -59,7 +61,7 @@ const ViewQuotation = () => {
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
-      alert('Failed to load quotations.');
+      toast.error('Failed to load quotations.');
     }
   };
 
@@ -72,9 +74,10 @@ const ViewQuotation = () => {
       try {
         await apiClient.delete(`/quotations/${id}/`);
         await fetchQuotations();
+        toast.success('Quotation deleted successfully!');
       } catch (error) {
         console.error('Error deleting quotation:', error);
-        alert('Failed to delete quotation.');
+        toast.error('Failed to delete quotation.');
       }
     }
   };
@@ -139,10 +142,10 @@ const ViewQuotation = () => {
         selectedQuotation: null,
         fullOrderPo: { clientPoNumber: '', poFile: null },
       }));
-      alert('Full Purchase Order created successfully.');
+      toast.success('Full Purchase Order created successfully.');
     } catch (error) {
       console.error('Error creating PO:', error);
-      alert('Failed to create Full Purchase Order.');
+      toast.error('Failed to create Full Purchase Order.');
     }
   };
 
@@ -167,10 +170,10 @@ const ViewQuotation = () => {
         partialOrders: [],
         poUploads: {},
       }));
-      alert('PO details uploaded successfully.');
+      toast.success('PO details uploaded successfully.');
     } catch (error) {
       console.error('Error uploading PO details:', error);
-      alert('Failed to upload PO details.');
+      toast.error('Failed to upload PO details.');
     }
   };
 
@@ -374,10 +377,30 @@ const ViewQuotation = () => {
       const updatePayload = { [field]: value || null };
       await apiClient.patch(`/quotations/${id}/`, updatePayload);
       await fetchQuotations();
+      toast.success(`${field} updated successfully!`);
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
-      alert(`Failed to update ${field}.`);
+      toast.error(`Failed to update ${field}.`);
     }
+  };
+
+  // New function to check if PO process is complete
+  const isPoComplete = quotation => {
+    if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
+      return false;
+    }
+    const hasFullOrder = quotation.purchase_orders.some(
+      po => po.order_type === 'full' && (po.client_po_number || po.po_file)
+    );
+    if (hasFullOrder) {
+      return true;
+    }
+    const partialOrders = quotation.purchase_orders.filter(po => po.order_type === 'partial');
+    if (partialOrders.length === 0) {
+      return false;
+    }
+    // Check if all partial orders have client_po_number or po_file
+    return partialOrders.every(po => po.client_po_number || po.po_file);
   };
 
   const filteredQuotations = state.quotations
@@ -578,9 +601,13 @@ const ViewQuotation = () => {
                         >
                           View Details
                         </Button>
-                        <Button
-                          onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        <Button onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
+                          disabled={isPoComplete(quotation)}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            isPoComplete(quotation)
+                              ? 'bg-gray-300 text-gray-500'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
                         >
                           Edit
                         </Button>
@@ -590,23 +617,28 @@ const ViewQuotation = () => {
                         >
                           Print
                         </Button>
-                        {hasBothOrderTypes(quotation) ? null : quotation.purchase_orders?.some(
+                        {hasBothOrderTypes(quotation) || isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                           po => po.order_type === 'partial'
                         ) ? (
                           <Button
                             onClick={() => handleUploadPO(quotation.id)}
-                            className="px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
+                            disabled={isPoComplete(quotation)}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              isPoComplete(quotation)
+                                ? 'bg-gray-300 text-gray-500'
+                                : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                            }`}
                           >
                             Upload PO
                           </Button>
                         ) : (
                           <Button
                             onClick={() => handleConvertToPO(quotation.id)}
-                            disabled={quotation.quotation_status !== 'Approved'}
+                            disabled={quotation.quotation_status !== 'Approved' || isPoComplete(quotation)}
                             className={`px-3 py-1 rounded-md text-sm ${
-                              quotation.quotation_status === 'Approved'
+                              quotation.quotation_status === 'Approved' && !isPoComplete(quotation)
                                 ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-gray-300 text-gray-500'
                             }`}
                           >
                             Convert to PO
@@ -895,7 +927,12 @@ const ViewQuotation = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleFullOrderSubmit}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              disabled={!state.fullOrderPo.clientPoNumber && !state.fullOrderPo.poFile}
+              className={`px-4 py-2 rounded-md ${
+                state.fullOrderPo.clientPoNumber || state.fullOrderPo.poFile
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500'
+              }`}
             >
               Submit
             </Button>
@@ -968,7 +1005,12 @@ const ViewQuotation = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handlePoUploadSubmit}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              disabled={!Object.values(state.poUploads).some(po => po.clientPoNumber || po.poFile)}
+              className={`px-4 py-2 rounded-md ${
+                Object.values(state.poUploads).some(po => po.clientPoNumber || po.poFile)
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500'
+              }`}
             >
               Save
             </Button>
