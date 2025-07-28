@@ -30,15 +30,18 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isJobExecutionOpen, setIsJobExecutionOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRFQOpen, setIsRFQOpen] = useState(false);
+  const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
+  const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
 
   useEffect(() => {
     const preJobPaths = ["/add-rfq", "/view-rfq", "/view-quotation"];
     const jobExecutionPaths = [
-      "/job-execution/initiate-work-order",
-      "/job-execution/processing-work-orders",
-      "/job-execution/manager-approval",
-      "/job-execution/delivery",
-      "/job-execution/close-work-order",
+      "/job-execution/initiate-work-order/list-all-purchase-orders",
+      "/job-execution/initiate-work-order/add-wo-without-po",
+      "/job-execution/processing-work-orders/list-all-processing-work-orders",
+      "/job-execution/processing-work-orders/manager-approval",
+      "/job-execution/processing-work-orders/delivery",
+      "/job-execution/processing-work-orders/close-work-orders",
     ];
     const settingsPaths = [
       "/additional-settings/add-rfq-channel",
@@ -48,17 +51,31 @@ const Sidebar = ({ toggleSidebar }) => {
       "/additional-settings/add-series",
     ];
     const rfqPaths = ["/add-rfq", "/view-rfq"];
+    const initiateWorkOrderPaths = [
+      "/job-execution/initiate-work-order/list-all-purchase-orders",
+      "/job-execution/initiate-work-order/add-wo-without-po",
+    ];
+    const processingWorkOrdersPaths = [
+      "/job-execution/processing-work-orders/list-all-processing-work-orders",
+      "/job-execution/processing-work-orders/manager-approval",
+      "/job-execution/processing-work-orders/delivery",
+      "/job-execution/processing-work-orders/close-work-orders",
+    ];
 
     setIsPreJobOpen(preJobPaths.includes(location.pathname));
     setIsJobExecutionOpen(jobExecutionPaths.includes(location.pathname));
     setIsSettingsOpen(settingsPaths.includes(location.pathname));
     setIsRFQOpen(rfqPaths.includes(location.pathname));
+    setIsInitiateWorkOrderOpen(initiateWorkOrderPaths.includes(location.pathname));
+    setIsProcessingWorkOrdersOpen(processingWorkOrdersPaths.includes(location.pathname));
   }, [location.pathname]);
 
   const togglePreJob = () => setIsPreJobOpen(!isPreJobOpen);
   const toggleJobExecution = () => setIsJobExecutionOpen(!isJobExecutionOpen);
   const toggleSettings = () => setIsSettingsOpen(!isSettingsOpen);
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
+  const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
+  const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -83,11 +100,24 @@ const Sidebar = ({ toggleSidebar }) => {
       label: "Job Execution",
       icon: <Wrench className="w-5 h-5 mr-3" />,
       subItems: [
-        { to: "/job-execution/initiate-work-order", label: "Initiate Work Order", icon: <ListOrdered className="w-5 h-5 mr-3" /> },
-        { to: "/job-execution/processing-work-orders", label: "Processing Work Orders", icon: <Wrench className="w-5 h-5 mr-3" /> },
-        { to: "/job-execution/manager-approval", label: "Manager Approval", icon: <CheckSquare className="w-5 h-5 mr-3" /> },
-        { to: "/job-execution/delivery", label: "Delivery", icon: <Truck className="w-5 h-5 mr-3" /> },
-        { to: "/job-execution/close-work-order", label: "Close Work Order", icon: <ArchiveRestore className="w-5 h-5 mr-3" /> },
+        {
+          label: "Initiate Work Order",
+          icon: <ListOrdered className="w-5 h-5 mr-3" />,
+          subItems: [
+            { to: "/job-execution/initiate-work-order/list-all-purchase-orders", label: "List Purchase Orders", icon: <FileText className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/initiate-work-order/add-wo-without-po", label: "Add WO Without PO", icon: <FilePlus className="w-5 h-5 mr-3" /> },
+          ],
+        },
+        {
+          label: "Processing Work Orders",
+          icon: <Wrench className="w-5 h-5 mr-3" />,
+          subItems: [
+            { to: "/job-execution/processing-work-orders/list-all-processing-work-orders", label: "List Processing WO", icon: <FileText className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/manager-approval", label: "Manager Approval", icon: <CheckSquare className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/delivery", label: "Delivery", icon: <Truck className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/close-work-orders", label: "Close Work Order", icon: <ArchiveRestore className="w-5 h-5 mr-3" /> },
+          ],
+        },
       ],
     },
     { to: "/profile", label: "Profile", icon: <User className="w-5 h-5 mr-3" /> },
@@ -125,15 +155,16 @@ const Sidebar = ({ toggleSidebar }) => {
                       item.label === "Pre-Job"
                         ? togglePreJob
                         : item.label === "Job Execution"
-                          ? toggleJobExecution
-                          : toggleSettings
+                        ? toggleJobExecution
+                        : toggleSettings
                     }
-                    className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${(item.label === "Pre-Job" && isPreJobOpen) ||
+                    className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      (item.label === "Pre-Job" && isPreJobOpen) ||
                       (item.label === "Job Execution" && isJobExecutionOpen) ||
-                      (item.label === "Settings" && isSettingsOpen)
-                      ? "bg-indigo-100 text-indigo-600"
-                      : "text-gray-700 hover:bg-indigo-500 hover:text-white"
-                      }`}
+                      (item.label === "Additional Settings" && isSettingsOpen)
+                        ? "bg-indigo-100 text-indigo-600"
+                        : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+                    }`}
                   >
                     <span className="flex items-center">
                       {item.icon}
@@ -173,22 +204,51 @@ const Sidebar = ({ toggleSidebar }) => {
                             {subItem.subItems ? (
                               <>
                                 <button
-                                  onClick={toggleRFQ}
-                                  className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isRFQOpen ? "bg-indigo-100 text-indigo-600" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
-                                    }`}
+                                  onClick={
+                                    subItem.label === "RFQ"
+                                      ? toggleRFQ
+                                      : subItem.label === "Initiate Work Order"
+                                      ? toggleInitiateWorkOrder
+                                      : toggleProcessingWorkOrders
+                                  }
+                                  className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                    (subItem.label === "RFQ" && isRFQOpen) ||
+                                    (subItem.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
+                                    (subItem.label === "Processing Work Orders" && isProcessingWorkOrdersOpen)
+                                      ? "bg-indigo-100 text-indigo-600"
+                                      : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                  }`}
                                 >
                                   <span className="flex items-center">
                                     {subItem.icon}
                                     {subItem.label}
                                   </span>
-                                  {isRFQOpen ? (
-                                    <ChevronUp className="w-4 h-4" />
+                                  {subItem.label === "RFQ" ? (
+                                    isRFQOpen ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )
+                                  ) : subItem.label === "Initiate Work Order" ? (
+                                    isInitiateWorkOrderOpen ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )
                                   ) : (
-                                    <ChevronDown className="w-4 h-4" />
+                                    isProcessingWorkOrdersOpen ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )
                                   )}
                                 </button>
                                 <AnimatePresence>
-                                  {isRFQOpen && (
+                                  {(subItem.label === "RFQ"
+                                    ? isRFQOpen
+                                    : subItem.label === "Initiate Work Order"
+                                    ? isInitiateWorkOrderOpen
+                                    : isProcessingWorkOrdersOpen) && (
                                     <motion.ul
                                       className="ml-4 mt-1 space-y-1"
                                       initial={{ height: 0, opacity: 0 }}
@@ -201,7 +261,8 @@ const Sidebar = ({ toggleSidebar }) => {
                                           <NavLink
                                             to={nestedItem.to}
                                             className={({ isActive }) =>
-                                              `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                              `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                                isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
                                               }`
                                             }
                                             onClick={() => isMobile() && toggleSidebar()}
@@ -219,7 +280,8 @@ const Sidebar = ({ toggleSidebar }) => {
                               <NavLink
                                 to={subItem.to}
                                 className={({ isActive }) =>
-                                  `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                  `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                    isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
                                   }`
                                 }
                                 onClick={() => isMobile() && toggleSidebar()}
@@ -238,7 +300,8 @@ const Sidebar = ({ toggleSidebar }) => {
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive ? "bg-indigo-500 text-white" : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+                    `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      isActive ? "bg-indigo-500 text-white" : "text-gray-700 hover:bg-indigo-500 hover:text-white"
                     }`
                   }
                   onClick={() => isMobile() && toggleSidebar()}
