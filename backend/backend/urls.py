@@ -33,6 +33,7 @@ urlpatterns = [
                 path("", include("channels.urls")),
                 path("", include("series.urls")),
                 path("", include("pre_job.urls")),
+                path("", include("job_execution.urls")),
             ]
         ),
     ),

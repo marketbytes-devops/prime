@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "channels",
     "series",
     "pre_job",
+    "job_execution",
 ]
 
 MIDDLEWARE = [
