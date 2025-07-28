@@ -22,6 +22,12 @@ import Series from "./pages/AdditionalSettings/Series";
 import Unit from "./pages/AdditionalSettings/Unit";
 import PartialOrderSelection from "./pages/PreJob/Quotation/PartialOrderSelection";
 import ExistingClient from "./components/ExistingClient";
+import ListPurchaseOrders from "./pages/JobExecution/InitiateWorkOrder/ListPurchaseOrders";
+import AddWOWithoutPO from "./pages/JobExecution/InitiateWorkOrder/AddWOWithoutPO";
+import ListProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/ListProcessingWorkOrders";
+import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerApproval";
+import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
+import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -111,6 +117,30 @@ function App() {
         {
           path: "/pre-job/partial-order-selection",
           element: <PartialOrderSelection />,
+        },
+        {
+          path: "/job-execution/initiate-work-order/list-all-purchase-orders",
+          element: <ListPurchaseOrders />,
+        },
+        {
+          path: "/job-execution/initiate-work-order/add-wo-without-po",
+          element: <AddWOWithoutPO />,
+        },
+        {
+          path: "/job-execution/processing-work-orders/list-all-processing-work-orders",
+          element: <ListProcessingWorkOrders />,
+        },
+        {
+          path: "/job-execution/processing-work-orders/manager-approval",
+          element: <ManagerApproval />,
+        },
+        {
+          path: "/job-execution/processing-work-orders/delivery",
+          element: <Delivery />,
+        },
+        {
+          path: "/job-execution/processing-work-orders/close-work-orders",
+          element: <CloseWorkOrder />,
         },
       ],
     },
