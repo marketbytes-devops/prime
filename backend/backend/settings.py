@@ -169,7 +169,7 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = os.getenv("EMAIL_PORT", 587)
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "marketbytesdevops@gmail.com")
-EMAIL_HOST_PASSWORD = os.getenv("ysydcazqvfxcewow", "ysydcazqvfxcewow")
+EMAIL_HOST_PASSWORD = os.getenv("ajlynuqzidudayti", "ajlynuqzidudayti")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "marketbytesdevops@gmail.com")
 
 AUTH_USER_MODEL = 'authapp.CustomUser'
