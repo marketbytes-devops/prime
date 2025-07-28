@@ -435,13 +435,13 @@ const AddRFQ = () => {
         <div className="flex flex-col space-y-4">
           <Button
             onClick={() => handleClientSelect("new")}
-            className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
+            className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg scale-100 hover:scale-[1.02] transition-all duration-300"
           >
             New Client
           </Button>
           <Button
             onClick={() => handleClientSelect("existing")}
-            className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-1"
+            className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 shadow-md hover:shadow-lg scale-100 hover:scale-[1.02] transition-all duration-300"
           >
             Existing Client
           </Button>
