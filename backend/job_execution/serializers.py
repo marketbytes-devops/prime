@@ -55,8 +55,19 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        if not data.get('purchase_order') and not data.get('quotation'):
-            raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
+        # Only enforce purchase_order or quotation requirement for creation or when fields are provided
+        if self.instance is None:  # POST (creation)
+            if not data.get('purchase_order') and not data.get('quotation'):
+                raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
+        else:  # PATCH or PUT (update)
+            # Check if purchase_order or quotation is being explicitly set to None
+            if 'purchase_order' in data and data['purchase_order'] is None and \
+               'quotation' in data and data['quotation'] is None:
+                raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
+            # If neither field is in data, rely on existing instance values
+            if 'purchase_order' not in data and 'quotation' not in data:
+                if not self.instance.purchase_order and not self.instance.quotation:
+                    raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
         return data
 
     def send_assignment_email(self, work_order, assigned_to):
@@ -201,7 +212,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         created_by = validated_data.pop('created_by', None)
         
         try:
-            wo_series = NumberSeries.objects.get(series_name='WorkOrder')
+            wo_series = NumberSeries.objects.get(series_name='Work Order')
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Work Order series not found.")
         max_sequence = WorkOrder.objects.filter(wo_number__startswith=wo_series.prefix).aggregate(

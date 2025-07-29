@@ -24,7 +24,7 @@ const ListProcessingWorkOrders = () => {
   const fetchWorkOrders = async () => {
     try {
       const [woRes, itemsRes, unitsRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Processing' } }),
+        apiClient.get('work-orders/', { params: { status: 'Submitted' } }),
         apiClient.get('item/'),
         apiClient.get('unit/'),
       ]);
@@ -99,7 +99,7 @@ const ListProcessingWorkOrders = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Processing Work Orders</h1>
+      <h1 className="text-2xl font-bold mb-4">Submitted Work Orders</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">

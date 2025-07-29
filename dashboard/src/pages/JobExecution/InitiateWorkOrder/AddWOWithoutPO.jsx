@@ -30,8 +30,8 @@ const AddWOWithoutPO = () => {
       const [quotationsRes, teamRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('quotations/'),
         apiClient.get('teams/'),
-        apiClient.get('item/'),
-        apiClient.get('unit/'),
+        apiClient.get('items/'),
+        apiClient.get('units/'),
       ]);
       setState(prev => ({
         ...prev,
@@ -66,6 +66,13 @@ const AddWOWithoutPO = () => {
     }));
   };
 
+  const handleRemoveItem = index => {
+    setState(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
       const payload = {
@@ -80,7 +87,12 @@ const AddWOWithoutPO = () => {
         remarks: state.remarks,
         assigned_to: state.assignedTo,
         created_by: state.teamMembers.find(m => m.email === localStorage.getItem('userEmail'))?.id,
-        items: state.items,
+        items: state.items.map(item => ({
+          item: parseInt(item.item),
+          quantity: parseFloat(item.quantity),
+          unit: parseInt(item.unit),
+          unit_price: parseFloat(item.unit_price),
+        })),
         manager_approval_status: 'Pending',
       };
       await apiClient.post('work-orders/', payload);
@@ -92,6 +104,11 @@ const AddWOWithoutPO = () => {
     }
   };
 
+  const getAssignedSalesPersonName = () => {
+    const quotation = state.quotations.find(q => q.id === parseInt(state.selectedQuotation));
+    return quotation?.assigned_sales_person_name || 'N/A';
+  };
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Add Work Order Without PO</h1>
@@ -101,13 +118,24 @@ const AddWOWithoutPO = () => {
           <select
             value={state.selectedQuotation}
             onChange={e => setState(prev => ({ ...prev, selectedQuotation: e.target.value }))}
-            className="p-2 border rounded w-full"
+            className="p-2 border rounded w-full focus:outline-indigo-500"
           >
             <option value="">Select Quotation</option>
             {state.quotations.map(q => (
-              <option key={q.id} value={q.id}>{q.company_name || 'Unnamed'} ({q.id})</option>
+              <option key={q.id} value={q.id}>
+                {q.series_number || `Quotation ID ${q.id}`}
+              </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Sales Person</label>
+          <InputField
+            type="text"
+            value={getAssignedSalesPersonName()}
+            readOnly
+            className="w-full bg-gray-100"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Date Received</label>
@@ -132,7 +160,7 @@ const AddWOWithoutPO = () => {
           <select
             value={state.onsiteOrLab}
             onChange={e => setState(prev => ({ ...prev, onsiteOrLab: e.target.value }))}
-            className="p-2 border rounded w-full"
+            className="p-2 border rounded w-full focus:outline-indigo-500"
           >
             <option value="">Select</option>
             <option value="Onsite">Onsite</option>
@@ -180,7 +208,7 @@ const AddWOWithoutPO = () => {
           <select
             value={state.assignedTo}
             onChange={e => setState(prev => ({ ...prev, assignedTo: e.target.value }))}
-            className="p-2 border rounded w-full"
+            className="p-2 border rounded w-full focus:outline-indigo-500"
           >
             <option value="">Select Technician</option>
             {state.teamMembers.map(member => (
@@ -189,18 +217,27 @@ const AddWOWithoutPO = () => {
           </select>
         </div>
         <div>
-          <h3 className="text-lg font-medium text-black">Items</h3>
+          <h3 className="text-lg font-medium text-black mb-2">Items</h3>
           <Button onClick={handleAddItem} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
             Add Item
           </Button>
           {state.items.map((item, index) => (
-            <div key={index} className="border p-4 mt-2 rounded-md">
+            <div key={index} className="border p-4 mt-2 rounded-md space-y-2">
+              <div className="flex justify-between items-center">
+                <h4 className="text-sm font-medium text-gray-700">Item {index + 1}</h4>
+                <Button
+                  onClick={() => handleRemoveItem(index)}
+                  className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                >
+                  Remove
+                </Button>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
                 <select
                   value={item.item}
                   onChange={e => handleItemChange(index, 'item', e.target.value)}
-                  className="p-2 border rounded w-full"
+                  className="p-2 border rounded w-full focus:outline-indigo-500"
                 >
                   <option value="">Select Item</option>
                   {state.itemsList.map(i => (
@@ -215,6 +252,7 @@ const AddWOWithoutPO = () => {
                   value={item.quantity}
                   onChange={e => handleItemChange(index, 'quantity', e.target.value)}
                   className="w-full"
+                  min="0"
                 />
               </div>
               <div>
@@ -222,7 +260,7 @@ const AddWOWithoutPO = () => {
                 <select
                   value={item.unit}
                   onChange={e => handleItemChange(index, 'unit', e.target.value)}
-                  className="p-2 border rounded w-full"
+                  className="p-2 border rounded w-full focus:outline-indigo-500"
                 >
                   <option value="">Select Unit</option>
                   {state.units.map(u => (
@@ -237,6 +275,8 @@ const AddWOWithoutPO = () => {
                   value={item.unit_price}
                   onChange={e => handleItemChange(index, 'unit_price', e.target.value)}
                   className="w-full"
+                  min="0"
+                  step="0.01"
                 />
               </div>
             </div>
@@ -245,8 +285,26 @@ const AddWOWithoutPO = () => {
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSubmit}
-            disabled={!state.selectedQuotation || !state.dateReceived || !state.expectedCompletionDate || state.items.length === 0}
-            className={`px-4 py-2 rounded-md ${state.selectedQuotation && state.dateReceived && state.expectedCompletionDate && state.items.length > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+            disabled={
+              !state.selectedQuotation ||
+              !state.dateReceived ||
+              !state.expectedCompletionDate ||
+              state.items.length === 0 ||
+              state.items.some(
+                item => !item.item || !item.quantity || !item.unit || !item.unit_price
+              )
+            }
+            className={`px-4 py-2 rounded-md ${
+              state.selectedQuotation &&
+              state.dateReceived &&
+              state.expectedCompletionDate &&
+              state.items.length > 0 &&
+              !state.items.some(
+                item => !item.item || !item.quantity || !item.unit || !item.unit_price
+              )
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'bg-gray-300 text-gray-500'
+            }`}
           >
             Submit for Approval
           </Button>
