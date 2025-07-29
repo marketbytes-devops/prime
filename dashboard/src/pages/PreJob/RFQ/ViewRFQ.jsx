@@ -36,7 +36,9 @@ const ViewRFQ = () => {
         rfqsRes.data.map(async (rfq) => {
           try {
             const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
-            return { ...rfq, hasQuotation: quotationRes.data.length > 0 };
+            const hasQuotation = quotationRes.data.length > 0;
+            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`); // Debugging
+            return { ...rfq, hasQuotation };
           } catch (error) {
             console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
             return { ...rfq, hasQuotation: false };
@@ -83,6 +85,7 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
+      console.log(`Status updated for RFQ ${id} to ${newStatus}`); // Debugging
       await fetchRFQs(); // Refresh after status change
     } catch (error) {
       console.error('Error updating status:', error);

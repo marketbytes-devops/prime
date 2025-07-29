@@ -30,6 +30,13 @@ class QuotationViewSet(viewsets.ModelViewSet):
     queryset = Quotation.objects.all()
     serializer_class = QuotationSerializer
     permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        rfq_id = self.request.query_params.get('rfq')
+        if rfq_id:
+            queryset = queryset.filter(rfq=rfq_id)
+        return queryset
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

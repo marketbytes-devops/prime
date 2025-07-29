@@ -69,10 +69,29 @@ const ViewQuotation = () => {
     fetchQuotations();
   }, []);
 
-  const handleDelete = async id => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this quotation?')) {
       try {
+        const quotationRes = await apiClient.get(`/quotations/${id}/`);
+        const quotation = quotationRes.data;
+        const rfqId = quotation.rfq; 
         await apiClient.delete(`/quotations/${id}/`);
+        if (rfqId) {
+          try {
+            const rfqRes = await apiClient.get(`/rfqs/${rfqId}/`);
+            const rfq = rfqRes.data;
+            if (rfq.rfq_status === 'Completed') {
+              const payload = {
+                rfq_status: 'Processing',
+                items: rfq.items || [],
+              };
+              await apiClient.patch(`/rfqs/${rfqId}/`, payload);
+            }
+          } catch (error) {
+            console.error(`Error updating RFQ ${rfqId} status:`, error);
+            toast.error('Failed to update associated RFQ status.');
+          }
+        }
         await fetchQuotations();
         toast.success('Quotation deleted successfully!');
       } catch (error) {
@@ -92,7 +111,6 @@ const ViewQuotation = () => {
 
   const handleUploadPO = id => {
     const quotation = state.quotations.find(q => q.id === id);
-    // Use only the partial orders created in the current session (from createdPartialOrders if available)
     const currentPartialOrders = quotation.purchase_orders.filter(po => po.order_type === 'partial');
     setState(prev => ({
       ...prev,
