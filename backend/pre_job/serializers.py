@@ -602,8 +602,39 @@ class QuotationSerializer(serializers.ModelSerializer):
                 email_sent = True
                 print(f"PO follow-up reminder email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
             except Exception as e:
-                print(f"Failed to send PO follow-up reminder email to Might have been assigned to a different user or email address.")
                 print(f"Failed to send PO follow-up reminder email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Quotation #{quotation.series_number} PO Follow-up Due Today Notification'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'We would like to inform you that the following Quotation has a PO follow-up due today:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
+                f'🔹 Status: {quotation.quotation_status}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                print(f"PO follow-up reminder email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send PO follow-up reminder email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
 
         return email_sent
 
@@ -776,11 +807,27 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                 )
         else:  # partial order
             for item_data in items_data:
+                item_instance = None
+                unit_instance = None
+                # Handle item field
+                item_id = item_data.get('item')
+                if item_id is not None:
+                    try:
+                        item_instance = Item.objects.get(id=item_id)
+                    except Item.DoesNotExist:
+                        raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
+                # Handle unit field
+                unit_id = item_data.get('unit')
+                if unit_id is not None:
+                    try:
+                        unit_instance = Unit.objects.get(id=unit_id)
+                    except Unit.DoesNotExist:
+                        raise serializers.ValidationError(f"Unit with ID {unit_id} does not exist.")
                 PurchaseOrderItem.objects.create(
                     purchase_order=purchase_order,
-                    item=Item.objects.get(id=item_data['item']) if item_data.get('item') else None,
+                    item=item_instance,
                     quantity=item_data.get('quantity'),
-                    unit=Unit.objects.get(id=item_data['unit']) if item_data.get('unit') else None,
+                    unit=unit_instance,
                     unit_price=item_data.get('unit_price')
                 )
 
@@ -795,3 +842,40 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             quotation.save()
 
         return purchase_order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        instance.order_type = validated_data.get('order_type', instance.order_type)
+        instance.client_po_number = validated_data.get('client_po_number', instance.client_po_number)
+        if 'po_file' in validated_data:
+            instance.po_file = validated_data.get('po_file')
+        instance.save()
+
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                item_instance = None
+                unit_instance = None
+                # Handle item field
+                item_id = item_data.get('item')
+                if item_id is not None:
+                    try:
+                        item_instance = Item.objects.get(id=item_id)
+                    except Item.DoesNotExist:
+                        raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
+                # Handle unit field
+                unit_id = item_data.get('unit')
+                if unit_id is not None:
+                    try:
+                        unit_instance = Unit.objects.get(id=unit_id)
+                    except Unit.DoesNotExist:
+                        raise serializers.ValidationError(f"Unit with ID {unit_id} does not exist.")
+                PurchaseOrderItem.objects.create(
+                    purchase_order=instance,
+                    item=item_instance,
+                    quantity=item_data.get('quantity'),
+                    unit=unit_instance,
+                    unit_price=item_data.get('unit_price')
+                )
+
+        return instance
