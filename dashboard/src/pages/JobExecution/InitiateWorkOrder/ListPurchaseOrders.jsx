@@ -44,7 +44,7 @@ const ListPurchaseOrders = () => {
     try {
       const [poRes, teamRes, itemsRes, unitsRes, quotationsRes, seriesRes] = await Promise.all([
         apiClient.get('purchase-orders/'),
-        apiClient.get('teams/'),
+        apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('quotations/'),
@@ -203,9 +203,25 @@ const ListPurchaseOrders = () => {
 
   const handleUpdateStatus = async (poId, status) => {
     try {
-      const workOrder = await apiClient.get(`/work-orders/?purchase_order=${poId}`);
-      if (workOrder.data.length > 0) {
-        await apiClient.patch(`/work-orders/${workOrder.data[0].id}/`, { status });
+      const workOrderResponse = await apiClient.get(`/work-orders/?purchase_order=${poId}`);
+      const workOrders = workOrderResponse.data || [];
+      if (workOrders.length > 0) {
+        const workOrderId = workOrders[0].id;
+        const patchResponse = await apiClient.patch(`/work-orders/${workOrderId}/update_status/`, { status });
+        setState(prev => {
+          const updatedPOs = prev.purchaseOrders.map(po => {
+            if (po.id === poId) {
+              return {
+                ...po,
+                work_orders: po.work_orders.map(wo =>
+                  wo.id === workOrderId ? { ...wo, status: patchResponse.data.status } : wo
+                ),
+              };
+            }
+            return po;
+          });
+          return { ...prev, purchaseOrders: updatedPOs };
+        });
         toast.success('Work Order status updated successfully.');
         await fetchData();
       } else {
@@ -303,7 +319,7 @@ const ListPurchaseOrders = () => {
             <p><strong>Client PO Number:</strong> ${po.client_po_number || 'N/A'}</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
             <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
-            <p><strong>PO File:</strong> ${po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : 'N/A'}</p>
+            <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split('/').pop() || 'File Uploaded' : 'N/A'}</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
           <div style="margin-bottom: 20px;">
@@ -338,8 +354,8 @@ const ListPurchaseOrders = () => {
                           <td style="padding: 8px;">${item.name || 'N/A'}</td>
                           <td style="padding: 8px; text-align: center;">${item.quantity || 'N/A'}</td>
                           <td style="padding: 8px; text-align: left;">${state.units.find(u => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td style="padding: 8px; text-align: right;">$${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                          <td style="padding: 8px; text-align: right;">$${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                          <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                         </tr>
                       `
                       )
@@ -357,8 +373,8 @@ const ListPurchaseOrders = () => {
                               <td style="padding: 8px;">${item.name || 'N/A'}</td>
                               <td style="padding: 8px; text-align: center;">${item.quantity || 'N/A'}</td>
                               <td style="padding: 8px; text-align: left;">${state.units.find(u => u.id === item.unit)?.name || 'N/A'}</td>
-                              <td style="padding: 8px; text-align: right;">$${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                              <td style="padding: 8px; text-align: right;">$${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                              <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                              <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                             </tr>
                           `
                           )
@@ -374,6 +390,19 @@ const ListPurchaseOrders = () => {
     `);
     printWindow.document.close();
     printWindow.print();
+  };
+
+  const handleDeletePO = async poId => {
+    if (window.confirm('Are you sure you want to delete this purchase order?')) {
+      try {
+        await apiClient.delete(`purchase-orders/${poId}/`);
+        toast.success('Purchase order deleted successfully.');
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting purchase order:', error);
+        toast.error('Failed to delete purchase order.');
+      }
+    }
   };
 
   const filteredPOs = state.purchaseOrders
@@ -479,10 +508,10 @@ const ListPurchaseOrders = () => {
               ) : (
                 currentPOs.map((po, index) => (
                   <tr key={po.id} className="border hover:bg-gray-50">
-                    <td className="border p-2 whitespace-nowrap">${startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">${new Date(po.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2 whitespace-nowrap">${po.client_po_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">${getAssignedSalesPersonName(po)}</td>
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(po.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{po.client_po_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedSalesPersonName(po)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <select
                         value={po.work_orders?.[0]?.status || 'Collection Pending'}
@@ -503,9 +532,16 @@ const ListPurchaseOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleConvertToWO(po)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          className={`px-3 py-1 text-white rounded-md text-sm ${po.work_orders?.[0]?.status === 'Completed' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                          disabled={po.work_orders?.[0]?.status !== 'Completed'}
                         >
                           Convert to Work Order
+                        </Button>
+                        <Button
+                          onClick={() => handleDeletePO(po.id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                        >
+                          Delete
                         </Button>
                       </div>
                     </td>
@@ -535,7 +571,7 @@ const ListPurchaseOrders = () => {
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              ${page}
+              {page}
             </Button>
           ))}
           <Button
@@ -556,12 +592,12 @@ const ListPurchaseOrders = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>PO ID:</strong> ${state.selectedPO.id}</p>
-              <p><strong>Client PO Number:</strong> ${state.selectedPO.client_po_number || 'N/A'}</p>
-              <p><strong>Order Type:</strong> ${state.selectedPO.order_type}</p>
-              <p><strong>Created:</strong> ${new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
-              <p><strong>PO File:</strong> ${state.selectedPO.po_file ? `<a href="${state.selectedPO.po_file}" target="_blank" rel="noopener noreferrer">View File</a>` : 'N/A'}</p>
-              <p><strong>Assigned Sales Person:</strong> ${getAssignedSalesPersonName(state.selectedPO)}</p>
+              <p><strong>PO ID:</strong> {state.selectedPO.id}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type}</p>
+              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
+              <p><strong>PO File:</strong> {state.selectedPO.po_file ? state.selectedPO.po_file.split('/').pop() || 'File Uploaded' : 'N/A'}</p>
+              <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -581,17 +617,17 @@ const ListPurchaseOrders = () => {
                       {state.selectedPO.items.map(item => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
-                            ${state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}
+                            {state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">${item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${state.units.find(u => u.id === item.unit)?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            $${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                            {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $${item.quantity && item.unit_price
+                            {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(2)
                               : '0.00'}
                           </td>
@@ -630,7 +666,7 @@ const ListPurchaseOrders = () => {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() => setState(prev => ({ ...prev, isWOTypeModalOpen: false, selectedPO: null }))}
+              onClose={() => setState(prev => ({ ...prev, isWOTypeModalOpen: false, selectedPO: null }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
@@ -662,7 +698,7 @@ const ListPurchaseOrders = () => {
             >
               <option value="">Select Creator</option>
               {state.teamMembers.map(member => (
-                <option key={member.id} value={member.id}>${member.name}</option>
+                <option key={member.id} value={member.id}>{member.name}</option>
               ))}
             </select>
           </div>
@@ -741,7 +777,7 @@ const ListPurchaseOrders = () => {
             >
               <option value="">Select Technician</option>
               {state.teamMembers.map(member => (
-                <option key={member.id} value={member.id}>${member.name}</option>
+                <option key={member.id} value={member.id}>{member.name}</option>
               ))}
             </select>
           </div>
@@ -776,16 +812,16 @@ const ListPurchaseOrders = () => {
                   <tbody>
                     {state.savedItems.map(item => (
                       <tr key={item.id} className="border">
-                        <td className="border p-2 whitespace-nowrap">${item.name || 'N/A'}</td>
-                        <td className="border p-2 whitespace-nowrap">${item.quantity || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.name || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                         <td className="border p-2 whitespace-nowrap">
-                          ${state.units.find(u => u.id === item.unit)?.name || 'N/A'}
+                          {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          $${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          $${item.quantity && item.unit_price
+                          {item.quantity && item.unit_price
                             ? Number(item.quantity * item.unit_price).toFixed(2)
                             : '0.00'}
                         </td>
@@ -794,63 +830,66 @@ const ListPurchaseOrders = () => {
                   </tbody>
                 </table>
               </div>
-            ) : state.woType === 'Split' ? (
+            ) : state.woType === 'Split' && state.savedItems.length > 0 ? (
               <div>
-                {state.createdSplitOrders.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-md font-semibold mb-2 text-black">Created Split Orders</h4>
-                    {state.createdSplitOrders.map((order, index) => (
-                      <div key={index} className="mb-4">
-                        <h5 className="text-sm font-medium text-gray-700">Split Order ${index + 1}</h5>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="bg-gray-200">
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {order.items.map(item => (
-                                <tr key={item.id} className="border">
-                                  <td className="border p-2 whitespace-nowrap">${item.name || 'N/A'}</td>
-                                  <td className="border p-2 whitespace-nowrap">${item.quantity || 'N/A'}</td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    ${state.units.find(u => u.id === item.unit)?.name || 'N/A'}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    $${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    $${item.quantity && item.unit_price
-                                      ? Number(item.quantity * item.unit_price).toFixed(2)
-                                      : '0.00'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {remainingItems.length > 0 && (
-                  <div>
-                    <h4 className="text-md font-semibold mb-2 text-black">
-                      Select Items for Split Order ${state.createdSplitOrders.length + 1}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Selected items: ${state.selectedItemIds.length} (Remaining: ${remainingItems.length})
-                    </p>
+                {state.createdSplitOrders.map((order, index) => (
+                  <div key={index} className="mb-4 p-2 border rounded">
+                    <h4 className="text-md font-medium">Split Order {index + 1}</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Select</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {order.items.map(item => (
+                            <tr key={item.id} className="border">
+                              <td className="border p-2 whitespace-nowrap">{item.name || 'N/A'}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.quantity && item.unit_price
+                                  ? Number(item.quantity * item.unit_price).toFixed(2)
+                                  : '0.00'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+                {state.numberOfSplitOrders && state.createdSplitOrders.length < state.numberOfSplitOrders && (
+                  <div>
+                    <h4 className="text-md font-medium">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-200">
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={state.selectedItemIds.length === remainingItems.length}
+                                onChange={e =>
+                                  setState(prev => ({
+                                    ...prev,
+                                    selectedItemIds: e.target.checked
+                                      ? remainingItems.map(item => item.id)
+                                      : [],
+                                  }))
+                                }
+                              />
+                            </th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
@@ -866,19 +905,18 @@ const ListPurchaseOrders = () => {
                                   type="checkbox"
                                   checked={state.selectedItemIds.includes(item.id)}
                                   onChange={() => handleItemSelection(item.id)}
-                                  disabled={state.usedItemIds.includes(item.id)}
                                 />
                               </td>
-                              <td className="border p-2 whitespace-nowrap">${item.name || 'N/A'}</td>
-                              <td className="border p-2 whitespace-nowrap">${item.quantity || 'N/A'}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.name || 'N/A'}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                               <td className="border p-2 whitespace-nowrap">
-                                ${state.units.find(u => u.id === item.unit)?.name || 'N/A'}
+                                {state.units.find(u => u.id === item.unit)?.name || 'N/A'}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                $${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                                {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                $${item.quantity && item.unit_price
+                                {item.quantity && item.unit_price
                                   ? Number(item.quantity * item.unit_price).toFixed(2)
                                   : '0.00'}
                               </td>
@@ -890,7 +928,11 @@ const ListPurchaseOrders = () => {
                     <Button
                       onClick={handleGenerateSplitOrder}
                       disabled={isGenerateDisabled()}
-                      className={`mt-2 px-3 py-1 rounded-md ${isGenerateDisabled() ? 'bg-gray-300 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                      className={`px-4 py-2 mt-2 rounded-md ${
+                        isGenerateDisabled()
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
                       Generate Split Order
                     </Button>
@@ -898,29 +940,27 @@ const ListPurchaseOrders = () => {
                 )}
               </div>
             ) : (
-              <p className="text-gray-500">No items added. Click 'Add Item' to fetch items from PO.</p>
+              <p className="text-gray-500">No items available.</p>
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button
-              onClick={handlePrint}
-              disabled={!state.dateReceived || !state.expectedCompletionDate || !state.createdBy || (state.woType === 'Split' && state.createdSplitOrders.length !== state.numberOfSplitOrders)}
-              className={`px-4 py-2 rounded-md ${state.dateReceived && state.expectedCompletionDate && state.createdBy && (state.woType !== 'Split' || state.createdSplitOrders.length === state.numberOfSplitOrders) ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500'}`}
-            >
-              Print
-            </Button>
-            <Button
-              onClick={handleWOSubmit}
-              disabled={!state.dateReceived || !state.expectedCompletionDate || !state.createdBy || (state.woType === 'Split' && state.createdSplitOrders.length !== state.numberOfSplitOrders)}
-              className={`px-4 py-2 rounded-md ${state.dateReceived && state.expectedCompletionDate && state.createdBy && (state.woType !== 'Split' || state.createdSplitOrders.length === state.numberOfSplitOrders) ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
-            >
-              Submit
-            </Button>
             <Button
               onClick={() => setState(prev => ({ ...prev, isWOModalOpen: false, selectedPO: null }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
+            </Button>
+            <Button
+              onClick={handleWOSubmit}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            >
+              Submit
+            </Button>
+            <Button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Print
             </Button>
           </div>
         </div>

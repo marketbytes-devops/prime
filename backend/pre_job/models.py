@@ -1,6 +1,7 @@
 from django.db import models
 from datetime import timedelta
 from django.utils import timezone
+from series.models import NumberSeries  # Assuming this exists; adjust if different
 
 class RFQ(models.Model):
     company_name = models.CharField(max_length=100, null=True, blank=True)
@@ -98,9 +99,32 @@ class PurchaseOrder(models.Model):
     client_po_number = models.CharField(max_length=100, blank=True, null=True)
     po_file = models.FileField(upload_to='po_files/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)  # Already added
 
     def __str__(self):
         return f"PO {self.id} - {self.quotation.company_name or 'Unnamed'} ({self.order_type})"
+
+    def save(self, *args, **kwargs):
+        # Only generate series_number on creation, not on updates
+        if not self.series_number and self._state.adding:
+            try:
+                po_series = NumberSeries.objects.get(series_name='PurchaseOrder')
+                max_sequence = PurchaseOrder.objects.filter(
+                    series_number__startswith=po_series.prefix
+                ).aggregate(models.Max('series_number'))['series_number__max']
+                sequence = 1
+                if max_sequence:
+                    sequence = int(max_sequence.split('-')[-1]) + 1
+                self.series_number = f"{po_series.prefix}-{sequence:06d}"
+            except NumberSeries.DoesNotExist:
+                max_sequence = PurchaseOrder.objects.filter(
+                    series_number__startswith='PO-PRIME'
+                ).aggregate(models.Max('series_number'))['series_number__max']
+                sequence = 1
+                if max_sequence:
+                    sequence = int(max_sequence.split('-')[-1]) + 1
+                self.series_number = f"PO-PRIME-{sequence:06d}"
+        super().save(*args, **kwargs)
 
 class PurchaseOrderItem(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, related_name='items', on_delete=models.CASCADE)
