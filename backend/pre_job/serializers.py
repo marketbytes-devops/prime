@@ -777,12 +777,13 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     order_type = serializers.ChoiceField(choices=[('full', 'Full'), ('partial', 'Partial')], default='full')
     client_po_number = serializers.CharField(max_length=100, allow_blank=True, required=False)
     po_file = serializers.FileField(required=False, allow_null=True)
+    series_number = serializers.CharField(max_length=50, read_only=True)  # Added read-only field
 
     class Meta:
         model = PurchaseOrder
         fields = [
             'id', 'quotation', 'order_type', 'client_po_number', 'po_file',
-            'created_at', 'items'
+            'created_at', 'items', 'series_number'
         ]
 
     def create(self, validated_data):

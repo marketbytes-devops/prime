@@ -5,6 +5,9 @@ from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
 from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WorkOrderViewSet(viewsets.ModelViewSet):
     queryset = WorkOrder.objects.all()
@@ -13,10 +16,32 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        purchase_order_id = self.request.query_params.get('purchase_order')
         status = self.request.query_params.get('status')
+        logger.info(f"Filtering queryset with purchase_order={purchase_order_id}, status={status}")
+        if purchase_order_id:
+            queryset = queryset.filter(purchase_order_id=purchase_order_id)
         if status:
             queryset = queryset.filter(status=status)
+        logger.info(f"Queryset count: {queryset.count()}")
         return queryset
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        work_order = self.get_object()
+        logger.info(f"Attempting to update status for WorkOrder {pk}. Request data: {request.data}")
+        new_status = request.data.get('status')
+        if new_status in dict(WorkOrder.STATUS_CHOICES).keys():
+            serializer = self.get_serializer(work_order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                updated_work_order = WorkOrder.objects.get(pk=pk)  # Refresh from DB
+                logger.info(f"Status updated successfully: {serializer.data}")
+                return Response(self.get_serializer(updated_work_order).data)
+            logger.error(f"Serializer validation failed: {serializer.errors}")
+            return Response(serializer.errors, status=400)
+        logger.warning(f"Invalid status value: {new_status}")
+        return Response({'error': 'Invalid status value'}, status=400)
 
     @action(detail=True, methods=['post'])
     def move_to_approval(self, request, pk=None):
@@ -35,7 +60,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             work_order.status = 'Approved'
             work_order.save()
             
-            # Create Delivery Note
             try:
                 dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
             except NumberSeries.DoesNotExist:
@@ -67,6 +91,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             work_order.save()
             return Response({'status': 'Work Order declined'})
         return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=400)
+
+    @action(detail=True, methods=['get'])
+    def can_convert_to_work_order(self, request, pk=None):
+        work_order = self.get_object()
+        return Response({'can_convert': work_order.status == 'Collected'})
 
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()

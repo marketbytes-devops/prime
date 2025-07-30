@@ -80,6 +80,9 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             for po in subsequent_pos:
                 current_sequence = int(po.series_number.split('-')[-1])
                 new_sequence = current_sequence - 1
+                # Check for existing series_number to avoid duplicates
+                while PurchaseOrder.objects.filter(series_number=f"PO-PRIME-{new_sequence:06d}").exists():
+                    new_sequence += 1
                 po.series_number = f"PO-PRIME-{new_sequence:06d}"
                 po.save()
         quotation = instance.quotation

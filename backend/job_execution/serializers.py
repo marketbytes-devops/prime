@@ -10,7 +10,6 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from datetime import date, timedelta
-
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
     unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
@@ -53,23 +52,37 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'manager_approval_status', 'decline_reason', 'items', 'delivery_note',
             'assigned_to_name', 'created_by_name'
         ]
+        extra_kwargs = {
+            'status': {'required': False},
+        }
 
     def validate(self, data):
-        # Only enforce purchase_order or quotation requirement for creation or when fields are provided
         if self.instance is None:  # POST (creation)
             if not data.get('purchase_order') and not data.get('quotation'):
                 raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
         else:  # PATCH or PUT (update)
-            # Check if purchase_order or quotation is being explicitly set to None
             if 'purchase_order' in data and data['purchase_order'] is None and \
                'quotation' in data and data['quotation'] is None:
                 raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
-            # If neither field is in data, rely on existing instance values
             if 'purchase_order' not in data and 'quotation' not in data:
                 if not self.instance.purchase_order and not self.instance.quotation:
                     raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
+            # Validate status transition
+            current_status = self.instance.status if self.instance else None
+            new_status = data.get('status', current_status)
+            valid_transitions = {
+                'Collection Pending': ['Collected'],
+                'Collected': ['Processing', 'Manager Approval'],
+                'Processing': ['Manager Approval'],
+                'Manager Approval': ['Approved', 'Declined'],
+                'Approved': ['Delivered'],
+                'Delivered': ['Closed'],
+                'Declined': [],
+                'Closed': []
+            }
+            if current_status and new_status and new_status not in valid_transitions.get(current_status, []):
+                raise serializers.ValidationError(f"Invalid status transition from {current_status} to {new_status}")
         return data
-
     def send_assignment_email(self, work_order, assigned_to):
         email_sent = False
         if assigned_to and assigned_to.email:
@@ -102,7 +115,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             except Exception as e:
                 print(f"Failed to send email to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
 
-            # Email to admin
             admin_email = settings.ADMIN_EMAIL
             admin_subject = f'Work Order Assignment Notification – #{work_order.wo_number}'
             admin_message = (
@@ -172,7 +184,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             except Exception as e:
                 print(f"Failed to send calibration due reminder to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
 
-            # Email to admin
             admin_email = settings.ADMIN_EMAIL
             admin_subject = f'Calibration Due Notification – Work Order #{work_order.wo_number}'
             admin_message = (
@@ -253,7 +264,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         assigned_to = validated_data.get('assigned_to', instance.assigned_to)
         
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            setattr(instance, attr, value)  # Allow all fields to be updated
         instance.save()
 
         if items_data is not None:
@@ -263,5 +274,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
         if assigned_to and (not instance.assigned_to or instance.assigned_to.id != assigned_to.id):
             self.send_assignment_email(instance, assigned_to)
+
+        # Send calibration due reminders for updated items
+        for item in instance.items.all():
+            if item.calibration_due_date and item.calibration_due_date == date.today():
+                self.send_calibration_due_reminder(instance, item, assigned_to)
 
         return instance
