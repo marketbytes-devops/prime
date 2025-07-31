@@ -22,7 +22,8 @@ class WorkOrder(models.Model):
             ('Delivered', 'Delivered'),
             ('Closed', 'Closed')
         ],
-        default='Collection Pending'
+        default='Collection Pending',
+        null=True, blank=True
     )
     date_received = models.DateField(null=True, blank=True)
     expected_completion_date = models.DateField(null=True, blank=True)

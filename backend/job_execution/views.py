@@ -1,11 +1,10 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
 from pre_job.models import PurchaseOrder
-from team.models import TeamMember
 from django.utils import timezone
 import logging
 
@@ -20,131 +19,141 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         purchase_order_id = self.request.query_params.get('purchase_order')
         status = self.request.query_params.get('status')
-        logger.info(f"Filtering queryset with purchase_order={purchase_order_id}, status={status}")
         if purchase_order_id:
             queryset = queryset.filter(purchase_order_id=purchase_order_id)
         if status:
             queryset = queryset.filter(status=status)
-        logger.info(f"Queryset count: {queryset.count()}")
+        logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, count={queryset.count()}")
         return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        logger.info(f"Received POST request for WorkOrder creation: {request.data}")
         if serializer.is_valid():
             self.perform_create(serializer)
-            logger.info(f"WorkOrder created successfully: {serializer.data}")
-            return Response(serializer.data, status=201)
-        logger.error(f"Serializer validation failed: {serializer.errors}")
-        return Response(serializer.errors, status=400)
+            logger.info(f"WorkOrder created: {serializer.data['id']}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Create failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['post'], url_path='create-from-purchase-order')
-    def create_from_purchase_order(self, request):
-        purchase_order_id = request.data.get('purchase_order')
-        if not purchase_order_id:
-            return Response({'error': 'purchase_order is required'}, status=400)
-        try:
-            purchase_order = PurchaseOrder.objects.get(id=purchase_order_id)
-        except PurchaseOrder.DoesNotExist:
-            return Response({'error': 'PurchaseOrder not found'}, status=400)
-        team_member = TeamMember.objects.first()  # Use an existing TeamMember or pass via request
-        if not team_member:
-            return Response({'error': 'No TeamMember available to assign'}, status=400)
-        work_order = WorkOrder.objects.create(
-            purchase_order=purchase_order,
-            status='Collection Pending',
-            assigned_to=team_member
-        )
-        serializer = self.get_serializer(work_order)
-        logger.info(f"Created WorkOrder {work_order.id} from PurchaseOrder {purchase_order_id}")
-        return Response(serializer.data, status=201)
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        if serializer.is_valid():
+            self.perform_update(serializer)
+            logger.info(f"WorkOrder {instance.id} updated")
+            return Response(serializer.data)
+        logger.error(f"Update failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['patch'])
-    def update_status(self, request, pk=None):
-        work_order = self.get_object()
-        logger.info(f"Attempting to update status for WorkOrder {pk}. Request data: {request.data}")
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        logger.info(f"WorkOrder {instance.id} deleted")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['patch'], url_path='update-status-by-purchase-order/(?P<po_id>[^/.]+)')
+    def update_status_by_purchase_order(self, request, po_id=None):
         new_status = request.data.get('status')
-        if new_status in dict(WorkOrder.STATUS_CHOICES).keys():
-            serializer = self.get_serializer(work_order, data=request.data, partial=True)
+        valid_statuses = [choice[0] for choice in WorkOrder._meta.get_field('status').choices]
+        
+        if not new_status or new_status not in valid_statuses:
+            logger.warning(f"Invalid status: {new_status}")
+            return Response({'error': 'Invalid status value'}, status=status.HTTP_400_BAD_REQUEST)
+
+        work_orders = WorkOrder.objects.filter(purchase_order_id=po_id)
+        if not work_orders.exists():
+            logger.info(f"No work orders found for PO {po_id}")
+            return Response({'error': 'No work orders found for this purchase order'}, status=status.HTTP_404_NOT_FOUND)
+
+        updated_orders = []
+        for work_order in work_orders:
+            serializer = self.get_serializer(work_order, data={'status': new_status}, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                updated_work_order = WorkOrder.objects.get(pk=pk)  # Refresh from DB
-                logger.info(f"Status updated successfully: {serializer.data}")
-                return Response(self.get_serializer(updated_work_order).data)
-            logger.error(f"Serializer validation failed: {serializer.errors}")
-            return Response(serializer.errors, status=400)
-        logger.warning(f"Invalid status value: {new_status}")
-        return Response({'error': 'Invalid status value'}, status=400)
+                updated_orders.append(serializer.data)
+                logger.info(f"Updated status for WorkOrder {work_order.id} to {new_status}")
+            else:
+                logger.error(f"Failed to update WorkOrder {work_order.id}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
+        return Response(updated_orders, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='move-to-approval')
     def move_to_approval(self, request, pk=None):
         work_order = self.get_object()
         if all(item.certificate_number and item.calibration_due_date for item in work_order.items.all()):
             work_order.status = 'Manager Approval'
             work_order.save()
+            logger.info(f"WorkOrder {pk} moved to Manager Approval")
             return Response({'status': 'Work Order moved to Manager Approval'})
-        return Response({'error': 'All items must have certificate number and calibration due date'}, status=400)
+        logger.warning(f"WorkOrder {pk} cannot move to approval: missing certificate data")
+        return Response({'error': 'All items must have certificate number and calibration due date'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='approve')
     def approve(self, request, pk=None):
         work_order = self.get_object()
-        if work_order.status == 'Manager Approval':
-            work_order.manager_approval_status = 'Approved'
-            work_order.status = 'Approved'
-            work_order.save()
-            
-            try:
-                dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
-            except NumberSeries.DoesNotExist:
-                return Response({'error': 'Delivery Note series not found'}, status=400)
-            max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
-                Max('dn_number')
-            )['dn_number__max']
-            sequence = 1
-            if max_sequence:
-                sequence = int(max_sequence.split('-')[-1]) + 1
-            dn_number = f"{dn_series.prefix}-{sequence:06d}"
+        if work_order.status != 'Manager Approval':
+            logger.warning(f"WorkOrder {pk} not in Manager Approval status")
+            return Response({'error': 'Work Order must be in Manager Approval status'}, status=status.HTTP_400_BAD_REQUEST)
 
-            DeliveryNote.objects.create(
-                work_order=work_order,
-                dn_number=dn_number,
-                delivery_status='Delivery Pending'
-            )
-            return Response({'status': 'Work Order approved and Delivery Note created'})
-        return Response({'error': 'Work Order must be in Manager Approval status'}, status=400)
+        from series.models import NumberSeries
+        try:
+            dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
+        except NumberSeries.DoesNotExist:
+            logger.error("Delivery Note series not found")
+            return Response({'error': 'Delivery Note series not found'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
+        max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
+            Max('dn_number')
+        )['dn_number__max']
+        sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+        dn_number = f"{dn_series.prefix}-{sequence:06d}"
+
+        work_order.manager_approval_status = 'Approved'
+        work_order.status = 'Approved'
+        work_order.save()
+        DeliveryNote.objects.create(
+            work_order=work_order,
+            dn_number=dn_number,
+            delivery_status='Delivery Pending'
+        )
+        logger.info(f"WorkOrder {pk} approved, Delivery Note {dn_number} created")
+        return Response({'status': 'Work Order approved and Delivery Note created'})
+
+    @action(detail=True, methods=['post'], url_path='decline')
     def decline(self, request, pk=None):
         work_order = self.get_object()
         decline_reason = request.data.get('decline_reason')
-        if work_order.status == 'Manager Approval' and decline_reason:
-            work_order.manager_approval_status = 'Declined'
-            work_order.status = 'Declined'
-            work_order.decline_reason = decline_reason
-            work_order.save()
-            return Response({'status': 'Work Order declined'})
-        return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=400)
-
-    @action(detail=True, methods=['get'])
-    def can_convert_to_work_order(self, request, pk=None):
-        work_order = self.get_object()
-        return Response({'can_convert': work_order.status == 'Collected'})
+        if work_order.status != 'Manager Approval' or not decline_reason:
+            logger.warning(f"WorkOrder {pk} decline failed: invalid status or no decline reason")
+            return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        work_order.manager_approval_status = 'Declined'
+        work_order.status = 'Declined'
+        work_order.decline_reason = decline_reason
+        work_order.save()
+        logger.info(f"WorkOrder {pk} declined")
+        return Response({'status': 'Work Order declined'})
 
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
     serializer_class = DeliveryNoteSerializer
     permission_classes = [AllowAny]
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='upload-signed-note')
     def upload_signed_note(self, request, pk=None):
         delivery_note = self.get_object()
         signed_delivery_note = request.FILES.get('signed_delivery_note')
-        if signed_delivery_note:
-            delivery_note.signed_delivery_note = signed_delivery_note
-            delivery_note.delivery_status = 'Delivered'
-            delivery_note.save()
-            work_order = delivery_note.work_order
-            work_order.status = 'Delivered'
-            work_order.save()
-            return Response({'status': 'Signed Delivery Note uploaded and status updated'})
-        return Response({'error': 'Signed Delivery Note is required'}, status=400)
+        if not signed_delivery_note:
+            logger.warning(f"No signed delivery note provided for DeliveryNote {pk}")
+            return Response({'error': 'Signed Delivery Note is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        delivery_note.signed_delivery_note = signed_delivery_note
+        delivery_note.delivery_status = 'Delivered'
+        delivery_note.save()
+        work_order = delivery_note.work_order
+        work_order.status = 'Delivered'
+        work_order.save()
+        logger.info(f"Signed Delivery Note uploaded for DeliveryNote {pk}, WorkOrder {work_order.id} set to Delivered")
+        return Response({'status': 'Signed Delivery Note uploaded and status updated'})

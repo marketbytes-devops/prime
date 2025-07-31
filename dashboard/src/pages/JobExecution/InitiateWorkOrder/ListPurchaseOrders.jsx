@@ -38,19 +38,19 @@ const ListPurchaseOrders = () => {
     savedItems: [],
     createdSplitOrders: [],
     usedItemIds: [],
+    workOrderStatusMap: {}, 
   });
 
   const fetchData = async () => {
     try {
-      const [poRes, teamRes, itemsRes, unitsRes, quotationsRes, seriesRes] =
-        await Promise.all([
-          apiClient.get("purchase-orders/"),
-          apiClient.get("technicians/"),
-          apiClient.get("items/"),
-          apiClient.get("units/"),
-          apiClient.get("quotations/"),
-          apiClient.get("series/"),
-        ]);
+      const [poRes, teamRes, itemsRes, unitsRes, quotationsRes, seriesRes] = await Promise.all([
+        apiClient.get("purchase-orders/"),
+        apiClient.get("technicians/"),
+        apiClient.get("items/"),
+        apiClient.get("units/"),
+        apiClient.get("quotations/"),
+        apiClient.get("series/"),
+      ]);
 
       const purchaseOrders = poRes.data || [];
       const workOrdersPromises = purchaseOrders.map((po) =>
@@ -66,6 +66,13 @@ const ListPurchaseOrders = () => {
         return { ...po, work_orders: woData ? woData.work_orders : [] };
       });
 
+      const workOrderStatusMap = {};
+      updatedPurchaseOrders.forEach((po) => {
+        workOrderStatusMap[po.id] = po.work_orders.length > 0
+          ? po.work_orders.map(wo => ({ id: wo.id, status: wo.status }))
+          : [{ id: null, status: "Collection Pending" }];
+      });
+
       setState((prev) => ({
         ...prev,
         purchaseOrders: updatedPurchaseOrders,
@@ -74,6 +81,7 @@ const ListPurchaseOrders = () => {
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
         series: seriesRes.data || [],
+        workOrderStatusMap,
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -87,8 +95,7 @@ const ListPurchaseOrders = () => {
 
   const handleConvertToWO = (po) => {
     const userEmail = localStorage.getItem("userEmail");
-    const defaultCreatedBy =
-      state.teamMembers.find((m) => m.email === userEmail)?.id || "";
+    const defaultCreatedBy = state.teamMembers.find((m) => m.email === userEmail)?.id || "";
     setState((prev) => ({
       ...prev,
       isWOTypeModalOpen: true,
@@ -104,9 +111,7 @@ const ListPurchaseOrders = () => {
       usedItemIds: [],
     }));
     if (!defaultCreatedBy) {
-      toast.warn(
-        "No team member found for the current user email. Please select a creator in the Work Order form."
-      );
+      toast.warn("No team member found for the current user email.");
     }
   };
 
@@ -123,7 +128,7 @@ const ListPurchaseOrders = () => {
       ...prev,
       isWOTypeModalOpen: false,
       isWOModalOpen: true,
-      woType: type, // Automatically set the work order type
+      woType: type,
       selectedItemIds: type === "Single" ? prev.savedItems.map((item) => item.id) : [],
     }));
   };
@@ -133,20 +138,16 @@ const ListPurchaseOrders = () => {
       toast.error("Please select a team member for Created By.");
       return;
     }
-    const workOrderSeries = state.series.find(
-      (s) => s.series_name === "Work Order"
-    );
+    const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
     if (!workOrderSeries) {
-      toast.error(
-        "Work Order series not found. Please ensure the series is configured."
-      );
+      toast.error("Work Order series not found.");
       return;
     }
     try {
       const payload = {
         purchase_order: state.selectedPO.id,
         quotation: state.selectedPO.quotation,
-        status: "Submitted",
+        status: "Collection Pending",
         date_received: state.dateReceived,
         expected_completion_date: state.expectedCompletionDate,
         onsite_or_lab: state.onsiteOrLab,
@@ -156,7 +157,6 @@ const ListPurchaseOrders = () => {
         remarks: state.remarks,
         assigned_to: state.assignedTo,
         created_by: state.createdBy,
-        series: workOrderSeries.id,
         items: [],
       };
 
@@ -180,7 +180,7 @@ const ListPurchaseOrders = () => {
         }
       }
 
-      toast.success("Submitted successfully"); // Standardized success message
+      toast.success("Work Order(s) created successfully");
       setState((prev) => ({
         ...prev,
         isWOModalOpen: false,
@@ -204,73 +204,47 @@ const ListPurchaseOrders = () => {
       fetchData();
     } catch (error) {
       console.error("Error creating work order:", error);
-      toast.error(
-        error.response?.data?.detail ||
-          error.response?.data?.created_by?.[0] ||
-          "Failed to create Work Order."
-      );
+      toast.error("Failed to create Work Order.");
     }
   };
 
   const handleUpdateStatus = async (poId, status) => {
     try {
-      console.log(`Attempting to update status for PO ID ${poId} to ${status}`);
-
-      const workOrderResponse = await apiClient.get(
-        `/work-orders/?purchase_order=${poId}`
-      );
-      console.log("Work Order Response:", workOrderResponse.data);
-
-      const workOrders = workOrderResponse.data || [];
-
-      if (workOrders.length > 0) {
-        const workOrderId = workOrders[0].id;
-        console.log(`Found Work Order ID ${workOrderId}`);
-
-        const patchResponse = await apiClient.patch(
-          `/work-orders/${workOrderId}/update_status/`,
-          { status }
-        );
-        console.log("Status update response:", patchResponse.data);
-
-        setState((prev) => {
-          const updatedPOs = prev.purchaseOrders.map((po) => {
-            if (po.id === poId) {
-              return {
-                ...po,
-                work_orders: po.work_orders.map((wo) =>
-                  wo.id === workOrderId
-                    ? { ...wo, status: patchResponse.data.status }
-                    : wo
-                ),
-              };
-            }
-            return po;
-          });
-          return { ...prev, purchaseOrders: updatedPOs };
+      console.log(`Updating status for PO ID ${poId} to ${status}`);
+      const response = await apiClient.patch(`/work-orders/update-status-by-purchase-order/${poId}/`, { status });
+      
+      setState((prev) => {
+        const updatedWorkOrderStatusMap = {
+          ...prev.workOrderStatusMap,
+          [poId]: response.data.map(wo => ({ id: wo.id, status: wo.status })),
+        };
+        const updatedPOs = prev.purchaseOrders.map((po) => {
+          if (po.id === poId) {
+            return {
+              ...po,
+              work_orders: response.data,
+            };
+          }
+          return po;
         });
+        return {
+          ...prev,
+          purchaseOrders: updatedPOs,
+          workOrderStatusMap: updatedWorkOrderStatusMap,
+        };
+      });
 
-        toast.success("Work Order status updated successfully.");
-      } else {
-        console.log(`No associated Work Order found for PO ${poId}`);
-        toast.info(
-          "No Work Order exists for this Purchase Order. Use 'Convert to Work Order' to create one."
-        );
-      }
+      toast.success("Work Order statuses updated successfully.");
     } catch (error) {
       console.error("Error updating work order status:", error.response?.data || error);
-      toast.error(
-        `Failed to update Work Order status: ${error.response?.data?.detail || error.message}`
-      );
+      toast.error("Failed to update Work Order statuses.");
     }
   };
 
   const handleNumberOfSplitOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
     if (value && (value < 1 || value > state.savedItems.length)) {
-      toast.error(
-        `Number of split orders must be between 1 and ${state.savedItems.length}.`
-      );
+      toast.error(`Number of split orders must be between 1 and ${state.savedItems.length}.`);
       return;
     }
     setState((prev) => ({
@@ -287,19 +261,14 @@ const ListPurchaseOrders = () => {
       const selectedItemIds = prev.selectedItemIds.includes(itemId)
         ? prev.selectedItemIds.filter((id) => id !== itemId)
         : [...prev.selectedItemIds, itemId];
-      const remainingItemsCount =
-        prev.savedItems.length - prev.usedItemIds.length;
-      const remainingSplitOrders =
-        prev.numberOfSplitOrders - prev.createdSplitOrders.length;
-      const maxItemsPerOrder =
-        remainingSplitOrders > 1
-          ? prev.savedItems.length - (prev.numberOfSplitOrders - 1)
-          : remainingItemsCount;
+      const remainingItemsCount = prev.savedItems.length - prev.usedItemIds.length;
+      const remainingSplitOrders = prev.numberOfSplitOrders - prev.createdSplitOrders.length;
+      const maxItemsPerOrder = remainingSplitOrders > 1
+        ? prev.savedItems.length - (prev.numberOfSplitOrders - 1)
+        : remainingItemsCount;
 
       if (selectedItemIds.length > maxItemsPerOrder) {
-        toast.error(
-          `Cannot select more than ${maxItemsPerOrder} items for this split order.`
-        );
+        toast.error(`Cannot select more than ${maxItemsPerOrder} items.`);
         return prev;
       }
       return { ...prev, selectedItemIds };
@@ -308,30 +277,17 @@ const ListPurchaseOrders = () => {
 
   const isGenerateDisabled = () => {
     if (!state.numberOfSplitOrders || state.woType !== "Split") return true;
-    if (state.createdSplitOrders.length >= state.numberOfSplitOrders)
-      return true;
+    if (state.createdSplitOrders.length >= state.numberOfSplitOrders) return true;
     if (state.selectedItemIds.length === 0) return true;
-    const remainingItemsCount =
-      state.savedItems.length - state.usedItemIds.length;
-    const remainingSplitOrders =
-      state.numberOfSplitOrders - state.createdSplitOrders.length;
-    const maxItemsPerOrder =
-      remainingSplitOrders > 1
-        ? state.savedItems.length - (state.numberOfSplitOrders - 1)
-        : remainingItemsCount;
+    const remainingItemsCount = state.savedItems.length - state.usedItemIds.length;
+    const remainingSplitOrders = state.numberOfSplitOrders - state.createdSplitOrders.length;
+    const maxItemsPerOrder = remainingSplitOrders > 1
+      ? state.savedItems.length - (state.numberOfSplitOrders - 1)
+      : remainingItemsCount;
 
-    if (
-      remainingSplitOrders > 1 &&
-      state.selectedItemIds.length > maxItemsPerOrder
-    )
-      return true;
-    if (
-      remainingSplitOrders === 1 &&
-      state.selectedItemIds.length !== remainingItemsCount
-    )
-      return true;
-    if (state.selectedItemIds.some((id) => state.usedItemIds.includes(id)))
-      return true;
+    if (remainingSplitOrders > 1 && state.selectedItemIds.length > maxItemsPerOrder) return true;
+    if (remainingSplitOrders === 1 && state.selectedItemIds.length !== remainingItemsCount) return true;
+    if (state.selectedItemIds.some((id) => state.usedItemIds.includes(id))) return true;
     return false;
   };
 
@@ -346,18 +302,11 @@ const ListPurchaseOrders = () => {
 
     setState((prev) => ({
       ...prev,
-      createdSplitOrders: [
-        ...prev.createdSplitOrders,
-        { items: selectedItems },
-      ],
+      createdSplitOrders: [...prev.createdSplitOrders, { items: selectedItems }],
       usedItemIds: [...prev.usedItemIds, ...prev.selectedItemIds],
       selectedItemIds: [],
     }));
-    toast.success(
-      `Split Work Order ${
-        state.createdSplitOrders.length + 1
-      } generated successfully!`
-    );
+    toast.success(`Split Work Order ${state.createdSplitOrders.length + 1} generated successfully!`);
   };
 
   const handlePrint = () => {
@@ -373,50 +322,24 @@ const ListPurchaseOrders = () => {
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
             <p><strong>PO ID:</strong> ${po.id}</p>
-            <p><strong>Client PO Number:</strong> ${
-              po.client_po_number || "N/A"
-            }</p>
+            <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
-            <p><strong>Created:</strong> ${new Date(
-              po.created_at
-            ).toLocaleDateString()}</p>
-            <p><strong>PO File:</strong> ${
-              po.po_file
-                ? po.po_file.split("/").pop() || "File Uploaded"
-                : "N/A"
-            }</p>
+            <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+            <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
             <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
-            <p><strong>Date Received:</strong> ${
-              state.dateReceived
-                ? new Date(state.dateReceived).toLocaleDateString()
-                : "N/A"
-            }</p>
-            <p><strong>Expected Completion Date:</strong> ${
-              state.expectedCompletionDate
-                ? new Date(state.expectedCompletionDate).toLocaleDateString()
-                : "N/A"
-            }</p>
+            <p><strong>Date Received:</strong> ${state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Expected Completion Date:</strong> ${state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"}</p>
             <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
             <p><strong>Range:</strong> ${state.range || "N/A"}</p>
-            <p><strong>Serial Number:</strong> ${
-              state.serialNumber || "N/A"
-            }</p>
-            <p><strong>Site Location:</strong> ${
-              state.siteLocation || "N/A"
-            }</p>
+            <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
+            <p><strong>Site Location:</strong> ${state.siteLocation || "N/A"}</p>
             <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
-            <p><strong>Assigned To:</strong> ${
-              state.teamMembers.find((m) => m.id === state.assignedTo)?.name ||
-              "N/A"
-            }</p>
-            <p><strong>Created By:</strong> ${
-              state.teamMembers.find((m) => m.id === state.createdBy)?.name ||
-              "N/A"
-            }</p>
+            <p><strong>Assigned To:</strong> ${state.teamMembers.find((m) => m.id === state.assignedTo)?.name || "N/A"}</p>
+            <p><strong>Created By:</strong> ${state.teamMembers.find((m) => m.id === state.createdBy)?.name || "N/A"}</p>
           </div>
           <div>
             <h2 style="font-size: 1.25rem; font-weight: 600;">Items</h2>
@@ -428,78 +351,42 @@ const ListPurchaseOrders = () => {
                 <th style="padding: 8px; text-align: left;">Unit Price</th>
                 <th style="padding: 8px; text-align: left;">Total Price</th>
               </tr>
-              ${
-                state.woType === "Single"
-                  ? state.savedItems
-                      .map(
-                        (item) => `
+              ${state.woType === "Single"
+                ? state.savedItems
+                    .map(
+                      (item) => `
                         <tr>
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: center;">${
-                            item.quantity || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.units.find((u) => u.id === item.unit)?.name ||
-                            "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">${
-                            item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">${
-                            item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"
-                          }</td>
+                          <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                         </tr>
                       `
-                      )
-                      .join("")
-                  : state.createdSplitOrders
-                      .map(
-                        (order, index) => `
+                    )
+                    .join("")
+                : state.createdSplitOrders
+                    .map(
+                      (order, index) => `
                         <tr>
-                          <td colspan="5" style="padding: 8px; font-weight: bold;">Split Order ${
-                            index + 1
-                          }</td>
+                          <td colspan="5" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
                         </tr>
                         ${order.items
                           .map(
                             (item) => `
                             <tr>
-                              <td style="padding: 8px;">${
-                                item.name || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: center;">${
-                                item.quantity || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: left;">${
-                                state.units.find((u) => u.id === item.unit)
-                                  ?.name || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: right;">${
-                                item.unit_price
-                                  ? Number(item.unit_price).toFixed(2)
-                                  : "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: right;">${
-                                item.quantity && item.unit_price
-                                  ? Number(
-                                      item.quantity * item.unit_price
-                                    ).toFixed(2)
-                                  : "0.00"
-                              }</td>
+                              <td style="padding: 8px;">${item.name || "N/A"}</td>
+                              <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                              <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                              <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                              <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                             </tr>
                           `
                           )
                           .join("")}
                       `
-                      )
-                      .join("")
-              }
+                    )
+                    .join("")}
             </table>
           </div>
         </body>
@@ -510,9 +397,7 @@ const ListPurchaseOrders = () => {
   };
 
   const handleDeletePO = async (poId) => {
-    if (
-      window.confirm("Are you sure you want to delete this purchase order?")
-    ) {
+    if (window.confirm("Are you sure you want to delete this purchase order?")) {
       try {
         await apiClient.delete(`purchase-orders/${poId}/`);
         toast.success("Purchase order deleted successfully.");
@@ -527,37 +412,27 @@ const ListPurchaseOrders = () => {
   const filteredPOs = state.purchaseOrders
     .filter(
       (po) =>
-        (po.client_po_number || "")
-          .toLowerCase()
-          .includes(state.searchTerm.toLowerCase()) ||
+        (po.client_po_number || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
         (po.id || "").toString().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === "created_at") {
         return new Date(b.created_at) - new Date(a.created_at);
       } else if (state.sortBy === "client_po_number") {
-        return (a.client_po_number || "").localeCompare(
-          b.client_po_number || ""
-        );
+        return (a.client_po_number || "").localeCompare(b.client_po_number || "");
       }
       return 0;
     });
 
   const totalPages = Math.ceil(filteredPOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
-  const currentPOs = filteredPOs.slice(
-    startIndex,
-    startIndex + state.itemsPerPage
-  );
+  const currentPOs = filteredPOs.slice(startIndex, startIndex + state.itemsPerPage);
 
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
   const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
-  const pageNumbers = Array.from(
-    { length: endPage - startPage + 1 },
-    (_, i) => startPage + i
-  );
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -580,9 +455,18 @@ const ListPurchaseOrders = () => {
     return quotation?.assigned_sales_person_name || "N/A";
   };
 
-  const remainingItems = state.savedItems.filter(
-    (item) => !state.usedItemIds.includes(item.id)
-  );
+  const getStatusDisplay = (poId) => {
+    const statuses = state.workOrderStatusMap[poId] || [{ status: "Collection Pending" }];
+    if (statuses.length === 1) return statuses[0].status;
+    return statuses.map(s => s.status).join(", ");
+  };
+
+  const canConvertToWorkOrder = (poId) => {
+    const statuses = state.workOrderStatusMap[poId] || [];
+    return statuses.every(s => s.status === "Collected");
+  };
+
+  const remainingItems = state.savedItems.filter((item) => !state.usedItemIds.includes(item.id));
 
   return (
     <div className="mx-auto p-4">
@@ -590,28 +474,20 @@ const ListPurchaseOrders = () => {
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search Purchase Orders
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Purchase Orders</label>
             <InputField
               type="text"
               placeholder="Search by PO number or ID..."
               value={state.searchTerm}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, searchTerm: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort By
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={state.sortBy}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, sortBy: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
               className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="created_at">Creation Date</option>
@@ -623,66 +499,40 @@ const ListPurchaseOrders = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Sl No
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Created At
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  PO Number
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Assigned To
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Current Status
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Actions
-                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created At</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">PO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Current Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentPOs.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="6"
-                    className="border p-2 text-center text-gray-500 whitespace-nowrap"
-                  >
+                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">
                     No purchase orders found.
                   </td>
                 </tr>
               ) : (
                 currentPOs.map((po, index) => (
                   <tr key={po.id} className="border hover:bg-gray-50">
-                    <td className="border p-2 whitespace-nowrap">
-                      {startIndex + index + 1}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {new Date(po.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {po.client_po_number || "N/A"}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {getAssignedSalesPersonName(po)}
-                    </td>
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(po.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{po.client_po_number || "N/A"}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedSalesPersonName(po)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <select
-                        value={
-                          po.work_orders?.[0]?.status || "Collection Pending"
-                        }
-                        onChange={(e) =>
-                          handleUpdateStatus(po.id, e.target.value)
-                        }
+                        value={state.workOrderStatusMap[po.id]?.[0]?.status || "Collection Pending"}
+                        onChange={(e) => handleUpdateStatus(po.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
-                        <option value="Collection Pending">
-                          Collection Pending
-                        </option>
+                        <option value="Collection Pending">Collection Pending</option>
                         <option value="Collected">Collected</option>
                       </select>
+                      {state.workOrderStatusMap[po.id]?.length > 1 && (
+                        <span className="text-xs text-gray-500">({state.workOrderStatusMap[po.id].length} work orders)</span>
+                      )}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -695,6 +545,7 @@ const ListPurchaseOrders = () => {
                         <Button
                           onClick={() => handleConvertToWO(po)}
                           className="px-3 py-1 text-white rounded-md text-sm bg-blue-600 hover:bg-blue-700"
+                          disabled={!canConvertToWorkOrder(po.id)}
                         >
                           Convert to Work Order
                         </Button>
@@ -746,45 +597,19 @@ const ListPurchaseOrders = () => {
       )}
       <Modal
         isOpen={state.isModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isModalOpen: false,
-            selectedPO: null,
-          }))
-        }
+        onClose={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedPO: null }))}
         title={`Purchase Order Details - ID ${state.selectedPO?.id || "N/A"}`}
       >
         {state.selectedPO && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Purchase Order Details
-              </h3>
-              <p>
-                <strong>PO ID:</strong> {state.selectedPO.id}
-              </p>
-              <p>
-                <strong>Client PO Number:</strong>{" "}
-                {state.selectedPO.client_po_number || "N/A"}
-              </p>
-              <p>
-                <strong>Order Type:</strong> {state.selectedPO.order_type}
-              </p>
-              <p>
-                <strong>Created:</strong>{" "}
-                {new Date(state.selectedPO.created_at).toLocaleDateString()}
-              </p>
-              <p>
-                <strong>PO File:</strong>{" "}
-                {state.selectedPO.po_file
-                  ? state.selectedPO.po_file.split("/").pop() || "File Uploaded"
-                  : "N/A"}
-              </p>
-              <p>
-                <strong>Assigned Sales Person:</strong>{" "}
-                {getAssignedSalesPersonName(state.selectedPO)}
-              </p>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>PO ID:</strong> {state.selectedPO.id}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || "N/A"}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type}</p>
+              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
+              <p><strong>PO File:</strong> {state.selectedPO.po_file ? state.selectedPO.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
+              <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -793,49 +618,21 @@ const ListPurchaseOrders = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Item
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Quantity
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit Price
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Total Price
-                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedPO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.quantity || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"}
-                          </td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -850,19 +647,11 @@ const ListPurchaseOrders = () => {
       </Modal>
       <Modal
         isOpen={state.isWOTypeModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isWOTypeModalOpen: false,
-            selectedPO: null,
-          }))
-        }
+        onClose={() => setState((prev) => ({ ...prev, isWOTypeModalOpen: false, selectedPO: null }))}
         title="Convert to Work Order"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
-            Select an option to convert Purchase Order to a Work Order:
-          </p>
+          <p className="text-gray-700">Select an option to convert Purchase Order to a Work Order:</p>
           <div className="flex justify-center gap-4">
             <Button
               onClick={() => handleWOTypeOption("Single")}
@@ -879,13 +668,7 @@ const ListPurchaseOrders = () => {
           </div>
           <div className="flex justify-end">
             <Button
-              onClick={() =>
-                setState((prev) => ({
-                  ...prev,
-                  isWOTypeModalOpen: false,
-                  selectedPO: null,
-                }))
-              }
+              onClick={() => setState((prev) => ({ ...prev, isWOTypeModalOpen: false, selectedPO: null }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
@@ -895,84 +678,55 @@ const ListPurchaseOrders = () => {
       </Modal>
       <Modal
         isOpen={state.isWOModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isWOModalOpen: false,
-            selectedPO: null,
-          }))
-        }
+        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedPO: null }))}
         title="Create Work Order"
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Work Order Type
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Type</label>
             <InputField
               type="text"
-              defaultValue={state.woType} // Automatically filled based on selection
+              defaultValue={state.woType}
               disabled
               className="w-full p-2 border rounded bg-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Created By
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
             <select
               value={state.createdBy}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, createdBy: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, createdBy: e.target.value }))}
               className="p-2 border rounded w-full"
             >
               <option value="">Select Creator</option>
               {state.teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
+                <option key={member.id} value={member.id}>{member.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date Received
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date Received</label>
             <InputField
               type="date"
               value={state.dateReceived}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, dateReceived: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, dateReceived: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expected Completion Date
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Expected Completion Date</label>
             <InputField
               type="date"
               value={state.expectedCompletionDate}
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  expectedCompletionDate: e.target.value,
-                }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, expectedCompletionDate: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Onsite or Lab
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Onsite or Lab</label>
             <select
               value={state.onsiteOrLab}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, onsiteOrLab: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, onsiteOrLab: e.target.value }))}
               className="p-2 border rounded w-full"
             >
               <option value="">Select</option>
@@ -981,81 +735,57 @@ const ListPurchaseOrders = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Range
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Range</label>
             <InputField
               type="text"
               value={state.range}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, range: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, range: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Serial Number
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
             <InputField
               type="text"
               value={state.serialNumber}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, serialNumber: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, serialNumber: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Site Location
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Site Location</label>
             <InputField
               type="text"
               value={state.siteLocation}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, siteLocation: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, siteLocation: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Remarks
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
             <InputField
               type="text"
               value={state.remarks}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, remarks: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, remarks: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Assign To
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
             <select
               value={state.assignedTo}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, assignedTo: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, assignedTo: e.target.value }))}
               className="p-2 border rounded w-full"
             >
               <option value="">Select Technician</option>
               {state.teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
+                <option key={member.id} value={member.id}>{member.name}</option>
               ))}
             </select>
           </div>
           {state.woType === "Split" && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Number of Split Orders
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Number of Split Orders</label>
               <InputField
                 type="number"
                 value={state.numberOfSplitOrders}
@@ -1074,46 +804,21 @@ const ListPurchaseOrders = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-200">
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Item
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Quantity
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Unit
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Unit Price
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Total Price
-                      </th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.savedItems.map((item) => (
                       <tr key={item.id} className="border">
-                        <td className="border p-2 whitespace-nowrap">
-                          {item.name || "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          {item.quantity || "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          {state.units.find((u) => u.id === item.unit)?.name ||
-                            "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          {item.unit_price
-                            ? Number(item.unit_price).toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          {item.quantity && item.unit_price
-                            ? Number(item.quantity * item.unit_price).toFixed(2)
-                            : "0.00"}
-                        </td>
+                        <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1126,55 +831,26 @@ const ListPurchaseOrders = () => {
               <div>
                 {state.createdSplitOrders.map((order, index) => (
                   <div key={index} className="mb-4 p-2 border rounded">
-                    <h4 className="text-md font-medium">
-                      Split Order {index + 1}
-                    </h4>
+                    <h4 className="text-md font-medium">Split Order {index + 1}</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Item
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Quantity
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Unit
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Unit Price
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Total Price
-                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                           </tr>
                         </thead>
                         <tbody>
                           {order.items.map((item) => (
                             <tr key={item.id} className="border">
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.name || "N/A"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.quantity || "N/A"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {state.units.find((u) => u.id === item.unit)
-                                  ?.name || "N/A"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.unit_price
-                                  ? Number(item.unit_price).toFixed(2)
-                                  : "N/A"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.quantity && item.unit_price
-                                  ? Number(
-                                      item.quantity * item.unit_price
-                                    ).toFixed(2)
-                                  : "0.00"}
-                              </td>
+                              <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1182,139 +858,88 @@ const ListPurchaseOrders = () => {
                     </div>
                   </div>
                 ))}
-                {state.numberOfSplitOrders &&
-                  state.createdSplitOrders.length <
-                    state.numberOfSplitOrders && (
-                    <div>
-                      <h4 className="text-md font-medium">
-                        Select Items for Split Order{" "}
-                        {state.createdSplitOrders.length + 1}
-                      </h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                          <thead>
-                            <tr className="bg-gray-200">
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                {state.numberOfSplitOrders && state.createdSplitOrders.length < state.numberOfSplitOrders && (
+                  <div>
+                    <h4 className="text-md font-medium">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-200">
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={state.selectedItemIds.length === remainingItems.length}
+                                onChange={(e) =>
+                                  setState((prev) => ({
+                                    ...prev,
+                                    selectedItemIds: e.target.checked ? remainingItems.map((item) => item.id) : [],
+                                  }))
+                                }
+                              />
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remainingItems.map((item) => (
+                            <tr key={item.id} className="border">
+                              <td className="border p-2 whitespace-nowrap">
                                 <input
                                   type="checkbox"
-                                  checked={
-                                    state.selectedItemIds.length ===
-                                    remainingItems.length
-                                  }
-                                  onChange={(e) =>
-                                    setState((prev) => ({
-                                      ...prev,
-                                      selectedItemIds: e.target.checked
-                                        ? remainingItems.map((item) => item.id)
-                                        : [],
-                                    }))
-                                  }
+                                  checked={state.selectedItemIds.includes(item.id)}
+                                  onChange={() => handleItemSelection(item.id)}
                                 />
-                              </th>
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                Item
-                              </th>
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                Quantity
-                              </th>
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                Unit
-                              </th>
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                Unit Price
-                              </th>
-                              <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                Total Price
-                              </th>
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {remainingItems.map((item) => (
-                              <tr key={item.id} className="border">
-                                <td className="border p-2 whitespace-nowrap">
-                                  <input
-                                    type="checkbox"
-                                    checked={state.selectedItemIds.includes(
-                                      item.id
-                                    )}
-                                    onChange={() =>
-                                      handleItemSelection(item.id)
-                                    }
-                                  />
-                                </td>
-                                <td className="border p-2 whitespace-nowrap">
-                                  {item.name || "N/A"}
-                                </td>
-                                <td className="border p-2 whitespace-nowrap">
-                                  {item.quantity || "N/A"}
-                                </td>
-                                <td className="border p-2 whitespace-nowrap">
-                                    {state.units.find((u) => u.id === item.unit)
-                                      ?.name || "N/A"}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    {item.unit_price
-                                      ? Number(item.unit_price).toFixed(2)
-                                      : "N/A"}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    {item.quantity && item.unit_price
-                                      ? Number(
-                                          item.quantity * item.unit_price
-                                        ).toFixed(2)
-                                      : "0.00"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <Button
-                          onClick={handleGenerateSplitOrder}
-                          disabled={isGenerateDisabled()}
-                          className={`px-4 py-2 mt-2 rounded-md ${
-                            isGenerateDisabled()
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-blue-600 text-white hover:bg-blue-700"
-                          }`}
-                        >
-                          Generate Split Order
-                        </Button>
-                      </div>
-                    )}
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button
+                      onClick={handleGenerateSplitOrder}
+                      disabled={isGenerateDisabled()}
+                      className={`px-4 py-2 mt-2 rounded-md ${isGenerateDisabled() ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                    >
+                      Generate Split Order
+                    </Button>
                   </div>
                 )}
               </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  onClick={() =>
-                    setState((prev) => ({
-                      ...prev,
-                      isWOModalOpen: false,
-                      selectedPO: null,
-                    }))
-                  }
-                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleWOSubmit}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                >
-                  Submit
-                </Button>
-                <Button
-                  onClick={handlePrint}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Print
-                </Button>
-              </div>
-            </div>
-          </Modal>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedPO: null }))}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleWOSubmit}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            >
+              Submit
+            </Button>
+            <Button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Print
+            </Button>
+          </div>
         </div>
-      );
-    };
+      </Modal>
+    </div>
+  );
+};
 
-    export default ListPurchaseOrders;
+export default ListPurchaseOrders;

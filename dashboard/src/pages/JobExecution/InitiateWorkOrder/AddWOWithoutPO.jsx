@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
-import Modal from '../../../components/Modal';
 
 const AddWOWithoutPO = () => {
   const navigate = useNavigate();
@@ -29,7 +28,7 @@ const AddWOWithoutPO = () => {
     try {
       const [quotationsRes, teamRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('quotations/'),
-        apiClient.get('teams/'),
+        apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
       ]);
@@ -60,9 +59,7 @@ const AddWOWithoutPO = () => {
   const handleItemChange = (index, field, value) => {
     setState(prev => ({
       ...prev,
-      items: prev.items.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      ),
+      items: prev.items.map((item, i) => i === index ? { ...item, [field]: value } : item),
     }));
   };
 
@@ -122,9 +119,7 @@ const AddWOWithoutPO = () => {
           >
             <option value="">Select Quotation</option>
             {state.quotations.map(q => (
-              <option key={q.id} value={q.id}>
-                {q.series_number || `Quotation ID ${q.id}`}
-              </option>
+              <option key={q.id} value={q.id}>{q.series_number || `Quotation ID ${q.id}`}</option>
             ))}
           </select>
         </div>
@@ -290,18 +285,14 @@ const AddWOWithoutPO = () => {
               !state.dateReceived ||
               !state.expectedCompletionDate ||
               state.items.length === 0 ||
-              state.items.some(
-                item => !item.item || !item.quantity || !item.unit || !item.unit_price
-              )
+              state.items.some(item => !item.item || !item.quantity || !item.unit || !item.unit_price)
             }
             className={`px-4 py-2 rounded-md ${
               state.selectedQuotation &&
               state.dateReceived &&
               state.expectedCompletionDate &&
               state.items.length > 0 &&
-              !state.items.some(
-                item => !item.item || !item.quantity || !item.unit || !item.unit_price
-              )
+              !state.items.some(item => !item.item || !item.quantity || !item.unit || !item.unit_price)
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-300 text-gray-500'
             }`}

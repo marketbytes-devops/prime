@@ -6,7 +6,7 @@ const Team = () => {
   const [state, setState] = useState({
     members: [],
     technicians: [],
-    memberType: 'team', // 'team' or 'technician'
+    memberType: 'team', 
     name: '',
     designation: '',
     email: '',

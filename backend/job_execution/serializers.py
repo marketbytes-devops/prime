@@ -56,188 +56,54 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'manager_approval_status', 'decline_reason', 'items', 'delivery_note',
             'assigned_to_name', 'created_by_name'
         ]
-        extra_kwargs = {
-            'status': {'required': False},
-        }
-
-    def validate(self, data):
-        if self.instance is None:  # POST (creation)
-            if not data.get('purchase_order') and not data.get('quotation'):
-                raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
-        else:  # PATCH or PUT (update)
-            if 'purchase_order' in data and data['purchase_order'] is None and \
-               'quotation' in data and data['quotation'] is None:
-                raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
-            if 'purchase_order' not in data and 'quotation' not in data:
-                if not self.instance.purchase_order and not self.instance.quotation:
-                    raise serializers.ValidationError("Either purchase_order or quotation must be provided.")
-            # Validate status transition
-            current_status = self.instance.status if self.instance else None
-            new_status = data.get('status', current_status)
-            valid_transitions = {
-                'Collection Pending': ['Collected'],
-                'Collected': ['Processing', 'Manager Approval'],
-                'Processing': ['Manager Approval'],
-                'Manager Approval': ['Approved', 'Declined'],
-                'Approved': ['Delivered'],
-                'Delivered': ['Closed'],
-                'Declined': [],
-                'Closed': []
-            }
-            if current_status and new_status and new_status not in valid_transitions.get(current_status, []):
-                raise serializers.ValidationError(f"Invalid status transition from {current_status} to {new_status}")
-        return data
 
     def send_assignment_email(self, work_order, assigned_to):
-        email_sent = False
         if assigned_to and assigned_to.email:
             subject = f'You Have Been Assigned to Work Order #{work_order.wo_number}'
             message = (
                 f'Dear {assigned_to.name},\n\n'
-                f'You have been assigned to the following Work Order:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Work Order Number: {work_order.wo_number}\n'
-                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                f'🔹 Status: {work_order.status}\n'
-                f'🔹 Expected Completion Date: {work_order.expected_completion_date or "Not specified"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to view the details and take the necessary actions.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
+                f'You have been assigned to Work Order #{work_order.wo_number}:\n'
+                f'Project: {work_order.quotation.company_name or "Unnamed"}\n'
+                f'Status: {work_order.status}\n'
+                f'Expected Completion: {work_order.expected_completion_date or "Not specified"}\n\n'
+                f'Please check PrimeCRM for details.\n\n'
+                f'Best regards,\nPrimeCRM Team'
             )
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_to.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                logger.info(f"Email sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
+                send_mail(subject, message, None, [assigned_to.email], fail_silently=True)
+                logger.info(f"Email sent to {assigned_to.email} for WO #{work_order.wo_number}")
             except Exception as e:
-                logger.error(f"Failed to send email to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
+                logger.error(f"Failed to send email to {assigned_to.email}: {str(e)}")
 
             admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Work Order Assignment Notification – #{work_order.wo_number}'
+            admin_subject = f'Work Order Assignment – #{work_order.wo_number}'
             admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following Work Order has been assigned:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Work Order Number: {work_order.wo_number}\n'
-                f'🔹 Assigned To: {assigned_to.name} ({assigned_to.email})\n'
-                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                f'🔹 Status: {work_order.status}\n'
-                f'🔹 Expected Completion Date: {work_order.expected_completion_date or "Not specified"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
+                f'Work Order #{work_order.wo_number} assigned to {assigned_to.name} ({assigned_to.email}).\n'
+                f'Project: {work_order.quotation.company_name or "Unnamed"}\n'
+                f'Status: {work_order.status}\n'
+                f'Expected Completion: {work_order.expected_completion_date or "Not specified"}'
             )
             try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                logger.info(f"Email sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
+                send_mail(admin_subject, admin_message, None, [admin_email], fail_silently=True)
+                logger.info(f"Admin email sent to {admin_email} for WO #{work_order.wo_number}")
             except Exception as e:
-                logger.error(f"Failed to send email to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_calibration_due_reminder(self, work_order, item, assigned_to):
-        email_sent = False
-        if (assigned_to and assigned_to.email and
-                item.calibration_due_date and
-                item.calibration_due_date == date.today()):
-            subject = f'Reminder: Calibration Due for Work Order #{work_order.wo_number}'
-            message = (
-                f'Dear {assigned_to.name},\n\n'
-                f'The calibration due date for the following item in Work Order #{work_order.wo_number} is today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Item: {item.item.name if item.item else "N/A"}\n'
-                f'🔹 Certificate Number: {item.certificate_number or "N/A"}\n'
-                f'🔹 Calibration Due Date: {item.calibration_due_date}\n'
-                f'🔹 Work Order Number: {work_order.wo_number}\n'
-                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please ensure the necessary actions are taken. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_to.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                logger.info(f"Calibration due reminder sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
-            except Exception as e:
-                logger.error(f"Failed to send calibration due reminder to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
-
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Calibration Due Notification – Work Order #{work_order.wo_number}'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'The calibration due date for the following item in Work Order #{work_order.wo_number} is today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Item: {item.item.name if item.item else "N/A"}\n'
-                f'🔹 Certificate Number: {item.certificate_number or "N/A"}\n'
-                f'🔹 Calibration Due Date: {item.calibration_due_date}\n'
-                f'🔹 Assigned To: {assigned_to.name} ({assigned_to.email})\n'
-                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                logger.info(f"Calibration due reminder sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
-            except Exception as e:
-                logger.error(f"Failed to send calibration due reminder to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
+                logger.error(f"Failed to send admin email to {admin_email}: {str(e)}")
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
-        assigned_to = validated_data.pop('assigned_to', None)
-        created_by = validated_data.pop('created_by', None)
-        status = validated_data.pop('status', 'Collection Pending')  # Default to Collection Pending
+        assigned_to = validated_data.get('assigned_to')
+        created_by = validated_data.get('created_by')
+        status = validated_data.get('status', 'Collection Pending')
 
         try:
             wo_series = NumberSeries.objects.get(series_name='Work Order')
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Work Order series not found.")
+
         max_sequence = WorkOrder.objects.filter(wo_number__startswith=wo_series.prefix).aggregate(
             Max('wo_number')
         )['wo_number__max']
-        sequence = 1
-        if max_sequence:
-            sequence = int(max_sequence.split('-')[-1]) + 1
+        sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
         wo_number = f"{wo_series.prefix}-{sequence:06d}"
 
         work_order = WorkOrder.objects.create(
@@ -249,22 +115,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
-        # Always create items from the provided items_data, even if purchase_order exists
-        if items_data:
-            for item_data in items_data:
-                WorkOrderItem.objects.create(work_order=work_order, **item_data)
-                logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id} with item {item_data.get('item')}")
-
-        if work_order.purchase_order and not items_data:
-            for item in work_order.purchase_order.items.all():
-                WorkOrderItem.objects.create(
-                    work_order=work_order,
-                    item=item.item,
-                    quantity=item.quantity,
-                    unit=item.unit,
-                    unit_price=item.unit_price
-                )
-                logger.info(f"Created WorkOrderItem from PurchaseOrder for WorkOrder {work_order.id} with item {item.item}")
+        for item_data in items_data:
+            WorkOrderItem.objects.create(work_order=work_order, **item_data)
+            logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
 
         if assigned_to:
             self.send_assignment_email(work_order, assigned_to)
@@ -274,11 +127,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         assigned_to = validated_data.get('assigned_to', instance.assigned_to)
-        
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        logger.info(f"Updated WorkOrder {instance.id} with data {validated_data}")
+        logger.info(f"Updated WorkOrder {instance.id}")
 
         if items_data is not None:
             instance.items.all().delete()
@@ -288,10 +141,5 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
         if assigned_to and (not instance.assigned_to or instance.assigned_to.id != assigned_to.id):
             self.send_assignment_email(instance, assigned_to)
-
-        # Send calibration due reminders for updated items
-        for item in instance.items.all():
-            if item.calibration_due_date and item.calibration_due_date == date.today():
-                self.send_calibration_due_reminder(instance, item, assigned_to)
 
         return instance
