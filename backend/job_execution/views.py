@@ -1,3 +1,4 @@
+# work_orders/views.py
 from rest_framework import viewsets, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -51,33 +52,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         logger.info(f"WorkOrder {instance.id} deleted")
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=['patch'], url_path='update-status-by-purchase-order/(?P<po_id>[^/.]+)')
-    def update_status_by_purchase_order(self, request, po_id=None):
-        new_status = request.data.get('status')
-        valid_statuses = [choice[0] for choice in WorkOrder._meta.get_field('status').choices]
-        
-        if not new_status or new_status not in valid_statuses:
-            logger.warning(f"Invalid status: {new_status}")
-            return Response({'error': 'Invalid status value'}, status=status.HTTP_400_BAD_REQUEST)
-
-        work_orders = WorkOrder.objects.filter(purchase_order_id=po_id)
-        if not work_orders.exists():
-            logger.info(f"No work orders found for PO {po_id}")
-            return Response({'error': 'No work orders found for this purchase order'}, status=status.HTTP_404_NOT_FOUND)
-
-        updated_orders = []
-        for work_order in work_orders:
-            serializer = self.get_serializer(work_order, data={'status': new_status}, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                updated_orders.append(serializer.data)
-                logger.info(f"Updated status for WorkOrder {work_order.id} to {new_status}")
-            else:
-                logger.error(f"Failed to update WorkOrder {work_order.id}: {serializer.errors}")
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(updated_orders, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='move-to-approval')
     def move_to_approval(self, request, pk=None):
