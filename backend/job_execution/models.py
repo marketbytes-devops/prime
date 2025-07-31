@@ -13,8 +13,6 @@ class WorkOrder(models.Model):
     status = models.CharField(
         max_length=20,
         choices=[
-            ('Collection Pending', 'Collection Pending'),
-            ('Collected', 'Collected'),
             ('Processing', 'Processing'),
             ('Manager Approval', 'Manager Approval'),
             ('Approved', 'Approved'),

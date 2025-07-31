@@ -38,7 +38,7 @@ const ListPurchaseOrders = () => {
     savedItems: [],
     createdSplitOrders: [],
     usedItemIds: [],
-    workOrderStatusMap: {}, 
+    workOrderStatusMap: {},
   });
 
   const fetchData = async () => {
@@ -211,33 +211,25 @@ const ListPurchaseOrders = () => {
   const handleUpdateStatus = async (poId, status) => {
     try {
       console.log(`Updating status for PO ID ${poId} to ${status}`);
-      const response = await apiClient.patch(`/work-orders/update-status-by-purchase-order/${poId}/`, { status });
+      const response = await apiClient.patch(`/purchase-orders/${poId}/update_status/`, { status });
       
       setState((prev) => {
-        const updatedWorkOrderStatusMap = {
-          ...prev.workOrderStatusMap,
-          [poId]: response.data.map(wo => ({ id: wo.id, status: wo.status })),
-        };
         const updatedPOs = prev.purchaseOrders.map((po) => {
           if (po.id === poId) {
-            return {
-              ...po,
-              work_orders: response.data,
-            };
+            return { ...po, status: response.data.status };
           }
           return po;
         });
         return {
           ...prev,
           purchaseOrders: updatedPOs,
-          workOrderStatusMap: updatedWorkOrderStatusMap,
         };
       });
 
-      toast.success("Work Order statuses updated successfully.");
+      toast.success("Purchase Order status updated successfully.");
     } catch (error) {
-      console.error("Error updating work order status:", error.response?.data || error);
-      toast.error("Failed to update Work Order statuses.");
+      console.error("Error updating purchase order status:", error.response?.data || error);
+      toast.error("Failed to update Purchase Order status.");
     }
   };
 
@@ -456,14 +448,13 @@ const ListPurchaseOrders = () => {
   };
 
   const getStatusDisplay = (poId) => {
-    const statuses = state.workOrderStatusMap[poId] || [{ status: "Collection Pending" }];
-    if (statuses.length === 1) return statuses[0].status;
-    return statuses.map(s => s.status).join(", ");
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    return po ? po.status : "Collection Pending";
   };
 
   const canConvertToWorkOrder = (poId) => {
-    const statuses = state.workOrderStatusMap[poId] || [];
-    return statuses.every(s => s.status === "Collected");
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    return po && po.status === 'Collected';
   };
 
   const remainingItems = state.savedItems.filter((item) => !state.usedItemIds.includes(item.id));
@@ -523,16 +514,13 @@ const ListPurchaseOrders = () => {
                     <td className="border p-2 whitespace-nowrap">{getAssignedSalesPersonName(po)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <select
-                        value={state.workOrderStatusMap[po.id]?.[0]?.status || "Collection Pending"}
+                        value={po.status || "Collection Pending"}
                         onChange={(e) => handleUpdateStatus(po.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
                         <option value="Collection Pending">Collection Pending</option>
                         <option value="Collected">Collected</option>
                       </select>
-                      {state.workOrderStatusMap[po.id]?.length > 1 && (
-                        <span className="text-xs text-gray-500">({state.workOrderStatusMap[po.id].length} work orders)</span>
-                      )}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">

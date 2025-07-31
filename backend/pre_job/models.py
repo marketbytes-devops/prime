@@ -102,8 +102,12 @@ class PurchaseOrder(models.Model):
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     status = models.CharField(
         max_length=20,
-        choices=[('Pending', 'Pending'), ('Collected', 'Collected'), ('Completed', 'Completed')],
-        default='Pending'
+        choices=[
+            ('Collection Pending', 'Collection Pending'),
+            ('Collected', 'Collected'),
+            ('Completed', 'Completed'),
+        ],
+        default='Collection Pending'
     )
 
     def __str__(self):

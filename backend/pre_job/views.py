@@ -96,7 +96,8 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         purchase_order = self.get_object()
         status = request.data.get('status')
-        if status not in dict(PurchaseOrder.STATUS_CHOICES):
+        valid_statuses = [choice[0] for choice in PurchaseOrder._meta.get_field('status').choices]
+        if status not in valid_statuses:
             return Response({"detail": "Invalid status"}, status=400)
         purchase_order.status = status
         purchase_order.save()
