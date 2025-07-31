@@ -777,13 +777,18 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     order_type = serializers.ChoiceField(choices=[('full', 'Full'), ('partial', 'Partial')], default='full')
     client_po_number = serializers.CharField(max_length=100, allow_blank=True, required=False)
     po_file = serializers.FileField(required=False, allow_null=True)
-    series_number = serializers.CharField(max_length=50, read_only=True)  # Added read-only field
+    series_number = serializers.CharField(max_length=50, read_only=True)
+    status = serializers.ChoiceField(
+        choices=[('Pending', 'Pending'), ('Collected', 'Collected'), ('Completed', 'Completed')],
+        default='Pending',
+        required=False
+    )
 
     class Meta:
         model = PurchaseOrder
         fields = [
             'id', 'quotation', 'order_type', 'client_po_number', 'po_file',
-            'created_at', 'items', 'series_number'
+            'created_at', 'items', 'series_number', 'status'
         ]
 
     def create(self, validated_data):
@@ -848,6 +853,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop('items', None)
         instance.order_type = validated_data.get('order_type', instance.order_type)
         instance.client_po_number = validated_data.get('client_po_number', instance.client_po_number)
+        instance.status = validated_data.get('status', instance.status)
         if 'po_file' in validated_data:
             instance.po_file = validated_data.get('po_file')
         instance.save()

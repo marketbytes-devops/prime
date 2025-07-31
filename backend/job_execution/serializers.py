@@ -9,7 +9,11 @@ from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date
+import logging
+
+logger = logging.getLogger(__name__)
+
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
     unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
@@ -83,6 +87,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             if current_status and new_status and new_status not in valid_transitions.get(current_status, []):
                 raise serializers.ValidationError(f"Invalid status transition from {current_status} to {new_status}")
         return data
+
     def send_assignment_email(self, work_order, assigned_to):
         email_sent = False
         if assigned_to and assigned_to.email:
@@ -111,9 +116,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     fail_silently=True,
                 )
                 email_sent = True
-                print(f"Email sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
+                logger.info(f"Email sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
             except Exception as e:
-                print(f"Failed to send email to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
+                logger.error(f"Failed to send email to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
 
             admin_email = settings.ADMIN_EMAIL
             admin_subject = f'Work Order Assignment Notification – #{work_order.wo_number}'
@@ -141,9 +146,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     recipient_list=[admin_email],
                     fail_silently=True,
                 )
-                print(f"Email sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
+                logger.info(f"Email sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
             except Exception as e:
-                print(f"Failed to send email to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
+                logger.error(f"Failed to send email to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
                 email_sent = False
 
         return email_sent
@@ -180,9 +185,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     fail_silently=True,
                 )
                 email_sent = True
-                print(f"Calibration due reminder sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
+                logger.info(f"Calibration due reminder sent successfully to {assigned_to.email} for Work Order #{work_order.wo_number}")
             except Exception as e:
-                print(f"Failed to send calibration due reminder to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
+                logger.error(f"Failed to send calibration due reminder to {assigned_to.email} for Work Order #{work_order.wo_number}: {str(e)}")
 
             admin_email = settings.ADMIN_EMAIL
             admin_subject = f'Calibration Due Notification – Work Order #{work_order.wo_number}'
@@ -210,9 +215,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     recipient_list=[admin_email],
                     fail_silently=True,
                 )
-                print(f"Calibration due reminder sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
+                logger.info(f"Calibration due reminder sent successfully to {admin_email} for Work Order #{work_order.wo_number}")
             except Exception as e:
-                print(f"Failed to send calibration due reminder to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
+                logger.error(f"Failed to send calibration due reminder to {admin_email} for Work Order #{work_order.wo_number}: {str(e)}")
                 email_sent = False
 
         return email_sent
@@ -221,7 +226,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop('items', [])
         assigned_to = validated_data.pop('assigned_to', None)
         created_by = validated_data.pop('created_by', None)
-        
+        status = validated_data.pop('status', 'Collection Pending')  # Default to Collection Pending
+
         try:
             wo_series = NumberSeries.objects.get(series_name='Work Order')
         except NumberSeries.DoesNotExist:
@@ -238,10 +244,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             wo_number=wo_number,
             assigned_to=assigned_to,
             created_by=created_by,
+            status=status,
             **validated_data
         )
+        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
-        if work_order.purchase_order:
+        # Always create items from the provided items_data, even if purchase_order exists
+        if items_data:
+            for item_data in items_data:
+                WorkOrderItem.objects.create(work_order=work_order, **item_data)
+                logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id} with item {item_data.get('item')}")
+
+        if work_order.purchase_order and not items_data:
             for item in work_order.purchase_order.items.all():
                 WorkOrderItem.objects.create(
                     work_order=work_order,
@@ -250,9 +264,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     unit=item.unit,
                     unit_price=item.unit_price
                 )
-        else:
-            for item_data in items_data:
-                WorkOrderItem.objects.create(work_order=work_order, **item_data)
+                logger.info(f"Created WorkOrderItem from PurchaseOrder for WorkOrder {work_order.id} with item {item.item}")
 
         if assigned_to:
             self.send_assignment_email(work_order, assigned_to)
@@ -264,13 +276,15 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         assigned_to = validated_data.get('assigned_to', instance.assigned_to)
         
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)  # Allow all fields to be updated
+            setattr(instance, attr, value)
         instance.save()
+        logger.info(f"Updated WorkOrder {instance.id} with data {validated_data}")
 
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
+            logger.info(f"Updated items for WorkOrder {instance.id}")
 
         if assigned_to and (not instance.assigned_to or instance.assigned_to.id != assigned_to.id):
             self.send_assignment_email(instance, assigned_to)
