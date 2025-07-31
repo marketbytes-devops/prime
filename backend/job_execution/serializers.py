@@ -108,12 +108,20 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
         work_order = WorkOrder.objects.create(
             wo_number=wo_number,
+            purchase_order=validated_data.get('purchase_order'),
+            quotation=validated_data.get('quotation'),
             assigned_to=assigned_to,
             created_by=created_by,
             status=status,
-            **validated_data
+            date_received=validated_data.get('date_received'),
+            expected_completion_date=validated_data.get('expected_completion_date'),
+            onsite_or_lab=validated_data.get('onsite_or_lab'),
+            range=validated_data.get('range'),
+            serial_number=validated_data.get('serial_number'),
+            site_location=validated_data.get('site_location'),
+            remarks=validated_data.get('remarks')
         )
-        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
+        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}, purchase_order {work_order.purchase_order_id}, status {work_order.status}, assigned_to {assigned_to.id if assigned_to else None}, created_by {created_by.id if created_by else None}")
 
         for item_data in items_data:
             WorkOrderItem.objects.create(work_order=work_order, **item_data)

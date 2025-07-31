@@ -18,7 +18,8 @@ class WorkOrder(models.Model):
             ('Approved', 'Approved'),
             ('Declined', 'Declined'),
             ('Delivered', 'Delivered'),
-            ('Closed', 'Closed')
+            ('Closed', 'Closed'),
+            ('Submitted', 'Submitted')  # Added to match frontend
         ],
         default='Collection Pending',
         null=True, blank=True
