@@ -99,7 +99,12 @@ class PurchaseOrder(models.Model):
     client_po_number = models.CharField(max_length=100, blank=True, null=True)
     po_file = models.FileField(upload_to='po_files/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)  # Already added
+    series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[('Pending', 'Pending'), ('Collected', 'Collected'), ('Completed', 'Completed')],
+        default='Pending'
+    )
 
     def __str__(self):
         return f"PO {self.id} - {self.quotation.company_name or 'Unnamed'} ({self.order_type})"

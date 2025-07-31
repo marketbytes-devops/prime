@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
+from pre_job.models import PurchaseOrder
+from team.models import TeamMember
 from django.utils import timezone
 import logging
 
@@ -25,6 +27,37 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(status=status)
         logger.info(f"Queryset count: {queryset.count()}")
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        logger.info(f"Received POST request for WorkOrder creation: {request.data}")
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            logger.info(f"WorkOrder created successfully: {serializer.data}")
+            return Response(serializer.data, status=201)
+        logger.error(f"Serializer validation failed: {serializer.errors}")
+        return Response(serializer.errors, status=400)
+
+    @action(detail=False, methods=['post'], url_path='create-from-purchase-order')
+    def create_from_purchase_order(self, request):
+        purchase_order_id = request.data.get('purchase_order')
+        if not purchase_order_id:
+            return Response({'error': 'purchase_order is required'}, status=400)
+        try:
+            purchase_order = PurchaseOrder.objects.get(id=purchase_order_id)
+        except PurchaseOrder.DoesNotExist:
+            return Response({'error': 'PurchaseOrder not found'}, status=400)
+        team_member = TeamMember.objects.first()  # Use an existing TeamMember or pass via request
+        if not team_member:
+            return Response({'error': 'No TeamMember available to assign'}, status=400)
+        work_order = WorkOrder.objects.create(
+            purchase_order=purchase_order,
+            status='Collection Pending',
+            assigned_to=team_member
+        )
+        serializer = self.get_serializer(work_order)
+        logger.info(f"Created WorkOrder {work_order.id} from PurchaseOrder {purchase_order_id}")
+        return Response(serializer.data, status=201)
 
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):

@@ -12,7 +12,16 @@ class WorkOrder(models.Model):
     assigned_to = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_orders')
     status = models.CharField(
         max_length=20,
-        choices=[('Collection Pending', 'Collection Pending'), ('Collected', 'Collected'), ('Processing', 'Processing'), ('Manager Approval', 'Manager Approval'), ('Approved', 'Approved'), ('Declined', 'Declined'), ('Delivered', 'Delivered'), ('Closed', 'Closed')],
+        choices=[
+            ('Collection Pending', 'Collection Pending'),
+            ('Collected', 'Collected'),
+            ('Processing', 'Processing'),
+            ('Manager Approval', 'Manager Approval'),
+            ('Approved', 'Approved'),
+            ('Declined', 'Declined'),
+            ('Delivered', 'Delivered'),
+            ('Closed', 'Closed')
+        ],
         default='Collection Pending'
     )
     date_received = models.DateField(null=True, blank=True)

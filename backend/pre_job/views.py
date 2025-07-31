@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .models import RFQ, Quotation, PurchaseOrder
+from rest_framework.decorators import action
 from .serializers import RFQSerializer, QuotationSerializer, PurchaseOrderSerializer
 
 class RFQViewSet(viewsets.ModelViewSet):
@@ -90,3 +91,14 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             quotation.quotation_status = 'Approved'
             quotation.save()
         return Response(status=204)
+
+    @action(detail=True, methods=['patch'], url_path='update_status')
+    def update_status(self, request, pk=None):
+        purchase_order = self.get_object()
+        status = request.data.get('status')
+        if status not in dict(PurchaseOrder.STATUS_CHOICES):
+            return Response({"detail": "Invalid status"}, status=400)
+        purchase_order.status = status
+        purchase_order.save()
+        serializer = self.get_serializer(purchase_order)
+        return Response(serializer.data)
