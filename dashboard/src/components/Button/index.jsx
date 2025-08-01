@@ -1,13 +1,20 @@
 import PropTypes from 'prop-types';
 
 const Button = ({ onClick, children, className, disabled }) => {
+  const handleClick = () => {
+    console.log("Button clicked:", { disabled, children }); // Debug log
+    if (!disabled && onClick) {
+      onClick();
+    }
+  };
+
   return (
     <button
-      onClick={disabled ? undefined : onClick} 
+      onClick={handleClick}
       className={`w-full p-2 rounded transition-opacity duration-300 opacity-90 ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
       } ${className}`}
-      disabled={disabled} 
+      disabled={disabled}
     >
       {children}
     </button>

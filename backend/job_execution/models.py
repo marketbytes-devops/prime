@@ -4,12 +4,13 @@ from pre_job.models import PurchaseOrder, Quotation
 from team.models import TeamMember
 from item.models import Item
 from unit.models import Unit
+from team.models import Technician  # Import Technician
 
 class WorkOrder(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     wo_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
-    assigned_to = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_orders')
+    assigned_to = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_orders')
     status = models.CharField(
         max_length=20,
         choices=[
@@ -18,7 +19,8 @@ class WorkOrder(models.Model):
             ('Approved', 'Approved'),
             ('Declined', 'Declined'),
             ('Delivered', 'Delivered'),
-            ('Closed', 'Closed')
+            ('Closed', 'Closed'),
+            ('Submitted', 'Submitted')
         ],
         default='Collection Pending',
         null=True, blank=True
@@ -31,16 +33,18 @@ class WorkOrder(models.Model):
     site_location = models.TextField(null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(TeamMember, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
     manager_approval_status = models.CharField(
         max_length=20,
         choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Declined', 'Declined')],
         default='Pending'
     )
     decline_reason = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')  # New field
 
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
+
+# [Rest of the models (WorkOrderItem, DeliveryNote) remain unchanged]
 
 class WorkOrderItem(models.Model):
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='items')
