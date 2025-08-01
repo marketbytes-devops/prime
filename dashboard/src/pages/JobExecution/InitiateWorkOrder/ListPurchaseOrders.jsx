@@ -828,7 +828,7 @@ const ListPurchaseOrders = () => {
               <p className="text-gray-500">No items available.</p>
             )}
             {state.woType === "Split" && state.numberOfSplitOrders && (
-              <div>
+              <div className="mt-4">
                 {state.createdSplitOrders.length > 0 && (
                   <div>
                     <h3 className="text-md font-semibold mb-2 text-black">Created Split Orders</h3>
@@ -865,23 +865,12 @@ const ListPurchaseOrders = () => {
                 )}
                 {state.createdSplitOrders.length < state.numberOfSplitOrders && (
                   <div>
-                    <h4 className="text-md font-medium">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
+                    <h4 className="text-md font-medium mb-2">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              <input
-                                type="checkbox"
-                                checked={state.selectedItemIds.length === remainingItems.length}
-                                onChange={(e) =>
-                                  setState((prev) => ({
-                                    ...prev,
-                                    selectedItemIds: e.target.checked ? remainingItems.map((item) => item.id) : [],
-                                  }))
-                                }
-                              />
-                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Select</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
