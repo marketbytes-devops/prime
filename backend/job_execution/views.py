@@ -4,8 +4,6 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
-from pre_job.models import PurchaseOrder
-from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)

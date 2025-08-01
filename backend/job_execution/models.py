@@ -1,10 +1,8 @@
 from django.db import models
-from django.utils import timezone
 from pre_job.models import PurchaseOrder, Quotation
-from team.models import TeamMember
 from item.models import Item
 from unit.models import Unit
-from team.models import Technician  # Import Technician
+from team.models import Technician  
 
 class WorkOrder(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
@@ -44,14 +42,13 @@ class WorkOrder(models.Model):
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 
-# [Rest of the models (WorkOrderItem, DeliveryNote) remain unchanged]
-
 class WorkOrderItem(models.Model):
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='items')
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    certificate_uut_label = models.CharField(max_length=100, null=True, blank=True)
     certificate_number = models.CharField(max_length=100, null=True, blank=True)
     calibration_date = models.DateField(null=True, blank=True)
     calibration_due_date = models.DateField(null=True, blank=True)

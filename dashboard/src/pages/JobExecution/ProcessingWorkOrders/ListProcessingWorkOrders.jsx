@@ -16,9 +16,8 @@ const ListProcessingWorkOrders = () => {
     sortBy: "created_at",
     currentPage: 1,
     itemsPerPage: 20,
-    isModalOpen: false,
+    isViewModalOpen: false,
     selectedWO: null,
-    items: [],
   });
 
   const fetchWorkOrders = async () => {
@@ -44,39 +43,16 @@ const ListProcessingWorkOrders = () => {
     fetchWorkOrders();
   }, []);
 
-  const handleUpdateWO = (wo) => {
+  const handleViewWO = (wo) => {
     setState((prev) => ({
       ...prev,
-      isModalOpen: true,
+      isViewModalOpen: true,
       selectedWO: wo,
-      items: wo.items || [],
     }));
   };
 
-  const handleItemChange = (index, field, value) => {
-    setState((prev) => ({
-      ...prev,
-      items: prev.items.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      ),
-    }));
-  };
-
-  const handleMoveToApproval = async () => {
-    try {
-      await apiClient.post(`work-orders/${state.selectedWO.id}/move_to_approval/`);
-      toast.success("Work Order moved to Manager Approval.");
-      setState((prev) => ({
-        ...prev,
-        isModalOpen: false,
-        selectedWO: null,
-        items: [],
-      }));
-      fetchWorkOrders();
-    } catch (error) {
-      console.error("Error moving to approval:", error);
-      toast.error("Failed to move Work Order to approval.");
-    }
+  const handleEditWO = (wo) => {
+    navigate(`/job-execution/processing-work-orders/edit-work-order/${wo.id}`);
   };
 
   const filteredWOs = state.workOrders
@@ -150,13 +126,13 @@ const ListProcessingWorkOrders = () => {
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
-                          onClick={() => handleUpdateWO(wo)}
+                          onClick={() => handleEditWO(wo)}
                           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
-                          Update WO
+                          Edit WO
                         </Button>
                         <Button
-                          onClick={() => navigate(`/view-work-order/${wo.id}`)}
+                          onClick={() => handleViewWO(wo)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           View WO
@@ -171,111 +147,61 @@ const ListProcessingWorkOrders = () => {
         </div>
       </div>
       <Modal
-        isOpen={state.isModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedWO: null, items: [] }))}
-        title="Update Work Order"
+        isOpen={state.isViewModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
       >
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
-          {state.items.map((item, index) => (
-            <div key={index} className="border p-4 rounded-md">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
-                <select
-                  value={item.item}
-                  onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                  className="p-2 border rounded w-full"
-                >
-                  <option value="">Select Item</option>
-                  {state.itemsList.map((i) => (
-                    <option key={i.id} value={i.id}>{i.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                <InputField
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                <select
-                  value={item.unit}
-                  onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                  className="p-2 border rounded w-full"
-                >
-                  <option value="">Select Unit</option>
-                  {state.units.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Number</label>
-                <InputField
-                  type="text"
-                  value={item.certificate_number}
-                  onChange={(e) => handleItemChange(index, "certificate_number", e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Calibration Date</label>
-                <InputField
-                  type="date"
-                  value={item.calibration_date}
-                  onChange={(e) => handleItemChange(index, "calibration_date", e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Calibration Due Date</label>
-                <InputField
-                  type="date"
-                  value={item.calibration_due_date}
-                  onChange={(e) => handleItemChange(index, "calibration_due_date", e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">UUC Serial Number</label>
-                <InputField
-                  type="text"
-                  value={item.uuc_serial_number}
-                  onChange={(e) => handleItemChange(index, "uuc_serial_number", e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Certificate</label>
-                <input
-                  type="file"
-                  onChange={(e) => handleItemChange(index, "certificate_file", e.target.files[0])}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
+        {state.selectedWO && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
+              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Assigned To:</strong> {state.selectedWO.assigned_to_name || "N/A"}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received || "N/A"}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date || "N/A"}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || "N/A"}</p>
+              <p><strong>Range:</strong> {state.selectedWO.range || "N/A"}</p>
+              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || "N/A"}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || "N/A"}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}</p>
             </div>
-          ))}
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={handleMoveToApproval}
-              disabled={!state.items.every((item) => item.certificate_number && item.calibration_due_date)}
-              className={`px-4 py-2 rounded-md ${state.items.every((item) => item.certificate_number && item.calibration_due_date) ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-300 text-gray-500"}`}
-            >
-              Move to Approval
-            </Button>
-            <Button
-              onClick={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedWO: null, items: [] }))}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-            >
-              Cancel
-            </Button>
+            <div>
+              <h3 className="text-lg font-medium text-black">Items</h3>
+              {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Calibration Due</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedWO.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
+                          <td className="border p-2">{item.quantity || "N/A"}</td>
+                          <td className="border p-2">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td className="border p-2">{item.certificate_number || "N/A"}</td>
+                          <td className="border p-2">{item.calibration_due_date || "N/A"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </Modal>
     </div>
   );

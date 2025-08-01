@@ -1,14 +1,12 @@
 from rest_framework import serializers
 from .models import WorkOrder, WorkOrderItem, DeliveryNote
 from pre_job.models import PurchaseOrder, Quotation
-from team.models import TeamMember
 from item.models import Item
 from unit.models import Unit
 from series.models import NumberSeries
 from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
-from django.utils import timezone
 import logging
 from team.models import Technician
 
@@ -63,12 +61,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), allow_null=True)
     quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all(), allow_null=True)
     assigned_to = serializers.PrimaryKeyRelatedField(
-        queryset=Technician.objects.all(),  # Updated to Technician
+        queryset=Technician.objects.all(),
         allow_null=True,
         required=False
     )
     created_by = serializers.PrimaryKeyRelatedField(
-        queryset=Technician.objects.all(),  # Updated to Technician (assuming created_by should also be a Technician)
+        queryset=Technician.objects.all(), 
         allow_null=True,
         required=False
     )
@@ -128,7 +126,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop('items', [])
         assigned_to = validated_data.get('assigned_to')
         request = self.context.get('request')
-        if request and hasattr(request.user, 'technician'):  # Adjusted for Technician
+        if request and hasattr(request.user, 'technician'):  
             validated_data['created_by'] = request.user.technician
         else:
             validated_data['created_by'] = None

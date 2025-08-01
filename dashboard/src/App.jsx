@@ -28,6 +28,7 @@ import ListProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/
 import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerApproval";
 import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
 import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
+import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -129,6 +130,10 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/list-all-processing-work-orders",
           element: <ListProcessingWorkOrders />,
+        },
+        {
+          path: "/job-execution/processing-work-orders/edit-work-order/:id",
+          element: <EditProcessingWorkOrders />,
         },
         {
           path: "/job-execution/processing-work-orders/manager-approval",
