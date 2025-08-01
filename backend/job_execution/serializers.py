@@ -34,6 +34,7 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryNote
         fields = ['id', 'dn_number', 'signed_delivery_note', 'delivery_status', 'created_at']
+        
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
     unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
@@ -43,7 +44,7 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
         model = WorkOrderItem
         fields = [
             'id', 'item', 'quantity', 'unit', 'unit_price', 'total_price',
-            'certificate_number', 'calibration_date', 'calibration_due_date',
+            'certificate_uut_label','certificate_number', 'calibration_date', 'calibration_due_date',
             'uuc_serial_number', 'certificate_file'
         ]
 

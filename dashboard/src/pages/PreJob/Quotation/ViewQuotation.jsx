@@ -891,7 +891,7 @@ const ViewQuotation = () => {
       >
         <div className="space-y-4">
           {state.partialOrders.map(po => (
-            <div key={po.id} className="border p-2 rounded">
+            <div key={po.id} className="border p-2 rounded space-y-4">
               <h4 className="text-md font-medium">PO ID: {po.id}</h4>
               <InputField
                 label="Client PO Number"

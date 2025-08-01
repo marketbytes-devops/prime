@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class WorkOrderViewSet(viewsets.ModelViewSet):
     queryset = WorkOrder.objects.all()
     serializer_class = WorkOrderSerializer
-    permission_classes = [IsAuthenticated]  # Updated from AllowAny for security
+    permission_classes = [IsAuthenticated] 
 
     def get_queryset(self):
         queryset = super().get_queryset()

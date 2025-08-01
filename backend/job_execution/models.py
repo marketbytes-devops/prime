@@ -48,6 +48,7 @@ class WorkOrderItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    certificate_uut_label = models.CharField(max_length=100, null=True, blank=True)
     certificate_number = models.CharField(max_length=100, null=True, blank=True)
     calibration_date = models.DateField(null=True, blank=True)
     calibration_due_date = models.DateField(null=True, blank=True)

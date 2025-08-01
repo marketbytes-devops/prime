@@ -86,6 +86,7 @@ const EditProcessingWorkOrders = () => {
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
+          certificate_uut_label: item.certificate_uut_label,
           certificate_number: item.certificate_number,
           calibration_date: item.calibration_date,
           calibration_due_date: item.calibration_due_date,
@@ -204,7 +205,7 @@ const EditProcessingWorkOrders = () => {
         <div>
           <h3 className="text-lg font-medium text-black mb-4">Device Under Test Details</h3>
           {state.items.map((item, index) => (
-            <div key={index} className="border p-4 rounded-md mb-4">
+            <div key={index} className="border p-4 rounded-md mb-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
                 <select
@@ -239,6 +240,15 @@ const EditProcessingWorkOrders = () => {
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Certificate UUT Label</label>
+                <InputField
+                  type="text"
+                  value={item.certificate_uut_label}
+                  onChange={(e) => handleItemChange(index, "certificate_uut_label", e.target.value)}
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Number</label>
