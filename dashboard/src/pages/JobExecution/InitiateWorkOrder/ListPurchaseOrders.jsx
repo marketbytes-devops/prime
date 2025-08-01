@@ -487,6 +487,9 @@ const ListPurchaseOrders = () => {
 
   const remainingItems = state.savedItems.filter((item) => !state.usedItemIds.includes(item.id));
 
+  // Calculate total quantity of items
+  const totalQuantity = state.savedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Initiate Work Order</h1>
@@ -663,18 +666,22 @@ const ListPurchaseOrders = () => {
         <div className="space-y-4">
           <p className="text-gray-700">Select an option to convert Purchase Order to a Work Order:</p>
           <div className="flex justify-center gap-4">
-            <Button
-              onClick={() => handleWOTypeOption("Single")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Single Order
-            </Button>
-            <Button
-              onClick={() => handleWOTypeOption("Split")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Split Order
-            </Button>
+            {totalQuantity === 1 && (
+              <Button
+                onClick={() => handleWOTypeOption("Single")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Single Order
+              </Button>
+            )}
+            {totalQuantity > 1 && (
+              <Button
+                onClick={() => handleWOTypeOption("Split")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Split Order
+              </Button>
+            )}
           </div>
           <div className="flex justify-end">
             <Button
