@@ -1,7 +1,7 @@
 from django.db import models
 from datetime import timedelta
 from django.utils import timezone
-from series.models import NumberSeries  # Assuming this exists; adjust if different
+from series.models import NumberSeries 
 
 class RFQ(models.Model):
     company_name = models.CharField(max_length=100, null=True, blank=True)

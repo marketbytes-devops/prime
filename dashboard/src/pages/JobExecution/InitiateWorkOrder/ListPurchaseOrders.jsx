@@ -10,7 +10,7 @@ const ListPurchaseOrders = () => {
   const navigate = useNavigate();
   const [state, setState] = useState({
     purchaseOrders: [],
-    teamMembers: [],
+    technicians: [],
     itemsList: [],
     units: [],
     quotations: [],
@@ -20,19 +20,18 @@ const ListPurchaseOrders = () => {
     currentPage: 1,
     itemsPerPage: 20,
     isModalOpen: false,
-    selectedPO: null,
-    isWOModalOpen: false,
     isWOTypeModalOpen: false,
+    isWOModalOpen: false,
+    selectedPO: null,
     woType: "",
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
     range: "",
     serialNumber: "",
-    siteLocation: "",
+    site_location: "",
     remarks: "",
     assignedTo: "",
-    createdBy: "",
     numberOfSplitOrders: "",
     selectedItemIds: [],
     savedItems: [],
@@ -43,7 +42,7 @@ const ListPurchaseOrders = () => {
 
   const fetchData = async () => {
     try {
-      const [poRes, teamRes, itemsRes, unitsRes, quotationsRes, seriesRes] =
+      const [poRes, techRes, itemsRes, unitsRes, quotationsRes, seriesRes] =
         await Promise.all([
           apiClient.get("purchase-orders/"),
           apiClient.get("technicians/"),
@@ -78,13 +77,15 @@ const ListPurchaseOrders = () => {
       setState((prev) => ({
         ...prev,
         purchaseOrders: updatedPurchaseOrders,
-        teamMembers: teamRes.data || [],
+        technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
         series: seriesRes.data || [],
         workOrderStatusMap,
+        assignedTo: "",
       }));
+      console.log("Fetched technicians:", techRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load purchase orders.");
@@ -95,15 +96,18 @@ const ListPurchaseOrders = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (state.assignedTo && !state.technicians.some((t) => t.id === parseInt(state.assignedTo))) {
+      setState((prev) => ({ ...prev, assignedTo: "" }));
+      toast.warn("Selected technician is no longer valid. Please select again.");
+    }
+  }, [state.assignedTo, state.technicians]);
+
   const handleConvertToWO = (po) => {
-    const userEmail = localStorage.getItem("userEmail");
-    const defaultCreatedBy =
-      state.teamMembers.find((m) => m.email === userEmail)?.id || "";
     setState((prev) => ({
       ...prev,
       isWOTypeModalOpen: true,
       selectedPO: po,
-      createdBy: defaultCreatedBy,
       savedItems: po.items.map((item) => ({
         ...item,
         name: prev.itemsList.find((i) => i.id === item.item)?.name || "N/A",
@@ -112,10 +116,8 @@ const ListPurchaseOrders = () => {
       selectedItemIds: [],
       createdSplitOrders: [],
       usedItemIds: [],
+      assignedTo: "",
     }));
-    if (!defaultCreatedBy) {
-      toast.warn("No team member found for the current user email.");
-    }
   };
 
   const handleViewPO = (po) => {
@@ -132,28 +134,22 @@ const ListPurchaseOrders = () => {
       isWOTypeModalOpen: false,
       isWOModalOpen: true,
       woType: type,
-      selectedItemIds:
-        type === "Single" ? prev.savedItems.map((item) => item.id) : [],
+      selectedItemIds: type === "Single" ? prev.savedItems.map((item) => item.id) : [],
+      assignedTo: "",
     }));
   };
 
   const handleWOSubmit = async () => {
-    console.log("handleWOSubmit called", { state }); // Debug start
-    if (!state.createdBy) {
-      console.log("Validation failed: Created By is required");
-      toast.error("Please select a team member for Created By.");
+    if (!state.assignedTo && state.woType === "Single") {
+      toast.error("Please select a technician for Assigned To.");
       return;
     }
-    const workOrderSeries = state.series.find(
-      (s) => s.series_name === "Work Order"
-    );
+    const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
     if (!workOrderSeries) {
-      console.log("Validation failed: Work Order series not found");
       toast.error("Work Order series not found.");
       return;
     }
     try {
-      console.log("API Client:", apiClient); // Log apiClient to verify configuration
       const payload = {
         purchase_order: state.selectedPO.id,
         quotation: state.selectedPO.quotation,
@@ -163,14 +159,18 @@ const ListPurchaseOrders = () => {
         onsite_or_lab: state.onsiteOrLab,
         range: state.range,
         serial_number: state.serialNumber,
-        site_location: state.siteLocation,
+        site_location: state.site_location,
         remarks: state.remarks,
-        assigned_to: state.assignedTo,
-        created_by: state.createdBy,
+        assigned_to: state.assignedTo ? parseInt(state.assignedTo) : null,
         items: [],
       };
 
-      console.log("Submitting payload:", payload); // Log payload before request
+      if (state.assignedTo && !state.technicians.some((t) => t.id === parseInt(state.assignedTo))) {
+        toast.error("Selected technician is invalid. Please select a valid technician.");
+        return;
+      }
+
+      console.log("Payload being sent:", payload);
 
       let responses = [];
       if (state.woType === "Single") {
@@ -195,10 +195,8 @@ const ListPurchaseOrders = () => {
         }
       }
 
-      console.log("API Responses:", responses); // Log successful responses
       toast.success("Work Order(s) created successfully");
 
-      // Update state with new work order status
       const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
       responses.forEach((response) => {
         updatedWorkOrderStatusMap[state.selectedPO.id] = [
@@ -217,10 +215,9 @@ const ListPurchaseOrders = () => {
         onsiteOrLab: "",
         range: "",
         serialNumber: "",
-        siteLocation: "",
+        site_location: "",
         remarks: "",
         assignedTo: "",
-        createdBy: "",
         numberOfSplitOrders: "",
         selectedItemIds: [],
         savedItems: [],
@@ -228,7 +225,6 @@ const ListPurchaseOrders = () => {
         usedItemIds: [],
       }));
 
-      // Refresh data to reflect changes
       await fetchData();
     } catch (error) {
       console.error("Error creating work order:", {
@@ -239,9 +235,9 @@ const ListPurchaseOrders = () => {
       toast.error("Failed to create Work Order. Check console for details.");
     }
   };
+
   const handleUpdateStatus = async (poId, status) => {
     try {
-      console.log(`Updating status for PO ID ${poId} to ${status}`);
       const response = await apiClient.patch(
         `/purchase-orders/${poId}/update_status/`,
         { status }
@@ -292,8 +288,7 @@ const ListPurchaseOrders = () => {
       const selectedItemIds = prev.selectedItemIds.includes(itemId)
         ? prev.selectedItemIds.filter((id) => id !== itemId)
         : [...prev.selectedItemIds, itemId];
-      const remainingItemsCount =
-        prev.savedItems.length - prev.usedItemIds.length;
+      const remainingItemsCount = prev.savedItems.length - prev.usedItemIds.length;
       const remainingSplitOrders =
         prev.numberOfSplitOrders - prev.createdSplitOrders.length;
       const maxItemsPerOrder =
@@ -311,11 +306,9 @@ const ListPurchaseOrders = () => {
 
   const isGenerateDisabled = () => {
     if (!state.numberOfSplitOrders || state.woType !== "Split") return true;
-    if (state.createdSplitOrders.length >= state.numberOfSplitOrders)
-      return true;
+    if (state.createdSplitOrders.length >= state.numberOfSplitOrders) return true;
     if (state.selectedItemIds.length === 0) return true;
-    const remainingItemsCount =
-      state.savedItems.length - state.usedItemIds.length;
+    const remainingItemsCount = state.savedItems.length - state.usedItemIds.length;
     const remainingSplitOrders =
       state.numberOfSplitOrders - state.createdSplitOrders.length;
     const maxItemsPerOrder =
@@ -326,13 +319,11 @@ const ListPurchaseOrders = () => {
     if (
       remainingSplitOrders > 1 &&
       state.selectedItemIds.length > maxItemsPerOrder
-    )
-      return true;
+    ) return true;
     if (
       remainingSplitOrders === 1 &&
       state.selectedItemIds.length !== remainingItemsCount
-    )
-      return true;
+    ) return true;
     if (state.selectedItemIds.some((id) => state.usedItemIds.includes(id)))
       return true;
     return false;
@@ -376,50 +367,23 @@ const ListPurchaseOrders = () => {
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
             <p><strong>PO ID:</strong> ${po.id}</p>
-            <p><strong>Client PO Number:</strong> ${
-              po.client_po_number || "N/A"
-            }</p>
+            <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
-            <p><strong>Created:</strong> ${new Date(
-              po.created_at
-            ).toLocaleDateString()}</p>
-            <p><strong>PO File:</strong> ${
-              po.po_file
-                ? po.po_file.split("/").pop() || "File Uploaded"
-                : "N/A"
-            }</p>
+            <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+            <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
             <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
-            <p><strong>Date Received:</strong> ${
-              state.dateReceived
-                ? new Date(state.dateReceived).toLocaleDateString()
-                : "N/A"
-            }</p>
-            <p><strong>Expected Completion Date:</strong> ${
-              state.expectedCompletionDate
-                ? new Date(state.expectedCompletionDate).toLocaleDateString()
-                : "N/A"
-            }</p>
+            <p><strong>Date Received:</strong> ${state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Expected Completion Date:</strong> ${state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"}</p>
             <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
             <p><strong>Range:</strong> ${state.range || "N/A"}</p>
-            <p><strong>Serial Number:</strong> ${
-              state.serialNumber || "N/A"
-            }</p>
-            <p><strong>Site Location:</strong> ${
-              state.siteLocation || "N/A"
-            }</p>
+            <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
+            <p><strong>Site Location:</strong> ${state.site_location || "N/A"}</p>
             <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
-            <p><strong>Assigned To:</strong> ${
-              state.teamMembers.find((m) => m.id === state.assignedTo)?.name ||
-              "N/A"
-            }</p>
-            <p><strong>Created By:</strong> ${
-              state.teamMembers.find((m) => m.id === state.createdBy)?.name ||
-              "N/A"
-            }</p>
+            <p><strong>Assigned To:</strong> ${state.technicians.find((t) => t.id === parseInt(state.assignedTo))?.name || "N/A"}</p>
           </div>
           <div>
             <h2 style="font-size: 1.25rem; font-weight: 600;">Items</h2>
@@ -431,78 +395,42 @@ const ListPurchaseOrders = () => {
                 <th style="padding: 8px; text-align: left;">Unit Price</th>
                 <th style="padding: 8px; text-align: left;">Total Price</th>
               </tr>
-              ${
-                state.woType === "Single"
-                  ? state.savedItems
-                      .map(
-                        (item) => `
+              ${state.woType === "Single"
+                ? state.savedItems
+                    .map(
+                      (item) => `
                         <tr>
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: center;">${
-                            item.quantity || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.units.find((u) => u.id === item.unit)?.name ||
-                            "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">${
-                            item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">${
-                            item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"
-                          }</td>
+                          <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                         </tr>
                       `
-                      )
-                      .join("")
-                  : state.createdSplitOrders
-                      .map(
-                        (order, index) => `
+                    )
+                    .join("")
+                : state.createdSplitOrders
+                    .map(
+                      (order, index) => `
                         <tr>
-                          <td colspan="5" style="padding: 8px; font-weight: bold;">Split Order ${
-                            index + 1
-                          }</td>
+                          <td colspan="5" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
                         </tr>
                         ${order.items
                           .map(
                             (item) => `
-                            <tr>
-                              <td style="padding: 8px;">${
-                                item.name || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: center;">${
-                                item.quantity || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: left;">${
-                                state.units.find((u) => u.id === item.unit)
-                                  ?.name || "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: right;">${
-                                item.unit_price
-                                  ? Number(item.unit_price).toFixed(2)
-                                  : "N/A"
-                              }</td>
-                              <td style="padding: 8px; text-align: right;">${
-                                item.quantity && item.unit_price
-                                  ? Number(
-                                      item.quantity * item.unit_price
-                                    ).toFixed(2)
-                                  : "0.00"
-                              }</td>
-                            </tr>
-                          `
+                              <tr>
+                                <td style="padding: 8px;">${item.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                                <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
+                              </tr>
+                            `
                           )
                           .join("")}
                       `
-                      )
-                      .join("")
-              }
+                    )
+                    .join("")}
             </table>
           </div>
         </body>
@@ -931,25 +859,6 @@ const ListPurchaseOrders = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Created By
-            </label>
-            <select
-              value={state.createdBy}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, createdBy: e.target.value }))
-              }
-              className="p-2 border rounded w-full"
-            >
-              <option value="">Select Creator</option>
-              {state.teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               Date Received
             </label>
             <InputField
@@ -1025,9 +934,9 @@ const ListPurchaseOrders = () => {
             </label>
             <InputField
               type="text"
-              value={state.siteLocation}
+              value={state.site_location}
               onChange={(e) =>
-                setState((prev) => ({ ...prev, siteLocation: e.target.value }))
+                setState((prev) => ({ ...prev, site_location: e.target.value }))
               }
               className="w-full"
             />
@@ -1057,9 +966,9 @@ const ListPurchaseOrders = () => {
               className="p-2 border rounded w-full"
             >
               <option value="">Select Technician</option>
-              {state.teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
+              {state.technicians.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.name} ({technician.designation})
                 </option>
               ))}
             </select>

@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class WorkOrderViewSet(viewsets.ModelViewSet):
     queryset = WorkOrder.objects.all()
     serializer_class = WorkOrderSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]  # Updated from AllowAny for security
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -112,7 +112,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
     serializer_class = DeliveryNoteSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=['post'], url_path='upload-signed-note')
     def upload_signed_note(self, request, pk=None):

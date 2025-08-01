@@ -9,11 +9,33 @@ from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from datetime import date
 import logging
+from team.models import Technician
 
 logger = logging.getLogger(__name__)
 
+class WorkOrderItemSerializer(serializers.ModelSerializer):
+    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
+    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
+    total_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderItem
+        fields = [
+            'id', 'item', 'quantity', 'unit', 'unit_price', 'total_price',
+            'certificate_number', 'calibration_date', 'calibration_due_date',
+            'uuc_serial_number', 'certificate_file'
+        ]
+
+    def get_total_price(self, obj):
+        if obj.quantity and obj.unit_price:
+            return obj.quantity * obj.unit_price
+        return 0
+
+class DeliveryNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryNote
+        fields = ['id', 'dn_number', 'signed_delivery_note', 'delivery_status', 'created_at']
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
     unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
@@ -40,8 +62,16 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), allow_null=True)
     quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all(), allow_null=True)
-    assigned_to = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
-    created_by = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=Technician.objects.all(),  # Updated to Technician
+        allow_null=True,
+        required=False
+    )
+    created_by = serializers.PrimaryKeyRelatedField(
+        queryset=Technician.objects.all(),  # Updated to Technician (assuming created_by should also be a Technician)
+        allow_null=True,
+        required=False
+    )
     items = WorkOrderItemSerializer(many=True, required=False)
     delivery_note = DeliveryNoteSerializer(read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.name', read_only=True)
@@ -56,6 +86,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'manager_approval_status', 'decline_reason', 'items', 'delivery_note',
             'assigned_to_name', 'created_by_name'
         ]
+
+    def validate_assigned_to(self, value):
+        if value is not None and not Technician.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Selected technician does not exist.")
+        return value
 
     def send_assignment_email(self, work_order, assigned_to):
         if assigned_to and assigned_to.email:
@@ -92,8 +127,15 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         assigned_to = validated_data.get('assigned_to')
-        created_by = validated_data.get('created_by')
-        status = validated_data.get('status', 'Collection Pending')
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'technician'):  # Adjusted for Technician
+            validated_data['created_by'] = request.user.technician
+        else:
+            validated_data['created_by'] = None
+
+        if assigned_to and not Technician.objects.filter(id=assigned_to.id).exists():
+            assigned_to = None
+            logger.warning("Invalid assigned_to PK, setting to None")
 
         try:
             wo_series = NumberSeries.objects.get(series_name='Work Order')
@@ -111,8 +153,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             purchase_order=validated_data.get('purchase_order'),
             quotation=validated_data.get('quotation'),
             assigned_to=assigned_to,
-            created_by=created_by,
-            status=status,
+            created_by=validated_data.get('created_by'),
+            status=validated_data.get('status', 'Collection Pending'),
             date_received=validated_data.get('date_received'),
             expected_completion_date=validated_data.get('expected_completion_date'),
             onsite_or_lab=validated_data.get('onsite_or_lab'),
@@ -121,7 +163,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             site_location=validated_data.get('site_location'),
             remarks=validated_data.get('remarks')
         )
-        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}, purchase_order {work_order.purchase_order_id}, status {work_order.status}, assigned_to {assigned_to.id if assigned_to else None}, created_by {created_by.id if created_by else None}")
+        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
         for item_data in items_data:
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
