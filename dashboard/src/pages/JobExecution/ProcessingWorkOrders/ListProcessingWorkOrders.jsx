@@ -12,6 +12,7 @@ const ListProcessingWorkOrders = () => {
     workOrders: [],
     itemsList: [],
     units: [],
+    technicians: [], // Added to store technician data
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -22,16 +23,18 @@ const ListProcessingWorkOrders = () => {
 
   const fetchWorkOrders = async () => {
     try {
-      const [woRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
         apiClient.get("work-orders/", { params: { status: "Submitted" } }),
         apiClient.get("items/"),
         apiClient.get("units/"),
+        apiClient.get("technicians/"),
       ]);
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        technicians: techRes.data || [],
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -55,6 +58,28 @@ const ListProcessingWorkOrders = () => {
     navigate(`/job-execution/processing-work-orders/edit-work-order/${wo.id}`);
   };
 
+  const handleDeleteWO = async (woId) => {
+    if (window.confirm("Are you sure you want to delete this work order?")) {
+      try {
+        await apiClient.delete(`work-orders/${woId}/`);
+        toast.success("Work order deleted successfully.");
+        await fetchWorkOrders(); // Refresh the work orders list
+      } catch (error) {
+        console.error("Error deleting work order:", error);
+        toast.error("Failed to delete work order.");
+      }
+    }
+  };
+
+  // Helper to get unique technician names for a work order's items
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return "None";
+    if (technicianIds.length > 1) return "Multiple";
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+  };
+
   const filteredWOs = state.workOrders
     .filter((wo) =>
       (wo.wo_number || "").toLowerCase().includes(state.searchTerm.toLowerCase())
@@ -69,6 +94,28 @@ const ListProcessingWorkOrders = () => {
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentWOs = filteredWOs.slice(startIndex, startIndex + state.itemsPerPage);
+
+  const pageGroupSize = 3;
+  const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
+  const startPage = currentGroup * pageGroupSize + 1;
+  const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+
+  const handlePageChange = (page) => {
+    setState((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handleNext = () => {
+    if (state.currentPage < totalPages) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
+    }
+  };
+
+  const handlePrev = () => {
+    if (state.currentPage > 1) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
+    }
+  };
 
   return (
     <div className="mx-auto p-4">
@@ -100,30 +147,30 @@ const ListProcessingWorkOrders = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Equipment Collection Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created At</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Equipment Collection Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">
                     No processing work orders found.
                   </td>
                 </tr>
               ) : (
                 currentWOs.map((wo, index) => (
                   <tr key={wo.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{wo.wo_number || "N/A"}</td>
-                    <td className="border p-2">{wo.assigned_to_name || "N/A"}</td>
-                    <td className="border p-2">{wo.equipment_collection_status || "Pending"}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(wo.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{wo.wo_number || "N/A"}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(wo.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">{wo.equipment_collection_status || "Pending"}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => handleEditWO(wo)}
@@ -137,6 +184,12 @@ const ListProcessingWorkOrders = () => {
                         >
                           View WO
                         </Button>
+                        <Button
+                          onClick={() => handleDeleteWO(wo.id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -146,6 +199,33 @@ const ListProcessingWorkOrders = () => {
           </table>
         </div>
       </div>
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4 w-fit">
+          <Button
+            onClick={handlePrev}
+            disabled={state.currentPage === 1}
+            className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+          >
+            Prev
+          </Button>
+          {pageNumbers.map((page) => (
+            <Button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+            >
+              {page}
+            </Button>
+          ))}
+          <Button
+            onClick={handleNext}
+            disabled={state.currentPage === totalPages}
+            className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+          >
+            Next
+          </Button>
+        </div>
+      )}
       <Modal
         isOpen={state.isViewModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
@@ -158,9 +238,8 @@ const ListProcessingWorkOrders = () => {
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
               <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-              <p><strong>Assigned To:</strong> {state.selectedWO.assigned_to_name || "N/A"}</p>
-              <p><strong>Date Received:</strong> {state.selectedWO.date_received || "N/A"}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date || "N/A"}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "N/A"}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
               <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || "N/A"}</p>
               <p><strong>Range:</strong> {state.selectedWO.range || "N/A"}</p>
               <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || "N/A"}</p>
@@ -174,23 +253,25 @@ const ListProcessingWorkOrders = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Certificate Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Calibration Due</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
-                          <td className="border p-2">{item.quantity || "N/A"}</td>
-                          <td className="border p-2">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td className="border p-2">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                          <td className="border p-2">{item.certificate_number || "N/A"}</td>
-                          <td className="border p-2">{item.calibration_due_date || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
                         </tr>
                       ))}
                     </tbody>

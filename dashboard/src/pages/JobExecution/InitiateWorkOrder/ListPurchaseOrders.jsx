@@ -30,13 +30,13 @@ const ListPurchaseOrders = () => {
     serialNumber: "",
     site_location: "",
     remarks: "",
-    assignedTo: "",
     numberOfSplitOrders: "",
+    selectedItemIds: [],
     savedItems: [],
     createdSplitOrders: [],
     usedItemIds: [],
     workOrderStatusMap: {},
-    assignedQuantities: {},
+    splitOrderAssignedTo: "",
   });
 
   const fetchData = async () => {
@@ -82,7 +82,6 @@ const ListPurchaseOrders = () => {
         quotations: quotationsRes.data || [],
         series: seriesRes.data || [],
         workOrderStatusMap,
-        assignedTo: "",
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -94,18 +93,17 @@ const ListPurchaseOrders = () => {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    if (state.assignedTo && !state.technicians.some((t) => t.id === parseInt(state.assignedTo))) {
-      setState((prev) => ({ ...prev, assignedTo: "" }));
-      toast.warn("Selected technician is no longer valid. Please select again.");
-    }
-  }, [state.assignedTo, state.technicians]);
-
   const handleConvertToWO = (po) => {
     const savedItems = po.items.map((item) => ({
-      ...item,
+      id: item.id, 
+      item_id: item.item,
       name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
-      remainingQuantity: item.quantity || 0,
+      quantity: item.quantity || 0,
+      unit: item.unit,
+      unit_price: item.unit_price,
+      remaining_quantity: item.quantity || 0,
+      assigned_quantity: "",
+      assigned_to: state.woType === "Single" ? "" : undefined,
     }));
     const totalQuantity = savedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const woType = totalQuantity === 1 ? "Single" : "Split";
@@ -116,9 +114,10 @@ const ListPurchaseOrders = () => {
       savedItems,
       woType,
       numberOfSplitOrders: "",
+      selectedItemIds: woType === "Single" ? savedItems.map((item) => item.id) : [],
       createdSplitOrders: [],
       usedItemIds: [],
-      assignedQuantities: savedItems.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
+      splitOrderAssignedTo: "",
     }));
   };
 
@@ -132,111 +131,151 @@ const ListPurchaseOrders = () => {
 
   const handleNumberOfSplitOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
-    if (value && (value < 1 || value > state.savedItems.length)) {
-      toast.error(`Number of split orders must be between 1 and ${state.savedItems.length}.`);
+    if (value && value < 1) {
+      toast.error("Number of split orders must be at least 1.");
       return;
     }
     setState((prev) => ({
       ...prev,
       numberOfSplitOrders: value,
+      selectedItemIds: [],
       createdSplitOrders: [],
       usedItemIds: [],
-      assignedQuantities: state.savedItems.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
+      savedItems: prev.savedItems.map((item) => ({
+        ...item,
+        assigned_quantity: "",
+        remaining_quantity: item.quantity || 0,
+      })),
+      splitOrderAssignedTo: "",
     }));
   };
 
-  const handleAssignedQuantityChange = (itemId, e) => {
-    const value = parseInt(e.target.value, 10) || 0;
-    const item = state.savedItems.find((i) => i.id === itemId);
-    if (value > item.remainingQuantity) {
-      toast.error(`Assigned quantity cannot exceed remaining quantity (${item.remainingQuantity}).`);
-      return;
-    }
+  const handleItemSelection = (itemId) => {
+    setState((prev) => {
+      const selectedItemIds = prev.selectedItemIds.includes(itemId)
+        ? prev.selectedItemIds.filter((id) => id !== itemId)
+        : [...prev.selectedItemIds, itemId];
+      return { ...prev, selectedItemIds };
+    });
+  };
+
+  const handleAssignedQuantityChange = (itemId, value) => {
+    const assignedQuantity = value === "" ? "" : parseInt(value, 10);
+    setState((prev) => {
+      const updatedItems = prev.savedItems.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              assigned_quantity: assignedQuantity,
+            }
+          : item
+      );
+
+      const selectedItem = updatedItems.find((item) => item.id === itemId);
+      if (
+        assignedQuantity !== "" &&
+        (isNaN(assignedQuantity) || assignedQuantity < 0 || assignedQuantity > selectedItem.remaining_quantity)
+      ) {
+        toast.error(`Assigned quantity must be between 0 and ${selectedItem.remaining_quantity}.`);
+        return prev;
+      }
+
+      return { ...prev, savedItems: updatedItems };
+    });
+  };
+
+  const handleAssignedToChange = (itemId, value) => {
     setState((prev) => ({
       ...prev,
-      assignedQuantities: {
-        ...prev.assignedQuantities,
-        [itemId]: value,
-      },
+      savedItems: prev.savedItems.map((item) =>
+        item.id === itemId ? { ...item, assigned_to: value } : item
+      ),
     }));
+  };
+
+  const handleSplitOrderAssignedToChange = (value) => {
+    setState((prev) => ({ ...prev, splitOrderAssignedTo: value }));
   };
 
   const isGenerateDisabled = () => {
     if (!state.numberOfSplitOrders || state.woType !== "Split") return true;
     if (state.createdSplitOrders.length >= state.numberOfSplitOrders) return true;
-    const totalAssigned = Object.values(state.assignedQuantities).reduce((sum, qty) => sum + qty, 0);
-    const totalRemaining = state.savedItems.reduce((sum, item) => sum + item.remainingQuantity, 0);
-    return totalAssigned === 0 || totalAssigned > totalRemaining;
+    if (state.selectedItemIds.length === 0) return true;
+    if (!state.splitOrderAssignedTo || !state.technicians.some((t) => t.id === parseInt(state.splitOrderAssignedTo))) {
+      return true;
+    }
+
+    const selectedItems = state.savedItems.filter((item) => state.selectedItemIds.includes(item.id));
+    const allHaveAssignedQuantity = selectedItems.every(
+      (item) => item.assigned_quantity !== "" && !isNaN(item.assigned_quantity) && item.assigned_quantity > 0
+    );
+    if (!allHaveAssignedQuantity) return true;
+
+    return false;
+  };
+
+  const isSubmitDisabled = () => {
+    if (state.woType === "Single") {
+      const allHaveAssignedTo = state.savedItems.every(
+        (item) => item.assigned_to !== "" && state.technicians.some((t) => t.id === parseInt(item.assigned_to))
+      );
+      return !allHaveAssignedTo;
+    }
+    if (state.woType === "Split") {
+      if (state.createdSplitOrders.length !== state.numberOfSplitOrders) return true;
+      const allItemsAssigned = state.savedItems.every((item) => item.remaining_quantity === 0);
+      if (!allItemsAssigned) return true;
+    }
+    return false;
   };
 
   const handleGenerateSplitOrder = () => {
-    const totalAssigned = Object.values(state.assignedQuantities).reduce((sum, qty) => sum + qty, 0);
-    const totalQuantity = state.savedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const remainingQuantity = state.savedItems.reduce((sum, item) => sum + item.remainingQuantity, 0);
-
-    if (state.createdSplitOrders.length + 1 > state.numberOfSplitOrders) {
-      toast.error("Cannot exceed the specified number of split orders.");
-      return;
-    }
-
-    if (totalAssigned === 0) {
-      toast.error("Please assign quantities to at least one item.");
-      return;
-    }
-
-    const newSplitOrderItems = state.savedItems
-      .filter((item) => state.assignedQuantities[item.id] > 0)
+    const selectedItems = state.savedItems
+      .filter((item) => state.selectedItemIds.includes(item.id))
       .map((item) => ({
         ...item,
-        quantity: state.assignedQuantities[item.id],
+        quantity: item.assigned_quantity,
+        assigned_to: state.splitOrderAssignedTo,
       }));
-
-    if (newSplitOrderItems.length === 0) {
-      toast.error("No items with assigned quantities.");
+    if (!selectedItems.length) {
+      toast.error("No valid items selected.");
       return;
     }
 
-    const newRemainingQuantities = state.savedItems.map((item) => ({
-      ...item,
-      remainingQuantity: item.remainingQuantity - (state.assignedQuantities[item.id] || 0),
-    }));
+    setState((prev) => {
+      const updatedItems = prev.savedItems.map((item) =>
+        prev.selectedItemIds.includes(item.id)
+          ? {
+              ...item,
+              remaining_quantity: item.remaining_quantity - (item.assigned_quantity || 0),
+              assigned_quantity: "",
+            }
+          : item
+      );
 
-    setState((prev) => ({
-      ...prev,
-      createdSplitOrders: [
-        ...prev.createdSplitOrders,
-        { items: newSplitOrderItems, assignedTo: "" },
-      ],
-      savedItems: newRemainingQuantities,
-      assignedQuantities: newRemainingQuantities.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
-      usedItemIds: [...prev.usedItemIds, ...newSplitOrderItems.map((item) => item.id)],
-    }));
+      return {
+        ...prev,
+        createdSplitOrders: [...prev.createdSplitOrders, { items: selectedItems }],
+        usedItemIds: [
+          ...prev.usedItemIds,
+          ...prev.selectedItemIds.filter((id) =>
+            updatedItems.find((item) => item.id === id && item.remaining_quantity === 0)
+          ),
+        ],
+        selectedItemIds: [],
+        savedItems: updatedItems,
+        splitOrderAssignedTo: "",
+      };
+    });
     toast.success(`Split Work Order ${state.createdSplitOrders.length + 1} generated successfully!`);
   };
 
   const handleWOSubmit = async () => {
-    if (!state.assignedTo && state.woType === "Single") {
-      toast.error("Please select a technician for Assigned To.");
-      return;
-    }
     const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
     if (!workOrderSeries) {
       toast.error("Work Order series not found.");
       return;
     }
-    if (state.woType === "Split" && state.createdSplitOrders.some((order) => !order.assignedTo)) {
-      toast.error("Please assign a technician to all split orders.");
-      return;
-    }
-    if (state.woType === "Split" && state.createdSplitOrders.length !== state.numberOfSplitOrders) {
-      toast.error("Please create exactly the specified number of split orders.");
-      return;
-    }
-    if (state.woType === "Split" && state.savedItems.some((item) => item.remainingQuantity > 0)) {
-      toast.error("All quantities must be fully assigned across split orders.");
-      return;
-    }
-
     try {
       const basePayload = {
         purchase_order: state.selectedPO.id,
@@ -249,28 +288,51 @@ const ListPurchaseOrders = () => {
         serial_number: state.serialNumber,
         site_location: state.site_location,
         remarks: state.remarks,
-        assigned_to: null,
         items: [],
       };
 
       let responses = [];
       if (state.woType === "Single") {
+        const allHaveAssignedTo = state.savedItems.every(
+          (item) => item.assigned_to !== "" && state.technicians.some((t) => t.id === parseInt(item.assigned_to))
+        );
+        if (!allHaveAssignedTo) {
+          toast.error("All items must be assigned to a valid technician.");
+          return;
+        }
         basePayload.items = state.savedItems.map((item) => ({
-          item: item.item,
+          item: item.item_id, 
           quantity: item.quantity,
           unit: item.unit,
+          unit_price: item.unit_price,
+          assigned_to: parseInt(item.assigned_to),
         }));
-        basePayload.assigned_to = state.assignedTo ? parseInt(state.assignedTo) : null;
         const response = await apiClient.post("work-orders/", basePayload);
         responses.push(response.data);
       } else if (state.woType === "Split") {
+        if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
+          toast.error("Please create exactly the specified number of split orders.");
+          return;
+        }
+        if (state.savedItems.some((item) => item.remaining_quantity !== 0)) {
+          toast.error("All items must be fully assigned to split orders.");
+          return;
+        }
         for (const order of state.createdSplitOrders) {
+          const allHaveAssignedTo = order.items.every(
+            (item) => item.assigned_to !== "" && state.technicians.some((t) => t.id === parseInt(item.assigned_to))
+          );
+          if (!allHaveAssignedTo) {
+            toast.error("All items in split orders must be assigned to a valid technician.");
+            return;
+          }
           basePayload.items = order.items.map((item) => ({
-            item: item.item,
+            item: item.item_id,
             quantity: item.quantity,
             unit: item.unit,
+            unit_price: item.unit_price,
+            assigned_to: parseInt(item.assigned_to),
           }));
-          basePayload.assigned_to = order.assignedTo ? parseInt(order.assignedTo) : null;
           const response = await apiClient.post("work-orders/", basePayload);
           responses.push(response.data);
         }
@@ -298,19 +360,22 @@ const ListPurchaseOrders = () => {
         serialNumber: "",
         site_location: "",
         remarks: "",
-        assignedTo: "",
         numberOfSplitOrders: "",
         selectedItemIds: [],
         savedItems: [],
         createdSplitOrders: [],
         usedItemIds: [],
-        assignedQuantities: {},
+        splitOrderAssignedTo: "",
       }));
 
       await fetchData();
     } catch (error) {
-      console.error("Error creating work order:", error);
-      toast.error("Failed to create Work Order.");
+      console.error("Error creating work order:", {
+        message: error.message,
+        response: error.response?.data || "No response data",
+        status: error.response?.status,
+      });
+      toast.error("Failed to create Work Order. Check console for details.");
     }
   };
 
@@ -325,7 +390,7 @@ const ListPurchaseOrders = () => {
       });
       toast.success("Purchase Order status updated successfully.");
     } catch (error) {
-      console.error("Error updating purchase order status:", error);
+      console.error("Error updating purchase order status:", error.response?.data || error);
       toast.error("Failed to update Purchase Order status.");
     }
   };
@@ -359,15 +424,15 @@ const ListPurchaseOrders = () => {
             <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
             <p><strong>Site Location:</strong> ${state.site_location || "N/A"}</p>
             <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
-            <p><strong>Assigned To:</strong> ${state.technicians.find((t) => t.id === parseInt(state.assignedTo))?.name || "N/A"}</p>
           </div>
           <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Items</h2>
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
             <table border="1" style="width: 100%; border-collapse: collapse;">
               <tr style="background-color: #f2f2f2;">
                 <th style="padding: 8px; text-align: left;">Item</th>
                 <th style="padding: 8px; text-align: left;">Quantity</th>
                 <th style="padding: 8px; text-align: left;">Unit</th>
+                <th style="padding: 8px; text-align: left;">Assigned To</th>
               </tr>
               ${state.woType === "Single"
                 ? state.savedItems
@@ -377,6 +442,7 @@ const ListPurchaseOrders = () => {
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
                           <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
                           <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
                         </tr>
                       `
                     )
@@ -385,7 +451,7 @@ const ListPurchaseOrders = () => {
                     .map(
                       (order, index) => `
                         <tr>
-                          <td colspan="3" style="padding: 8px; font-weight: bold;">Split Order ${index + 1} (Assigned To: ${state.technicians.find((t) => t.id === parseInt(order.assignedTo))?.name || "N/A"})</td>
+                          <td colspan="4" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
                         </tr>
                         ${order.items
                           .map(
@@ -394,6 +460,7 @@ const ListPurchaseOrders = () => {
                                 <td style="padding: 8px;">${item.name || "N/A"}</td>
                                 <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
                                 <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
                               </tr>
                             `
                           )
@@ -479,7 +546,7 @@ const ListPurchaseOrders = () => {
     return po && po.status === "Collected";
   };
 
-  const remainingItems = state.savedItems.filter((item) => item.remainingQuantity > 0);
+  const remainingItems = state.savedItems.filter((item) => !state.usedItemIds.includes(item.id));
 
   return (
     <div className="mx-auto p-4">
@@ -616,7 +683,7 @@ const ListPurchaseOrders = () => {
               <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Items</h3>
+              <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
               {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
@@ -727,21 +794,6 @@ const ListPurchaseOrders = () => {
               className="w-full"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-            <select
-              value={state.assignedTo}
-              onChange={(e) => setState((prev) => ({ ...prev, assignedTo: e.target.value }))}
-              className="p-2 border rounded w-full"
-            >
-              <option value="">Select Technician</option>
-              {state.technicians.map((technician) => (
-                <option key={technician.id} value={technician.id}>
-                  {technician.name} ({technician.designation})
-                </option>
-              ))}
-            </select>
-          </div>
           {state.woType === "Split" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Number of Split Orders</label>
@@ -751,40 +803,28 @@ const ListPurchaseOrders = () => {
                 onChange={handleNumberOfSplitOrdersChange}
                 className="w-full"
                 min="1"
-                max={state.savedItems.length}
                 placeholder="Enter number of split orders"
               />
             </div>
           )}
           <div>
-            <h3 className="text-lg font-medium text-black mb-2">Items</h3>
+            <h3 className="text-lg font-medium text-black mb-2">Device Under Test Details</h3>
             {state.savedItems.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-200">
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining Quantity</th>
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.savedItems.map((item) => (
                       <tr key={item.id} className="border">
                         <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
-                        <td className="border p-2 whitespace-nowrap">{item.remainingQuantity || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || "0"}</td>
                         <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                        <td className="border p-2 whitespace-nowrap">
-                          <InputField
-                            type="number"
-                            value={state.assignedQuantities[item.id] || 0}
-                            onChange={(e) => handleAssignedQuantityChange(item.id, e)}
-                            min="0"
-                            max={item.remainingQuantity}
-                            className="w-full"
-                          />
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -792,6 +832,46 @@ const ListPurchaseOrders = () => {
               </div>
             ) : (
               <p className="text-gray-500">No items available.</p>
+            )}
+            {state.woType === "Single" && (
+              <div className="mt-4">
+                <h4 className="text-md font-medium mb-2">Assign Technicians to Items</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.savedItems.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            <select
+                              value={item.assigned_to}
+                              onChange={(e) => handleAssignedToChange(item.id, e.target.value)}
+                              className="p-2 border rounded w-full"
+                            >
+                              <option value="">Select Technician</option>
+                              {state.technicians.map((technician) => (
+                                <option key={technician.id} value={technician.id}>
+                                  {technician.name} ({technician.designation})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
             {state.woType === "Split" && state.numberOfSplitOrders && (
               <div className="mt-4">
@@ -801,25 +881,6 @@ const ListPurchaseOrders = () => {
                     {state.createdSplitOrders.map((order, index) => (
                       <div key={index} className="mb-4 p-2 border rounded">
                         <h4 className="text-md font-medium">Split Order {index + 1}</h4>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-                          <select
-                            value={order.assignedTo}
-                            onChange={(e) => {
-                              const updatedOrders = [...state.createdSplitOrders];
-                              updatedOrders[index].assignedTo = e.target.value;
-                              setState((prev) => ({ ...prev, createdSplitOrders: updatedOrders }));
-                            }}
-                            className="p-2 border rounded w-full"
-                          >
-                            <option value="">Select Technician</option>
-                            {state.technicians.map((technician) => (
-                              <option key={technician.id} value={technician.id}>
-                                {technician.name} ({technician.designation})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse">
                             <thead>
@@ -827,6 +888,7 @@ const ListPurchaseOrders = () => {
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -835,6 +897,7 @@ const ListPurchaseOrders = () => {
                                   <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
                                   <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
                                   <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                                  <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -847,6 +910,63 @@ const ListPurchaseOrders = () => {
                 {state.createdSplitOrders.length < state.numberOfSplitOrders && (
                   <div>
                     <h4 className="text-md font-medium mb-2">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                      <select
+                        value={state.splitOrderAssignedTo}
+                        onChange={(e) => handleSplitOrderAssignedToChange(e.target.value)}
+                        className="p-2 border rounded w-full mb-4"
+                      >
+                        <option value="">Select Technician</option>
+                        {state.technicians.map((technician) => (
+                          <option key={technician.id} value={technician.id}>
+                            {technician.name} ({technician.designation})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-200">
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Select</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remainingItems.map((item) => (
+                            <tr key={item.id} className="border">
+                              <td className="border p-2 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={state.selectedItemIds.includes(item.id)}
+                                  onChange={() => handleItemSelection(item.id)}
+                                  disabled={item.remaining_quantity === 0}
+                                />
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || "0"}</td>
+                              <td className="border p-2 whitespace-nowrap">
+                                <InputField
+                                  type="number"
+                                  value={item.assigned_quantity}
+                                  onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
+                                  className="w-full"
+                                  min="0"
+                                  max={item.remaining_quantity}
+                                  disabled={!state.selectedItemIds.includes(item.id) || item.remaining_quantity === 0}
+                                  placeholder="Enter quantity"
+                                />
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                     <Button
                       onClick={handleGenerateSplitOrder}
                       disabled={isGenerateDisabled()}
@@ -868,7 +988,8 @@ const ListPurchaseOrders = () => {
             </Button>
             <Button
               onClick={handleWOSubmit}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              disabled={isSubmitDisabled()}
+              className={`px-4 py-2 rounded-md ${isSubmitDisabled() ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
             >
               Submit
             </Button>
