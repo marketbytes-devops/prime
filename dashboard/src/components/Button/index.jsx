@@ -1,10 +1,10 @@
 import PropTypes from 'prop-types';
 
 const Button = ({ onClick, children, className, disabled }) => {
-  const handleClick = () => {
-    console.log("Button clicked:", { disabled, children }); // Debug log
+  const handleClick = (e) => {
+    console.log("Button clicked:", { disabled, children }); 
     if (!disabled && onClick) {
-      onClick();
+      onClick(e);
     }
   };
 
