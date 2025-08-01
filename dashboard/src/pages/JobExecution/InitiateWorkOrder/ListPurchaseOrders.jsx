@@ -32,11 +32,11 @@ const ListPurchaseOrders = () => {
     remarks: "",
     assignedTo: "",
     numberOfSplitOrders: "",
-    selectedItemIds: [],
     savedItems: [],
     createdSplitOrders: [],
     usedItemIds: [],
     workOrderStatusMap: {},
+    assignedQuantities: {},
   });
 
   const fetchData = async () => {
@@ -105,6 +105,7 @@ const ListPurchaseOrders = () => {
     const savedItems = po.items.map((item) => ({
       ...item,
       name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
+      remainingQuantity: item.quantity || 0,
     }));
     const totalQuantity = savedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const woType = totalQuantity === 1 ? "Single" : "Split";
@@ -115,10 +116,9 @@ const ListPurchaseOrders = () => {
       savedItems,
       woType,
       numberOfSplitOrders: "",
-      selectedItemIds: woType === "Single" ? savedItems.map((item) => item.id) : [],
       createdSplitOrders: [],
       usedItemIds: [],
-      assignedTo: "",
+      assignedQuantities: savedItems.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
     }));
   };
 
@@ -139,66 +139,77 @@ const ListPurchaseOrders = () => {
     setState((prev) => ({
       ...prev,
       numberOfSplitOrders: value,
-      selectedItemIds: [],
       createdSplitOrders: [],
       usedItemIds: [],
+      assignedQuantities: state.savedItems.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
     }));
   };
 
-  const handleItemSelection = (itemId) => {
-    setState((prev) => {
-      const selectedItemIds = prev.selectedItemIds.includes(itemId)
-        ? prev.selectedItemIds.filter((id) => id !== itemId)
-        : [...prev.selectedItemIds, itemId];
-      const remainingItemsCount = prev.savedItems.length - prev.usedItemIds.length;
-      const remainingSplitOrders = prev.numberOfSplitOrders - prev.createdSplitOrders.length;
-      const maxItemsPerOrder =
-        remainingSplitOrders > 1
-          ? remainingItemsCount - (remainingSplitOrders - 1)
-          : remainingItemsCount;
-
-      if (selectedItemIds.length > maxItemsPerOrder) {
-        toast.error(`Cannot select more than ${maxItemsPerOrder} items.`);
-        return prev;
-      }
-      return { ...prev, selectedItemIds };
-    });
+  const handleAssignedQuantityChange = (itemId, e) => {
+    const value = parseInt(e.target.value, 10) || 0;
+    const item = state.savedItems.find((i) => i.id === itemId);
+    if (value > item.remainingQuantity) {
+      toast.error(`Assigned quantity cannot exceed remaining quantity (${item.remainingQuantity}).`);
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      assignedQuantities: {
+        ...prev.assignedQuantities,
+        [itemId]: value,
+      },
+    }));
   };
 
   const isGenerateDisabled = () => {
     if (!state.numberOfSplitOrders || state.woType !== "Split") return true;
     if (state.createdSplitOrders.length >= state.numberOfSplitOrders) return true;
-    if (state.selectedItemIds.length === 0) return true;
-    const remainingItemsCount = state.savedItems.length - state.usedItemIds.length;
-    const remainingSplitOrders = state.numberOfSplitOrders - state.createdSplitOrders.length;
-    const maxItemsPerOrder =
-      remainingSplitOrders > 1
-        ? remainingItemsCount - (remainingSplitOrders - 1)
-        : remainingItemsCount;
-
-    if (remainingSplitOrders > 1 && state.selectedItemIds.length > maxItemsPerOrder) return true;
-    if (remainingSplitOrders === 1 && state.selectedItemIds.length !== remainingItemsCount) return true;
-    if (state.selectedItemIds.some((id) => state.usedItemIds.includes(id))) return true;
-    return false;
+    const totalAssigned = Object.values(state.assignedQuantities).reduce((sum, qty) => sum + qty, 0);
+    const totalRemaining = state.savedItems.reduce((sum, item) => sum + item.remainingQuantity, 0);
+    return totalAssigned === 0 || totalAssigned > totalRemaining;
   };
 
   const handleGenerateSplitOrder = () => {
-    const selectedItems = state.savedItems
-      .filter((item) => state.selectedItemIds.includes(item.id))
-      .map((item) => ({ ...item }));
-    if (!selectedItems.length) {
-      toast.error("No valid items selected.");
+    const totalAssigned = Object.values(state.assignedQuantities).reduce((sum, qty) => sum + qty, 0);
+    const totalQuantity = state.savedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const remainingQuantity = state.savedItems.reduce((sum, item) => sum + item.remainingQuantity, 0);
+
+    if (state.createdSplitOrders.length + 1 > state.numberOfSplitOrders) {
+      toast.error("Cannot exceed the specified number of split orders.");
       return;
     }
+
+    if (totalAssigned === 0) {
+      toast.error("Please assign quantities to at least one item.");
+      return;
+    }
+
+    const newSplitOrderItems = state.savedItems
+      .filter((item) => state.assignedQuantities[item.id] > 0)
+      .map((item) => ({
+        ...item,
+        quantity: state.assignedQuantities[item.id],
+      }));
+
+    if (newSplitOrderItems.length === 0) {
+      toast.error("No items with assigned quantities.");
+      return;
+    }
+
+    const newRemainingQuantities = state.savedItems.map((item) => ({
+      ...item,
+      remainingQuantity: item.remainingQuantity - (state.assignedQuantities[item.id] || 0),
+    }));
 
     setState((prev) => ({
       ...prev,
       createdSplitOrders: [
         ...prev.createdSplitOrders,
-        { items: selectedItems },
+        { items: newSplitOrderItems, assignedTo: "" },
       ],
-      usedItemIds: [...prev.usedItemIds, ...prev.selectedItemIds],
-      selectedItemIds: [],
+      savedItems: newRemainingQuantities,
+      assignedQuantities: newRemainingQuantities.reduce((acc, item) => ({ ...acc, [item.id]: 0 }), {}),
+      usedItemIds: [...prev.usedItemIds, ...newSplitOrderItems.map((item) => item.id)],
     }));
     toast.success(`Split Work Order ${state.createdSplitOrders.length + 1} generated successfully!`);
   };
@@ -213,6 +224,19 @@ const ListPurchaseOrders = () => {
       toast.error("Work Order series not found.");
       return;
     }
+    if (state.woType === "Split" && state.createdSplitOrders.some((order) => !order.assignedTo)) {
+      toast.error("Please assign a technician to all split orders.");
+      return;
+    }
+    if (state.woType === "Split" && state.createdSplitOrders.length !== state.numberOfSplitOrders) {
+      toast.error("Please create exactly the specified number of split orders.");
+      return;
+    }
+    if (state.woType === "Split" && state.savedItems.some((item) => item.remainingQuantity > 0)) {
+      toast.error("All quantities must be fully assigned across split orders.");
+      return;
+    }
+
     try {
       const basePayload = {
         purchase_order: state.selectedPO.id,
@@ -225,14 +249,9 @@ const ListPurchaseOrders = () => {
         serial_number: state.serialNumber,
         site_location: state.site_location,
         remarks: state.remarks,
-        assigned_to: state.assignedTo ? parseInt(state.assignedTo) : null,
+        assigned_to: null,
         items: [],
       };
-
-      if (state.assignedTo && !state.technicians.some((t) => t.id === parseInt(state.assignedTo))) {
-        toast.error("Selected technician is invalid. Please select a valid technician.");
-        return;
-      }
 
       let responses = [];
       if (state.woType === "Single") {
@@ -240,26 +259,18 @@ const ListPurchaseOrders = () => {
           item: item.item,
           quantity: item.quantity,
           unit: item.unit,
-          unit_price: item.unit_price,
         }));
+        basePayload.assigned_to = state.assignedTo ? parseInt(state.assignedTo) : null;
         const response = await apiClient.post("work-orders/", basePayload);
         responses.push(response.data);
       } else if (state.woType === "Split") {
-        if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
-          toast.error("Please create exactly the specified number of split orders.");
-          return;
-        }
-        if (state.usedItemIds.length !== state.savedItems.length) {
-          toast.error("All items must be assigned to split orders.");
-          return;
-        }
         for (const order of state.createdSplitOrders) {
           basePayload.items = order.items.map((item) => ({
             item: item.item,
             quantity: item.quantity,
             unit: item.unit,
-            unit_price: item.unit_price,
           }));
+          basePayload.assigned_to = order.assignedTo ? parseInt(order.assignedTo) : null;
           const response = await apiClient.post("work-orders/", basePayload);
           responses.push(response.data);
         }
@@ -293,16 +304,13 @@ const ListPurchaseOrders = () => {
         savedItems: [],
         createdSplitOrders: [],
         usedItemIds: [],
+        assignedQuantities: {},
       }));
 
       await fetchData();
     } catch (error) {
-      console.error("Error creating work order:", {
-        message: error.message,
-        response: error.response?.data || "No response data",
-        status: error.response?.status,
-      });
-      toast.error("Failed to create Work Order. Check console for details.");
+      console.error("Error creating work order:", error);
+      toast.error("Failed to create Work Order.");
     }
   };
 
@@ -317,7 +325,7 @@ const ListPurchaseOrders = () => {
       });
       toast.success("Purchase Order status updated successfully.");
     } catch (error) {
-      console.error("Error updating purchase order status:", error.response?.data || error);
+      console.error("Error updating purchase order status:", error);
       toast.error("Failed to update Purchase Order status.");
     }
   };
@@ -360,8 +368,6 @@ const ListPurchaseOrders = () => {
                 <th style="padding: 8px; text-align: left;">Item</th>
                 <th style="padding: 8px; text-align: left;">Quantity</th>
                 <th style="padding: 8px; text-align: left;">Unit</th>
-                <th style="padding: 8px; text-align: left;">Unit Price</th>
-                <th style="padding: 8px; text-align: left;">Total Price</th>
               </tr>
               ${state.woType === "Single"
                 ? state.savedItems
@@ -371,8 +377,6 @@ const ListPurchaseOrders = () => {
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
                           <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
                           <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                          <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                         </tr>
                       `
                     )
@@ -381,7 +385,7 @@ const ListPurchaseOrders = () => {
                     .map(
                       (order, index) => `
                         <tr>
-                          <td colspan="5" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
+                          <td colspan="3" style="padding: 8px; font-weight: bold;">Split Order ${index + 1} (Assigned To: ${state.technicians.find((t) => t.id === parseInt(order.assignedTo))?.name || "N/A"})</td>
                         </tr>
                         ${order.items
                           .map(
@@ -390,8 +394,6 @@ const ListPurchaseOrders = () => {
                                 <td style="padding: 8px;">${item.name || "N/A"}</td>
                                 <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
                                 <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                                <td style="padding: 8px; text-align: right;">${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                                <td style="padding: 8px; text-align: right;">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                               </tr>
                             `
                           )
@@ -477,7 +479,7 @@ const ListPurchaseOrders = () => {
     return po && po.status === "Collected";
   };
 
-  const remainingItems = state.savedItems.filter((item) => !state.usedItemIds.includes(item.id));
+  const remainingItems = state.savedItems.filter((item) => item.remainingQuantity > 0);
 
   return (
     <div className="mx-auto p-4">
@@ -623,8 +625,6 @@ const ListPurchaseOrders = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -633,8 +633,6 @@ const ListPurchaseOrders = () => {
                           <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -768,18 +766,25 @@ const ListPurchaseOrders = () => {
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.savedItems.map((item) => (
                       <tr key={item.id} className="border">
                         <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
-                        <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.remainingQuantity || "N/A"}</td>
                         <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                        <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                        <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
+                        <td className="border p-2 whitespace-nowrap">
+                          <InputField
+                            type="number"
+                            value={state.assignedQuantities[item.id] || 0}
+                            onChange={(e) => handleAssignedQuantityChange(item.id, e)}
+                            min="0"
+                            max={item.remainingQuantity}
+                            className="w-full"
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -796,6 +801,25 @@ const ListPurchaseOrders = () => {
                     {state.createdSplitOrders.map((order, index) => (
                       <div key={index} className="mb-4 p-2 border rounded">
                         <h4 className="text-md font-medium">Split Order {index + 1}</h4>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+                          <select
+                            value={order.assignedTo}
+                            onChange={(e) => {
+                              const updatedOrders = [...state.createdSplitOrders];
+                              updatedOrders[index].assignedTo = e.target.value;
+                              setState((prev) => ({ ...prev, createdSplitOrders: updatedOrders }));
+                            }}
+                            className="p-2 border rounded w-full"
+                          >
+                            <option value="">Select Technician</option>
+                            {state.technicians.map((technician) => (
+                              <option key={technician.id} value={technician.id}>
+                                {technician.name} ({technician.designation})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse">
                             <thead>
@@ -803,8 +827,6 @@ const ListPurchaseOrders = () => {
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -813,8 +835,6 @@ const ListPurchaseOrders = () => {
                                   <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
                                   <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
                                   <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                                  <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                                  <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -827,39 +847,6 @@ const ListPurchaseOrders = () => {
                 {state.createdSplitOrders.length < state.numberOfSplitOrders && (
                   <div>
                     <h4 className="text-md font-medium mb-2">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Select</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {remainingItems.map((item) => (
-                            <tr key={item.id} className="border">
-                              <td className="border p-2 whitespace-nowrap">
-                                <input
-                                  type="checkbox"
-                                  checked={state.selectedItemIds.includes(item.id)}
-                                  onChange={() => handleItemSelection(item.id)}
-                                  disabled={state.usedItemIds.includes(item.id)}
-                                />
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
-                              <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
-                              <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                              <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                              <td className="border p-2 whitespace-nowrap">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
                     <Button
                       onClick={handleGenerateSplitOrder}
                       disabled={isGenerateDisabled()}
