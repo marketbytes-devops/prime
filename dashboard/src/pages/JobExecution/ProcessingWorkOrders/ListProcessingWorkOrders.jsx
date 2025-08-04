@@ -71,12 +71,38 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
+  const handleMoveToApproval = async (woId) => {
+    try {
+      await apiClient.post(`work-orders/${woId}/move-to-approval/`);
+      toast.success("Work Order moved to Manager Approval.");
+      await fetchWorkOrders();
+    } catch (error) {
+      console.error("Error moving work order to approval:", error);
+      toast.error(
+        error.response?.data?.error || "Failed to move Work Order to Manager Approval."
+      );
+    }
+  };
+
+  const isEligibleForApproval = (wo) => {
+    return (
+      wo.items &&
+      wo.items.length > 0 &&
+      wo.items.every(
+        (item) =>
+          item.certificate_number &&
+          item.calibration_due_date &&
+          wo.range // Check work order's range field
+      )
+    );
+  };
+
   const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
     if (technicianIds.length === 0) return "None";
     if (technicianIds.length > 1) return "Multiple";
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+    return technician ? `${technician.name} (${technician.designation})` : "N/A";
   };
 
   const filteredWOs = state.workOrders
@@ -189,6 +215,17 @@ const ListProcessingWorkOrders = () => {
                         >
                           Delete
                         </Button>
+                        <Button
+                          onClick={() => handleMoveToApproval(wo.id)}
+                          disabled={!isEligibleForApproval(wo)}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            isEligibleForApproval(wo)
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "bg-gray-300 text-gray-500"
+                          }`}
+                        >
+                          Move to Manager Approval
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -211,7 +248,11 @@ const ListProcessingWorkOrders = () => {
             <Button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+              className={`px-3 py-1 rounded-md min-w-fit ${
+                state.currentPage === page
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
               {page}
             </Button>
@@ -279,9 +320,9 @@ const ListProcessingWorkOrders = () => {
                           <td className="border p-2 text-left whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_url ? (
+                            {item.certificate_file ? (
                               <a
-                                href={item.certificate_url}
+                                href={item.certificate_file}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:underline"

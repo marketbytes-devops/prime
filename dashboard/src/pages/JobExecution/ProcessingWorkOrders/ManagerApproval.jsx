@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
+import InputField from '../../../components/InputField';
 
 const ManagerApproval = () => {
   const [state, setState] = useState({
