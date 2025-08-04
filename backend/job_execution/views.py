@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class WorkOrderViewSet(viewsets.ModelViewSet):
     queryset = WorkOrder.objects.all()
     serializer_class = WorkOrderSerializer
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -20,7 +20,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         if purchase_order_id:
             queryset = queryset.filter(purchase_order_id=purchase_order_id)
         if status:
-            queryset = queryset.filter(status=status)
+            if isinstance(status, str) and ',' in status:
+                statuses = status.split(',')
+                queryset = queryset.filter(status__in=statuses)
+            else:
+                queryset = queryset.filter(status=status)
         logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, count={queryset.count()}")
         return queryset
 
@@ -101,11 +105,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         work_order.manager_approval_status = 'Declined'
-        work_order.status = 'Declined'
+        work_order.status = 'Submitted' 
         work_order.decline_reason = decline_reason
         work_order.save()
-        logger.info(f"WorkOrder {pk} declined")
-        return Response({'status': 'Work Order declined'})
+        logger.info(f"WorkOrder {pk} declined and returned to Submitted status")
+        return Response({'status': 'Work Order declined and returned to Processing Work Orders'})
 
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()

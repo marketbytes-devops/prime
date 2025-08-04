@@ -20,8 +20,8 @@ const ManagerApproval = () => {
     isDeclineModalOpen: false,
     selectedWO: null,
     declineReason: '',
-    deliveryNoteType: 'single', // Default to single delivery note
-    isWorkOrderComplete: true, // Default to Yes
+    deliveryNoteType: 'single',
+    isWorkOrderComplete: true,
   });
 
   const fetchData = async () => {
@@ -82,7 +82,7 @@ const ManagerApproval = () => {
       await apiClient.post(`work-orders/${state.selectedWO.id}/decline/`, {
         decline_reason: state.declineReason,
       });
-      toast.success('Work Order declined.');
+      toast.success('Work Order declined and returned to Processing Work Orders.');
       setState(prev => ({
         ...prev,
         isDeclineModalOpen: false,
@@ -92,7 +92,7 @@ const ManagerApproval = () => {
       fetchData();
     } catch (error) {
       console.error('Error declining work order:', error);
-      toast.error('Failed to decline Work Order.');
+      toast.error(error.response?.data?.error || 'Failed to decline Work Order.');
     }
   };
 
@@ -366,7 +366,7 @@ const ManagerApproval = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleApprove}
-              disabled={!state.isWorkOrderComplete} // Disable if work order is not complete
+              disabled={!state.isWorkOrderComplete}
               className={`px-4 py-2 rounded-md ${
                 state.isWorkOrderComplete ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'
               }`}

@@ -76,6 +76,7 @@ const ListProcessingWorkOrders = () => {
       await apiClient.post(`work-orders/${woId}/move-to-approval/`);
       toast.success("Work Order moved to Manager Approval.");
       await fetchWorkOrders();
+      navigate("/job-execution/processing-work-orders/manager-approval");
     } catch (error) {
       console.error("Error moving work order to approval:", error);
       toast.error(
@@ -92,7 +93,7 @@ const ListProcessingWorkOrders = () => {
         (item) =>
           item.certificate_number &&
           item.calibration_due_date &&
-          wo.range // Check work order's range field
+          wo.range
       )
     );
   };
@@ -102,7 +103,7 @@ const ListProcessingWorkOrders = () => {
     if (technicianIds.length === 0) return "None";
     if (technicianIds.length > 1) return "Multiple";
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation})` : "N/A";
+    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
   };
 
   const filteredWOs = state.workOrders
@@ -177,24 +178,26 @@ const ListProcessingWorkOrders = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Equipment Collection Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">
+                  <td colSpan="7" className="border p-2 text-center text-gray-500 whitespace-nowrap">
                     No processing work orders found.
                   </td>
                 </tr>
               ) : (
                 currentWOs.map((wo, index) => (
-                  <tr key={wo.id} className="border hover:bg-gray-50">
+                  <tr key={wo.id} className={`border ${wo.manager_approval_status === 'Declined' ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{new Date(wo.created_at).toLocaleDateString()}</td>
                     <td className="border p-2 whitespace-nowrap">{wo.wo_number || "N/A"}</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(wo.items)}</td>
                     <td className="border p-2 whitespace-nowrap">{wo.equipment_collection_status || "Pending"}</td>
+                    <td className="border p-2 whitespace-nowrap">{wo.manager_approval_status || "Pending"}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
@@ -277,6 +280,10 @@ const ListProcessingWorkOrders = () => {
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
+              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || "N/A"}</p>
+              {state.selectedWO.manager_approval_status === "Declined" && (
+                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || "N/A"}</p>
+              )}
               <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
               <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "N/A"}</p>
               <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
@@ -317,7 +324,7 @@ const ListProcessingWorkOrders = () => {
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                          <td className="border p-2 text-left whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
