@@ -95,7 +95,7 @@ const ListPurchaseOrders = () => {
 
   const handleConvertToWO = (po) => {
     const savedItems = po.items.map((item) => ({
-      id: item.id, 
+      id: item.id,
       item_id: item.item,
       name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
       quantity: item.quantity || 0,
@@ -206,10 +206,26 @@ const ListPurchaseOrders = () => {
     }
 
     const selectedItems = state.savedItems.filter((item) => state.selectedItemIds.includes(item.id));
-    const allHaveAssignedQuantity = selectedItems.every(
-      (item) => item.assigned_quantity !== "" && !isNaN(item.assigned_quantity) && item.assigned_quantity > 0
+    const allHaveValidAssignedQuantity = selectedItems.every(
+      (item) => item.assigned_quantity !== "" && !isNaN(item.assigned_quantity) && item.assigned_quantity > 0 && item.assigned_quantity <= item.remaining_quantity
     );
-    if (!allHaveAssignedQuantity) return true;
+    if (!allHaveValidAssignedQuantity) return true;
+
+    // Check for the last split order
+    const isLastSplitOrder = state.createdSplitOrders.length + 1 === state.numberOfSplitOrders;
+    if (isLastSplitOrder) {
+      // Calculate the remaining quantities after this assignment
+      const updatedItems = state.savedItems.map((item) =>
+        selectedItems.find((selected) => selected.id === item.id)
+          ? {
+              ...item,
+              remaining_quantity: item.remaining_quantity - (item.assigned_quantity || 0),
+            }
+          : item
+      );
+      const allItemsFullyAssigned = updatedItems.every((item) => item.remaining_quantity === 0);
+      if (!allItemsFullyAssigned) return true;
+    }
 
     return false;
   };
@@ -301,7 +317,7 @@ const ListPurchaseOrders = () => {
           return;
         }
         basePayload.items = state.savedItems.map((item) => ({
-          item: item.item_id, 
+          item: item.item_id,
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
