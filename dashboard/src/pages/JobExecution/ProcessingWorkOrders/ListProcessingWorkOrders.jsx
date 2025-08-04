@@ -12,7 +12,7 @@ const ListProcessingWorkOrders = () => {
     workOrders: [],
     itemsList: [],
     units: [],
-    technicians: [], // Added to store technician data
+    technicians: [],
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -63,7 +63,7 @@ const ListProcessingWorkOrders = () => {
       try {
         await apiClient.delete(`work-orders/${woId}/`);
         toast.success("Work order deleted successfully.");
-        await fetchWorkOrders(); // Refresh the work orders list
+        await fetchWorkOrders();
       } catch (error) {
         console.error("Error deleting work order:", error);
         toast.error("Failed to delete work order.");
@@ -71,7 +71,6 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
-  // Helper to get unique technician names for a work order's items
   const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
     if (technicianIds.length === 0) return "None";
@@ -258,8 +257,12 @@ const ListProcessingWorkOrders = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -270,8 +273,25 @@ const ListProcessingWorkOrders = () => {
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 text-left whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.certificate_url ? (
+                              <a
+                                href={item.certificate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View Certificate
+                              </a>
+                            ) : (
+                              "N/A"
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

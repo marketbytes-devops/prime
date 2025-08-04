@@ -34,6 +34,7 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             "unit",
             "unit_price",
             "total_price",
+            "certificate_uut_label",
             "certificate_number",
             "calibration_date",
             "calibration_due_date",

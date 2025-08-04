@@ -39,7 +39,10 @@ const EditProcessingWorkOrders = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         technicians: techRes.data || [],
-        items: workOrder.items || [],
+        items: (workOrder.items || []).map((item) => ({
+          ...item,
+          assigned_to: item.assigned_to || "",
+        })),
         dateReceived: workOrder.date_received || "",
         expectedCompletionDate: workOrder.expected_completion_date || "",
         onsiteOrLab: workOrder.onsite_or_lab || "",
@@ -47,7 +50,7 @@ const EditProcessingWorkOrders = () => {
         serialNumber: workOrder.serial_number || "",
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
-        assignedTo: workOrder.assigned_to || "",
+        assignedTo: workOrder.created_by || "",
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -72,44 +75,36 @@ const EditProcessingWorkOrders = () => {
   const handleSubmit = async () => {
     try {
       const payload = {
-        date_received: state.dateReceived,
-        expected_completion_date: state.expectedCompletionDate,
-        onsite_or_lab: state.onsiteOrLab,
-        range: state.range,
-        serial_number: state.serialNumber,
-        site_location: state.siteLocation,
-        remarks: state.remarks,
-        assigned_to: state.assignedTo || null,
+        purchase_order: state.workOrder?.purchase_order || null, 
+        quotation: state.workOrder?.quotation || null, 
+        date_received: state.dateReceived || null,
+        expected_completion_date: state.expectedCompletionDate || null,
+        onsite_or_lab: state.onsiteOrLab || null,
+        range: state.range || null,
+        serial_number: state.serialNumber || null,
+        site_location: state.siteLocation || null,
+        remarks: state.remarks || null,
+        created_by: state.assignedTo || null,
         items: state.items.map((item) => ({
           id: item.id,
           item: item.item,
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
-          certificate_uut_label: item.certificate_uut_label,
-          certificate_number: item.certificate_number,
-          calibration_date: item.calibration_date,
-          calibration_due_date: item.calibration_due_date,
-          uuc_serial_number: item.uuc_serial_number,
+          certificate_uut_label: item.certificate_uut_label || null,
+          certificate_number: item.certificate_number || null,
+          calibration_date: item.calibration_date || null,
+          calibration_due_date: item.calibration_due_date || null,
+          uuc_serial_number: item.uuc_serial_number || null,
+          assigned_to: item.assigned_to || null,
         })),
       };
       await apiClient.put(`work-orders/${id}/`, payload);
       toast.success("Work Order updated successfully.");
       navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
     } catch (error) {
-      console.error("Error updating work order:", error);
-      toast.error("Failed to update Work Order.");
-    }
-  };
-
-  const handleMoveToApproval = async () => {
-    try {
-      await apiClient.post(`work-orders/${id}/move_to_approval/`);
-      toast.success("Work Order moved to Manager Approval.");
-      navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
-    } catch (error) {
-      console.error("Error moving to approval:", error);
-      toast.error("Failed to move Work Order to approval.");
+      console.error("Error updating work order:", error.response?.data || error);
+      toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
     }
   };
 
@@ -187,7 +182,7 @@ const EditProcessingWorkOrders = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
             <select
               value={state.assignedTo}
               onChange={(e) => setState((prev) => ({ ...prev, assignedTo: e.target.value }))}
@@ -242,10 +237,25 @@ const EditProcessingWorkOrders = () => {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                <select
+                  value={item.assigned_to || ""}
+                  onChange={(e) => handleItemChange(index, "assigned_to", e.target.value)}
+                  className="p-2 border rounded w-full"
+                >
+                  <option value="">Select Technician</option>
+                  {state.technicians.map((technician) => (
+                    <option key={technician.id} value={technician.id}>
+                      {technician.name} ({technician.designation})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Certificate UUT Label</label>
                 <InputField
                   type="text"
-                  value={item.certificate_uut_label}
+                  value={item.certificate_uut_label || ""}
                   onChange={(e) => handleItemChange(index, "certificate_uut_label", e.target.value)}
                   className="w-full"
                 />
@@ -254,7 +264,7 @@ const EditProcessingWorkOrders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Number</label>
                 <InputField
                   type="text"
-                  value={item.certificate_number}
+                  value={item.certificate_number || ""}
                   onChange={(e) => handleItemChange(index, "certificate_number", e.target.value)}
                   className="w-full"
                 />
@@ -263,7 +273,7 @@ const EditProcessingWorkOrders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Calibration Date</label>
                 <InputField
                   type="date"
-                  value={item.calibration_date}
+                  value={item.calibration_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_date", e.target.value)}
                   className="w-full"
                 />
@@ -272,7 +282,7 @@ const EditProcessingWorkOrders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Calibration Due Date</label>
                 <InputField
                   type="date"
-                  value={item.calibration_due_date}
+                  value={item.calibration_due_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_due_date", e.target.value)}
                   className="w-full"
                 />
@@ -281,7 +291,7 @@ const EditProcessingWorkOrders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">UUC Serial Number</label>
                 <InputField
                   type="text"
-                  value={item.uuc_serial_number}
+                  value={item.uuc_serial_number || ""}
                   onChange={(e) => handleItemChange(index, "uuc_serial_number", e.target.value)}
                   className="w-full"
                 />
@@ -298,13 +308,6 @@ const EditProcessingWorkOrders = () => {
           ))}
         </div>
         <div className="flex justify-end gap-2">
-          <Button
-            onClick={handleMoveToApproval}
-            disabled={!state.items.every((item) => item.certificate_number && item.calibration_due_date)}
-            className={`px-4 py-2 rounded-md ${state.items.every((item) => item.certificate_number && item.calibration_due_date) ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-300 text-gray-500"}`}
-          >
-            Move to Approval
-          </Button>
           <Button
             onClick={handleSubmit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
