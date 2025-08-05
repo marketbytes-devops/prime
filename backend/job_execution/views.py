@@ -37,10 +37,9 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         logger.error(f"Create failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+    def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
             self.perform_update(serializer)
             logger.info(f"WorkOrder {instance.id} updated")

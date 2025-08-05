@@ -200,19 +200,19 @@ const ManagerApproval = () => {
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => handleViewWO(wo)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
                           View WO & Certificates
                         </Button>
                         <Button
                           onClick={() => setState(prev => ({ ...prev, isApproveModalOpen: true, selectedWO: wo }))}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                          className="whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           Approve
                         </Button>
                         <Button
                           onClick={() => setState(prev => ({ ...prev, isDeclineModalOpen: true, selectedWO: wo }))}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          className="whitespace-nowrap px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
                         >
                           Decline
                         </Button>

@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import WorkOrderViewSet, DeliveryNoteViewSet  # Adjust import based on your app structure
+from .views import WorkOrderViewSet, DeliveryNoteViewSet  
 
 router = DefaultRouter()
 router.register(r'work-orders', WorkOrderViewSet)

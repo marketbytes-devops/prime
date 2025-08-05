@@ -114,7 +114,6 @@ class PurchaseOrder(models.Model):
         return f"PO {self.id} - {self.quotation.company_name or 'Unnamed'} ({self.order_type})"
 
     def save(self, *args, **kwargs):
-        # Only generate series_number on creation, not on updates
         if not self.series_number and self._state.adding:
             try:
                 po_series = NumberSeries.objects.get(series_name='PurchaseOrder')
