@@ -22,6 +22,8 @@ const EditProcessingWorkOrders = () => {
     siteLocation: "",
     remarks: "",
     assignedTo: "",
+    // Track file changes separately
+    fileChanges: {},
   });
 
   const fetchData = async () => {
@@ -51,6 +53,7 @@ const EditProcessingWorkOrders = () => {
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
         assignedTo: workOrder.created_by || "",
+        fileChanges: {},
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -72,34 +75,93 @@ const EditProcessingWorkOrders = () => {
     }));
   };
 
+  const handleFileChange = (index, file) => {
+    setState((prev) => ({
+      ...prev,
+      fileChanges: {
+        ...prev.fileChanges,
+        [index]: file,
+      },
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
-      const payload = {
-        purchase_order: state.workOrder?.purchase_order || null, 
-        quotation: state.workOrder?.quotation || null, 
-        date_received: state.dateReceived || null,
-        expected_completion_date: state.expectedCompletionDate || null,
-        onsite_or_lab: state.onsiteOrLab || null,
-        range: state.range || null,
-        serial_number: state.serialNumber || null,
-        site_location: state.siteLocation || null,
-        remarks: state.remarks || null,
-        created_by: state.assignedTo || null,
-        items: state.items.map((item) => ({
-          id: item.id,
-          item: item.item,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.unit_price,
-          certificate_uut_label: item.certificate_uut_label || null,
-          certificate_number: item.certificate_number || null,
-          calibration_date: item.calibration_date || null,
-          calibration_due_date: item.calibration_due_date || null,
-          uuc_serial_number: item.uuc_serial_number || null,
-          assigned_to: item.assigned_to || null,
-        })),
-      };
-      await apiClient.put(`work-orders/${id}/`, payload);
+      // Check if there are any file uploads
+      const hasFileUploads = Object.keys(state.fileChanges).length > 0;
+
+      if (hasFileUploads) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+        
+        // Add non-file fields
+        formData.append('purchase_order', state.workOrder?.purchase_order || '');
+        formData.append('quotation', state.workOrder?.quotation || '');
+        formData.append('date_received', state.dateReceived || '');
+        formData.append('expected_completion_date', state.expectedCompletionDate || '');
+        formData.append('onsite_or_lab', state.onsiteOrLab || '');
+        formData.append('range', state.range || '');
+        formData.append('serial_number', state.serialNumber || '');
+        formData.append('site_location', state.siteLocation || '');
+        formData.append('remarks', state.remarks || '');
+        formData.append('created_by', state.assignedTo || '');
+
+        // Add items data
+        state.items.forEach((item, index) => {
+          formData.append(`items[${index}]id`, item.id || '');
+          formData.append(`items[${index}]item`, item.item || '');
+          formData.append(`items[${index}]quantity`, item.quantity || '');
+          formData.append(`items[${index}]unit`, item.unit || '');
+          formData.append(`items[${index}]unit_price`, item.unit_price || '');
+          formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || '');
+          formData.append(`items[${index}]certificate_number`, item.certificate_number || '');
+          formData.append(`items[${index}]calibration_date`, item.calibration_date || '');
+          formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || '');
+          formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || '');
+          formData.append(`items[${index}]assigned_to`, item.assigned_to || '');
+          
+          // Add file if changed
+          if (state.fileChanges[index]) {
+            formData.append(`items[${index}]certificate_file`, state.fileChanges[index]);
+          }
+        });
+
+        await apiClient.put(`work-orders/${id}/`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // Use JSON payload if no file uploads
+        const payload = {
+          purchase_order: state.workOrder?.purchase_order || null,
+          quotation: state.workOrder?.quotation || null,
+          date_received: state.dateReceived || null,
+          expected_completion_date: state.expectedCompletionDate || null,
+          onsite_or_lab: state.onsiteOrLab || null,
+          range: state.range || null,
+          serial_number: state.serialNumber || null,
+          site_location: state.siteLocation || null,
+          remarks: state.remarks || null,
+          created_by: state.assignedTo || null,
+          items: state.items.map((item) => ({
+            id: item.id,
+            item: item.item,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            certificate_uut_label: item.certificate_uut_label || null,
+            certificate_number: item.certificate_number || null,
+            calibration_date: item.calibration_date || null,
+            calibration_due_date: item.calibration_due_date || null,
+            uuc_serial_number: item.uuc_serial_number || null,
+            assigned_to: item.assigned_to || null,
+          })),
+        };
+
+        await apiClient.put(`work-orders/${id}/`, payload);
+      }
+
       toast.success("Work Order updated successfully.");
       navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
     } catch (error) {
@@ -298,11 +360,32 @@ const EditProcessingWorkOrders = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Upload Certificate</label>
+                {item.certificate_file && (
+                  <div className="mb-2">
+                    <span className="text-sm text-gray-600">
+                      Current file: 
+                      <a 
+                        href={item.certificate_file} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline ml-1"
+                      >
+                        View Current Certificate
+                      </a>
+                    </span>
+                  </div>
+                )}
                 <input
                   type="file"
-                  onChange={(e) => handleItemChange(index, "certificate_file", e.target.files[0])}
+                  onChange={(e) => handleFileChange(index, e.target.files[0])}
                   className="w-full p-2 border rounded"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                 />
+                {state.fileChanges[index] && (
+                  <div className="mt-1 text-sm text-green-600">
+                    New file selected: {state.fileChanges[index].name}
+                  </div>
+                )}
               </div>
             </div>
           ))}

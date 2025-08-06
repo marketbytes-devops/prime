@@ -12,7 +12,6 @@ from team.models import Technician
 
 logger = logging.getLogger(__name__)
 
-
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
         queryset=Item.objects.all(), allow_null=True
@@ -122,9 +121,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     f"{item_data['quantity']} {Unit.objects.get(id=item_data['unit'].id if hasattr(item_data['unit'], 'id') else item_data['unit']).name}"
                     for item_data in assigned_items
                 )
-                subject = (
-                    f"You Have Been Assigned to Work Order #{work_order.wo_number}"
-                )
+                subject = f"You Have Been Assigned to Work Order #{work_order.wo_number}"
                 message = (
                     f"Dear {technician.name},\n\n"
                     f"You have been assigned to Work Order #{work_order.wo_number}:\n"
@@ -139,13 +136,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     send_mail(
                         subject, message, None, [technician.email], fail_silently=True
                     )
-                    logger.info(
-                        f"Email sent to {technician.email} for WO #{work_order.wo_number}"
-                    )
+                    logger.info(f"Email sent to {technician.email} for WO #{work_order.wo_number}")
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send email to {technician.email}: {str(e)}"
-                    )
+                    logger.error(f"Failed to send email to {technician.email}: {str(e)}")
 
                 admin_email = settings.ADMIN_EMAIL
                 admin_subject = f"Work Order Assignment – #{work_order.wo_number}"
@@ -164,17 +157,83 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                         [admin_email],
                         fail_silently=True,
                     )
-                    logger.info(
-                        f"Admin email sent to {admin_email} for WO #{work_order.wo_number}"
-                    )
+                    logger.info(f"Admin email sent to {admin_email} for WO #{work_order.wo_number}")
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send admin email to {admin_email}: {str(e)}"
-                    )
+                    logger.error(f"Failed to send admin email to {admin_email}: {str(e)}")
+
+    def parse_formdata_items(self, request_data):
+        """Parse FormData items format into proper structure"""
+        items_data = []
+        item_indices = set()
+        
+        # Find all item indices
+        for key in request_data.keys():
+            if key.startswith('items[') and ']' in key:
+                try:
+                    index = int(key.split('[')[1].split(']')[0])
+                    item_indices.add(index)
+                except (ValueError, IndexError):
+                    continue
+        
+        # Build items data for each index
+        for index in sorted(item_indices):
+            item_data = {}
+            prefix = f'items[{index}]'
+            
+            # Map form fields to item data
+            field_mappings = {
+                f'{prefix}id': 'id',
+                f'{prefix}item': 'item',
+                f'{prefix}quantity': 'quantity',
+                f'{prefix}unit': 'unit',
+                f'{prefix}unit_price': 'unit_price',
+                f'{prefix}certificate_uut_label': 'certificate_uut_label',
+                f'{prefix}certificate_number': 'certificate_number',
+                f'{prefix}calibration_date': 'calibration_date',
+                f'{prefix}calibration_due_date': 'calibration_due_date',
+                f'{prefix}uuc_serial_number': 'uuc_serial_number',
+                f'{prefix}assigned_to': 'assigned_to',
+                f'{prefix}certificate_file': 'certificate_file',
+            }
+            
+            for form_key, item_key in field_mappings.items():
+                if form_key in request_data:
+                    value = request_data[form_key]
+                    # Convert empty strings to None for nullable fields
+                    if value == '' or value == 'null':
+                        value = None
+                    # Convert numeric strings to appropriate types
+                    elif item_key in ['item', 'unit', 'assigned_to'] and value:
+                        try:
+                            value = int(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    elif item_key == 'quantity' and value:
+                        try:
+                            value = int(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    elif item_key == 'unit_price' and value:
+                        try:
+                            value = float(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    
+                    item_data[item_key] = value
+            
+            if item_data:  # Only add if we have some data
+                items_data.append(item_data)
+        
+        return items_data
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         request = self.context.get("request")
+        
+        # Check if this is FormData format
+        if hasattr(request, 'data') and any(key.startswith('items[') for key in request.data.keys()):
+            items_data = self.parse_formdata_items(request.data)
+        
         if request and hasattr(request.user, "technician"):
             validated_data["created_by"] = request.user.technician
         else:
@@ -208,6 +267,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
         for item_data in items_data:
+            logger.info(f"Creating item with data: {dict(item_data)}")
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
 
@@ -218,6 +278,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
+        logger.info(f"Validated data received: {validated_data}")  # Log top-level data
+        logger.info(f"Items data received: {items_data}")  # Log items data
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -227,6 +289,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
+                logger.info(f"Creating item with data: {dict(item_data)}")  # Log each item
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
             logger.info(f"Updated items for WorkOrder {instance.id}")
 
