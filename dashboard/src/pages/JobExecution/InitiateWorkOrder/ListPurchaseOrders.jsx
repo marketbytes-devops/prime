@@ -37,6 +37,7 @@ const ListPurchaseOrders = () => {
     usedItemIds: [],
     workOrderStatusMap: {},
     splitOrderAssignedTo: "",
+    isSubmitting: false, // Added loading state
   });
 
   const fetchData = async () => {
@@ -325,86 +326,59 @@ const ListPurchaseOrders = () => {
     );
   };
 
-const handleWOSubmit = async () => {
-  const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
-  if (!workOrderSeries) {
-    toast.error("Work Order series not found.");
-    return;
-  }
-  try {
-    const basePayload = {
-      purchase_order: state.selectedPO.id,
-      quotation: state.selectedPO.quotation,
-      status: "Submitted",
-      date_received: state.dateReceived,
-      expected_completion_date: state.expectedCompletionDate,
-      onsite_or_lab: state.onsiteOrLab,
-      range: state.range,
-      serial_number: state.serialNumber,
-      site_location: state.site_location,
-      remarks: state.remarks,
-      items: [],
-    };
+  const handleWOSubmit = async () => {
+    setState((prev) => ({ ...prev, isSubmitting: true })); // Start loading
+    const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
+    if (!workOrderSeries) {
+      toast.error("Work Order series not found.");
+      setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+      return;
+    }
+    try {
+      const basePayload = {
+        purchase_order: state.selectedPO.id,
+        quotation: state.selectedPO.quotation,
+        status: "Submitted",
+        date_received: state.dateReceived,
+        expected_completion_date: state.expectedCompletionDate,
+        onsite_or_lab: state.onsiteOrLab,
+        range: state.range,
+        serial_number: state.serialNumber,
+        site_location: state.site_location,
+        remarks: state.remarks,
+        items: [],
+      };
 
-    let responses = [];
-    if (state.woType === "Single") {
-      const allHaveAssignedTo = state.savedItems.every(
-        (item) =>
-          item.assigned_to !== "" &&
-          state.technicians.some((t) => t.id === parseInt(item.assigned_to))
-      );
-      if (!allHaveAssignedTo) {
-        toast.error("All items must be assigned to a valid technician.");
-        return;
-      }
-      basePayload.items = state.savedItems.map((item) => ({
-        item: item.item_id,
-        quantity: item.quantity,
-        unit: item.unit,
-        unit_price: item.unit_price,
-        assigned_to: item.assigned_to ? parseInt(item.assigned_to) : null, // Ensure null if not set
-      }));
-      const response = await apiClient.post("work-orders/", basePayload);
-      responses.push(response.data);
-    } else if (state.woType === "Split") {
-      if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
-        toast.error("Please create exactly the specified number of split orders.");
-        return;
-      }
-      if (state.savedItems.some((item) => item.remaining_quantity !== 0)) {
-        toast.error("All items must be fully assigned to split orders.");
-        return;
-      }
-      for (const order of state.createdSplitOrders) {
-        const allHaveAssignedTo = order.items.every(
+      let responses = [];
+      if (state.woType === "Single") {
+        const allHaveAssignedTo = state.savedItems.every(
           (item) =>
             item.assigned_to !== "" &&
             state.technicians.some((t) => t.id === parseInt(item.assigned_to))
         );
         if (!allHaveAssignedTo) {
-          toast.error("All items in split orders must be assigned to a valid technician.");
+          toast.error("All items must be assigned to a valid technician.");
+          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
           return;
         }
-        basePayload.items = order.items.map((item) => ({
+        basePayload.items = state.savedItems.map((item) => ({
           item: item.item_id,
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
-          assigned_to: item.assigned_to ? parseInt(item.assigned_to) : null, // Ensure null if not set
+          assigned_to: item.assigned_to ? parseInt(item.assigned_to) : null,
         }));
         const response = await apiClient.post("work-orders/", basePayload);
         responses.push(response.data);
-      }
-    }
-       else if (state.woType === "Split") {
+      } else if (state.woType === "Split") {
         if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
-          toast.error(
-            "Please create exactly the specified number of split orders."
-          );
+          toast.error("Please create exactly the specified number of split orders.");
+          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
           return;
         }
         if (state.savedItems.some((item) => item.remaining_quantity !== 0)) {
           toast.error("All items must be fully assigned to split orders.");
+          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
           return;
         }
         for (const order of state.createdSplitOrders) {
@@ -414,9 +388,8 @@ const handleWOSubmit = async () => {
               state.technicians.some((t) => t.id === parseInt(item.assigned_to))
           );
           if (!allHaveAssignedTo) {
-            toast.error(
-              "All items in split orders must be assigned to a valid technician."
-            );
+            toast.error("All items in split orders must be assigned to a valid technician.");
+            setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
             return;
           }
           basePayload.items = order.items.map((item) => ({
@@ -424,7 +397,7 @@ const handleWOSubmit = async () => {
             quantity: item.quantity,
             unit: item.unit,
             unit_price: item.unit_price,
-            assigned_to: parseInt(item.assigned_to),
+            assigned_to: item.assigned_to ? parseInt(item.assigned_to) : null,
           }));
           const response = await apiClient.post("work-orders/", basePayload);
           responses.push(response.data);
@@ -459,6 +432,7 @@ const handleWOSubmit = async () => {
         createdSplitOrders: [],
         usedItemIds: [],
         splitOrderAssignedTo: "",
+        isSubmitting: false, // Stop loading on success
       }));
 
       await fetchData();
@@ -469,6 +443,7 @@ const handleWOSubmit = async () => {
         status: error.response?.status,
       });
       toast.error("Failed to create Work Order. Check console for details.");
+      setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
     }
   };
 
@@ -494,105 +469,106 @@ const handleWOSubmit = async () => {
     }
   };
 
-const handlePrint = () => {
-  const po = state.selectedPO;
-  const quotation = state.quotations.find((q) => q.id === po.quotation);
-  const salesPersonName = quotation?.assigned_sales_person_name || "N/A";
-  const printWindow = window.open("", "_blank");
-  printWindow.document.write(`
-    <html>
-      <head><title>Work Order for PO ${po.id}</title></head>
-      <body style="font-family: Arial, sans-serif; padding: 20px;">
-        <h1>Work Order Details</h1>
-        <div style="margin-bottom: 20px;">
-          <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
-          <p><strong>PO ID:</strong> ${po.id}</p>
-          <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
-          <p><strong>Order Type:</strong> ${po.order_type}</p>
-          <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
-          <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
-          <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
-          <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
-          <p><strong>Date Received:</strong> ${state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"}</p>
-          <p><strong>Expected Completion Date:</strong> ${state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"}</p>
-          <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
-          <p><strong>Range:</strong> ${state.range || "N/A"}</p>
-          <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
-          <p><strong>Site Location:</strong> ${state.site_location || "N/A"}</p>
-          <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
-        </div>
-        <div>
-          <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
-          <table border="1" style="width: 100%; border-collapse: collapse;">
-            <tr style="background-color: #f2f2f2;">
-              <th style="padding: 8px; text-align: left;">Item</th>
-              <th style="padding: 8px; text-align: left;">Quantity</th>
-              <th style="padding: 8px; text-align: left;">Unit</th>
-              <th style="padding: 8px; text-align: left;">Assigned To</th>
-              <th style="padding: 8px; text-align: left;">Certificate UUT Label</th>
-              <th style="padding: 8px; text-align: left;">Certificate Number</th>
-              <th style="padding: 8px; text-align: left;">Calibration Date</th>
-              <th style="padding: 8px; text-align: left;">Calibration Due Date</th>
-              <th style="padding: 8px; text-align: left;">UUC Serial Number</th>
-              <th style="padding: 8px; text-align: left;">Certificate</th>
-            </tr>
-            ${state.woType === "Single"
-              ? state.savedItems
-                  .map(
-                    (item) => `
-                      <tr>
-                        <td style="padding: 8px;">${item.name || "N/A"}</td>
-                        <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
-                        <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
-                      </tr>
-                    `
-                  )
-                  .join("")
-              : state.createdSplitOrders
-                  .map(
-                    (order, index) => `
-                      <tr>
-                        <td colspan="10" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
-                      </tr>
-                      ${order.items
-                        .map(
-                          (item) => `
-                            <tr>
-                              <td style="padding: 8px;">${item.name || "N/A"}</td>
-                              <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
-                              <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
-                            </tr>
-                          `
-                        )
-                        .join("")}
-                    `
-                  )
-                  .join("")}
-          </table>
-        </div>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.print();
-};
+  const handlePrint = () => {
+    const po = state.selectedPO;
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    const salesPersonName = quotation?.assigned_sales_person_name || "N/A";
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head><title>Work Order for PO ${po.id}</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+          <h1>Work Order Details</h1>
+          <div style="margin-bottom: 20px;">
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
+            <p><strong>PO ID:</strong> ${po.id}</p>
+            <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
+            <p><strong>Order Type:</strong> ${po.order_type}</p>
+            <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+            <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
+            <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
+          </div>
+          <div style="margin-bottom: 20px;">
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
+            <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
+            <p><strong>Date Received:</strong> ${state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Expected Completion Date:</strong> ${state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
+            <p><strong>Range:</strong> ${state.range || "N/A"}</p>
+            <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
+            <p><strong>Site Location:</strong> ${state.site_location || "N/A"}</p>
+            <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
+          </div>
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
+            <table border="1" style="width: 100%; border-collapse: collapse;">
+              <tr style="background-color: #f2f2f2;">
+                <th style="padding: 8px; text-align: left;">Item</th>
+                <th style="padding: 8px; text-align: left;">Quantity</th>
+                <th style="padding: 8px; text-align: left;">Unit</th>
+                <th style="padding: 8px; text-align: left;">Assigned To</th>
+                <th style="padding: 8px; text-align: left;">Certificate UUT Label</th>
+                <th style="padding: 8px; text-align: left;">Certificate Number</th>
+                <th style="padding: 8px; text-align: left;">Calibration Date</th>
+                <th style="padding: 8px; text-align: left;">Calibration Due Date</th>
+                <th style="padding: 8px; text-align: left;">UUC Serial Number</th>
+                <th style="padding: 8px; text-align: left;">Certificate</th>
+              </tr>
+              ${state.woType === "Single"
+                ? state.savedItems
+                    .map(
+                      (item) => `
+                        <tr>
+                          <td style="padding: 8px;">${item.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : state.createdSplitOrders
+                    .map(
+                      (order, index) => `
+                        <tr>
+                          <td colspan="10" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
+                        </tr>
+                        ${order.items
+                          .map(
+                            (item) => `
+                              <tr>
+                                <td style="padding: 8px;">${item.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
+                              </tr>
+                            `
+                          )
+                          .join("")}
+                      `
+                    )
+                    .join("")}
+            </table>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const handleDeletePO = async (poId) => {
     if (
       window.confirm("Are you sure you want to delete this purchase order?")
@@ -1347,14 +1323,14 @@ const handlePrint = () => {
             </Button>
             <Button
               onClick={handleWOSubmit}
-              disabled={isSubmitDisabled()}
+              disabled={isSubmitDisabled() || state.isSubmitting}
               className={`px-4 py-2 rounded-md ${
-                isSubmitDisabled()
+                isSubmitDisabled() || state.isSubmitting
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
-              Submit
+              {state.isSubmitting ? "Submitting..." : "Submit"}
             </Button>
             <Button
               onClick={handlePrint}

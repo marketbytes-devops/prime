@@ -61,9 +61,11 @@ const ManagerApproval = () => {
 
   const handleApprove = async () => {
     try {
-      await apiClient.post(`work-orders/${state.selectedWO.id}/approve/`, {
+      const payload = {
         delivery_note_type: state.deliveryNoteType,
-      });
+        wo_number: state.selectedWO.wo_number, // Pass WO number to use as DN number
+      };
+      await apiClient.post(`work-orders/${state.selectedWO.id}/approve/`, payload);
       toast.success("Work Order approved and Delivery Note created.");
       setState((prev) => ({
         ...prev,
@@ -75,7 +77,7 @@ const ManagerApproval = () => {
       fetchData();
     } catch (error) {
       console.error("Error approving work order:", error);
-      toast.error("Failed to approve Work Order.");
+      toast.error(error.response?.data?.error || "Failed to approve Work Order.");
     }
   };
 

@@ -76,8 +76,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         queryset=Technician.objects.all(), allow_null=True, required=False
     )
     items = WorkOrderItemSerializer(many=True, required=False)
-    delivery_note = DeliveryNoteSerializer(read_only=True)
+    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)  # Added to include delivery notes
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
+    purchase_order_file = serializers.FileField(required=False)
+    work_order_file = serializers.FileField(required=False)
+    signed_delivery_note_file = serializers.FileField(required=False)
 
     class Meta:
         model = WorkOrder
@@ -99,8 +102,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "manager_approval_status",
             "decline_reason",
             "items",
-            "delivery_note",
+            "delivery_notes",  # Added to ensure delivery notes are returned
             "created_by_name",
+            "purchase_order_file",
+            "work_order_file",
+            "signed_delivery_note_file",
         ]
 
     def send_assignment_email(self, work_order, items_data):

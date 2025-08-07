@@ -58,14 +58,14 @@ class WorkOrderItem(models.Model):
     def __str__(self):
         return f"{self.item} - {self.work_order}"
 
+
 class DeliveryNote(models.Model):
-    work_order = models.OneToOneField(WorkOrder, on_delete=models.CASCADE, related_name='delivery_note')
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='delivery_notes')  # Changed to ForeignKey
     dn_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     signed_delivery_note = models.FileField(upload_to='delivery_notes/', null=True, blank=True)
     delivery_status = models.CharField(
         max_length=20,
         choices=[('Delivery Pending', 'Delivery Pending'), ('Delivered', 'Delivered')],
-        default='Delivery Pending'
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
