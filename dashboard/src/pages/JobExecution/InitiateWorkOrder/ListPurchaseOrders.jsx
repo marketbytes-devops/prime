@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // Added useLocation
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
@@ -8,6 +8,7 @@ import Modal from "../../../components/Modal";
 
 const ListPurchaseOrders = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // Added to detect navigation changes
   const [state, setState] = useState({
     purchaseOrders: [],
     technicians: [],
@@ -37,7 +38,7 @@ const ListPurchaseOrders = () => {
     usedItemIds: [],
     workOrderStatusMap: {},
     splitOrderAssignedTo: "",
-    isSubmitting: false, // Added loading state
+    isSubmitting: false,
   });
 
   const fetchData = async () => {
@@ -71,7 +72,7 @@ const ListPurchaseOrders = () => {
         workOrderStatusMap[po.id] =
           po.work_orders.length > 0
             ? po.work_orders.map((wo) => ({ id: wo.id, status: wo.status }))
-            : [{ id: null, status: "Collection Pending" }];
+            : [];
       });
 
       setState((prev) => ({
@@ -90,9 +91,10 @@ const ListPurchaseOrders = () => {
     }
   };
 
+  // Modified useEffect to refresh data on navigation
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [location.pathname]); // Trigger fetchData when pathname changes
 
   const handleConvertToWO = (po) => {
     const savedItems = po.items.map((item) => ({
@@ -232,11 +234,9 @@ const ListPurchaseOrders = () => {
     );
     if (!allHaveValidAssignedQuantity) return true;
 
-    // Check for the last split order
     const isLastSplitOrder =
       state.createdSplitOrders.length + 1 === state.numberOfSplitOrders;
     if (isLastSplitOrder) {
-      // Calculate the remaining quantities after this assignment
       const updatedItems = state.savedItems.map((item) =>
         selectedItems.find((selected) => selected.id === item.id)
           ? {
@@ -327,11 +327,11 @@ const ListPurchaseOrders = () => {
   };
 
   const handleWOSubmit = async () => {
-    setState((prev) => ({ ...prev, isSubmitting: true })); // Start loading
+    setState((prev) => ({ ...prev, isSubmitting: true }));
     const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
     if (!workOrderSeries) {
       toast.error("Work Order series not found.");
-      setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+      setState((prev) => ({ ...prev, isSubmitting: false }));
       return;
     }
     try {
@@ -358,7 +358,7 @@ const ListPurchaseOrders = () => {
         );
         if (!allHaveAssignedTo) {
           toast.error("All items must be assigned to a valid technician.");
-          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+          setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
         }
         basePayload.items = state.savedItems.map((item) => ({
@@ -373,12 +373,12 @@ const ListPurchaseOrders = () => {
       } else if (state.woType === "Split") {
         if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
           toast.error("Please create exactly the specified number of split orders.");
-          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+          setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
         }
         if (state.savedItems.some((item) => item.remaining_quantity !== 0)) {
           toast.error("All items must be fully assigned to split orders.");
-          setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+          setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
         }
         for (const order of state.createdSplitOrders) {
@@ -389,7 +389,7 @@ const ListPurchaseOrders = () => {
           );
           if (!allHaveAssignedTo) {
             toast.error("All items in split orders must be assigned to a valid technician.");
-            setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+            setState((prev) => ({ ...prev, isSubmitting: false }));
             return;
           }
           basePayload.items = order.items.map((item) => ({
@@ -432,7 +432,7 @@ const ListPurchaseOrders = () => {
         createdSplitOrders: [],
         usedItemIds: [],
         splitOrderAssignedTo: "",
-        isSubmitting: false, // Stop loading on success
+        isSubmitting: false,
       }));
 
       await fetchData();
@@ -443,7 +443,7 @@ const ListPurchaseOrders = () => {
         status: error.response?.status,
       });
       toast.error("Failed to create Work Order. Check console for details.");
-      setState((prev) => ({ ...prev, isSubmitting: false })); // Stop loading on error
+      setState((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
@@ -645,9 +645,14 @@ const ListPurchaseOrders = () => {
     return po ? po.status : "Collection Pending";
   };
 
+  // Modified to check both PO status and workOrderStatusMap
   const canConvertToWorkOrder = (poId) => {
     const po = state.purchaseOrders.find((p) => p.id === poId);
-    return po && po.status === "Collected";
+    return (
+      po &&
+      po.status === "Collected" &&
+      (!state.workOrderStatusMap[poId] || state.workOrderStatusMap[poId].length === 0)
+    );
   };
 
   const remainingItems = state.savedItems.filter(

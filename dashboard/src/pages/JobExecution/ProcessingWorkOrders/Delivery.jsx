@@ -21,7 +21,6 @@ const Delivery = () => {
     statusFilter: 'all',
     isViewModalOpen: false,
     selectedWO: null,
-    pendingStatusChange: {}, // Track pending status changes
   });
 
   const fetchData = async () => {
@@ -55,7 +54,6 @@ const Delivery = () => {
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
-        pendingStatusChange: {}, // Reset pending status changes on fetch
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -71,28 +69,17 @@ const Delivery = () => {
     try {
       const formData = new FormData();
       formData.append('signed_delivery_note', state.signedDeliveryNote);
-      const response = await apiClient.post(`delivery-notes/${state.selectedDN.id}/upload-signed-note/`, formData, {
+      await apiClient.post(`delivery-notes/${state.selectedDN.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      if (response.data && response.data.status === 'Signed Delivery Note uploaded and status updated') {
-        toast.success('Signed Delivery Note uploaded and status updated to Delivered.');
-        // Clear pending status change after successful upload
-        setState((prev) => ({
-          ...prev,
-          isModalOpen: false,
-          selectedDN: null,
-          signedDeliveryNote: null,
-          pendingStatusChange: { ...prev.pendingStatusChange, [state.selectedDN.id]: undefined },
-        }));
-      } else {
-        toast.success('Signed Delivery Note uploaded.');
-        setState((prev) => ({
-          ...prev,
-          isModalOpen: false,
-          selectedDN: null,
-          signedDeliveryNote: null,
-        }));
-      }
+      await apiClient.patch(`delivery-notes/${state.selectedDN.id}/`, { delivery_status: 'Delivered' });
+      toast.success('Signed Delivery Note uploaded and status updated to Delivered.');
+      setState((prev) => ({
+        ...prev,
+        isModalOpen: false,
+        selectedDN: null,
+        signedDeliveryNote: null,
+      }));
       fetchData();
     } catch (error) {
       console.error('Error uploading signed delivery note:', error);
@@ -108,39 +95,6 @@ const Delivery = () => {
     }));
   };
 
-  const handleUpdateStatus = async (dnId, newStatus) => {
-    const currentDN = state.deliveryNotes.find((dn) => dn.id === dnId);
-    if (newStatus === 'Delivered' && !currentDN.signed_delivery_note) {
-      // Store pending status change and open modal
-      setState((prev) => ({
-        ...prev,
-        pendingStatusChange: { ...prev.pendingStatusChange, [dnId]: newStatus },
-        isModalOpen: true,
-        selectedDN: currentDN,
-      }));
-    } else {
-      try {
-        const payload = { delivery_status: newStatus };
-        await apiClient.patch(`delivery-notes/${dnId}/`, payload);
-        toast.success('Delivery status updated successfully.');
-        fetchData();
-      } catch (error) {
-        console.error('Error updating delivery status:', error);
-        toast.error('Failed to update delivery status.');
-      }
-    }
-  };
-
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [
-      ...new Set(items.map((item) => item.assigned_to).filter((id) => id)),
-    ];
-    if (technicianIds.length === 0) return "None";
-    if (technicianIds.length > 1) return "Multiple";
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "None";
-  };
-
   const handleViewWO = (woId) => {
     if (woId) {
       const workOrder = state.deliveryNotes.find((dn) => dn.work_order?.id === woId)?.work_order;
@@ -152,28 +106,21 @@ const Delivery = () => {
     }
   };
 
-  const handleDeleteDN = async (dnId) => {
-    if (window.confirm('Are you sure you want to delete this delivery note?')) {
-      try {
-        await apiClient.delete(`delivery-notes/${dnId}/`);
-        toast.success('Delivery note deleted successfully.');
-        fetchData();
-      } catch (error) {
-        console.error('Error deleting delivery note:', error);
-        toast.error('Failed to delete delivery note.');
-      }
-    }
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'None';
   };
 
   const filteredDNs = state.deliveryNotes
-    .filter((dn) =>
-      (dn.work_order?.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      (dn.dn_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+    .filter(
+      (dn) =>
+        (dn.work_order?.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        (dn.dn_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
     )
-    .filter((dn) => {
-      const status = dn.delivery_status;
-      return state.statusFilter === 'all' || status === state.statusFilter;
-    })
+    .filter((dn) => state.statusFilter === 'all' || dn.delivery_status === state.statusFilter)
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
         return new Date(b.created_at) - new Date(a.created_at);
@@ -189,10 +136,7 @@ const Delivery = () => {
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
   const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
-  const pageNumbers = Array.from(
-    { length: endPage - startPage + 1 },
-    (_, i) => startPage + i
-  );
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -253,6 +197,7 @@ const Delivery = () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
@@ -264,54 +209,24 @@ const Delivery = () => {
               {currentDNs.map((dn, index) => (
                 <tr key={dn.id} className="border hover:bg-gray-50">
                   <td className="border p-2">{startIndex + index + 1}</td>
-                  <td className="border p-2">
-                    {dn.work_order?.wo_number || 'N/A'}<br />
-                    <span className="text-sm text-gray-500">(DN: {dn.dn_number || ''})</span>
-                  </td>
+                  <td className="border p-2">{dn.dn_number || 'N/A'}</td>
+                  <td className="border p-2">{dn.work_order?.wo_number || 'N/A'}</td>
                   <td className="border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
-                  <td className="border p-2">
-                    {dn.work_order?.items ? getAssignedTechnicians(dn.work_order.items) : 'None'}
-                  </td>
-                  <td className="border p-2">
-                    <select
-                      value={state.pendingStatusChange[dn.id] || dn.delivery_status}
-                      onChange={(e) => handleUpdateStatus(dn.id, e.target.value)}
-                      className="w-full p-2 border rounded focus:outline-indigo-500"
-                    >
-                      <option value="Delivery Pending">Delivery Pending</option>
-                      <option value="Delivered">Delivered</option>
-                    </select>
-                  </td>
+                  <td className="border p-2">{dn.work_order?.items ? getAssignedTechnicians(dn.work_order.items) : 'None'}</td>
+                  <td className="border p-2">{dn.delivery_status}</td>
                   <td className="border p-2">
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={() => handleViewWO(dn.work_order?.id)}
-                        className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                        className="whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                       >
                         View WO
                       </Button>
-                      {dn.delivery_status === 'Delivery Pending' && (
-                        <Button
-                          onClick={() => handleOpenModal(dn)}
-                          disabled={true} // Disabled when status is Delivery Pending
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                          Upload Signed DN
-                        </Button>
-                      )}
-                      {dn.delivery_status === 'Delivered' && (
-                        <Button
-                          onClick={() => handleOpenModal(dn)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                        >
-                          Upload Signed DN
-                        </Button>
-                      )}
                       <Button
-                        onClick={() => handleDeleteDN(dn.id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                        onClick={() => handleOpenModal(dn)}
+                        className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                       >
-                        Delete
+                        Upload Signed DN
                       </Button>
                     </div>
                   </td>
@@ -334,9 +249,7 @@ const Delivery = () => {
                 key={page}
                 onClick={() => handlePageChange(page)}
                 className={`px-3 py-1 rounded-md min-w-fit ${
-                  state.currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
                 {page}
@@ -370,13 +283,13 @@ const Delivery = () => {
             <Button
               onClick={handleUploadSignedNote}
               disabled={!state.signedDeliveryNote}
-              className={`px-4 py-2 rounded-md ${state.signedDeliveryNote ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+              className={`whitespace-nowrap px-4 py-2 rounded-md ${state.signedDeliveryNote ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
             >
               Upload
             </Button>
             <Button
               onClick={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedDN: null, signedDeliveryNote: null }))}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+              className="whitespace-nowrap px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
             </Button>
@@ -386,26 +299,22 @@ const Delivery = () => {
       <Modal
         isOpen={state.isViewModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
-        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         {state.selectedWO && (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
-              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || "N/A"}</p>
-              {state.selectedWO.manager_approval_status === "Declined" && (
-                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || "N/A"}</p>
-              )}
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
               <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "N/A"}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || "N/A"}</p>
-              <p><strong>Range:</strong> {state.selectedWO.range || "N/A"}</p>
-              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || "N/A"}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || "N/A"}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong>Range:</strong> {state.selectedWO.range || 'N/A'}</p>
+              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -430,28 +339,23 @@ const Delivery = () => {
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
-                              <a
-                                href={item.certificate_file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
+                              <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                                 View Certificate
                               </a>
                             ) : (
-                              "N/A"
+                              'N/A'
                             )}
                           </td>
                         </tr>

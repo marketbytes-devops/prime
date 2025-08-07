@@ -76,7 +76,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         queryset=Technician.objects.all(), allow_null=True, required=False
     )
     items = WorkOrderItemSerializer(many=True, required=False)
-    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)  # Added to include delivery notes
+    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True) 
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
     purchase_order_file = serializers.FileField(required=False)
     work_order_file = serializers.FileField(required=False)
@@ -102,7 +102,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "manager_approval_status",
             "decline_reason",
             "items",
-            "delivery_notes",  # Added to ensure delivery notes are returned
+            "delivery_notes", 
             "created_by_name",
             "purchase_order_file",
             "work_order_file",
@@ -181,12 +181,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 except (ValueError, IndexError):
                     continue
         
-        # Build items data for each index
         for index in sorted(item_indices):
             item_data = {}
             prefix = f'items[{index}]'
             
-            # Map form fields to item data
             field_mappings = {
                 f'{prefix}id': 'id',
                 f'{prefix}item': 'item',
@@ -205,10 +203,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             for form_key, item_key in field_mappings.items():
                 if form_key in request_data:
                     value = request_data[form_key]
-                    # Convert empty strings to None for nullable fields
                     if value == '' or value == 'null':
                         value = None
-                    # Convert numeric strings to appropriate types
+                        
                     elif item_key in ['item', 'unit', 'assigned_to'] and value:
                         try:
                             value = int(value)
@@ -227,7 +224,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     
                     item_data[item_key] = value
             
-            if item_data:  # Only add if we have some data
+            if item_data:  
                 items_data.append(item_data)
         
         return items_data
@@ -236,7 +233,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items", [])
         request = self.context.get("request")
         
-        # Check if this is FormData format
         if hasattr(request, 'data') and any(key.startswith('items[') for key in request.data.keys()):
             items_data = self.parse_formdata_items(request.data)
         
@@ -284,8 +280,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
-        logger.info(f"Validated data received: {validated_data}")  # Log top-level data
-        logger.info(f"Items data received: {items_data}")  # Log items data
+        logger.info(f"Validated data received: {validated_data}")  
+        logger.info(f"Items data received: {items_data}")  
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -295,7 +291,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
-                logger.info(f"Creating item with data: {dict(item_data)}")  # Log each item
+                logger.info(f"Creating item with data: {dict(item_data)}")  
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
             logger.info(f"Updated items for WorkOrder {instance.id}")
 

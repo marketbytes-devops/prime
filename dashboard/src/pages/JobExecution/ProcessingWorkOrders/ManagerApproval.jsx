@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
-import apiClient from "../../../helpers/apiClient";
-import Button from "../../../components/Button";
-import Modal from "../../../components/Modal";
-import InputField from "../../../components/InputField";
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import apiClient from '../../../helpers/apiClient';
+import Button from '../../../components/Button';
+import Modal from '../../../components/Modal';
+import InputField from '../../../components/InputField';
 
 const ManagerApproval = () => {
   const [state, setState] = useState({
@@ -11,28 +11,26 @@ const ManagerApproval = () => {
     itemsList: [],
     units: [],
     technicians: [],
-    searchTerm: "",
-    sortBy: "created_at",
+    searchTerm: '',
+    sortBy: 'created_at',
     currentPage: 1,
     itemsPerPage: 20,
     isViewModalOpen: false,
     isApproveModalOpen: false,
     isDeclineModalOpen: false,
     selectedWO: null,
-    declineReason: "",
-    deliveryNoteType: "single",
+    declineReason: '',
+    deliveryNoteType: 'single',
     isWorkOrderComplete: true,
   });
 
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
-        apiClient.get("work-orders/", {
-          params: { status: "Manager Approval" },
-        }),
-        apiClient.get("items/"),
-        apiClient.get("units/"),
-        apiClient.get("technicians/"),
+        apiClient.get('work-orders/', { params: { status: 'Manager Approval' } }),
+        apiClient.get('items/'),
+        apiClient.get('units/'),
+        apiClient.get('technicians/'),
       ]);
       setState((prev) => ({
         ...prev,
@@ -42,8 +40,8 @@ const ManagerApproval = () => {
         technicians: techRes.data || [],
       }));
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load work orders.");
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load work orders.');
     }
   };
 
@@ -63,21 +61,21 @@ const ManagerApproval = () => {
     try {
       const payload = {
         delivery_note_type: state.deliveryNoteType,
-        wo_number: state.selectedWO.wo_number, // Pass WO number to use as DN number
+        wo_number: state.selectedWO.wo_number,
       };
       await apiClient.post(`work-orders/${state.selectedWO.id}/approve/`, payload);
-      toast.success("Work Order approved and Delivery Note created.");
+      toast.success(`Work Order approved and ${state.deliveryNoteType} Delivery Note created.`);
       setState((prev) => ({
         ...prev,
         isApproveModalOpen: false,
         selectedWO: null,
-        deliveryNoteType: "single",
+        deliveryNoteType: 'single',
         isWorkOrderComplete: true,
       }));
       fetchData();
     } catch (error) {
-      console.error("Error approving work order:", error);
-      toast.error(error.response?.data?.error || "Failed to approve Work Order.");
+      console.error('Error approving work order:', error);
+      toast.error(error.response?.data?.error || 'Failed to approve Work Order.');
     }
   };
 
@@ -86,85 +84,52 @@ const ManagerApproval = () => {
       await apiClient.post(`work-orders/${state.selectedWO.id}/decline/`, {
         decline_reason: state.declineReason,
       });
-      toast.success(
-        "Work Order declined and returned to Processing Work Orders."
-      );
+      toast.success('Work Order declined and returned to Processing Work Orders.');
       setState((prev) => ({
         ...prev,
         isDeclineModalOpen: false,
         selectedWO: null,
-        declineReason: "",
+        declineReason: '',
       }));
       fetchData();
     } catch (error) {
-      console.error("Error declining work order:", error);
-      toast.error(
-        error.response?.data?.error || "Failed to decline Work Order."
-      );
-    }
-  };
-
-  const handleDeleteWO = async (woId) => {
-    if (window.confirm("Are you sure you want to delete this work order?")) {
-      try {
-        await apiClient.delete(`work-orders/${woId}/`);
-        toast.success("Work Order deleted successfully.");
-        fetchData();
-      } catch (error) {
-        console.error("Error deleting work order:", error);
-        toast.error("Failed to delete work order.");
-      }
+      console.error('Error declining work order:', error);
+      toast.error(error.response?.data?.error || 'Failed to decline Work Order.');
     }
   };
 
   const getAssignedTechnicians = (items) => {
-    const technicianIds = [
-      ...new Set(items.map((item) => item.assigned_to).filter((id) => id)),
-    ];
-    if (technicianIds.length === 0) return "None";
-    if (technicianIds.length > 1) return "Multiple";
+    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician
-      ? `${technician.name} (${technician.designation || "N/A"})`
-      : "N/A";
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
   };
 
   const filteredWOs = state.workOrders
     .filter(
       (wo) =>
-        (wo.quotation?.company_name || "")
-          .toLowerCase()
-          .includes(state.searchTerm.toLowerCase()) ||
-        (wo.wo_number || "")
-          .toLowerCase()
-          .includes(state.searchTerm.toLowerCase())
+        (wo.quotation?.company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        (wo.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      if (state.sortBy === "created_at") {
+      if (state.sortBy === 'created_at') {
         return new Date(b.created_at) - new Date(a.created_at);
-      } else if (state.sortBy === "company_name") {
-        return (a.quotation?.company_name || "").localeCompare(
-          b.quotation?.company_name || ""
-        );
+      } else if (state.sortBy === 'company_name') {
+        return (a.quotation?.company_name || '').localeCompare(b.quotation?.company_name || '');
       }
       return 0;
     });
 
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
-  const currentWOs = filteredWOs.slice(
-    startIndex,
-    startIndex + state.itemsPerPage
-  );
+  const currentWOs = filteredWOs.slice(startIndex, startIndex + state.itemsPerPage);
 
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
   const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
-  const pageNumbers = Array.from(
-    { length: endPage - startPage + 1 },
-    (_, i) => startPage + i
-  );
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -188,28 +153,20 @@ const ManagerApproval = () => {
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search Work Orders
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
               placeholder="Search by company name or WO Number..."
               value={state.searchTerm}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, searchTerm: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort By
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={state.sortBy}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, sortBy: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
               className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="created_at">Creation Date</option>
@@ -221,30 +178,17 @@ const ManagerApproval = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                  Sl No
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                  WO Number
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                  Created At
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                  Assigned To
-                </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                  Actions
-                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="5"
-                    className="border p-2 text-center text-gray-500"
-                  >
+                  <td colSpan="5" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
@@ -252,13 +196,9 @@ const ManagerApproval = () => {
                 currentWOs.map((wo, index) => (
                   <tr key={wo.id} className="border hover:bg-gray-50">
                     <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{wo.wo_number || "N/A"}</td>
-                    <td className="border p-2">
-                      {new Date(wo.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="border p-2">
-                      {getAssignedTechnicians(wo.items)}
-                    </td>
+                    <td className="border p-2">{wo.wo_number || 'N/A'}</td>
+                    <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2">{getAssignedTechnicians(wo.items)}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
@@ -268,34 +208,16 @@ const ManagerApproval = () => {
                           View WO & Certificates
                         </Button>
                         <Button
-                          onClick={() =>
-                            setState((prev) => ({
-                              ...prev,
-                              isApproveModalOpen: true,
-                              selectedWO: wo,
-                            }))
-                          }
+                          onClick={() => setState((prev) => ({ ...prev, isApproveModalOpen: true, selectedWO: wo }))}
                           className="whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           Approve
                         </Button>
                         <Button
-                          onClick={() =>
-                            setState((prev) => ({
-                              ...prev,
-                              isDeclineModalOpen: true,
-                              selectedWO: wo,
-                            }))
-                          }
+                          onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: true, selectedWO: wo }))}
                           className="whitespace-nowrap px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
                         >
                           Decline
-                        </Button>
-                        <Button
-                          onClick={() => handleDeleteWO(wo.id)}
-                          className="whitespace-nowrap px-3 py-1 bg-red-800 text-white rounded-md hover:bg-red-900 text-sm"
-                        >
-                          Delete
                         </Button>
                       </div>
                     </td>
@@ -320,9 +242,7 @@ const ManagerApproval = () => {
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
-                state.currentPage === page
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               {page}
@@ -339,66 +259,23 @@ const ManagerApproval = () => {
       )}
       <Modal
         isOpen={state.isViewModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isViewModalOpen: false,
-            selectedWO: null,
-          }))
-        }
-        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
+        onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         {state.selectedWO && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Work Order Details
-              </h3>
-              <p>
-                <strong>WO Number:</strong>{" "}
-                {state.selectedWO.wo_number || "N/A"}
-              </p>
-              <p>
-                <strong>Status:</strong> {state.selectedWO.status || "N/A"}
-              </p>
-              <p>
-                <strong>Created At:</strong>{" "}
-                {new Date(state.selectedWO.created_at).toLocaleDateString()}
-              </p>
-              <p>
-                <strong>Date Received:</strong>{" "}
-                {state.selectedWO.date_received
-                  ? new Date(
-                      state.selectedWO.date_received
-                    ).toLocaleDateString()
-                  : "N/A"}
-              </p>
-              <p>
-                <strong>Expected Completion:</strong>{" "}
-                {state.selectedWO.expected_completion_date
-                  ? new Date(
-                      state.selectedWO.expected_completion_date
-                    ).toLocaleDateString()
-                  : "N/A"}
-              </p>
-              <p>
-                <strong>Onsite/Lab:</strong>{" "}
-                {state.selectedWO.onsite_or_lab || "N/A"}
-              </p>
-              <p>
-                <strong>Range:</strong> {state.selectedWO.range || "N/A"}
-              </p>
-              <p>
-                <strong>Serial Number:</strong>{" "}
-                {state.selectedWO.serial_number || "N/A"}
-              </p>
-              <p>
-                <strong>Site Location:</strong>{" "}
-                {state.selectedWO.site_location || "N/A"}
-              </p>
-              <p>
-                <strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}
-              </p>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong>Range:</strong> {state.selectedWO.range || 'N/A'}</p>
+              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -407,98 +284,39 @@ const ManagerApproval = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Item
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Quantity
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit Price
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Assigned To
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Certificate UUT Label
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Certificate Number
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Calibration Date
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Calibration Due Date
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          UUC Serial Number
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Certificate
-                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.quantity || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {getAssignedTechnicians([item])}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_uut_label || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_number || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.calibration_date
-                              ? new Date(
-                                  item.calibration_date
-                                ).toLocaleDateString()
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.calibration_due_date
-                              ? new Date(
-                                  item.calibration_due_date
-                                ).toLocaleDateString()
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.uuc_serial_number || "N/A"}
-                          </td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians([item])}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
-                              <a
-                                href={item.certificate_file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
+                              <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                                 View Certificate
                               </a>
                             ) : (
-                              "N/A"
+                              'N/A'
                             )}
                           </td>
                         </tr>
@@ -515,30 +333,15 @@ const ManagerApproval = () => {
       </Modal>
       <Modal
         isOpen={state.isApproveModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isApproveModalOpen: false,
-            selectedWO: null,
-            deliveryNoteType: "single",
-            isWorkOrderComplete: true,
-          }))
-        }
-        title={`Approve Work Order - ${state.selectedWO?.wo_number || "N/A"}`}
+        onClose={() => setState((prev) => ({ ...prev, isApproveModalOpen: false, selectedWO: null, deliveryNoteType: 'single', isWorkOrderComplete: true }))}
+        title={`Approve Work Order - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Work Order Complete?
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Complete?</label>
             <select
-              value={state.isWorkOrderComplete ? "yes" : "no"}
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  isWorkOrderComplete: e.target.value === "yes",
-                }))
-              }
+              value={state.isWorkOrderComplete ? 'yes' : 'no'}
+              onChange={(e) => setState((prev) => ({ ...prev, isWorkOrderComplete: e.target.value === 'yes' }))}
               className="p-2 border rounded w-full"
             >
               <option value="yes">Yes</option>
@@ -547,21 +350,14 @@ const ManagerApproval = () => {
           </div>
           {state.isWorkOrderComplete && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Delivery Note Type
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Note Type</label>
               <select
                 value={state.deliveryNoteType}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    deliveryNoteType: e.target.value,
-                  }))
-                }
+                onChange={(e) => setState((prev) => ({ ...prev, deliveryNoteType: e.target.value }))}
                 className="p-2 border rounded w-full"
               >
                 <option value="single">Single Delivery Note</option>
-                <option value="multiple">Multiple Delivery Notes</option>
+                <option value="multiple">Split Delivery Notes</option>
               </select>
             </div>
           )}
@@ -569,24 +365,12 @@ const ManagerApproval = () => {
             <Button
               onClick={handleApprove}
               disabled={!state.isWorkOrderComplete}
-              className={`px-4 py-2 rounded-md ${
-                state.isWorkOrderComplete
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                  : "bg-gray-300 text-gray-500"
-              }`}
+              className={`px-4 py-2 rounded-md ${state.isWorkOrderComplete ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
             >
               Submit
             </Button>
             <Button
-              onClick={() =>
-                setState((prev) => ({
-                  ...prev,
-                  isApproveModalOpen: false,
-                  selectedWO: null,
-                  deliveryNoteType: "single",
-                  isWorkOrderComplete: true,
-                }))
-              }
+              onClick={() => setState((prev) => ({ ...prev, isApproveModalOpen: false, selectedWO: null, deliveryNoteType: 'single', isWorkOrderComplete: true }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
@@ -596,27 +380,16 @@ const ManagerApproval = () => {
       </Modal>
       <Modal
         isOpen={state.isDeclineModalOpen}
-        onClose={() =>
-          setState((prev) => ({
-            ...prev,
-            isDeclineModalOpen: false,
-            selectedWO: null,
-            declineReason: "",
-          }))
-        }
+        onClose={() => setState((prev) => ({ ...prev, isDeclineModalOpen: false, selectedWO: null, declineReason: '' }))}
         title="Decline Work Order"
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Decline Reason
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Decline Reason</label>
             <InputField
               type="text"
               value={state.declineReason}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, declineReason: e.target.value }))
-              }
+              onChange={(e) => setState((prev) => ({ ...prev, declineReason: e.target.value }))}
               className="w-full"
             />
           </div>
@@ -624,23 +397,12 @@ const ManagerApproval = () => {
             <Button
               onClick={handleDecline}
               disabled={!state.declineReason}
-              className={`px-4 py-2 rounded-md ${
-                state.declineReason
-                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                  : "bg-gray-300 text-gray-500"
-              }`}
+              className={`px-4 py-2 rounded-md ${state.declineReason ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
             >
               Submit
             </Button>
             <Button
-              onClick={() =>
-                setState((prev) => ({
-                  ...prev,
-                  isDeclineModalOpen: false,
-                  selectedWO: null,
-                  declineReason: "",
-                }))
-              }
+              onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: false, selectedWO: null, declineReason: '' }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel

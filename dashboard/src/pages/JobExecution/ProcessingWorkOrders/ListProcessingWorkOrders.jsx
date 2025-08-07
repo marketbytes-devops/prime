@@ -64,6 +64,7 @@ const ListProcessingWorkOrders = () => {
         await apiClient.delete(`work-orders/${woId}/`);
         toast.success("Work order deleted successfully.");
         await fetchWorkOrders();
+        navigate("/job-execution/initiate-work-order/list-all-purchase-orders");
       } catch (error) {
         console.error("Error deleting work order:", error);
         toast.error("Failed to delete work order.");
@@ -322,7 +323,7 @@ const ListProcessingWorkOrders = () => {
                           <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
+                          <td className="border p-2 text-left whitespace-nowrap">{item.certificate_number || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>

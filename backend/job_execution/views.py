@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
-from django.db.models import Max  # Added import for Max
+from django.db.models import Max 
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,16 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        purchase_order = instance.purchase_order
         self.perform_destroy(instance)
         logger.info(f"WorkOrder {instance.id} deleted")
+        
+        remaining_work_orders = WorkOrder.objects.filter(purchase_order=purchase_order).count()
+        if remaining_work_orders == 0 and purchase_order:
+            purchase_order.status = 'Collection Pending'
+            purchase_order.save()
+            logger.info(f"PurchaseOrder {purchase_order.id} status reset to Collection Pending")
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], url_path='move-to-approval')
@@ -77,7 +85,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
         except NumberSeries.DoesNotExist:
             logger.error("Delivery Note series not found, using default prefix 'DN'")
-            dn_series = None  # Fallback to default prefix
+            dn_series = None 
 
         max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix if dn_series else 'DN').aggregate(
             Max('dn_number')

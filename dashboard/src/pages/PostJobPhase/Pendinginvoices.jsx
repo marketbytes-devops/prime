@@ -16,9 +16,6 @@ const PendingInvoices = () => {
     sortBy: 'created_at',
     currentPage: 1,
     itemsPerPage: 20,
-    isViewModalOpen: false,
-    selectedDocument: null,
-    documentType: '',
     isWOModalOpen: false,
     selectedWO: null,
     isPOModalOpen: false,
@@ -53,20 +50,19 @@ const PendingInvoices = () => {
     fetchData();
   }, []);
 
-  const handleViewDocument = (document, type) => {
+  const handleViewDocument = (workOrder, type) => {
     if (type === 'wo') {
-      const workOrder = state.workOrders.find((wo) => wo.id === document.wo_id);
       setState((prev) => ({
         ...prev,
         isWOModalOpen: true,
         selectedWO: workOrder,
       }));
     } else if (type === 'po') {
-      const purchaseOrder = state.purchaseOrders.find((po) => po.id === document.po_id);
+      const purchaseOrder = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order_id);
       setState((prev) => ({
         ...prev,
         isPOModalOpen: true,
-        selectedPO: purchaseOrder,
+        selectedPO: purchaseOrder || null,
       }));
     }
   };
@@ -85,10 +81,10 @@ const PendingInvoices = () => {
 
   const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return "None";
-    if (technicianIds.length > 1) return "Multiple";
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
   };
 
   const filteredWorkOrders = state.workOrders
@@ -105,6 +101,12 @@ const PendingInvoices = () => {
   const totalPages = Math.ceil(filteredWorkOrders.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentWorkOrders = filteredWorkOrders.slice(startIndex, startIndex + state.itemsPerPage);
+
+  const pageGroupSize = 3;
+  const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
+  const startPage = currentGroup * pageGroupSize + 1;
+  const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -124,7 +126,7 @@ const PendingInvoices = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Work Orders</h1>
+      <h1 className="text-2xl font-bold mb-4">Pending Invoices</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4 items-center">
           <div className="flex-1">
@@ -161,41 +163,49 @@ const PendingInvoices = () => {
               </tr>
             </thead>
             <tbody>
-              {currentWorkOrders.map((workOrder, index) => (
-                <tr key={workOrder.id} className="border hover:bg-gray-50">
-                  <td className="border p-2">{startIndex + index + 1}</td>
-                  <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
-                  <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                  <td className="border p-2">{getAssignedTechnicians(workOrder.items || [])}</td>
-                  <td className="border p-2">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => handleViewDocument(workOrder, 'po')}
-                        className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                      >
-                        View PO
-                      </Button>
-                      <Button
-                        onClick={() => handleViewDocument(workOrder, 'wo')}
-                        className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                      >
-                        View WO
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="border p-2">
-                    <select
-                      value={workOrder.status}
-                      onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
-                      className="w-full p-2 border rounded focus:outline-indigo-500"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+              {currentWorkOrders.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                    No work orders found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                currentWorkOrders.map((workOrder, index) => (
+                  <tr key={workOrder.id} className="border hover:bg-gray-50">
+                    <td className="border p-2">{startIndex + index + 1}</td>
+                    <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2">{getAssignedTechnicians(workOrder.items || [])}</td>
+                    <td className="border p-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleViewDocument(workOrder, 'po')}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          View PO
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(workOrder, 'wo')}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                        >
+                          View WO
+                        </Button>
+                      </div>
+                    </td>
+                    <td className="border p-2">
+                      <select
+                        value={workOrder.status || 'Pending'}
+                        onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
+                        className="w-full p-2 border rounded focus:outline-indigo-500"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -208,7 +218,7 @@ const PendingInvoices = () => {
             >
               Prev
             </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            {pageNumbers.map((page) => (
               <Button
                 key={page}
                 onClick={() => handlePageChange(page)}
@@ -235,26 +245,27 @@ const PendingInvoices = () => {
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
-        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
-        {state.selectedWO && (
+        {state.selectedWO ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
-              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || "N/A"}</p>
-              {state.selectedWO.manager_approval_status === "Declined" && (
-                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || "N/A"}</p>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
+              {state.selectedWO.manager_approval_status === 'Declined' && (
+                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               )}
-              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "N/A"}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || "N/A"}</p>
-              <p><strong>Range:</strong> {state.selectedWO.range || "N/A"}</p>
-              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || "N/A"}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || "N/A"}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}</p>
+              <p><strong>Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong>Range:</strong> {state.selectedWO.range || 'N/A'}</p>
+              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Purchase Order ID:</strong> {state.selectedWO.purchase_order_id || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -267,15 +278,40 @@ const PendingInvoices = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.certificate_file ? (
+                              <a
+                                href={item.certificate_file}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View Certificate
+                              </a>
+                            ) : (
+                              'N/A'
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -286,23 +322,34 @@ const PendingInvoices = () => {
               )}
             </div>
           </div>
+        ) : (
+          <p className="text-gray-500">No work order selected.</p>
         )}
       </Modal>
 
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
-        title={`Purchase Order Details - ID ${state.selectedPO?.id || "N/A"}`}
+        title={`Purchase Order Details - ID ${state.selectedPO?.id || 'N/A'}`}
       >
-        {state.selectedPO && (
+        {state.selectedPO ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>PO ID:</strong> {state.selectedPO.id}</p>
-              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || "N/A"}</p>
-              <p><strong>Order Type:</strong> {state.selectedPO.order_type}</p>
-              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
-              <p><strong>PO File:</strong> {state.selectedPO.po_file ? state.selectedPO.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
+              <p><strong>PO ID:</strong> {state.selectedPO.id || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
+              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>PO File:</strong> {state.selectedPO.po_file ? (
+                <a
+                  href={state.selectedPO.po_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  {state.selectedPO.po_file.split('/').pop() || 'View File'}
+                </a>
+              ) : 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
@@ -319,9 +366,9 @@ const PendingInvoices = () => {
                     <tbody>
                       {state.selectedPO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -332,6 +379,8 @@ const PendingInvoices = () => {
               )}
             </div>
           </div>
+        ) : (
+          <p className="text-gray-500">No purchase order found.</p>
         )}
       </Modal>
     </div>
