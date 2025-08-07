@@ -24,6 +24,7 @@ const EditProcessingWorkOrders = () => {
     assignedTo: "",
     // Track file changes separately
     fileChanges: {},
+    isSaving: false, // Added loading state
   });
 
   const fetchData = async () => {
@@ -86,6 +87,7 @@ const EditProcessingWorkOrders = () => {
   };
 
   const handleSubmit = async () => {
+    setState((prev) => ({ ...prev, isSaving: true })); // Start loading
     try {
       // Check if there are any file uploads
       const hasFileUploads = Object.keys(state.fileChanges).length > 0;
@@ -167,6 +169,8 @@ const EditProcessingWorkOrders = () => {
     } catch (error) {
       console.error("Error updating work order:", error.response?.data || error);
       toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
+    } finally {
+      setState((prev) => ({ ...prev, isSaving: false })); // Stop loading in all cases
     }
   };
 
@@ -393,9 +397,10 @@ const EditProcessingWorkOrders = () => {
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            disabled={state.isSaving}
+            className={`px-4 py-2 rounded-md ${state.isSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
           >
-            Save Changes
+            {state.isSaving ? "Saving..." : "Save Changes"}
           </Button>
           <Button
             onClick={() => navigate("/job-execution/processing-work-orders/list-all-processing-work-orders")}
