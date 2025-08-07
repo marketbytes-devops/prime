@@ -37,6 +37,17 @@ class WorkOrder(models.Model):
     )
     decline_reason = models.TextField(null=True, blank=True)
     created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
+    invoice_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'pending'),
+            ('Raised', 'Raised'),
+            ('processed', 'processed')
+        ],
+        default='pending',
+        null=True,
+        blank=True
+    )
 
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
@@ -57,7 +68,6 @@ class WorkOrderItem(models.Model):
 
     def __str__(self):
         return f"{self.item} - {self.work_order}"
-
 
 class DeliveryNote(models.Model):
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='delivery_notes')  # Changed to ForeignKey

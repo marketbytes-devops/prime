@@ -20,6 +20,8 @@ import {
   ArchiveRestore,
   FileSearch,
   FileEdit,
+  ClipboardList,
+  FileCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../../assets/images/img-logo.png";
@@ -32,6 +34,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isRFQOpen, setIsRFQOpen] = useState(false);
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
+  const [isPostJobPhaseOpen, setIsPostJobPhaseOpen] = useState(false);
 
   useEffect(() => {
     const preJobPaths = ["/add-rfq", "/view-rfq", "/view-quotation"];
@@ -61,6 +64,10 @@ const Sidebar = ({ toggleSidebar }) => {
       "/job-execution/processing-work-orders/delivery",
       "/job-execution/processing-work-orders/close-work-orders",
     ];
+    const postJobPhasePaths = [
+      "/post-job-phase/pending-invoices",
+      "/post-job-phase/completed-wo",
+    ];
 
     setIsPreJobOpen(preJobPaths.includes(location.pathname));
     setIsJobExecutionOpen(jobExecutionPaths.includes(location.pathname));
@@ -68,6 +75,7 @@ const Sidebar = ({ toggleSidebar }) => {
     setIsRFQOpen(rfqPaths.includes(location.pathname));
     setIsInitiateWorkOrderOpen(initiateWorkOrderPaths.includes(location.pathname));
     setIsProcessingWorkOrdersOpen(processingWorkOrdersPaths.includes(location.pathname));
+    setIsPostJobPhaseOpen(postJobPhasePaths.includes(location.pathname));
   }, [location.pathname]);
 
   const togglePreJob = () => setIsPreJobOpen(!isPreJobOpen);
@@ -76,6 +84,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
   const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
+  const togglePostJobPhase = () => setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -120,6 +129,14 @@ const Sidebar = ({ toggleSidebar }) => {
         },
       ],
     },
+    {
+      label: "Post Job Phase",
+      icon: <ClipboardList className="w-5 h-5 mr-3" />,
+      subItems: [
+        { to: "/post-job-phase/pending-invoices", label: "Pending Invoices", icon: <FileCheck className="w-5 h-5 mr-3" /> },
+        { to: "/post-job-phase/completed-wo", label: "Completed WO", icon: <FileCheck className="w-5 h-5 mr-3" /> },
+      ],
+    },
     { to: "/profile", label: "Profile", icon: <User className="w-5 h-5 mr-3" /> },
     {
       label: "Additional Settings",
@@ -156,11 +173,14 @@ const Sidebar = ({ toggleSidebar }) => {
                         ? togglePreJob
                         : item.label === "Job Execution"
                         ? toggleJobExecution
+                        : item.label === "Post Job Phase"
+                        ? togglePostJobPhase
                         : toggleSettings
                     }
                     className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
                       (item.label === "Pre-Job" && isPreJobOpen) ||
                       (item.label === "Job Execution" && isJobExecutionOpen) ||
+                      (item.label === "Post Job Phase" && isPostJobPhaseOpen) ||
                       (item.label === "Additional Settings" && isSettingsOpen)
                         ? "bg-indigo-100 text-indigo-600"
                         : "text-gray-700 hover:bg-indigo-500 hover:text-white"
@@ -182,6 +202,12 @@ const Sidebar = ({ toggleSidebar }) => {
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )
+                    ) : item.label === "Post Job Phase" ? (
+                      isPostJobPhaseOpen ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )
                     ) : (
                       isSettingsOpen ? (
                         <ChevronUp className="w-4 h-4" />
@@ -191,7 +217,7 @@ const Sidebar = ({ toggleSidebar }) => {
                     )}
                   </button>
                   <AnimatePresence>
-                    {(item.label === "Pre-Job" ? isPreJobOpen : item.label === "Job Execution" ? isJobExecutionOpen : isSettingsOpen) && (
+                    {(item.label === "Pre-Job" ? isPreJobOpen : item.label === "Job Execution" ? isJobExecutionOpen : item.label === "Post Job Phase" ? isPostJobPhaseOpen : isSettingsOpen) && (
                       <motion.ul
                         className="ml-4 mt-1 space-y-1"
                         initial={{ height: 0, opacity: 0 }}

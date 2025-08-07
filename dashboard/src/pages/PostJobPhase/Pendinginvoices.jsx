@@ -1,0 +1,341 @@
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import apiClient from '../../helpers/apiClient';
+import InputField from '../../components/InputField';
+import Button from '../../components/Button';
+import Modal from '../../components/Modal';
+
+const PendingInvoices = () => {
+  const [state, setState] = useState({
+    workOrders: [],
+    purchaseOrders: [],
+    technicians: [],
+    itemsList: [],
+    units: [],
+    searchTerm: '',
+    sortBy: 'created_at',
+    currentPage: 1,
+    itemsPerPage: 20,
+    isViewModalOpen: false,
+    selectedDocument: null,
+    documentType: '',
+    isWOModalOpen: false,
+    selectedWO: null,
+    isPOModalOpen: false,
+    selectedPO: null,
+  });
+
+  const fetchData = async () => {
+    try {
+      const [woRes, poRes, techRes, itemsRes, unitsRes] = await Promise.all([
+        apiClient.get('work-orders/'),
+        apiClient.get('purchase-orders/'),
+        apiClient.get('technicians/'),
+        apiClient.get('items/'),
+        apiClient.get('units/'),
+      ]);
+
+      setState((prev) => ({
+        ...prev,
+        workOrders: woRes.data || [],
+        purchaseOrders: poRes.data || [],
+        technicians: techRes.data || [],
+        itemsList: itemsRes.data || [],
+        units: unitsRes.data || [],
+      }));
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load data.');
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleViewDocument = (document, type) => {
+    if (type === 'wo') {
+      const workOrder = state.workOrders.find((wo) => wo.id === document.wo_id);
+      setState((prev) => ({
+        ...prev,
+        isWOModalOpen: true,
+        selectedWO: workOrder,
+      }));
+    } else if (type === 'po') {
+      const purchaseOrder = state.purchaseOrders.find((po) => po.id === document.po_id);
+      setState((prev) => ({
+        ...prev,
+        isPOModalOpen: true,
+        selectedPO: purchaseOrder,
+      }));
+    }
+  };
+
+  const handleUpdateStatus = async (workOrderId, newStatus) => {
+    try {
+      const payload = { status: newStatus };
+      await apiClient.patch(`work-orders/${workOrderId}/`, payload);
+      toast.success('Work order status updated successfully.');
+      fetchData();
+    } catch (error) {
+      console.error('Error updating work order status:', error);
+      toast.error('Failed to update work order status.');
+    }
+  };
+
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return "None";
+    if (technicianIds.length > 1) return "Multiple";
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+  };
+
+  const filteredWorkOrders = state.workOrders
+    .filter((workOrder) =>
+      (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (state.sortBy === 'created_at') {
+        return new Date(b.created_at) - new Date(a.created_at);
+      }
+      return 0;
+    });
+
+  const totalPages = Math.ceil(filteredWorkOrders.length / state.itemsPerPage);
+  const startIndex = (state.currentPage - 1) * state.itemsPerPage;
+  const currentWorkOrders = filteredWorkOrders.slice(startIndex, startIndex + state.itemsPerPage);
+
+  const handlePageChange = (page) => {
+    setState((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handleNext = () => {
+    if (state.currentPage < totalPages) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
+    }
+  };
+
+  const handlePrev = () => {
+    if (state.currentPage > 1) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
+    }
+  };
+
+  return (
+    <div className="mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Work Orders</h1>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
+        <div className="mb-6 flex gap-4 items-center">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
+            <InputField
+              type="text"
+              placeholder="Search by WO Number..."
+              value={state.searchTerm}
+              onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
+              className="w-full p-2 border rounded focus:outline-indigo-500"
+            />
+          </div>
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+            <select
+              value={state.sortBy}
+              onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
+              className="w-full p-2 border rounded focus:outline-indigo-500"
+            >
+              <option value="created_at">Creation Date</option>
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">View Documents</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentWorkOrders.map((workOrder, index) => (
+                <tr key={workOrder.id} className="border hover:bg-gray-50">
+                  <td className="border p-2">{startIndex + index + 1}</td>
+                  <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
+                  <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
+                  <td className="border p-2">{getAssignedTechnicians(workOrder.items || [])}</td>
+                  <td className="border p-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => handleViewDocument(workOrder, 'po')}
+                        className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                      >
+                        View PO
+                      </Button>
+                      <Button
+                        onClick={() => handleViewDocument(workOrder, 'wo')}
+                        className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                      >
+                        View WO
+                      </Button>
+                    </div>
+                  </td>
+                  <td className="border p-2">
+                    <select
+                      value={workOrder.status}
+                      onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
+                      className="w-full p-2 border rounded focus:outline-indigo-500"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4 w-fit">
+            <Button
+              onClick={handlePrev}
+              disabled={state.currentPage === 1}
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+            >
+              Prev
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-3 py-1 rounded-md min-w-fit ${
+                  state.currentPage === page
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {page}
+              </Button>
+            ))}
+            <Button
+              onClick={handleNext}
+              disabled={state.currentPage === totalPages}
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <Modal
+        isOpen={state.isWOModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
+      >
+        {state.selectedWO && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || "N/A"}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || "N/A"}</p>
+              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || "N/A"}</p>
+              {state.selectedWO.manager_approval_status === "Declined" && (
+                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || "N/A"}</p>
+              )}
+              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "N/A"}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || "N/A"}</p>
+              <p><strong>Range:</strong> {state.selectedWO.range || "N/A"}</p>
+              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || "N/A"}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || "N/A"}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Items</h3>
+              {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedWO.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={state.isPOModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
+        title={`Purchase Order Details - ID ${state.selectedPO?.id || "N/A"}`}
+      >
+        {state.selectedPO && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>PO ID:</strong> {state.selectedPO.id}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || "N/A"}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type}</p>
+              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
+              <p><strong>PO File:</strong> {state.selectedPO.po_file ? state.selectedPO.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
+              {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedPO.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+export default PendingInvoices;
