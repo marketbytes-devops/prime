@@ -29,6 +29,8 @@ import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerAp
 import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
 import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
 import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
+import PendingInvoices from "./pages/PostJobPhase/Pendinginvoices";
+import CompletedWO from "./pages/PostJobPhase/Completed Wo";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -146,6 +148,14 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/close-work-orders",
           element: <CloseWorkOrder />,
+        },
+        {
+          path: "/post-job-phase/pending-invoices",
+          element: <PendingInvoices />,
+        },
+        {
+          path: "/post-job-phase/completed-wo",
+          element: <CompletedWO />,
         },
       ],
     },
