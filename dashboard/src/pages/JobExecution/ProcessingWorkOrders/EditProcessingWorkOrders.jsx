@@ -21,10 +21,8 @@ const EditProcessingWorkOrders = () => {
     serialNumber: "",
     siteLocation: "",
     remarks: "",
-    assignedTo: "",
-    // Track file changes separately
     fileChanges: {},
-    isSaving: false, // Added loading state
+    isSaving: false,
   });
 
   const fetchData = async () => {
@@ -53,7 +51,6 @@ const EditProcessingWorkOrders = () => {
         serialNumber: workOrder.serial_number || "",
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
-        assignedTo: workOrder.created_by || "",
         fileChanges: {},
       }));
     } catch (error) {
@@ -87,16 +84,13 @@ const EditProcessingWorkOrders = () => {
   };
 
   const handleSubmit = async () => {
-    setState((prev) => ({ ...prev, isSaving: true })); // Start loading
+    setState((prev) => ({ ...prev, isSaving: true }));
     try {
-      // Check if there are any file uploads
       const hasFileUploads = Object.keys(state.fileChanges).length > 0;
 
       if (hasFileUploads) {
-        // Use FormData for file uploads
         const formData = new FormData();
         
-        // Add non-file fields
         formData.append('purchase_order', state.workOrder?.purchase_order || '');
         formData.append('quotation', state.workOrder?.quotation || '');
         formData.append('date_received', state.dateReceived || '');
@@ -106,9 +100,7 @@ const EditProcessingWorkOrders = () => {
         formData.append('serial_number', state.serialNumber || '');
         formData.append('site_location', state.siteLocation || '');
         formData.append('remarks', state.remarks || '');
-        formData.append('created_by', state.assignedTo || '');
 
-        // Add items data
         state.items.forEach((item, index) => {
           formData.append(`items[${index}]id`, item.id || '');
           formData.append(`items[${index}]item`, item.item || '');
@@ -122,7 +114,6 @@ const EditProcessingWorkOrders = () => {
           formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || '');
           formData.append(`items[${index}]assigned_to`, item.assigned_to || '');
           
-          // Add file if changed
           if (state.fileChanges[index]) {
             formData.append(`items[${index}]certificate_file`, state.fileChanges[index]);
           }
@@ -134,7 +125,6 @@ const EditProcessingWorkOrders = () => {
           },
         });
       } else {
-        // Use JSON payload if no file uploads
         const payload = {
           purchase_order: state.workOrder?.purchase_order || null,
           quotation: state.workOrder?.quotation || null,
@@ -145,7 +135,6 @@ const EditProcessingWorkOrders = () => {
           serial_number: state.serialNumber || null,
           site_location: state.siteLocation || null,
           remarks: state.remarks || null,
-          created_by: state.assignedTo || null,
           items: state.items.map((item) => ({
             id: item.id,
             item: item.item,
@@ -170,7 +159,7 @@ const EditProcessingWorkOrders = () => {
       console.error("Error updating work order:", error.response?.data || error);
       toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
     } finally {
-      setState((prev) => ({ ...prev, isSaving: false })); // Stop loading in all cases
+      setState((prev) => ({ ...prev, isSaving: false }));
     }
   };
 
@@ -246,21 +235,6 @@ const EditProcessingWorkOrders = () => {
               onChange={(e) => setState((prev) => ({ ...prev, remarks: e.target.value }))}
               className="w-full"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
-            <select
-              value={state.assignedTo}
-              onChange={(e) => setState((prev) => ({ ...prev, assignedTo: e.target.value }))}
-              className="p-2 border rounded w-full"
-            >
-              <option value="">Select Technician</option>
-              {state.technicians.map((technician) => (
-                <option key={technician.id} value={technician.id}>
-                  {technician.name} ({technician.designation})
-                </option>
-              ))}
-            </select>
           </div>
         </div>
         <div>
@@ -363,7 +337,7 @@ const EditProcessingWorkOrders = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Certificate</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Certificate</ label>
                 {item.certificate_file && (
                   <div className="mb-2">
                     <span className="text-sm text-gray-600">
