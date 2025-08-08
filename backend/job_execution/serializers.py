@@ -4,11 +4,13 @@ from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
 from unit.models import Unit
 from series.models import NumberSeries
+from team.models import Technician
 from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
+from datetime import date, timedelta
 import logging
-from team.models import Technician
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,6 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Selected technician does not exist.")
         return value
 
-
 class DeliveryNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryNote
@@ -63,7 +64,6 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "delivery_status",
             "created_at",
         ]
-
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
@@ -76,11 +76,17 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         queryset=Technician.objects.all(), allow_null=True, required=False
     )
     items = WorkOrderItemSerializer(many=True, required=False)
-    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True) 
+    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
     purchase_order_file = serializers.FileField(required=False)
     work_order_file = serializers.FileField(required=False)
     signed_delivery_note_file = serializers.FileField(required=False)
+    invoice_status = serializers.ChoiceField(
+        choices=[('pending', 'pending'), ('Raised', 'Raised'), ('processed', 'processed')],
+        required=False
+    )
+    due_in_days = serializers.IntegerField(required=False, allow_null=True)
+    received_date = serializers.DateField(required=False, allow_null=True)
 
     class Meta:
         model = WorkOrder
@@ -102,11 +108,14 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "manager_approval_status",
             "decline_reason",
             "items",
-            "delivery_notes", 
+            "delivery_notes",
             "created_by_name",
             "purchase_order_file",
             "work_order_file",
             "signed_delivery_note_file",
+            "invoice_status",
+            "due_in_days",
+            "received_date",
         ]
 
     def send_assignment_email(self, work_order, items_data):
@@ -167,11 +176,155 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 except Exception as e:
                     logger.error(f"Failed to send admin email to {admin_email}: {str(e)}")
 
+    def send_invoice_status_change_email(self, work_order, new_status):
+        """Send email to admin when invoice_status changes."""
+        admin_email = settings.ADMIN_EMAIL
+        subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
+        message = (
+            f"Dear Admin,\n\n"
+            f"The invoice status for the following Work Order has been updated:\n"
+            f'------------------------------------------------------------\n'
+            f'🔹 Work Order Number: {work_order.wo_number}\n'
+            f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
+            f'🔹 New Invoice Status: {new_status}\n'
+            f'🔹 Due in Days: {work_order.due_in_days or "Not specified"}\n'
+            f'🔹 Received Date: {work_order.received_date or "Not specified"}\n'
+            f'------------------------------------------------------------\n'
+            f'Please take any necessary actions or follow up as required.\n\n'
+            f'Best regards,\n'
+            f'PrimeCRM Team\n'
+            f'---\n'
+            f'This is an automated message. Please do not reply to this email.'
+        )
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=[admin_email],
+                fail_silently=True,
+            )
+            logger.info(f"Invoice status change email sent to {admin_email} for WO #{work_order.wo_number}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send invoice status change email to {admin_email} for WO #{work_order.wo_number}: {str(e)}")
+            return False
+
+    def send_due_date_reminder(self, work_order):
+        """Send reminder email for due date when invoice_status is Raised."""
+        email_sent = False
+        if (work_order.invoice_status == 'Raised' and
+                work_order.due_in_days and
+                work_order.received_date is None):
+            # Calculate due date
+            due_date = work_order.created_at.date() + timedelta(days=work_order.due_in_days)
+            today = timezone.now().date()
+            # Send reminders at 50% of due_in_days and on due date
+            half_due_days = work_order.due_in_days // 2
+            half_due_date = work_order.created_at.date() + timedelta(days=half_due_days)
+            if today not in (half_due_date, due_date):
+                return False
+
+            # Determine reminder type
+            reminder_type = "Midpoint Reminder" if today == half_due_date else "Due Date Reminder"
+            admin_email = settings.ADMIN_EMAIL
+            subject = f"{reminder_type}: Work Order #{work_order.wo_number} Invoice Due"
+            message = (
+                f"Dear Admin,\n\n"
+                f"This is a {reminder_type.lower()} for the following Work Order invoice:\n"
+                f'------------------------------------------------------------\n'
+                f'🔹 Work Order Number: {work_order.wo_number}\n'
+                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
+                f'🔹 Invoice Status: {work_order.invoice_status}\n'
+                f'🔹 Due Date: {due_date}\n'
+                f'🔹 Due in Days: {work_order.due_in_days}\n'
+                f'------------------------------------------------------------\n'
+                f'Please ensure all necessary actions are completed promptly.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                logger.info(f"{reminder_type} email sent to {admin_email} for WO #{work_order.wo_number}")
+            except Exception as e:
+                logger.error(f"Failed to send {reminder_type.lower()} email to {admin_email} for WO #{work_order.wo_number}: {str(e)}")
+            return email_sent
+        return False
+
+    def send_past_due_alert(self, work_order):
+        """Send past due alert email for invoices in Raised status."""
+        email_sent = False
+        if (work_order.invoice_status == 'Raised' and
+                work_order.due_in_days and
+                work_order.received_date is None):
+            due_date = work_order.created_at.date() + timedelta(days=work_order.due_in_days)
+            today = timezone.now().date()
+            if due_date >= today:
+                return False
+            admin_email = settings.ADMIN_EMAIL
+            subject = f"Alert: Work Order #{work_order.wo_number} Invoice Past Due"
+            message = (
+                f"Dear Admin,\n\n"
+                f"The invoice for the following Work Order is past due:\n"
+                f'------------------------------------------------------------\n'
+                f'🔹 Work Order Number: {work_order.wo_number}\n'
+                f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
+                f'🔹 Invoice Status: {work_order.invoice_status}\n'
+                f'🔹 Due Date: {due_date}\n'
+                f'🔹 Due in Days: {work_order.due_in_days}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take immediate action to address this.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                logger.info(f"Past due alert email sent to {admin_email} for WO #{work_order.wo_number}")
+            except Exception as e:
+                logger.error(f"Failed to send past due alert email to {admin_email} for WO #{work_order.wo_number}: {str(e)}")
+            return email_sent
+        return False
+
+    def validate(self, data):
+        """Validate invoice_status transitions."""
+        instance = getattr(self, 'instance', None)
+        new_invoice_status = data.get('invoice_status')
+        due_in_days = data.get('due_in_days')
+        received_date = data.get('received_date')
+
+        if new_invoice_status:
+            if new_invoice_status == 'Raised' and (not due_in_days or due_in_days <= 0):
+                raise serializers.ValidationError("Due in days is required and must be a positive integer for 'Raised' status.")
+            if new_invoice_status == 'processed' and not received_date:
+                raise serializers.ValidationError("Received date is required for 'processed' status.")
+            if instance and instance.invoice_status == 'processed' and new_invoice_status != 'processed':
+                raise serializers.ValidationError("Cannot change invoice status from 'processed' to another status.")
+
+        return data
+
     def parse_formdata_items(self, request_data):
         """Parse FormData items format into proper structure"""
         items_data = []
         item_indices = set()
-        
+
         # Find all item indices
         for key in request_data.keys():
             if key.startswith('items[') and ']' in key:
@@ -180,11 +333,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     item_indices.add(index)
                 except (ValueError, IndexError):
                     continue
-        
+
         for index in sorted(item_indices):
             item_data = {}
             prefix = f'items[{index}]'
-            
+
             field_mappings = {
                 f'{prefix}id': 'id',
                 f'{prefix}item': 'item',
@@ -199,13 +352,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 f'{prefix}assigned_to': 'assigned_to',
                 f'{prefix}certificate_file': 'certificate_file',
             }
-            
+
             for form_key, item_key in field_mappings.items():
                 if form_key in request_data:
                     value = request_data[form_key]
                     if value == '' or value == 'null':
                         value = None
-                        
                     elif item_key in ['item', 'unit', 'assigned_to'] and value:
                         try:
                             value = int(value)
@@ -221,21 +373,21 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                             value = float(value)
                         except (ValueError, TypeError):
                             value = None
-                    
+
                     item_data[item_key] = value
-            
-            if item_data:  
+
+            if item_data:
                 items_data.append(item_data)
-        
+
         return items_data
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         request = self.context.get("request")
-        
+
         if hasattr(request, 'data') and any(key.startswith('items[') for key in request.data.keys()):
             items_data = self.parse_formdata_items(request.data)
-        
+
         if request and hasattr(request.user, "technician"):
             validated_data["created_by"] = request.user.technician
         else:
@@ -265,6 +417,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             serial_number=validated_data.get("serial_number"),
             site_location=validated_data.get("site_location"),
             remarks=validated_data.get("remarks"),
+            invoice_status=validated_data.get("invoice_status", "pending"),
+            due_in_days=validated_data.get("due_in_days"),
+            received_date=validated_data.get("received_date"),
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
@@ -276,13 +431,17 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         if any(item_data.get("assigned_to") for item_data in items_data):
             self.send_assignment_email(work_order, items_data)
 
+        if work_order.invoice_status != 'pending':
+            self.send_invoice_status_change_email(work_order, work_order.invoice_status)
+
         return work_order
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
-        logger.info(f"Validated data received: {validated_data}")  
-        logger.info(f"Items data received: {items_data}")  
+        logger.info(f"Validated data received: {validated_data}")
+        logger.info(f"Items data received: {items_data}")
 
+        previous_invoice_status = instance.invoice_status
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -291,11 +450,20 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
-                logger.info(f"Creating item with data: {dict(item_data)}")  
+                logger.info(f"Creating item with data: {dict(item_data)}")
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
             logger.info(f"Updated items for WorkOrder {instance.id}")
 
             if any(item_data.get("assigned_to") for item_data in items_data):
                 self.send_assignment_email(instance, items_data)
+
+        # Send invoice status change email if status changed
+        if 'invoice_status' in validated_data and validated_data['invoice_status'] != previous_invoice_status:
+            self.send_invoice_status_change_email(instance, validated_data['invoice_status'])
+
+        # Send due date reminders and past due alerts for Raised status
+        if instance.invoice_status == 'Raised':
+            self.send_due_date_reminder(instance)
+            self.send_past_due_alert(instance)
 
         return instance

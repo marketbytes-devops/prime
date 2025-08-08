@@ -21,6 +21,11 @@ const PendingInvoices = () => {
     selectedWO: null,
     isPOModalOpen: false,
     selectedPO: null,
+    isStatusModalOpen: false,
+    selectedWorkOrderId: null,
+    newStatus: '',
+    dueInDays: '',
+    receivedDate: '',
   });
 
   const fetchData = async () => {
@@ -68,7 +73,7 @@ const PendingInvoices = () => {
       }));
     } else if (type === 'po') {
       console.log('workOrder:', workOrder);
-      const poId = workOrder.purchase_order; // Changed from purchase_order_id to purchase_order
+      const poId = workOrder.purchase_order;
       console.log('workOrder.purchase_order:', poId);
       const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
       console.log('Found PO:', purchaseOrder);
@@ -83,16 +88,61 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = async (workOrderId, newStatus) => {
+  const handleUpdateStatus = (workOrderId, newStatus) => {
+    if (newStatus === 'Raised' || newStatus === 'processed') {
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: true,
+        selectedWorkOrderId: workOrderId,
+        newStatus,
+        dueInDays: '',
+        receivedDate: '',
+      }));
+    } else {
+      // For pending, no additional input needed
+      confirmStatusUpdate(workOrderId, newStatus, null, null);
+    }
+  };
+
+  const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate) => {
     try {
-      const payload = { status: newStatus };
-      await apiClient.patch(`work-orders/${workOrderId}/`, payload);
-      toast.success('Work order status updated successfully.');
+      const payload = { invoice_status: newStatus };
+      if (newStatus === 'Raised' && dueInDays) {
+        payload.due_in_days = parseInt(dueInDays);
+      } else if (newStatus === 'processed' && receivedDate) {
+        payload.received_date = receivedDate;
+      }
+
+      console.log('Sending POST payload:', payload);
+      await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
+      toast.success('Work order invoice status updated successfully.');
+      // Close modal and reset state on successful submission
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        selectedWorkOrderId: null,
+        newStatus: '',
+        dueInDays: '',
+        receivedDate: '',
+      }));
       fetchData();
     } catch (error) {
-      console.error('Error updating work order status:', error);
-      toast.error('Failed to update work order status.');
+      console.error('Error updating work order invoice status:', error);
+      toast.error('Failed to update work order invoice status.');
     }
+  };
+
+  const handleStatusModalSubmit = () => {
+    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate } = state;
+    if (newStatus === 'Raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+      toast.error('Please enter a valid number of days.');
+      return;
+    }
+    if (newStatus === 'processed' && !receivedDate) {
+      toast.error('Please select a received date.');
+      return;
+    }
+    confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate);
   };
 
   const getAssignedTechnicians = (items) => {
@@ -181,7 +231,7 @@ const PendingInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">View Documents</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Invoice Status</th>
               </tr>
             </thead>
             <tbody>
@@ -216,13 +266,13 @@ const PendingInvoices = () => {
                     </td>
                     <td className="border p-2">
                       <select
-                        value={workOrder.status || 'Pending'}
+                        value={workOrder.invoice_status || 'pending'}
                         onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
                         className="w-full p-2 border rounded focus:outline-indigo-500"
                       >
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="Raised">Raised</option>
+                        <option value="processed">Processed</option>
                       </select>
                     </td>
                   </tr>
@@ -264,8 +314,6 @@ const PendingInvoices = () => {
         )}
       </div>
 
-      {console.log('PO Modal State:', { isPOModalOpen: state.isPOModalOpen, selectedPO: state.selectedPO })}
-
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -277,6 +325,9 @@ const PendingInvoices = () => {
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
+              <p><strong>Due in Days:</strong> {state.selectedWO.due_in_days || 'N/A'}</p>
+              <p><strong>Received Date:</strong> {state.selectedWO.received_date ? new Date(state.selectedWO.received_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
               {state.selectedWO.manager_approval_status === 'Declined' && (
                 <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
@@ -407,6 +458,67 @@ const PendingInvoices = () => {
         ) : (
           <p className="text-gray-500">No purchase order found.</p>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={state.isStatusModalOpen}
+        onClose={() => setState((prev) => ({
+          ...prev,
+          isStatusModalOpen: false,
+          selectedWorkOrderId: null,
+          newStatus: '',
+          dueInDays: '',
+          receivedDate: '',
+        }))}
+        title={`Update Invoice Status${state.newStatus ? ` to ${state.newStatus}` : ''}`}
+      >
+        <div className="space-y-4">
+          {state.newStatus === 'Raised' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
+              <InputField
+                type="number"
+                placeholder="Enter number of days"
+                value={state.dueInDays}
+                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+                min="1"
+              />
+            </div>
+          )}
+          {state.newStatus === 'processed' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
+              <InputField
+                type="date"
+                value={state.receivedDate}
+                onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setState((prev) => ({
+                ...prev,
+                isStatusModalOpen: false,
+                selectedWorkOrderId: null,
+                newStatus: '',
+                dueInDays: '',
+                receivedDate: '',
+              }))}
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStatusModalSubmit}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

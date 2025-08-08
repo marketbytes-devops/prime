@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
-from django.db.models import Max 
+from django.db.models import Max
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         purchase_order_id = self.request.query_params.get('purchase_order')
         status = self.request.query_params.get('status')
+        invoice_status = self.request.query_params.get('invoice_status')
         if purchase_order_id:
             queryset = queryset.filter(purchase_order_id=purchase_order_id)
         if status:
@@ -26,7 +27,9 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(status__in=statuses)
             else:
                 queryset = queryset.filter(status=status)
-        logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, count={queryset.count()}")
+        if invoice_status:
+            queryset = queryset.filter(invoice_status=invoice_status)
+        logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, invoice_status={invoice_status}, count={queryset.count()}")
         return queryset
 
     def create(self, request, *args, **kwargs):
@@ -53,13 +56,13 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         purchase_order = instance.purchase_order
         self.perform_destroy(instance)
         logger.info(f"WorkOrder {instance.id} deleted")
-        
+
         remaining_work_orders = WorkOrder.objects.filter(purchase_order=purchase_order).count()
         if remaining_work_orders == 0 and purchase_order:
             purchase_order.status = 'Collection Pending'
             purchase_order.save()
             logger.info(f"PurchaseOrder {purchase_order.id} status reset to Collection Pending")
-        
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], url_path='move-to-approval')
@@ -85,7 +88,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
         except NumberSeries.DoesNotExist:
             logger.error("Delivery Note series not found, using default prefix 'DN'")
-            dn_series = None 
+            dn_series = None
 
         max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix if dn_series else 'DN').aggregate(
             Max('dn_number')
@@ -111,14 +114,44 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         if work_order.status != 'Manager Approval' or not decline_reason:
             logger.warning(f"WorkOrder {pk} decline failed: invalid status or no decline reason")
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
-       
+
         work_order.manager_approval_status = 'Declined'
         work_order.status = 'Submitted'
         work_order.decline_reason = decline_reason
         work_order.save()
+
         logger.info(f"WorkOrder {pk} declined and returned to Submitted status")
         return Response({'status': 'Work Order declined and returned to Processing Work Orders'})
 
+    @action(detail=True, methods=['post'], url_path='update-invoice-status')
+    def update_invoice_status(self, request, pk=None):
+        """Custom action to update invoice_status with due_in_days or received_date."""
+        work_order = self.get_object()
+        new_status = request.data.get('invoice_status')
+        due_in_days = request.data.get('due_in_days')
+        received_date = request.data.get('received_date')
+
+        if not new_status:
+            return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = {'invoice_status': new_status}
+        if new_status == 'Raised':
+            if not due_in_days or int(due_in_days) <= 0:
+                return Response({'error': 'Due in days is required and must be a positive integer for Raised status'}, status=status.HTTP_400_BAD_REQUEST)
+            data['due_in_days'] = int(due_in_days)
+        elif new_status == 'processed':
+            if not received_date:
+                return Response({'error': 'Received date is required for processed status'}, status=status.HTTP_400_BAD_REQUEST)
+            data['received_date'] = received_date
+
+        serializer = self.get_serializer(work_order, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            logger.info(f"WorkOrder {work_order.id} invoice status updated to {new_status}")
+            return Response(serializer.data)
+        logger.error(f"Invoice status update failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
     serializer_class = DeliveryNoteSerializer
@@ -140,6 +173,3 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         work_order.save()
         logger.info(f"Signed Delivery Note uploaded for DeliveryNote {pk}, WorkOrder {work_order.id} set to Delivered")
         return Response({'status': 'Signed Delivery Note uploaded and status updated'})
-
-
-
