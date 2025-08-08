@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom"; // Added useLocation
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
@@ -8,7 +8,7 @@ import Modal from "../../../components/Modal";
 
 const ListPurchaseOrders = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // Added to detect navigation changes
+  const location = useLocation();
   const [state, setState] = useState({
     purchaseOrders: [],
     technicians: [],
@@ -91,10 +91,9 @@ const ListPurchaseOrders = () => {
     }
   };
 
-  // Modified useEffect to refresh data on navigation
   useEffect(() => {
     fetchData();
-  }, [location.pathname]); // Trigger fetchData when pathname changes
+  }, [location.pathname]);
 
   const handleConvertToWO = (po) => {
     const savedItems = po.items.map((item) => ({
@@ -485,14 +484,20 @@ const ListPurchaseOrders = () => {
             <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
             <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
-            <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split("/").pop() || "File Uploaded" : "N/A"}</p>
+            <p><strong>PO File:</strong> ${
+              po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : "N/A"
+            }</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
             <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
-            <p><strong>Date Received:</strong> ${state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"}</p>
-            <p><strong>Expected Completion Date:</strong> ${state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Date Received:</strong> ${
+              state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"
+            }</p>
+            <p><strong>Expected Completion Date:</strong> ${
+              state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"
+            }</p>
             <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
             <p><strong>Range:</strong> ${state.range || "N/A"}</p>
             <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
@@ -521,14 +526,30 @@ const ListPurchaseOrders = () => {
                         <tr>
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
                           <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            state.units.find((u) => u.id === item.unit)?.name || "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.certificate_uut_label || "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.certificate_number || "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.uuc_serial_number || "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"
+                          }</td>
                         </tr>
                       `
                     )
@@ -545,14 +566,30 @@ const ListPurchaseOrders = () => {
                               <tr>
                                 <td style="padding: 8px;">${item.name || "N/A"}</td>
                                 <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${state.units.find((u) => u.id === item.unit)?.name || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.certificate_uut_label || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.certificate_number || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.uuc_serial_number || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"}</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  state.units.find((u) => u.id === item.unit)?.name || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.certificate_uut_label || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.certificate_number || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.uuc_serial_number || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"
+                                }</td>
                               </tr>
                             `
                           )
@@ -645,7 +682,6 @@ const ListPurchaseOrders = () => {
     return po ? po.status : "Collection Pending";
   };
 
-  // Modified to check both PO status and workOrderStatusMap
   const canConvertToWorkOrder = (poId) => {
     const po = state.purchaseOrders.find((p) => p.id === poId);
     return (
@@ -851,9 +887,13 @@ const ListPurchaseOrders = () => {
               </p>
               <p>
                 <strong>PO File:</strong>{" "}
-                {state.selectedPO.po_file
-                  ? state.selectedPO.po_file.split("/").pop() || "File Uploaded"
-                  : "N/A"}
+                {state.selectedPO.po_file ? (
+                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
+                  </a>
+                ) : (
+                  "N/A"
+                )}
               </p>
               <p>
                 <strong>Assigned Sales Person:</strong>{" "}

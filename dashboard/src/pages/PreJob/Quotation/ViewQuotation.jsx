@@ -73,7 +73,7 @@ const ViewQuotation = () => {
       try {
         const quotationRes = await apiClient.get(`/quotations/${id}/`);
         const quotation = quotationRes.data;
-        const rfqId = quotation.rfq; 
+        const rfqId = quotation.rfq;
         await apiClient.delete(`/quotations/${id}/`);
         if (rfqId) {
           try {
@@ -290,7 +290,9 @@ const ViewQuotation = () => {
                 <div style="margin-bottom: 20px;">
                   <h3 style="font-size: 1.1rem; font-weight: 600;">Purchase Order ${index + 1} (ID: ${po.id}, Type: ${po.order_type})</h3>
                   <p><strong>Client PO Number:</strong> ${po.client_po_number || 'N/A'}</p>
-                  <p><strong>PO File:</strong> ${po.po_file ? po.po_file.split('/').pop() || 'File Uploaded' : 'N/A'}</p>
+                  <p><strong>PO File:</strong> ${
+                    po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : 'N/A'
+                  }</p>
                   <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
                   <table border="1" style="width: 100%; border-collapse: collapse;">
                     <tr style="background-color: #f2f2f2;">
@@ -769,14 +771,20 @@ const ViewQuotation = () => {
                   {state.selectedQuotation.purchase_orders.map((po, index) => (
                     <div key={po.id} className="mb-4 p-2 border rounded">
                       <h4 className="text-md font-medium">
-                        Purchase Order ${index + 1} (ID: ${po.id}, Type: ${po.order_type})
+                        Purchase Order - {index + 1} (ID: {po.id}, Type: {po.order_type})
                       </h4>
-                      <p><strong>Client PO Number:</strong> ${po.client_po_number || 'N/A'}</p>
+                      <p><strong>Client PO Number:</strong> {po.client_po_number || 'N/A'}</p>
                       <p>
                         <strong>PO File:</strong>{' '}
-                        {po.po_file ? po.po_file.split('/').pop() || 'File Uploaded' : 'N/A'}
+                        {po.po_file ? (
+                          <a href={po.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                            View File
+                          </a>
+                        ) : (
+                          'N/A'
+                        )}
                       </p>
-                      <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+                      <p><strong>Created:</strong> {new Date(po.created_at).toLocaleDateString()}</p>
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse mt-2">
                           <thead>
