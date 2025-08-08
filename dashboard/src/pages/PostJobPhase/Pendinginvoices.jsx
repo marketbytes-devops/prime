@@ -12,6 +12,7 @@ const PendingInvoices = () => {
     technicians: [],
     itemsList: [],
     units: [],
+    quotations: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -24,22 +25,30 @@ const PendingInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, poRes, techRes, itemsRes, unitsRes, quotationsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
+        apiClient.get('quotations/'),
       ]);
 
-      setState((prev) => ({
-        ...prev,
+      const newState = {
+        ...state,
         workOrders: woRes.data || [],
         purchaseOrders: poRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
-      }));
+        quotations: quotationsRes.data || [],
+      };
+      setState(newState);
+      console.log('Fetched workOrders:', newState.workOrders);
+      console.log('Fetched purchaseOrders:', newState.purchaseOrders);
+      console.log('Fetched itemsList:', newState.itemsList);
+      console.log('Fetched units:', newState.units);
+      console.log('Fetched quotations:', newState.quotations);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data.');
@@ -58,12 +67,19 @@ const PendingInvoices = () => {
         selectedWO: workOrder,
       }));
     } else if (type === 'po') {
-      const purchaseOrder = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order_id);
+      console.log('workOrder:', workOrder);
+      const poId = workOrder.purchase_order; // Changed from purchase_order_id to purchase_order
+      console.log('workOrder.purchase_order:', poId);
+      const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+      console.log('Found PO:', purchaseOrder);
       setState((prev) => ({
         ...prev,
         isPOModalOpen: true,
         selectedPO: purchaseOrder || null,
       }));
+      if (!purchaseOrder) {
+        toast.error('Purchase order not found. Please check if the purchase order ID matches.');
+      }
     }
   };
 
@@ -80,11 +96,17 @@ const PendingInvoices = () => {
   };
 
   const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
+    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
     if (technicianIds.length === 0) return 'None';
     if (technicianIds.length > 1) return 'Multiple';
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
     return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
+  };
+
+  const getAssignedSalesPersonName = (po) => {
+    if (!po) return 'N/A';
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return quotation?.assigned_sales_person_name || 'N/A';
   };
 
   const filteredWorkOrders = state.workOrders
@@ -175,7 +197,7 @@ const PendingInvoices = () => {
                     <td className="border p-2">{startIndex + index + 1}</td>
                     <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{getAssignedTechnicians(workOrder.items || [])}</td>
+                    <td className="border p-2">{getAssignedTechnicians(workOrder.items)}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
@@ -242,6 +264,8 @@ const PendingInvoices = () => {
         )}
       </div>
 
+      {console.log('PO Modal State:', { isPOModalOpen: state.isPOModalOpen, selectedPO: state.selectedPO })}
+
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -265,7 +289,7 @@ const PendingInvoices = () => {
               <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Purchase Order ID:</strong> {state.selectedWO.purchase_order_id || 'N/A'}</p>
+              <p><strong>Purchase Order ID:</strong> {state.selectedWO.purchase_order || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -350,6 +374,7 @@ const PendingInvoices = () => {
                   {state.selectedPO.po_file.split('/').pop() || 'View File'}
                 </a>
               ) : 'N/A'}</p>
+              <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
