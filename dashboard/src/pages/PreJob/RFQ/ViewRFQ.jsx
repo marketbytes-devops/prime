@@ -40,7 +40,7 @@ const ViewRFQ = () => {
           try {
             const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
             const hasQuotation = quotationRes.data.length > 0;
-            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`); // Debugging
+            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`); 
             return { ...rfq, hasQuotation };
           } catch (error) {
             console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
@@ -71,7 +71,7 @@ const ViewRFQ = () => {
     if (window.confirm('Are you sure you want to delete this RFQ?')) {
       try {
         await apiClient.delete(`rfqs/${id}/`);
-        await fetchRFQs(); 
+        await fetchRFQs();
       } catch (error) {
         console.error('Error deleting RFQ:', error);
         alert('Failed to delete RFQ.');
@@ -88,8 +88,8 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
-      console.log(`Status updated for RFQ ${id} to ${newStatus}`); 
-      await fetchRFQs(); 
+      console.log(`Status updated for RFQ ${id} to ${newStatus}`);
+      await fetchRFQs();
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status.');
@@ -296,8 +296,8 @@ const ViewRFQ = () => {
                           onClick={() => handleConvertToQuotation(rfq)}
                           disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
                           className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Completed' && !rfq.hasQuotation
-                              ? 'bg-purple-600 text-white hover:bg-purple-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-purple-600 text-white hover:bg-purple-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                         >
                           Convert to Quotation
@@ -306,8 +306,8 @@ const ViewRFQ = () => {
                           onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
                           disabled={rfq.hasQuotation}
                           className={`px-3 py-1 rounded-md text-sm ${!rfq.hasQuotation
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                         >
                           Edit
@@ -352,8 +352,8 @@ const ViewRFQ = () => {
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
             >
               {page}
