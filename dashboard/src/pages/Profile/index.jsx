@@ -91,117 +91,152 @@ const Profile = () => {
 
   return (
     <motion.div
-      className="p-6 mx-auto"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 sm:p-6 lg:p-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      <h2 className="text-2xl font-semibold mb-6 text-center">Profile</h2>
-      {error && <p className="text-red-600 mb-4 text-center">{error}</p>}
-      {message && <p className="text-green-600 mb-4 text-center">{message}</p>}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-6 shadow-xl">
-          <h3 className="text-lg font-semibold mb-4">User Information</h3>
-          <div className="space-y-4">
-            <div>
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  alt="Profile"
-                  className="w-32 h-32 rounded-full object-cover mb-2 mx-auto"
-                  onError={() => setImagePreview(null)}
+      <div className="w-full space-y-8">
+        <h1 className="text-2xl font-bold mb-4">Profile Settings</h1>
+        {error && (
+          <motion.p
+            className="text-red-600 bg-red-50 p-4 rounded-xl text-center font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {error}
+          </motion.p>
+        )}
+        {message && (
+          <motion.p
+            className="text-green-600 bg-green-50 p-4 rounded-xl text-center font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {message}
+          </motion.p>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* User Information Block */}
+          <motion.div
+            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6">User Information</h3>
+            <div className="space-y-6">
+              <div className="flex flex-col items-center">
+                {imagePreview && (
+                  <motion.img
+                    src={imagePreview}
+                    alt="Profile"
+                    className="w-28 h-28 rounded-full object-cover mb-4 border-4 border-blue-100 shadow-sm"
+                    onError={() => setImagePreview(null)}
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.4 }}
+                  />
+                )}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Profile Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
                 />
-              )}
-              <label className="block text-sm font-medium text-gray-700">Profile Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-              />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={profile.email}
+                  disabled
+                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={profile.name || ''}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                <input
+                  type="text"
+                  value={profile.username || ''}
+                  onChange={(e) => setProfile({ ...profile, username: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <textarea
+                  value={profile.address || ''}
+                  onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50 resize-none"
+                  rows="4"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={profile.phone_number || ''}
+                  onChange={(e) => setProfile({ ...profile, phone_number: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
+                />
+              </div>
+              <motion.button
+                onClick={handleProfileUpdate}
+                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium shadow-md"
+              >
+                Update Profile
+              </motion.button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={profile.email}
-                disabled
-                className="w-full p-2 border rounded bg-gray-100 opacity-75"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
-              <input
-                type="text"
-                value={profile.name || ''}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Username</label>
-              <input
-                type="text"
-                value={profile.username || ''}
-                onChange={(e) => setProfile({ ...profile, username: e.target.value })}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Address</label>
-              <textarea
-                value={profile.address || ''}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-                rows="4"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
-              <input
-                type="tel"
-                value={profile.phone_number || ''}
-                onChange={(e) => setProfile({ ...profile, phone_number: e.target.value })}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-              />
-            </div>
-            <button
-              onClick={handleProfileUpdate}
-              className="w-full p-2 bg-gray-900 text-white rounded hover:bg-gray-800 transition-opacity duration-200 opacity-90"
-            >
-              Update Profile
-            </button>
-          </div>
-        </div>
+          </motion.div>
 
-        <div className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Change Password</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring focus:ring-gray-600 opacity-75"
-              />
+          {/* Change Password Block */}
+          <motion.div
+            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6">Change Password</h3>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300 bg-gray-50"
+                />
+              </div>
+              <motion.button
+                onClick={handlePasswordChange}
+                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium shadow-md"
+              >
+                Change Password
+              </motion.button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChae={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-2 border focus:border-none rounded focus:outline-none focus:ring-2 focus:ring-gray-500 opacity-75"
-              />
-            </div>
-            <button
-              onClick={handlePasswordChange}
-              className="w-full p-2 bg-gray-900 text-white rounded hover:bg-gray-800 transition-opacity duration-200 opacity-90"
-            >
-              Change Password
-            </button>
-          </div>
+          </motion.div>
         </div>
       </div>
     </motion.div>
