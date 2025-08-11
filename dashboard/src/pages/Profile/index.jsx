@@ -195,7 +195,7 @@ const Profile = () => {
               </div>
               <motion.button
                 onClick={handleProfileUpdate}
-                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium shadow-md"
+                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium"
               >
                 Update Profile
               </motion.button>
@@ -231,7 +231,7 @@ const Profile = () => {
               </div>
               <motion.button
                 onClick={handlePasswordChange}
-                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium shadow-md"
+                className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300 font-medium"
               >
                 Change Password
               </motion.button>

@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import apiClient from '../../../helpers/apiClient';
-import InputField from '../../../components/InputField';
-import Button from '../../../components/Button';
-import Modal from '../../../components/Modal';
+import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import apiClient from "../../../helpers/apiClient";
+import InputField from "../../../components/InputField";
+import Button from "../../../components/Button";
+import Modal from "../../../components/Modal";
 
 const CloseWorkOrder = () => {
   const [state, setState] = useState({
     workOrders: [],
     technicians: [],
-    searchTerm: '',
-    sortBy: 'created_at',
+    searchTerm: "",
+    sortBy: "created_at",
     currentPage: 1,
-    itemsPerPage: 10,
+    itemsPerPage: 20,
     isModalOpen: false,
     uploadModalOpen: false,
     selectedWO: null,
@@ -27,15 +27,15 @@ const CloseWorkOrder = () => {
   const fetchWorkOrders = async () => {
     try {
       const [woRes, techRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Approved' } }),
-        apiClient.get('technicians/'),
+        apiClient.get("work-orders/", { params: { status: "Approved" } }),
+        apiClient.get("technicians/"),
       ]);
-      const userEmail = localStorage.getItem('userEmail');
+      const userEmail = localStorage.getItem("userEmail");
       const filteredWOs = woRes.data
         .filter((wo) => wo.created_by?.email === userEmail || !wo.created_by)
         .map((wo) => ({
           ...wo,
-          assigned_to: wo.items || [],
+          items: wo.items || [],
         }));
       setState((prev) => ({
         ...prev,
@@ -43,8 +43,8 @@ const CloseWorkOrder = () => {
         technicians: techRes.data || [],
       }));
     } catch (error) {
-      console.error('Error fetching work orders:', error);
-      toast.error('Failed to load work orders.');
+      console.error("Error fetching work orders:", error);
+      toast.error("Failed to load work orders.");
     }
   };
 
@@ -55,14 +55,14 @@ const CloseWorkOrder = () => {
   const handleCloseWO = async () => {
     try {
       const formData = new FormData();
-      if (state.purchaseOrderFile) formData.append('purchase_order_file', state.purchaseOrderFile);
-      if (state.workOrderFile) formData.append('work_order_file', state.workOrderFile);
-      if (state.signedDeliveryNoteFile) formData.append('signed_delivery_note_file', state.signedDeliveryNoteFile);
+      if (state.purchaseOrderFile) formData.append("purchase_order_file", state.purchaseOrderFile);
+      if (state.workOrderFile) formData.append("work_order_file", state.workOrderFile);
+      if (state.signedDeliveryNoteFile) formData.append("signed_delivery_note_file", state.signedDeliveryNoteFile);
 
       await apiClient.patch(`work-orders/${state.selectedWO.id}/close/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { "Content-Type": "multipart/form-data" },
       });
-      toast.success('Work Order closed and submitted for invoicing.');
+      toast.success("Work Order closed and submitted for invoicing.");
       setState((prev) => ({
         ...prev,
         isModalOpen: false,
@@ -75,8 +75,8 @@ const CloseWorkOrder = () => {
       }));
       fetchWorkOrders();
     } catch (error) {
-      console.error('Error closing work order:', error);
-      toast.error('Failed to close work order.');
+      console.error("Error closing work order:", error);
+      toast.error("Failed to close work order.");
     }
   };
 
@@ -88,12 +88,11 @@ const CloseWorkOrder = () => {
     }));
   };
 
-  const handleViewWO = (woId) => {
-    const workOrder = state.workOrders.find((wo) => wo.id === woId);
+  const handleViewWO = (wo) => {
     setState((prev) => ({
       ...prev,
       isViewModalOpen: true,
-      selectedViewWO: workOrder || null,
+      selectedViewWO: wo || null,
     }));
   };
 
@@ -107,32 +106,32 @@ const CloseWorkOrder = () => {
     setState((prev) => ({
       ...prev,
       uploadModalOpen: false,
-      ...(prev.uploadDocumentType === 'purchase_order' && { purchaseOrderFile: file }),
-      ...(prev.uploadDocumentType === 'work_order' && { workOrderFile: file }),
-      ...(prev.uploadDocumentType === 'signed_delivery_note' && { signedDeliveryNoteFile: file }),
+      ...(prev.uploadDocumentType === "purchase_order" && { purchaseOrderFile: file }),
+      ...(prev.uploadDocumentType === "work_order" && { workOrderFile: file }),
+      ...(prev.uploadDocumentType === "signed_delivery_note" && { signedDeliveryNoteFile: file }),
       uploadDocumentType: null,
     }));
   };
 
-  const getAssignedTo = (items) => {
+  const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
+    if (technicianIds.length === 0) return "None";
+    if (technicianIds.length > 1) return "Multiple";
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'None';
+    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
   };
 
   const filteredWOs = state.workOrders
     .filter(
       (wo) =>
-        (wo.quotation?.company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        (wo.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+        (wo.quotation?.company_name || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        (wo.wo_number || "").toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      if (state.sortBy === 'created_at') {
+      if (state.sortBy === "created_at") {
         return new Date(b.created_at) - new Date(a.created_at);
-      } else if (state.sortBy === 'company_name') {
-        return (a.quotation?.company_name || '').localeCompare(b.quotation?.company_name || '');
+      } else if (state.sortBy === "company_name") {
+        return (a.quotation?.company_name || "").localeCompare(b.quotation?.company_name || "");
       }
       return 0;
     });
@@ -141,27 +140,49 @@ const CloseWorkOrder = () => {
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentWOs = filteredWOs.slice(startIndex, startIndex + state.itemsPerPage);
 
+  const pageGroupSize = 3;
+  const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
+  const startPage = currentGroup * pageGroupSize + 1;
+  const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+
+  const handlePageChange = (page) => {
+    setState((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handleNext = () => {
+    if (state.currentPage < totalPages) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
+    }
+  };
+
+  const handlePrev = () => {
+    if (state.currentPage > 1) {
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
+    }
+  };
+
   return (
-    <div className="mx-auto p-4 max-w-6xl">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900">Close Work Orders</h1>
-      <div className="bg-white p-6 space-y-6 rounded-lg shadow-lg">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+    <div className="mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Close Work Orders</h1>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
+        <div className="mb-6 flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Work Orders</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
               placeholder="Search by company name or WO Number..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full"
             />
           </div>
-          <div className="w-full md:w-1/4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={state.sortBy}
               onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="created_at">Creation Date</option>
               <option value="company_name">Company Name</option>
@@ -172,109 +193,153 @@ const CloseWorkOrder = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-3 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-3 text-left text-sm font-medium text-gray-700">Created At</th>
-                <th className="border p-3 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-3 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-3 text-left text-sm font-medium text-gray-700">Action</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created At</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {currentWOs.map((wo, index) => (
-                <tr key={wo.id} className="border hover:bg-gray-50">
-                  <td className="border p-3">{startIndex + index + 1}</td>
-                  <td className="border p-3">{new Date(wo.created_at).toLocaleDateString()}</td>
-                  <td className="border p-3">{wo.wo_number}</td>
-                  <td className="border p-3">{getAssignedTo(wo.assigned_to)}</td>
-                  <td className="border p-3">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => handleViewWO(wo.id)}
-                        className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                      >
-                        View WO
-                      </Button>
-                      <Button
-                        onClick={() => handleOpenModal(wo)}
-                        className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                      >
-                        Submit for Invoicing
-                      </Button>
-                    </div>
+              {currentWOs.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="border p-2 text-center text-gray-500 whitespace-nowrap">
+                    No work orders found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                currentWOs.map((wo, index) => (
+                  <tr key={wo.id} className="border hover:bg-gray-50">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(wo.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{wo.wo_number || "N/A"}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(wo.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleViewWO(wo)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                        >
+                          View WO
+                        </Button>
+                        <Button
+                          onClick={() => handleOpenModal(wo)}
+                          className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                        >
+                          Submit for Invoicing
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        <div className="flex justify-between items-center mt-6">
+      </div>
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4 w-fit">
           <Button
-            onClick={() => setState((prev) => ({ ...prev, currentPage: Math.max(prev.currentPage - 1, 1) }))}
+            onClick={handlePrev}
             disabled={state.currentPage === 1}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-300"
+            className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
-            Previous
+            Prev
           </Button>
-          <span className="text-sm text-gray-700">Page {state.currentPage} of {totalPages}</span>
+          {pageNumbers.map((page) => (
+            <Button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded-md min-w-fit ${
+                state.currentPage === page
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              {page}
+            </Button>
+          ))}
           <Button
-            onClick={() => setState((prev) => ({ ...prev, currentPage: Math.min(prev.currentPage + 1, totalPages) }))}
+            onClick={handleNext}
             disabled={state.currentPage === totalPages}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-300"
+            className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
           </Button>
         </div>
-      </div>
+      )}
       <Modal
         isOpen={state.isModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedWO: null, purchaseOrderFile: null, workOrderFile: null, signedDeliveryNoteFile: null, uploadDocumentType: null }))}
+        onClose={() =>
+          setState((prev) => ({
+            ...prev,
+            isModalOpen: false,
+            selectedWO: null,
+            purchaseOrderFile: null,
+            workOrderFile: null,
+            signedDeliveryNoteFile: null,
+            uploadDocumentType: null,
+          }))
+        }
         title="Close Work Order"
       >
-        <div className="space-y-6 p-4">
+        <div className="space-y-4 p-4">
+          <h3 className="text-lg font-medium text-black">Submit for Invoicing</h3>
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Submit for Invoicing</h3>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Order (Optional)</label>
-            <select
-              onChange={(e) => e.target.value === 'upload' && handleOpenUploadModal('purchase_order')}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Order (Optional)</label>
+           <select
+              onChange={(e) => e.target.value === "upload" && handleOpenUploadModal("purchase_order")}
+              className="p-2 border rounded focus:outline-indigo-500 w-full"
             >
               <option value="">Select</option>
               <option value="upload">Upload</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Work Order (Optional)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Work Order (Optional)</label>
             <select
-              onChange={(e) => e.target.value === 'upload' && handleOpenUploadModal('work_order')}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => e.target.value === "upload" && handleOpenUploadModal("work_order")}
+              className="p-2 border rounded focus:outline-indigo-500 w-full"
             >
               <option value="">Select</option>
               <option value="upload">Upload</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Signed Delivery Note</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Signed Delivery Note</label>
             <select
-              onChange={(e) => e.target.value === 'upload' && handleOpenUploadModal('signed_delivery_note')}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => e.target.value === "upload" && handleOpenUploadModal("signed_delivery_note")}
+              className="p-2 border rounded focus:outline-indigo-500 w-full"
             >
               <option value="">Select</option>
               <option value="upload">Upload</option>
             </select>
           </div>
-          <div className="flex justify-end gap-4 mt-6">
+          <div className="flex justify-end gap-4 mt-4">
             <Button
               onClick={handleCloseWO}
               disabled={!state.signedDeliveryNoteFile}
-              className={`px-4 py-2 rounded-md ${state.signedDeliveryNoteFile ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+              className={`px-3 py-1 rounded-md text-sm ${
+                state.signedDeliveryNoteFile
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                  : "bg-gray-300 text-gray-500"
+              }`}
             >
               Submit
             </Button>
             <Button
-              onClick={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedWO: null, purchaseOrderFile: null, workOrderFile: null, signedDeliveryNoteFile: null, uploadDocumentType: null }))}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+              onClick={() =>
+                setState((prev) => ({
+                  ...prev,
+                  isModalOpen: false,
+                  selectedWO: null,
+                  purchaseOrderFile: null,
+                  workOrderFile: null,
+                  signedDeliveryNoteFile: null,
+                  uploadDocumentType: null,
+                }))
+              }
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 text-sm"
             >
               Cancel
             </Button>
@@ -284,18 +349,18 @@ const CloseWorkOrder = () => {
       <Modal
         isOpen={state.uploadModalOpen}
         onClose={() => setState((prev) => ({ ...prev, uploadModalOpen: false, uploadDocumentType: null }))}
-        title={`Upload ${state.uploadDocumentType?.replace('_', ' ') || 'Document'}`}
+        title={`Upload ${state.uploadDocumentType?.replace("_", " ") || "Document"}`}
       >
-        <div className="space-y-6 p-4">
+        <div className="space-y-4 p-4">
           <input
             type="file"
             onChange={handleFileUpload}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="p-2 border rounded focus:outline-indigo-500 w-full"
           />
           <div className="flex justify-end gap-4">
             <Button
               onClick={() => setState((prev) => ({ ...prev, uploadModalOpen: false }))}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 text-sm"
             >
               Cancel
             </Button>
@@ -305,22 +370,22 @@ const CloseWorkOrder = () => {
       <Modal
         isOpen={state.isViewModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedViewWO: null }))}
-        title={`Work Order Details - ${state.selectedViewWO?.wo_number || 'N/A'}`}
+        title={`Work Order Details - ${state.selectedViewWO?.wo_number || "N/A"}`}
       >
         {state.selectedViewWO && (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedViewWO.wo_number || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedViewWO.status || 'N/A'}</p>
+              <p><strong>WO Number:</strong> {state.selectedViewWO.wo_number || "N/A"}</p>
+              <p><strong>Status:</strong> {state.selectedViewWO.status || "N/A"}</p>
               <p><strong>Created At:</strong> {new Date(state.selectedViewWO.created_at).toLocaleDateString()}</p>
-              <p><strong>Date Received:</strong> {state.selectedViewWO.date_received ? new Date(state.selectedViewWO.date_received).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedViewWO.expected_completion_date ? new Date(state.selectedViewWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedViewWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Range:</strong> {state.selectedViewWO.range || 'N/A'}</p>
-              <p><strong>Serial Number:</strong> {state.selectedViewWO.serial_number || 'N/A'}</p>
-              <p><strong>Site Location:</strong> {state.selectedViewWO.site_location || 'N/A'}</p>
-              <p><strong>Remarks:</strong> {state.selectedViewWO.remarks || 'N/A'}</p>
+              <p><strong>Date Received:</strong> {state.selectedViewWO.date_received ? new Date(state.selectedViewWO.date_received).toLocaleDateString() : "N/A"}</p>
+              <p><strong>Expected Completion:</strong> {state.selectedViewWO.expected_completion_date ? new Date(state.selectedViewWO.expected_completion_date).toLocaleDateString() : "N/A"}</p>
+              <p><strong>Onsite/Lab:</strong> {state.selectedViewWO.onsite_or_lab || "N/A"}</p>
+              <p><strong>Range:</strong> {state.selectedViewWO.range || "N/A"}</p>
+              <p><strong>Serial Number:</strong> {state.selectedViewWO.serial_number || "N/A"}</p>
+              <p><strong>Site Location:</strong> {state.selectedViewWO.site_location || "N/A"}</p>
+              <p><strong>Remarks:</strong> {state.selectedViewWO.remarks || "N/A"}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -345,23 +410,28 @@ const CloseWorkOrder = () => {
                     <tbody>
                       {state.selectedViewWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{item.item?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.item?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
-                              <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              <a
+                                href={item.certificate_file}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
                                 View Certificate
                               </a>
                             ) : (
-                              'N/A'
+                              "N/A"
                             )}
                           </td>
                         </tr>
