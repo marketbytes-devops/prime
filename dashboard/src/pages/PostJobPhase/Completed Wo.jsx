@@ -28,7 +28,7 @@ const CompletedWO = () => {
   const fetchData = async () => {
     try {
       const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Closed' } }), // Assuming 'Closed' status for completed WOs
+        apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('delivery-notes/'),
         apiClient.get('technicians/'),
@@ -36,7 +36,6 @@ const CompletedWO = () => {
         apiClient.get('units/'),
       ]);
 
-      // Filter work orders by user email (only show WOs created by the logged-in user)
       const userEmail = localStorage.getItem('userEmail');
       const filteredWOs = (woRes.data || []).filter(
         (wo) => wo.created_by?.email === userEmail || !wo.created_by
@@ -69,12 +68,19 @@ const CompletedWO = () => {
         selectedWO: wo,
       }));
     } else if (type === 'po') {
-      const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order_id);
+      console.log('workOrder:', wo);
+      const poId = wo.purchase_order;
+      console.log('workOrder.purchase_order:', poId);
+      const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+      console.log('Found PO:', purchaseOrder);
       setState((prev) => ({
         ...prev,
         isPOModalOpen: true,
         selectedPO: purchaseOrder || null,
       }));
+      if (!purchaseOrder) {
+        toast.error('Purchase order not found. Please check if the purchase order ID matches.');
+      }
     } else if (type === 'dn') {
       const deliveryNote = state.deliveryNotes.find((dn) => dn.work_order === wo.id);
       setState((prev) => ({
@@ -82,6 +88,17 @@ const CompletedWO = () => {
         isDNModalOpen: true,
         selectedDN: deliveryNote || null,
       }));
+    }
+  };
+
+  const handleDeleteWorkOrder = async (workOrderId) => {
+    try {
+      await apiClient.delete(`work-orders/${workOrderId}/`);
+      toast.success('Work order deleted successfully.');
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      toast.error('Failed to delete work order.');
     }
   };
 
@@ -94,12 +111,8 @@ const CompletedWO = () => {
   };
 
   const getInvoiceStatus = (wo) => {
-    // Assuming invoice status is part of work order data or derived from delivery note
     const deliveryNote = state.deliveryNotes.find((dn) => dn.work_order === wo.id);
-    if (deliveryNote?.invoice_status) {
-      return deliveryNote.invoice_status; // e.g., 'Pending', 'Raised', 'Processed'
-    }
-    return 'Pending'; // Default if no invoice status is found
+    return deliveryNote?.invoice_status || 'Pending';
   };
 
   const filteredWOs = state.workOrders
@@ -124,10 +137,7 @@ const CompletedWO = () => {
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
   const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
-  const pageNumbers = Array.from(
-    { length: endPage - startPage + 1 },
-    (_, i) => startPage + i
-  );
+  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -182,12 +192,13 @@ const CompletedWO = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">View Documents</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Invoice Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Action</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                  <td colSpan="7" className="border p-2 text-center text-gray-500">
                     No completed work orders found.
                   </td>
                 </tr>
@@ -195,7 +206,7 @@ const CompletedWO = () => {
                 currentWOs.map((wo, index) => (
                   <tr key={wo.id} className="border hover:bg-gray-50">
                     <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2">08/08/2025</td>
                     <td className="border p-2">{wo.wo_number || 'N/A'}</td>
                     <td className="border p-2">{getAssignedTechnicians(wo.items || [])}</td>
                     <td className="border p-2">
@@ -221,6 +232,14 @@ const CompletedWO = () => {
                       </div>
                     </td>
                     <td className="border p-2">{getInvoiceStatus(wo)}</td>
+                    <td className="border p-2">
+                      <Button
+                        onClick={() => handleDeleteWorkOrder(wo.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                      >
+                        Delete
+                      </Button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -292,12 +311,6 @@ const CompletedWO = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -307,25 +320,6 @@ const CompletedWO = () => {
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_file ? (
-                              <a
-                                href={item.certificate_file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                View Certificate
-                              </a>
-                            ) : (
-                              'N/A'
-                            )}
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -349,10 +343,10 @@ const CompletedWO = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>PO ID:</strong> {state.selectedPO.id}</p>
+              <p><strong>PO ID:</strong> {state.selectedPO.id || 'N/A'}</p>
               <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
               <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
-              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
+              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
               <p><strong>PO File:</strong> {state.selectedPO.po_file ? (
                 <a
                   href={state.selectedPO.po_file}
@@ -360,7 +354,7 @@ const CompletedWO = () => {
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
                 >
-                  View File
+                  {state.selectedPO.po_file.split('/').pop() || 'View File'}
                 </a>
               ) : 'N/A'}</p>
             </div>

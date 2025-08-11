@@ -147,6 +147,11 @@ const ManagerApproval = () => {
     }
   };
 
+  // Calculate total quantity of items
+  const getTotalItemQuantity = (items) => {
+    return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  };
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Manager Approval</h1>
@@ -348,16 +353,17 @@ const ManagerApproval = () => {
               <option value="no">No</option>
             </select>
           </div>
-          {state.isWorkOrderComplete && (
+          {state.isWorkOrderComplete && state.selectedWO && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Note Type</label>
               <select
                 value={state.deliveryNoteType}
                 onChange={(e) => setState((prev) => ({ ...prev, deliveryNoteType: e.target.value }))}
                 className="p-2 border rounded w-full"
+                disabled={getTotalItemQuantity(state.selectedWO.items) <= 1}
               >
                 <option value="single">Single Delivery Note</option>
-                <option value="multiple">Split Delivery Notes</option>
+                <option value="multiple">Multiple Delivery Notes</option>
               </select>
             </div>
           )}
