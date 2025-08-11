@@ -179,8 +179,8 @@ const Sidebar = ({ toggleSidebar }) => {
       toggle: toggleUserRoles,
       isOpen: isUserRolesOpen,
       subItems: [
-        { to: "/user-roles/users", label: "Users", icon: <Users className="w-5 h-5 mr-3" /> },
         { to: "/user-roles/roles", label: "Roles", icon: <Tag className="w-5 h-5 mr-3" /> },
+        { to: "/user-roles/users", label: "Users", icon: <Users className="w-5 h-5 mr-3" /> },
         { to: "/user-roles/permissions", label: "Permissions", icon: <Settings className="w-5 h-5 mr-3" /> },
       ],
     },
