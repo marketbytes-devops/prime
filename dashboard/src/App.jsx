@@ -68,33 +68,10 @@ function App() {
         <div>Something went wrong. Please try again or contact support.</div>
       ),
       children: [
+        // pages
         {
           index: true,
           element: <Dashboard />,
-        },
-        {
-          path: "/profile",
-          element: <Profile />,
-        },
-        {
-          path: "/additional-settings/add-series",
-          element: <Series />,
-        },
-        {
-          path: "/additional-settings/add-item",
-          element: <Item />,
-        },
-        {
-          path: "/additional-settings/add-unit",
-          element: <Unit />,
-        },
-        {
-          path: "/additional-settings/add-team",
-          element: <Team />,
-        },
-        {
-          path: "/additional-settings/add-rfq-channel",
-          element: <Channels />,
         },
         {
           path: "/add-rfq",
@@ -160,7 +137,32 @@ function App() {
           path: "/post-job-phase/completed-wo",
           element: <CompletedWO />,
         },
-
+        // profile
+        {
+          path: "/profile",
+          element: <Profile />,
+        },
+        // additional settings
+        {
+          path: "/additional-settings/add-series",
+          element: <Series />,
+        },
+        {
+          path: "/additional-settings/add-item",
+          element: <Item />,
+        },
+        {
+          path: "/additional-settings/add-unit",
+          element: <Unit />,
+        },
+        {
+          path: "/additional-settings/add-team",
+          element: <Team />,
+        },
+        {
+          path: "/additional-settings/add-rfq-channel",
+          element: <Channels />,
+        },
         // user roles
         {
           path: "/user-roles/users",

@@ -4,6 +4,9 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
+import Template1 from '../../../components/Templates/Template1';
+import Template2 from '../../../components/Templates/Template2';
+import ReactDOMServer from 'react-dom/server';
 
 const ViewRFQ = () => {
   const navigate = useNavigate();
@@ -68,7 +71,7 @@ const ViewRFQ = () => {
     if (window.confirm('Are you sure you want to delete this RFQ?')) {
       try {
         await apiClient.delete(`rfqs/${id}/`);
-        await fetchRFQs(); // Refresh after delete
+        await fetchRFQs(); 
       } catch (error) {
         console.error('Error deleting RFQ:', error);
         alert('Failed to delete RFQ.');
@@ -85,8 +88,8 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
-      console.log(`Status updated for RFQ ${id} to ${newStatus}`); // Debugging
-      await fetchRFQs(); // Refresh after status change
+      console.log(`Status updated for RFQ ${id} to ${newStatus}`); 
+      await fetchRFQs(); 
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status.');
@@ -102,63 +105,28 @@ const ViewRFQ = () => {
     }
   };
 
-  const handlePrint = (rfq) => {
+  const handlePrint = (rfq, templateName) => {
     const channelName = state.channels.find(c => c.id === rfq.rfq_channel)?.channel_name || 'N/A';
     const salesPersonName = state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A';
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head><title>RFQ ${rfq.series_number || rfq.id}</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1>RFQ Details</h1>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Company Details</h2>
-            <p><strong>RFQ Number:</strong> ${rfq.series_number || 'N/A'}</p>
-            <p><strong>Company Name:</strong> ${rfq.company_name || 'N/A'}</p>
-            <p><strong>Company Address:</strong> ${rfq.company_address || 'N/A'}</p>
-            <p><strong>Company Phone:</strong> ${rfq.company_phone || 'N/A'}</p>
-            <p><strong>Company Email:</strong> ${rfq.company_email || 'N/A'}</p>
-            <p><strong>Channel:</strong> ${channelName}</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Contact Details</h2>
-            <p><strong>Contact Name:</strong> ${rfq.point_of_contact_name || 'N/A'}</p>
-            <p><strong>Contact Email:</strong> ${rfq.point_of_contact_email || 'N/A'}</p>
-            <p><strong>Contact Phone:</strong> ${rfq.point_of_contact_phone || 'N/A'}</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Assignment & Status</h2>
-            <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
-            <p><strong>Due Date:</strong> ${rfq.due_date_for_quotation ? new Date(rfq.due_date_for_quotation).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Status:</strong> ${rfq.rfq_status || 'N/A'}</p>
-            <p><strong>Created:</strong> ${new Date(rfq.created_at).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Items</h2>
-            <table border="1" style="width: 100%; border-collapse: collapse;">
-              <tr style="background-color: #f2f2f2;">
-                <th style="padding: 8px; text-align: left;">Item</th>
-                <th style="padding: 8px; text-align: left;">Quantity</th>
-                <th style="padding: 8px; text-align: left;">Unit</th>
-                <th style="padding: 8px; text-align: left;">Unit Price</th>
-                <th style="padding: 8px; text-align: left;">Total Price</th>
-              </tr>
-              ${rfq.items && Array.isArray(rfq.items) && rfq.items.length > 0
-                ? rfq.items.map(item => `
-                  <tr>
-                    <td style="padding: 8px;">${state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}</td>
-                    <td style="padding: 8px; text-align: center">${item.quantity || 'N/A'}</td>
-                    <td style="padding: 8px; text-align: left">${state.units.find(u => u.id === item.unit)?.name || 'N/A'}</td>
-                    <td style="padding: 8px; text-align: right">$${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                    <td style="padding: 8px; text-align: right">$${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
-                  </tr>
-                `).join('')
-                : '<tr><td colspan="5" style="padding: 8px; text-align: center;">No items added.</td></tr>'}
-            </table>
-          </div>
-        </body>
-      </html>
-    `);
+
+    const itemsData = (rfq.items || []).map(item => ({
+      id: item.id,
+      name: state.itemsList.find(i => i.id === item.item)?.name || 'N/A',
+      quantity: item.quantity || '',
+      unit: state.units.find(u => u.id === item.unit)?.name || 'N/A',
+      unit_price: item.unit_price || ''
+    }));
+
+    const data = { ...rfq, channelName, salesPersonName, items: itemsData };
+
+    let Component;
+    if (templateName === "Template1") Component = Template1;
+    else if (templateName === "Template2") Component = Template2;
+    else return alert("Invalid template");
+
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Component data={data} />);
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(htmlString);
     printWindow.document.close();
     printWindow.print();
   };
@@ -327,37 +295,37 @@ const ViewRFQ = () => {
                         <Button
                           onClick={() => handleConvertToQuotation(rfq)}
                           disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            rfq.rfq_status === 'Completed' && !rfq.hasQuotation
+                          className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Completed' && !rfq.hasQuotation
                               ? 'bg-purple-600 text-white hover:bg-purple-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
+                            }`}
                         >
                           Convert to Quotation
                         </Button>
                         <Button
                           onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
                           disabled={rfq.hasQuotation}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            !rfq.hasQuotation
+                          className={`px-3 py-1 rounded-md text-sm ${!rfq.hasQuotation
                               ? 'bg-blue-600 text-white hover:bg-blue-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
+                            }`}
                         >
                           Edit
                         </Button>
-                        <Button
-                          onClick={() => handlePrint(rfq)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                        >
-                          Print
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button onClick={() => handlePrint(rfq, "Template1")} className="bg-green-600 text-white">
+                            Print Template 1
+                          </Button>
+                          <Button onClick={() => handlePrint(rfq, "Template2")} className="bg-blue-600 text-white">
+                            Print Template 2
+                          </Button>
+                        </div>
+
                         <Button
                           onClick={() => handleDelete(rfq.id)}
                           disabled={rfq.hasQuotation}
-                          className={`px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm ${
-                            rfq.hasQuotation ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''
-                          }`}
+                          className={`px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm ${rfq.hasQuotation ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''
+                            }`}
                         >
                           Delete
                         </Button>
@@ -383,11 +351,10 @@ const ViewRFQ = () => {
             <Button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded-md min-w-fit ${
-                state.currentPage === page
+              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               {page}
             </Button>
