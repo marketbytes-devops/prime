@@ -30,7 +30,10 @@ import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
 import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
 import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
 import PendingInvoices from "./pages/PostJobPhase/Pendinginvoices";
-import CompletedWO from "./pages/PostJobPhase/Completed Wo";
+import CompletedWO from "./pages/PostJobPhase/CompletedWo";
+import Users from "./pages/UserRoles/Users";
+import Roles from "./pages/UserRoles/Roles";
+import Permissions from "./pages/UserRoles/Permissions";
 
 const ProtectedRoute = ({ children, isAuthenticated }) => {
   console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
@@ -156,6 +159,20 @@ function App() {
         {
           path: "/post-job-phase/completed-wo",
           element: <CompletedWO />,
+        },
+
+        // user roles
+        {
+          path: "/user-roles/users",
+          element: <Users />,
+        },
+        {
+          path: "/user-roles/roles",
+          element: <Roles />,
+        },
+        {
+          path: "/user-roles/permissions",
+          element: <Permissions />,
         },
       ],
     },

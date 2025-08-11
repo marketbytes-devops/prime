@@ -22,12 +22,14 @@ import {
   FileEdit,
   ClipboardList,
   FileCheck,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../../assets/images/img-logo.png";
 
 const Sidebar = ({ toggleSidebar }) => {
   const location = useLocation();
+
   const [isPreJobOpen, setIsPreJobOpen] = useState(false);
   const [isJobExecutionOpen, setIsJobExecutionOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -35,6 +37,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isPostJobPhaseOpen, setIsPostJobPhaseOpen] = useState(false);
+  const [isUserRolesOpen, setIsUserRolesOpen] = useState(false);
 
   useEffect(() => {
     const preJobPaths = ["/add-rfq", "/view-rfq", "/view-quotation"];
@@ -68,6 +71,11 @@ const Sidebar = ({ toggleSidebar }) => {
       "/post-job-phase/pending-invoices",
       "/post-job-phase/completed-wo",
     ];
+    const userRolesPaths = [
+      "/user-roles/users",
+      "/user-roles/roles",
+      "/user-roles/permissions",
+    ];
 
     setIsPreJobOpen(preJobPaths.includes(location.pathname));
     setIsJobExecutionOpen(jobExecutionPaths.includes(location.pathname));
@@ -76,15 +84,17 @@ const Sidebar = ({ toggleSidebar }) => {
     setIsInitiateWorkOrderOpen(initiateWorkOrderPaths.includes(location.pathname));
     setIsProcessingWorkOrdersOpen(processingWorkOrdersPaths.includes(location.pathname));
     setIsPostJobPhaseOpen(postJobPhasePaths.includes(location.pathname));
+    setIsUserRolesOpen(userRolesPaths.includes(location.pathname));
   }, [location.pathname]);
 
-  const togglePreJob = () => setIsPreJobOpen(!isPreJobOpen);
-  const toggleJobExecution = () => setIsJobExecutionOpen(!isJobExecutionOpen);
-  const toggleSettings = () => setIsSettingsOpen(!isSettingsOpen);
-  const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
-  const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
-  const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
-  const togglePostJobPhase = () => setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
+  const togglePreJob = () => setIsPreJobOpen((prev) => !prev);
+  const toggleJobExecution = () => setIsJobExecutionOpen((prev) => !prev);
+  const toggleSettings = () => setIsSettingsOpen((prev) => !prev);
+  const toggleRFQ = () => setIsRFQOpen((prev) => !prev);
+  const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen((prev) => !prev);
+  const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen((prev) => !prev);
+  const togglePostJobPhase = () => setIsPostJobPhaseOpen((prev) => !prev);
+  const toggleUserRoles = () => setIsUserRolesOpen((prev) => !prev);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -93,10 +103,14 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "Pre-Job",
       icon: <FileText className="w-5 h-5 mr-3" />,
+      toggle: togglePreJob,
+      isOpen: isPreJobOpen,
       subItems: [
         {
           label: "RFQ",
           icon: <FileSearch className="w-5 h-5 mr-3" />,
+          toggle: toggleRFQ,
+          isOpen: isRFQOpen,
           subItems: [
             { to: "/add-rfq", label: "Add RFQ", icon: <FilePlus className="w-5 h-5 mr-3" /> },
             { to: "/view-rfq", label: "View RFQ", icon: <FileSearch className="w-5 h-5 mr-3" /> },
@@ -108,10 +122,14 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "Job Execution",
       icon: <Wrench className="w-5 h-5 mr-3" />,
+      toggle: toggleJobExecution,
+      isOpen: isJobExecutionOpen,
       subItems: [
         {
           label: "Initiate Work Order",
           icon: <ListOrdered className="w-5 h-5 mr-3" />,
+          toggle: toggleInitiateWorkOrder,
+          isOpen: isInitiateWorkOrderOpen,
           subItems: [
             { to: "/job-execution/initiate-work-order/list-all-purchase-orders", label: "List Purchase Orders", icon: <FileText className="w-5 h-5 mr-3" /> },
             { to: "/job-execution/initiate-work-order/add-wo-without-po", label: "Add WO Without PO", icon: <FilePlus className="w-5 h-5 mr-3" /> },
@@ -120,6 +138,8 @@ const Sidebar = ({ toggleSidebar }) => {
         {
           label: "Processing Work Orders",
           icon: <Wrench className="w-5 h-5 mr-3" />,
+          toggle: toggleProcessingWorkOrders,
+          isOpen: isProcessingWorkOrdersOpen,
           subItems: [
             { to: "/job-execution/processing-work-orders/list-all-processing-work-orders", label: "List Processing WO", icon: <FileText className="w-5 h-5 mr-3" /> },
             { to: "/job-execution/processing-work-orders/manager-approval", label: "Manager Approval", icon: <CheckSquare className="w-5 h-5 mr-3" /> },
@@ -132,6 +152,8 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "Post Job Phase",
       icon: <ClipboardList className="w-5 h-5 mr-3" />,
+      toggle: togglePostJobPhase,
+      isOpen: isPostJobPhaseOpen,
       subItems: [
         { to: "/post-job-phase/pending-invoices", label: "Pending Invoices", icon: <FileCheck className="w-5 h-5 mr-3" /> },
         { to: "/post-job-phase/completed-wo", label: "Completed WO", icon: <FileCheck className="w-5 h-5 mr-3" /> },
@@ -141,12 +163,25 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "Additional Settings",
       icon: <Settings className="w-5 h-5 mr-3" />,
+      toggle: toggleSettings,
+      isOpen: isSettingsOpen,
       subItems: [
         { to: "/additional-settings/add-series", label: "Series", icon: <FileEdit className="w-5 h-5 mr-3" /> },
         { to: "/additional-settings/add-rfq-channel", label: "RFQ Channel", icon: <Send className="w-5 h-5 mr-3" /> },
         { to: "/additional-settings/add-item", label: "Item", icon: <Tag className="w-5 h-5 mr-3" /> },
         { to: "/additional-settings/add-unit", label: "Unit", icon: <SquaresUnite className="w-5 h-5 mr-3" /> },
         { to: "/additional-settings/add-team", label: "Team", icon: <Users className="w-5 h-5 mr-3" /> },
+      ],
+    },
+    {
+      label: "User Roles",
+      icon: <Shield className="w-5 h-5 mr-3" />,
+      toggle: toggleUserRoles,
+      isOpen: isUserRolesOpen,
+      subItems: [
+        { to: "/user-roles/users", label: "Users", icon: <Users className="w-5 h-5 mr-3" /> },
+        { to: "/user-roles/roles", label: "Roles", icon: <Tag className="w-5 h-5 mr-3" /> },
+        { to: "/user-roles/permissions", label: "Permissions", icon: <Settings className="w-5 h-5 mr-3" /> },
       ],
     },
   ];
@@ -168,56 +203,20 @@ const Sidebar = ({ toggleSidebar }) => {
               {item.subItems ? (
                 <>
                   <button
-                    onClick={
-                      item.label === "Pre-Job"
-                        ? togglePreJob
-                        : item.label === "Job Execution"
-                        ? toggleJobExecution
-                        : item.label === "Post Job Phase"
-                        ? togglePostJobPhase
-                        : toggleSettings
-                    }
-                    className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                      (item.label === "Pre-Job" && isPreJobOpen) ||
-                      (item.label === "Job Execution" && isJobExecutionOpen) ||
-                      (item.label === "Post Job Phase" && isPostJobPhaseOpen) ||
-                      (item.label === "Additional Settings" && isSettingsOpen)
-                        ? "bg-indigo-100 text-indigo-600"
-                        : "text-gray-700 hover:bg-indigo-500 hover:text-white"
-                    }`}
+                    onClick={item.toggle}
+                    className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${item.isOpen
+                      ? "bg-indigo-100 text-indigo-600"
+                      : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+                      }`}
                   >
                     <span className="flex items-center">
                       {item.icon}
                       {item.label}
                     </span>
-                    {item.label === "Pre-Job" ? (
-                      isPreJobOpen ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )
-                    ) : item.label === "Job Execution" ? (
-                      isJobExecutionOpen ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )
-                    ) : item.label === "Post Job Phase" ? (
-                      isPostJobPhaseOpen ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )
-                    ) : (
-                      isSettingsOpen ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )
-                    )}
+                    {item.isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                   <AnimatePresence>
-                    {(item.label === "Pre-Job" ? isPreJobOpen : item.label === "Job Execution" ? isJobExecutionOpen : item.label === "Post Job Phase" ? isPostJobPhaseOpen : isSettingsOpen) && (
+                    {item.isOpen && (
                       <motion.ul
                         className="ml-4 mt-1 space-y-1"
                         initial={{ height: 0, opacity: 0 }}
@@ -230,51 +229,20 @@ const Sidebar = ({ toggleSidebar }) => {
                             {subItem.subItems ? (
                               <>
                                 <button
-                                  onClick={
-                                    subItem.label === "RFQ"
-                                      ? toggleRFQ
-                                      : subItem.label === "Initiate Work Order"
-                                      ? toggleInitiateWorkOrder
-                                      : toggleProcessingWorkOrders
-                                  }
-                                  className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                                    (subItem.label === "RFQ" && isRFQOpen) ||
-                                    (subItem.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
-                                    (subItem.label === "Processing Work Orders" && isProcessingWorkOrdersOpen)
-                                      ? "bg-indigo-100 text-indigo-600"
-                                      : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
-                                  }`}
+                                  onClick={subItem.toggle}
+                                  className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${subItem.isOpen
+                                    ? "bg-indigo-100 text-indigo-600"
+                                    : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                    }`}
                                 >
                                   <span className="flex items-center">
                                     {subItem.icon}
                                     {subItem.label}
                                   </span>
-                                  {subItem.label === "RFQ" ? (
-                                    isRFQOpen ? (
-                                      <ChevronUp className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4" />
-                                    )
-                                  ) : subItem.label === "Initiate Work Order" ? (
-                                    isInitiateWorkOrderOpen ? (
-                                      <ChevronUp className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4" />
-                                    )
-                                  ) : (
-                                    isProcessingWorkOrdersOpen ? (
-                                      <ChevronUp className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4" />
-                                    )
-                                  )}
+                                  {subItem.isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                 </button>
                                 <AnimatePresence>
-                                  {(subItem.label === "RFQ"
-                                    ? isRFQOpen
-                                    : subItem.label === "Initiate Work Order"
-                                    ? isInitiateWorkOrderOpen
-                                    : isProcessingWorkOrdersOpen) && (
+                                  {subItem.isOpen && (
                                     <motion.ul
                                       className="ml-4 mt-1 space-y-1"
                                       initial={{ height: 0, opacity: 0 }}
@@ -287,8 +255,9 @@ const Sidebar = ({ toggleSidebar }) => {
                                           <NavLink
                                             to={nestedItem.to}
                                             className={({ isActive }) =>
-                                              `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                                                isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                              `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive
+                                                ? "bg-indigo-500 text-white"
+                                                : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
                                               }`
                                             }
                                             onClick={() => isMobile() && toggleSidebar()}
@@ -306,8 +275,9 @@ const Sidebar = ({ toggleSidebar }) => {
                               <NavLink
                                 to={subItem.to}
                                 className={({ isActive }) =>
-                                  `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                                    isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                                  `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive
+                                    ? "bg-indigo-500 text-white"
+                                    : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
                                   }`
                                 }
                                 onClick={() => isMobile() && toggleSidebar()}
@@ -326,8 +296,9 @@ const Sidebar = ({ toggleSidebar }) => {
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                      isActive ? "bg-indigo-500 text-white" : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+                    `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive
+                      ? "bg-indigo-500 text-white"
+                      : "text-gray-700 hover:bg-indigo-500 hover:text-white"
                     }`
                   }
                   onClick={() => isMobile() && toggleSidebar()}
