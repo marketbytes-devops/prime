@@ -4,9 +4,8 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
-import Template1 from '../../../components/Templates/Template1';
-import Template2 from '../../../components/Templates/Template2';
 import ReactDOMServer from 'react-dom/server';
+import Template1 from '../../../components/Templates/RFQ/Template1';
 
 const ViewRFQ = () => {
   const navigate = useNavigate();
@@ -40,7 +39,7 @@ const ViewRFQ = () => {
           try {
             const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
             const hasQuotation = quotationRes.data.length > 0;
-            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`); 
+            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`);
             return { ...rfq, hasQuotation };
           } catch (error) {
             console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
@@ -105,7 +104,7 @@ const ViewRFQ = () => {
     }
   };
 
-  const handlePrint = (rfq, templateName) => {
+  const handlePrint = (rfq) => {
     const channelName = state.channels.find(c => c.id === rfq.rfq_channel)?.channel_name || 'N/A';
     const salesPersonName = state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A';
 
@@ -119,12 +118,7 @@ const ViewRFQ = () => {
 
     const data = { ...rfq, channelName, salesPersonName, items: itemsData };
 
-    let Component;
-    if (templateName === "Template1") Component = Template1;
-    else if (templateName === "Template2") Component = Template2;
-    else return alert("Invalid template");
-
-    const htmlString = ReactDOMServer.renderToStaticMarkup(<Component data={data} />);
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
     const printWindow = window.open("", "_blank");
     printWindow.document.write(htmlString);
     printWindow.document.close();
@@ -312,15 +306,12 @@ const ViewRFQ = () => {
                         >
                           Edit
                         </Button>
-                        <div className="flex gap-2">
-                          <Button onClick={() => handlePrint(rfq, "Template1")} className="bg-green-600 text-white">
-                            Print Template 1
-                          </Button>
-                          <Button onClick={() => handlePrint(rfq, "Template2")} className="bg-blue-600 text-white">
-                            Print Template 2
-                          </Button>
-                        </div>
-
+                        <Button
+                          onClick={() => handlePrint(rfq)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                        >
+                          Print
+                        </Button>
                         <Button
                           onClick={() => handleDelete(rfq.id)}
                           disabled={rfq.hasQuotation}

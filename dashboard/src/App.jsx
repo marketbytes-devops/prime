@@ -34,7 +34,7 @@ import CompletedWO from "./pages/PostJobPhase/CompletedWo";
 import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
-import apiClient from "../../../prime/dashboard/src/helpers/apiClient";
+import apiClient from "./helpers/apiClient";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
