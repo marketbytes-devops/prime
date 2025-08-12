@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
-from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
@@ -31,7 +30,7 @@ class HasPermission(BasePermission):
             return False
         if request.user.is_superuser:
             return True
-        page = view.__class__.__name__.lower().replace('view', '')
+        page = getattr(view, 'page_name', view.__class__.__name__.lower().replace('view', ''))
         action = 'can_view' if request.method == 'GET' else 'can_add' if request.method == 'POST' else 'can_edit' if request.method in ['PUT', 'PATCH'] else 'can_delete' if request.method == 'DELETE' else None
         if not action:
             return False
@@ -167,6 +166,7 @@ class ChangePasswordView(APIView):
 
 class RoleView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'roles'
 
     def get(self, request):
         roles = Role.objects.all()
@@ -194,7 +194,7 @@ class RoleDetailView(APIView):
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request, pk):
-        if not has_permission(request.user, 'role', 'can_edit'):
+        if not has_permission(request.user, 'roles', 'edit'):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         try:
             role = Role.objects.get(pk=pk)
@@ -207,7 +207,7 @@ class RoleDetailView(APIView):
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request, pk):
-        if not has_permission(request.user, 'role', 'can_delete'):
+        if not has_permission(request.user, 'roles', 'delete'):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         try:
             role = Role.objects.get(pk=pk)
@@ -218,6 +218,7 @@ class RoleDetailView(APIView):
 
 class PermissionView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'permissions'
 
     def post(self, request):
         serializer = PermissionSerializer(data=request.data)
@@ -228,6 +229,7 @@ class PermissionView(APIView):
 
 class PermissionListView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'permissions'
 
     def get(self, request):
         permissions = Permission.objects.all()
@@ -236,6 +238,7 @@ class PermissionListView(APIView):
 
 class PermissionDetailView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'permissions'
 
     def put(self, request, pk):
         try:
@@ -258,6 +261,7 @@ class PermissionDetailView(APIView):
 
 class UserManagementView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'users'
 
     def get(self, request):
         users = CustomUser.objects.all()
@@ -275,6 +279,7 @@ class UserManagementView(APIView):
 
 class UserDetailView(APIView):
     permission_classes = [HasPermission]
+    page_name = 'users'
 
     def get(self, request, pk):
         try:

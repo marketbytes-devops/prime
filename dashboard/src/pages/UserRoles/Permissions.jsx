@@ -21,7 +21,7 @@ const Permissions = () => {
       const response = await apiClient.get("roles/");
       setRoles(response.data);
     } catch (error) {
-      setError("Failed to fetch roles");
+      setError("Failed to fetch roles. Please try again.");
     }
   };
 
@@ -30,7 +30,28 @@ const Permissions = () => {
     try {
       const response = await apiClient.get(`roles/${role.id}/`);
       const rolePermissions = response.data.permissions || [];
-      const permissionsMap = {};
+      const permissionsMap = {
+        Dashboard: { view: false, add: false, edit: false, delete: false },
+        Profile: { view: false, add: false, edit: false, delete: false },
+        rfq: { view: false, add: false, edit: false, delete: false },
+        quotation: { view: false, add: false, edit: false, delete: false },
+        purchase_orders: { view: false, add: false, edit: false, delete: false },
+        work_orders: { view: false, add: false, edit: false, delete: false },
+        processing_work_orders: { view: false, add: false, edit: false, delete: false },
+        manager_approval: { view: false, add: false, edit: false, delete: false },
+        delivery: { view: false, add: false, edit: false, delete: false },
+        close_work_orders: { view: false, add: false, edit: false, delete: false },
+        pending_invoices: { view: false, add: false, edit: false, delete: false },
+        completed_work_orders: { view: false, add: false, edit: false, delete: false },
+        series: { view: false, add: false, edit: false, delete: false },
+        rfq_channel: { view: false, add: false, edit: false, delete: false },
+        item: { view: false, add: false, edit: false, delete: false },
+        unit: { view: false, add: false, edit: false, delete: false },
+        team: { view: false, add: false, edit: false, delete: false },
+        users: { view: false, add: false, edit: false, delete: false },
+        roles: { view: false, add: false, edit: false, delete: false },
+        permissions: { view: false, add: false, edit: false, delete: false },
+      };
       rolePermissions.forEach((perm) => {
         permissionsMap[perm.page] = {
           view: perm.can_view,
@@ -41,7 +62,7 @@ const Permissions = () => {
       });
       setPermissions(permissionsMap);
     } catch (error) {
-      setError("Failed to fetch permissions");
+      setError("Failed to fetch permissions. Please try again.");
     }
   };
 
@@ -73,7 +94,7 @@ const Permissions = () => {
       setMessage(`Permissions updated for ${selectedRole.name}`);
       setSelectedRole(null);
     } catch (error) {
-      setError("Failed to update permissions");
+      setError("Failed to update permissions. Please try again.");
     }
   };
 

@@ -29,7 +29,7 @@ const Users = () => {
       const response = await apiClient.get("users/");
       setUsers(response.data);
     } catch (error) {
-      setError("Failed to fetch users");
+      setError("Failed to fetch users. Please try again.");
     }
   };
 
@@ -38,7 +38,7 @@ const Users = () => {
       const response = await apiClient.get("roles/");
       setRoles(response.data);
     } catch (error) {
-      setError("Failed to fetch roles");
+      setError("Failed to fetch roles. Please try again.");
     }
   };
 
@@ -59,7 +59,7 @@ const Users = () => {
         role_id: "",
       });
     } catch (error) {
-      setError(error.response?.data?.detail || "Failed to create user");
+      setError(error.response?.data?.detail || "Failed to create user. Please try again.");
     }
   };
 
@@ -76,7 +76,7 @@ const Users = () => {
       setMessage("User updated successfully");
       setEditUser(null);
     } catch (error) {
-      setError(error.response?.data?.detail || "Failed to update user");
+      setError(error.response?.data?.detail || "Failed to update user. Please try again.");
     }
   };
 
@@ -87,7 +87,7 @@ const Users = () => {
         setUsers(users.filter((user) => user.id !== id));
         setMessage("User deleted successfully");
       } catch (error) {
-        setError("Failed to delete user");
+        setError("Failed to delete user. Please try again.");
       }
     }
   };

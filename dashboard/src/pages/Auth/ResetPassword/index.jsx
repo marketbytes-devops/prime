@@ -15,27 +15,25 @@ const ResetPassword = () => {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleRequestOTP = (e) => {
+  const handleRequestOTP = async (e) => {
     e.preventDefault();
     if (!email) {
       setError('Email is required');
       return;
     }
-    apiClient
-      .post('request-otp/', { email })
-      .then((response) => {
-        setMessage(response.data.message);
-        setError('');
-        setStep('reset_password');
-      })
-      .catch((error) => {
-        setError(
-          error.response?.data?.error || 'Failed to send OTP. Please try again.'
-        );
-      });
+    try {
+      const response = await apiClient.post('request-otp/', { email });
+      setMessage(response.data.message);
+      setError('');
+      setStep('reset_password');
+    } catch (error) {
+      setError(
+        error.response?.data?.error || 'Failed to send OTP. Please try again.'
+      );
+    }
   };
 
-  const handleResetPassword = (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     if (!/^\d{6}$/.test(otp)) {
       setError('OTP must be exactly 6 digits');
@@ -45,19 +43,17 @@ const ResetPassword = () => {
       setError('Email and new password are required');
       return;
     }
-    apiClient
-      .post('reset-password/', { email, otp, new_password: newPassword })
-      .then((response) => {
-        setMessage(response.data.message);
-        setError('');
-        setTimeout(() => navigate('/login'), 2000);
-      })
-      .catch((error) => {
-        setError(
-          error.response?.data?.error ||
-            'Failed to reset password. Please try again.'
-        );
-      });
+    try {
+      const response = await apiClient.post('reset-password/', { email, otp, new_password: newPassword });
+      setMessage(response.data.message);
+      setError('');
+      setTimeout(() => navigate('/login'), 2000);
+    } catch (error) {
+      setError(
+        error.response?.data?.error ||
+          'Failed to reset password. Please try again.'
+      );
+    }
   };
 
   return (

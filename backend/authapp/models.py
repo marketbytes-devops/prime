@@ -47,15 +47,33 @@ class Permission(models.Model):
 def set_default_permissions(sender, instance, created, **kwargs):
     if created:
         default_permissions = [
-            {'page': 'Dashboard', 'can_view': True},
-            {'page': 'Profile', 'can_view': True},
+            {'page': 'Dashboard', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'Profile', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'rfq', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'quotation', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'purchase_orders', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'work_orders', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'processing_work_orders', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'manager_approval', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'delivery', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'close_work_orders', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'pending_invoices', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'completed_work_orders', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'series', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'rfq_channel', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'item', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'unit', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'team', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'users', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'roles', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
+            {'page': 'permissions', 'can_view': True, 'can_add': False, 'can_edit': False, 'can_delete': False},
         ]
         for perm in default_permissions:
             Permission.objects.create(
                 role=instance,
                 page=perm['page'],
-                can_view=perm['can_view'],
-                can_add=False,
-                can_edit=False,
-                can_delete=False,
+                can_view=perm.get('can_view', False),
+                can_add=perm.get('can_add', False),
+                can_edit=perm.get('can_edit', False),
+                can_delete=perm.get('can_delete', False),
             )

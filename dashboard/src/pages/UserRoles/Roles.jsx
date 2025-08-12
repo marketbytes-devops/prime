@@ -21,7 +21,7 @@ const Roles = () => {
       const response = await apiClient.get("roles/");
       setRoles(response.data);
     } catch (error) {
-      setError("Failed to fetch roles");
+      setError("Failed to fetch roles. Please try again.");
     }
   };
 
@@ -39,7 +39,7 @@ const Roles = () => {
       setMessage("Role created successfully");
       setFormData({ name: "", description: "" });
     } catch (error) {
-      setError(error.response?.data?.detail || "Failed to create role");
+      setError(error.response?.data?.detail || "Failed to create role. Please try again.");
     }
   };
 
@@ -50,7 +50,7 @@ const Roles = () => {
         setRoles(roles.filter((role) => role.id !== id));
         setMessage("Role deleted successfully");
       } catch (error) {
-        setError("Failed to delete role");
+        setError("Failed to delete role. Please try again.");
       }
     }
   };

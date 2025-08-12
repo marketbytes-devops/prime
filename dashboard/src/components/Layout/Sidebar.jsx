@@ -76,7 +76,6 @@ const Sidebar = ({ toggleSidebar }) => {
 
   const hasPermission = (page, action) => {
     if (isSuperadmin) return true;
-    console.log(`Checking permission for page: ${page}, action: ${action}`, permissions);
     const perm = permissions.find((p) => p.page === page);
     return perm && perm[`can_${action}`];
   };
@@ -103,7 +102,7 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "Pre-Job",
       icon: <FileText className="w-5 h-5 mr-3" />,
-      page: "pre_job",
+      page: "rfq",
       action: "view",
       subItems: [
         {
@@ -146,7 +145,7 @@ const Sidebar = ({ toggleSidebar }) => {
         {
           label: "Initiate Work Order",
           icon: <ListOrdered className="w-5 h-5 mr-3" />,
-          page: "initiate_work_order",
+          page: "purchase_orders",
           action: "view",
           subItems: [
             {
@@ -278,7 +277,7 @@ const Sidebar = ({ toggleSidebar }) => {
     {
       label: "User Roles",
       icon: <Shield className="w-5 h-5 mr-3" />,
-      page: "user_roles",
+      page: "users",
       action: "view",
       subItems: [
         {
@@ -326,6 +325,15 @@ const Sidebar = ({ toggleSidebar }) => {
 
       if (filteredSubItems.length === 0) return null;
 
+      const isActiveSubmenu = (subItems) => {
+        return subItems.some((subItem) => {
+          if (subItem.subItems) {
+            return subItem.subItems.some((nestedItem) => location.pathname === nestedItem.to);
+          }
+          return location.pathname === subItem.to;
+        });
+      };
+
       return (
         <>
           <button
@@ -335,13 +343,19 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Post Job Phase") togglePostJobPhase();
               else if (item.label === "Additional Settings") toggleSettings();
               else if (item.label === "User Roles") toggleUserRoles();
+              else if (item.label === "RFQ") toggleRFQ();
+              else if (item.label === "Initiate Work Order") toggleInitiateWorkOrder();
+              else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
             }}
             className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-              (item.label === "Pre-Job" && isPreJobOpen) ||
-              (item.label === "Job Execution" && isJobExecutionOpen) ||
-              (item.label === "Post Job Phase" && isPostJobPhaseOpen) ||
-              (item.label === "Additional Settings" && isSettingsOpen) ||
-              (item.label === "User Roles" && isUserRolesOpen)
+              (item.label === "Pre-Job" && (isPreJobOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Job Execution" && (isJobExecutionOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Post Job Phase" && (isPostJobPhaseOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Additional Settings" && (isSettingsOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "User Roles" && (isUserRolesOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "RFQ" && (isRFQOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen || isActiveSubmenu(item.subItems)))
                 ? "bg-indigo-100 text-indigo-600"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
             }`}
@@ -354,14 +368,20 @@ const Sidebar = ({ toggleSidebar }) => {
              (item.label === "Job Execution" && (isJobExecutionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
              (item.label === "Post Job Phase" && (isPostJobPhaseOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
              (item.label === "Additional Settings" && (isSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "User Roles" && (isUserRolesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
+             (item.label === "User Roles" && (isUserRolesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+             (item.label === "RFQ" && (isRFQOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+             (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+             (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
           </button>
           <AnimatePresence>
             {(item.label === "Pre-Job" ? isPreJobOpen :
               item.label === "Job Execution" ? isJobExecutionOpen :
               item.label === "Post Job Phase" ? isPostJobPhaseOpen :
               item.label === "Additional Settings" ? isSettingsOpen :
-              isUserRolesOpen) && (
+              item.label === "User Roles" ? isUserRolesOpen :
+              item.label === "RFQ" ? isRFQOpen :
+              item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
+              isProcessingWorkOrdersOpen) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}

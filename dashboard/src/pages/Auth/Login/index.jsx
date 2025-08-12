@@ -12,26 +12,24 @@ const Login = ({ setIsAuthenticated }) => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('isAuthenticated');
 
-    apiClient
-      .post('login/', { email, password })
-      .then((response) => {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('access_token', response.data.access);
-        localStorage.setItem('refresh_token', response.data.refresh);
-        setIsAuthenticated(true);
-        navigate('/');
-      })
-      .catch((error) => {
-        setError(
-          error.response?.data?.detail || 'Login failed. Please try again.'
-        );
-      });
+    try {
+      const response = await apiClient.post('login/', { email, password });
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
+      setIsAuthenticated(true);
+      navigate('/');
+    } catch (error) {
+      setError(
+        error.response?.data?.error || 'Login failed. Please check your credentials and try again.'
+      );
+    }
   };
 
   return (

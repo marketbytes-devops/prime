@@ -1,9 +1,9 @@
+import { useState, useEffect } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
   Navigate,
 } from "react-router-dom";
-import { useState, useEffect } from "react";
 import "./index.css";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -29,8 +29,8 @@ import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerAp
 import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
 import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
 import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
-import PendingInvoices from "./pages/PostJobPhase/Pendinginvoices";
-import CompletedWO from "./pages/PostJobPhase/CompletedWo";
+import PendingInvoices from "./pages/PostJobPhase/PendingInvoices";
+import CompletedWO from "./pages/PostJobPhase/CompletedWO";
 import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
@@ -85,11 +85,11 @@ const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredActio
   }, [isAuthenticated, requiredPage, requiredAction]);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
 
   if (!hasPermission) {
@@ -120,7 +120,7 @@ function App() {
           <Layout isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
         </ProtectedRoute>
       ),
-      errorElement: <div>Something went wrong. Please try again or contact support.</div>,
+      errorElement: <div className="flex justify-center items-center min-h-screen text-red-600">Something went wrong. Please try again or contact support.</div>,
       children: [
         { index: true, element: <Dashboard /> },
         {
@@ -164,7 +164,10 @@ function App() {
             </ProtectedRoute>
           ),
         },
-        { path: "/pre-job/partial-order-selection", element: <PartialOrderSelection /> },
+        {
+          path: "/pre-job/partial-order-selection",
+          element: <PartialOrderSelection />,
+        },
         {
           path: "/job-execution/initiate-work-order/list-all-purchase-orders",
           element: (
