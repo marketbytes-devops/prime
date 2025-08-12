@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework import viewsets
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
@@ -42,6 +41,22 @@ class HasPermission(BasePermission):
             **{action: True}
         ).exists()
 
+def has_permission(user, page, action):
+    """
+    Custom function to check if a user has permission for a given page and action.
+    """
+    if user.is_superuser or (user.role and user.role.name == "Superadmin"):
+        return True
+    if not user.role:
+        return False
+    try:
+        permission = Permission.objects.filter(
+            role=user.role, page=page, **{f"can_{action}": True}
+        ).exists()
+        return permission
+    except Permission.DoesNotExist:
+        return False
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
@@ -65,6 +80,64 @@ class LoginView(APIView):
                 return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class RequestOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RequestOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            try:
+                user = CustomUser.objects.get(email=email)
+                otp = "".join(random.choices(string.digits, k=6))
+                user.otp = otp
+                user.save()
+                send_mail(
+                    subject="Your OTP for Password Reset",
+                    message=f"Your OTP is {otp}. It is valid for 10 minutes.",
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                return Response(
+                    {"message": "OTP sent to your email"}, status=status.HTTP_200_OK
+                )
+            except CustomUser.DoesNotExist:
+                return Response(
+                    {"error": "User with this email does not exist"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            otp = serializer.validated_data["otp"]
+            new_password = serializer.validated_data["new_password"]
+            try:
+                user = CustomUser.objects.get(email=email)
+                if user.otp == otp:
+                    user.set_password(new_password)
+                    user.otp = None
+                    user.save()
+                    return Response(
+                        {"message": "Password reset successfully"},
+                        status=status.HTTP_200_OK,
+                    )
+                return Response(
+                    {"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST
+                )
+            except CustomUser.DoesNotExist:
+                return Response(
+                    {"error": "User with this email does not exist"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -72,6 +145,13 @@ class ProfileView(APIView):
         user = request.user
         serializer = ProfileSerializer(user)
         return Response(serializer.data)
+
+    def put(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
@@ -101,20 +181,24 @@ class RoleView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RoleDetailView(APIView):
-    permission_classes = [HasPermission]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         try:
             role = Role.objects.get(pk=pk)
+            if role != request.user.role and not request.user.is_superuser:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             serializer = RoleSerializer(role)
             return Response(serializer.data)
         except Role.DoesNotExist:
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request, pk):
+        if not has_permission(request.user, 'role', 'can_edit'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         try:
             role = Role.objects.get(pk=pk)
-            serializer = RoleCreateSerializer(role, data=request.data, partial=True)
+            serializer = RoleSerializer(role, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
@@ -123,6 +207,8 @@ class RoleDetailView(APIView):
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request, pk):
+        if not has_permission(request.user, 'role', 'can_delete'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         try:
             role = Role.objects.get(pk=pk)
             role.delete()
@@ -216,85 +302,3 @@ class UserDetailView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except CustomUser.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-class RequestOTPView(APIView):
-    def post(self, request):
-        serializer = RequestOTPSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data["email"]
-            try:
-                user = CustomUser.objects.get(email=email)
-                otp = "".join(random.choices(string.digits, k=6))
-                user.otp = otp
-                user.save()
-                send_mail(
-                    subject="Your OTP for Password Reset",
-                    message=f"Your OTP is {otp}. It is valid for 10 minutes.",
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=[email],
-                    fail_silently=False,
-                )
-                return Response(
-                    {"message": "OTP sent to your email"}, status=status.HTTP_200_OK
-                )
-            except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User with this email does not exist"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class RequestOTPView(APIView):
-    def post(self, request):
-        serializer = RequestOTPSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data["email"]
-            try:
-                user = CustomUser.objects.get(email=email)
-                otp = "".join(random.choices(string.digits, k=6))
-                user.otp = otp
-                user.save()
-                send_mail(
-                    subject="Your OTP for Password Reset",
-                    message=f"Your OTP is {otp}. It is valid for 10 minutes.",
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=[email],
-                    fail_silently=False,
-                )
-                return Response(
-                    {"message": "OTP sent to your email"}, status=status.HTTP_200_OK
-                )
-            except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User with this email does not exist"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class ResetPasswordView(APIView):
-    def post(self, request):
-        serializer = ResetPasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data["email"]
-            otp = serializer.validated_data["otp"]
-            new_password = serializer.validated_data["new_password"]
-            try:
-                user = CustomUser.objects.get(email=email)
-                if user.otp == otp:
-                    user.set_password(new_password)
-                    user.otp = None
-                    user.save()
-                    return Response(
-                        {"message": "Password reset successfully"},
-                        status=status.HTTP_200_OK,
-                    )
-                return Response(
-                    {"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST
-                )
-            except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User with this email does not exist"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
