@@ -11,68 +11,72 @@ const Template1 = ({ data }) => {
         <title>Quotation {data.series_number || data.id}</title>
         <style>
           {`
+            @page {
+              size: A4 portrait;
+              margin: 1.2cm 1.7cm 2.2cm 1.7cm;
+            }
             body { 
               font-family: Arial, sans-serif; 
-              margin: 40px; 
-              line-height: 1.5; 
+              line-height: 1.6;
+              font-size: 13px;
             }
             .header { 
               text-align: center; 
-              margin-bottom: 30px; 
+              margin-bottom: 25px;
             }
             .company-name { 
-              font-size: 20px; 
+              font-size: 19px;
               font-weight: bold; 
               margin-bottom: 10px;
             }
             .arabic-name { 
-              font-size: 18px; 
+              font-size: 17px;
               margin-bottom: 15px;
             }
-        .quote-info { 
-          display: flex; 
-          justify-content: space-between; 
-          gap: 20px; 
-          font-size: 14px; 
-          margin-bottom: 20px; 
-          padding: 10px 0;
-          }
+            .quote-info { 
+              display: flex; 
+              justify-content: space-between; 
+              gap: 20px; 
+              font-size: 13px; 
+              margin-bottom: 20px; 
+              padding: 10px 0;
+            }
             .quote-title { 
               text-align: center; 
-              font-size: 18px; 
+              font-size: 17px;
               font-weight: bold; 
               text-decoration: underline; 
-              margin: 30px 0; 
+              margin: 25px 0;
             }
             .customer-details { 
-              width: 60%; 
-              margin-bottom: 30px;
+              width: 100%;
+              margin-bottom: 25px;
             }
             .customer-details table { 
               width: 100%; 
               border-collapse: collapse; 
             }
             .customer-details td { 
-              padding: 8px; 
+              padding: 8px;
               vertical-align: top; 
-              font-size: 14px; 
+              font-size: 13px;
             }
             .bank-details { 
-              margin-top: 30px; 
-              font-size: 14px; 
-              line-height: 1.8;
-              padding: 15px;
+              margin-top: 25px;
+              font-size: 13px; 
+              line-height: 1.6;
+              padding: 12px 0px;
             }
             .table { 
               width: 100%; 
               border-collapse: collapse; 
-              margin: 30px 0; 
+              margin: 25px 0;
             }
             .table th, .table td { 
               border: 1px solid #000; 
-              padding: 10px; 
+              padding: 10px;
               text-align: left; 
-              font-size: 14px; 
+              font-size: 13px;
             }
             .table th { 
               background-color: #f2f2f2; 
@@ -82,23 +86,23 @@ const Template1 = ({ data }) => {
               font-weight: bold; 
             }
             .terms { 
-              margin-top: 30px; 
-              font-size: 14px; 
-              line-height: 1.8;
+              margin-top: 25px;
+              font-size: 13px; 
+              line-height: 1.6;
             }
             .terms ul { 
               list-style-type: disc; 
-              padding-left: 30px; 
+              padding-left: 25px;
               margin-top: 10px;
             }
             .footer { 
-              margin-top: 50px; 
+              margin-top: 35px;
               text-align: right; 
-              font-size: 14px;
-              line-height: 1.8;
+              font-size: 13px;
+              line-height: 1.6;
             }
             .contact-info { 
-              font-size: 12px; 
+              font-size: 12px;
               text-align: left; 
               line-height: 1.6;
             }
@@ -106,10 +110,23 @@ const Template1 = ({ data }) => {
               page-break-before: always; 
             }
             .page-footer { 
-              position: absolute; 
-              bottom: 30px; 
-              width: 100%; 
-              font-size: 14px; 
+              position: running(footer);
+              bottom: 0;
+              width: 100%;
+              font-size: 13px;
+            }
+            .page-footer-first {
+              position: absolute;
+              bottom: -0.5cm;
+              left: 10px;
+              width: 100%;
+              text-align: center;
+              font-size: 13px;
+            }
+            @page {
+              @bottom-center {
+                content: element(footer);
+              }
             }
           `}
         </style>
@@ -121,12 +138,12 @@ const Template1 = ({ data }) => {
             <div className="company-name">Prime Innovation Contracting Co.</div>
             <div className="arabic-name">شركة ابتكار الرئيسية للمقاوﻻت</div>
           </div>
-          
+
           <div style={{ marginBottom: '20px' }}>Quotation Submitted To:</div>
-          
+
           <div className="quote-title">QUOTATION FOR CALIBRATION SERVICES</div>
-          
-          <div className="customer-details">
+
+          <div className="table customer-details">
             <table>
               <tbody>
                 <tr>
@@ -164,7 +181,7 @@ const Template1 = ({ data }) => {
               </tbody>
             </table>
           </div>
-          
+
           <div className="bank-details">
             <strong>Our Bank Account Details are as follows:</strong><br />
             Bank Name: Saudi National Bank<br />
@@ -175,8 +192,15 @@ const Template1 = ({ data }) => {
             Company Address: Bldg No. 2099, Al Fayha Dist. 7453, Ras Tannurah-32817 City: Rastanura<br />
             Please ensure that all payments are made to the above‐mentioned account details.
           </div>
-          
-          <div className="page-footer">
+
+          <div className="page-footer-first">
+            <div className="contact-info">
+              Ph: +966 50 584 7698<br />
+              Info@primearabiagroup.com<br />
+              Bldg No. 2099, Al Fayha Dist.7453, Ras Tannurah-32817<br />
+              www.primearabiagroup.com<br />
+              CR No: 2050172178
+            </div>
             <div className="quote-info">
               <div>PRM-QAF-QR-00</div>
               <div>ISSUE DATE 12-NOV-2023</div>
@@ -191,9 +215,9 @@ const Template1 = ({ data }) => {
             <div className="company-name">Prime Innovation Contracting Co.</div>
             <div className="arabic-name">شركة ابتكار الرئيسية للمقاوﻻت</div>
           </div>
-          
+
           <div className="quote-title">CALIBRATION INSTRUMENT & EQUIPMENT</div>
-          
+
           <table className="table">
             <thead>
               <tr>
@@ -228,7 +252,7 @@ const Template1 = ({ data }) => {
               </tr>
             </tbody>
           </table>
-          
+
           <div className="terms">
             <strong>Terms & Conditions</strong><br />
             Calibration Service General Terms and Conditions
@@ -239,16 +263,13 @@ const Template1 = ({ data }) => {
               <li>Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your</li>
             </ul>
           </div>
-          
-          <div className="page-footer">
-            <div className="contact-info">
-              Ph: +966 50 584 7698<br />
-              Info@primearabiagroup.com<br />
-              Bldg No. 2099, Al Fayha Dist.7453, Ras Tannurah-32817<br />
-              www.primearabiagroup.com<br />
-              CR No: 2050172178
-            </div>
-          </div>
+          {/* <div className="contact-info">
+            Ph: +966 50 584 7698<br />
+            Info@primearabiagroup.com<br />
+            Bldg No. 2099, Al Fayha Dist.7453, Ras Tannurah-32817<br />
+            www.primearabiagroup.com<br />
+            CR No: 2050172178
+          </div> */}
         </div>
 
         {/* Page 3 - Remaining Terms */}
@@ -257,7 +278,7 @@ const Template1 = ({ data }) => {
             <div className="company-name">Prime Innovation Contracting Co.</div>
             <div className="arabic-name">شركة ابتكار الرئيسية للمقاوﻻت</div>
           </div>
-          
+
           <div className="terms">
             <ul>
               <li>explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.</li>
@@ -272,22 +293,19 @@ const Template1 = ({ data }) => {
               <li>VAT is excluded from our quotation and will be charged at 15% extra.</li>
             </ul>
           </div>
-          
+
           <div className="footer">
             For Prime Innovation Contracting Co<br /><br /><br />
             Hari Krishnan M<br />
             Head ‐ Engineering and QA/QC
           </div>
-          
-          <div className="page-footer">
-            <div className="contact-info">
-              Ph: +966 50 584 7698<br />
-              Info@primearabiagroup.com<br />
-              Bldg No. 2099, Al Fayha Dist.7453, Ras Tannurah-32817<br />
-              www.primearabiagroup.com<br />
-              CR No: 2050172178
-            </div>
-          </div>
+          {/* <div className="contact-info">
+            Ph: +966 50 584 7698<br />
+            Info@primearabiagroup.com<br />
+            Bldg No. 2099, Al Fayha Dist.7453, Ras Tannurah-32817<br />
+            www.primearabiagroup.com<br />
+            CR No: 2050172178
+          </div> */}
         </div>
       </body>
     </html>
