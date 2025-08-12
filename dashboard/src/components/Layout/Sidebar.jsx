@@ -76,6 +76,7 @@ const Sidebar = ({ toggleSidebar }) => {
 
   const hasPermission = (page, action) => {
     if (isSuperadmin) return true;
+    console.log(`Checking permission for page: ${page}, action: ${action}`, permissions);
     const perm = permissions.find((p) => p.page === page);
     return perm && perm[`can_${action}`];
   };
@@ -96,7 +97,7 @@ const Sidebar = ({ toggleSidebar }) => {
       to: "/",
       label: "Dashboard",
       icon: <LayoutDashboard className="w-5 h-5 mr-3" />,
-      page: "dashboard",
+      page: "Dashboard",
       action: "view",
     },
     {
@@ -228,7 +229,7 @@ const Sidebar = ({ toggleSidebar }) => {
       to: "/profile",
       label: "Profile",
       icon: <User className="w-5 h-5 mr-3" />,
-      page: "profile",
+      page: "Profile",
       action: "view",
     },
     {

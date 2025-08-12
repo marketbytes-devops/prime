@@ -68,7 +68,7 @@ const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredActio
         const perms = roleResponse.data.permissions || [];
         const pagePerm = perms.find((p) => p.page === requiredPage);
 
-        if (pagePerm && pagePerm[`can_${requiredAction}`]) {
+        if (!requiredPage || (pagePerm && pagePerm[`can_${requiredAction}`])) {
           setHasPermission(true);
         } else {
           setHasPermission(false);
@@ -116,7 +116,7 @@ function App() {
     {
       path: "/",
       element: (
-        <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="dashboard">
+        <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="Dashboard">
           <Layout isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
         </ProtectedRoute>
       ),
@@ -240,7 +240,7 @@ function App() {
         {
           path: "/profile",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="profile" requiredAction="view">
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="Profile">
               <Profile />
             </ProtectedRoute>
           ),
