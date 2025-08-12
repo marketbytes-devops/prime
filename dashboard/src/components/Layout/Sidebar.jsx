@@ -10,18 +10,27 @@ import {
   Wrench,
   User,
   Settings,
-  Send,
-  Tag,
-  SquaresUnite,
+  Package,
+  Ruler,
   Users,
   MessageSquareQuote,
   CheckSquare,
   Truck,
-  ArchiveRestore,
+  Archive,
   FileSearch,
-  FileEdit,
+  MessagesSquare,
   ClipboardList,
   FileCheck,
+  Shield,
+  Search,
+  File,
+  FilePlus2,
+  List,
+  CheckCircle,
+  Users2,
+  ShieldCheck,
+  Lock,
+  FolderKanban
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../../assets/images/img-logo.png";
@@ -35,6 +44,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isPostJobPhaseOpen, setIsPostJobPhaseOpen] = useState(false);
+  const [isUserRolesOpen, setIsUserRolesOpen] = useState(false);
 
   useEffect(() => {
     const preJobPaths = ["/add-rfq", "/view-rfq", "/view-quotation"];
@@ -68,6 +78,11 @@ const Sidebar = ({ toggleSidebar }) => {
       "/post-job-phase/pending-invoices",
       "/post-job-phase/completed-wo",
     ];
+    const userRolesPaths = [
+      "/user-roles/users",
+      "/user-roles/roles",
+      "/user-roles/permissions",
+    ];
 
     setIsPreJobOpen(preJobPaths.includes(location.pathname));
     setIsJobExecutionOpen(jobExecutionPaths.includes(location.pathname));
@@ -76,15 +91,52 @@ const Sidebar = ({ toggleSidebar }) => {
     setIsInitiateWorkOrderOpen(initiateWorkOrderPaths.includes(location.pathname));
     setIsProcessingWorkOrdersOpen(processingWorkOrdersPaths.includes(location.pathname));
     setIsPostJobPhaseOpen(postJobPhasePaths.includes(location.pathname));
+    setIsUserRolesOpen(userRolesPaths.includes(location.pathname));
   }, [location.pathname]);
 
-  const togglePreJob = () => setIsPreJobOpen(!isPreJobOpen);
-  const toggleJobExecution = () => setIsJobExecutionOpen(!isJobExecutionOpen);
-  const toggleSettings = () => setIsSettingsOpen(!isSettingsOpen);
+  const togglePreJob = () => {
+    setIsPreJobOpen(!isPreJobOpen);
+    setIsJobExecutionOpen(false);
+    setIsSettingsOpen(false);
+    setIsPostJobPhaseOpen(false);
+    setIsUserRolesOpen(false);
+  };
+
+  const toggleJobExecution = () => {
+    setIsJobExecutionOpen(!isJobExecutionOpen);
+    setIsPreJobOpen(false);
+    setIsSettingsOpen(false);
+    setIsPostJobPhaseOpen(false);
+    setIsUserRolesOpen(false);
+  };
+
+  const toggleSettings = () => {
+    setIsSettingsOpen(!isSettingsOpen);
+    setIsPreJobOpen(false);
+    setIsJobExecutionOpen(false);
+    setIsPostJobPhaseOpen(false);
+    setIsUserRolesOpen(false);
+  };
+
+  const togglePostJobPhase = () => {
+    setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
+    setIsPreJobOpen(false);
+    setIsJobExecutionOpen(false);
+    setIsSettingsOpen(false);
+    setIsUserRolesOpen(false);
+  };
+
+  const toggleUserRoles = () => {
+    setIsUserRolesOpen(!isUserRolesOpen);
+    setIsPreJobOpen(false);
+    setIsJobExecutionOpen(false);
+    setIsSettingsOpen(false);
+    setIsPostJobPhaseOpen(false);
+  };
+
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
   const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
-  const togglePostJobPhase = () => setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -99,7 +151,7 @@ const Sidebar = ({ toggleSidebar }) => {
           icon: <FileSearch className="w-5 h-5 mr-3" />,
           subItems: [
             { to: "/add-rfq", label: "Add RFQ", icon: <FilePlus className="w-5 h-5 mr-3" /> },
-            { to: "/view-rfq", label: "View RFQ", icon: <FileSearch className="w-5 h-5 mr-3" /> },
+            { to: "/view-rfq", label: "View RFQ", icon: <Search className="w-5 h-5 mr-3" /> },
           ],
         },
         { to: "/view-quotation", label: "Quotation", icon: <MessageSquareQuote className="w-5 h-5 mr-3" /> },
@@ -113,18 +165,18 @@ const Sidebar = ({ toggleSidebar }) => {
           label: "Initiate Work Order",
           icon: <ListOrdered className="w-5 h-5 mr-3" />,
           subItems: [
-            { to: "/job-execution/initiate-work-order/list-all-purchase-orders", label: "List Purchase Orders", icon: <FileText className="w-5 h-5 mr-3" /> },
-            { to: "/job-execution/initiate-work-order/add-wo-without-po", label: "Add WO Without PO", icon: <FilePlus className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/initiate-work-order/list-all-purchase-orders", label: "List Purchase Orders", icon: <File className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/initiate-work-order/add-wo-without-po", label: "Add WO Without PO", icon: <FilePlus2 className="w-5 h-5 mr-3" /> },
           ],
         },
         {
           label: "Processing Work Orders",
-          icon: <Wrench className="w-5 h-5 mr-3" />,
+          icon: <FolderKanban className="w-5 h-5 mr-3" />,
           subItems: [
-            { to: "/job-execution/processing-work-orders/list-all-processing-work-orders", label: "List Processing WO", icon: <FileText className="w-5 h-5 mr-3" /> },
-            { to: "/job-execution/processing-work-orders/manager-approval", label: "Manager Approval", icon: <CheckSquare className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/list-all-processing-work-orders", label: "List Processing WO", icon: <List className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/manager-approval", label: "Manager Approval", icon: <CheckCircle className="w-5 h-5 mr-3" /> },
             { to: "/job-execution/processing-work-orders/delivery", label: "Delivery", icon: <Truck className="w-5 h-5 mr-3" /> },
-            { to: "/job-execution/processing-work-orders/close-work-orders", label: "Close Work Order", icon: <ArchiveRestore className="w-5 h-5 mr-3" /> },
+            { to: "/job-execution/processing-work-orders/close-work-orders", label: "Close Work Order", icon: <Archive className="w-5 h-5 mr-3" /> },
           ],
         },
       ],
@@ -134,7 +186,7 @@ const Sidebar = ({ toggleSidebar }) => {
       icon: <ClipboardList className="w-5 h-5 mr-3" />,
       subItems: [
         { to: "/post-job-phase/pending-invoices", label: "Pending Invoices", icon: <FileCheck className="w-5 h-5 mr-3" /> },
-        { to: "/post-job-phase/completed-wo", label: "Completed WO", icon: <FileCheck className="w-5 h-5 mr-3" /> },
+        { to: "/post-job-phase/completed-wo", label: "Completed WO", icon: <CheckSquare className="w-5 h-5 mr-3" /> },
       ],
     },
     { to: "/profile", label: "Profile", icon: <User className="w-5 h-5 mr-3" /> },
@@ -142,11 +194,20 @@ const Sidebar = ({ toggleSidebar }) => {
       label: "Additional Settings",
       icon: <Settings className="w-5 h-5 mr-3" />,
       subItems: [
-        { to: "/additional-settings/add-series", label: "Series", icon: <FileEdit className="w-5 h-5 mr-3" /> },
-        { to: "/additional-settings/add-rfq-channel", label: "RFQ Channel", icon: <Send className="w-5 h-5 mr-3" /> },
-        { to: "/additional-settings/add-item", label: "Item", icon: <Tag className="w-5 h-5 mr-3" /> },
-        { to: "/additional-settings/add-unit", label: "Unit", icon: <SquaresUnite className="w-5 h-5 mr-3" /> },
-        { to: "/additional-settings/add-team", label: "Team", icon: <Users className="w-5 h-5 mr-3" /> },
+        { to: "/additional-settings/add-series", label: "Series", icon: <ListOrdered className="w-5 h-5 mr-3" /> },
+        { to: "/additional-settings/add-rfq-channel", label: "RFQ Channel", icon: <MessagesSquare className="w-5 h-5 mr-3" /> },
+        { to: "/additional-settings/add-item", label: "Item", icon: <Package className="w-5 h-5 mr-3" /> },
+        { to: "/additional-settings/add-unit", label: "Unit", icon: <Ruler className="w-5 h-5 mr-3" /> },
+        { to: "/additional-settings/add-team", label: "Team", icon: <Users2 className="w-5 h-5 mr-3" /> },
+      ],
+    },
+    {
+      label: "User Roles",
+      icon: <Shield className="w-5 h-5 mr-3" />,
+      subItems: [
+        { to: "/user-roles/users", label: "Users", icon: <Users className="w-5 h-5 mr-3" /> },
+        { to: "/user-roles/roles", label: "Roles", icon: <ShieldCheck className="w-5 h-5 mr-3" /> },
+        { to: "/user-roles/permissions", label: "Permissions", icon: <Lock className="w-5 h-5 mr-3" /> },
       ],
     },
   ];
@@ -175,13 +236,16 @@ const Sidebar = ({ toggleSidebar }) => {
                         ? toggleJobExecution
                         : item.label === "Post Job Phase"
                         ? togglePostJobPhase
-                        : toggleSettings
+                        : item.label === "Additional Settings"
+                        ? toggleSettings
+                        : toggleUserRoles
                     }
                     className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
                       (item.label === "Pre-Job" && isPreJobOpen) ||
                       (item.label === "Job Execution" && isJobExecutionOpen) ||
                       (item.label === "Post Job Phase" && isPostJobPhaseOpen) ||
-                      (item.label === "Additional Settings" && isSettingsOpen)
+                      (item.label === "Additional Settings" && isSettingsOpen) ||
+                      (item.label === "User Roles" && isUserRolesOpen)
                         ? "bg-indigo-100 text-indigo-600"
                         : "text-gray-700 hover:bg-indigo-500 hover:text-white"
                     }`}
@@ -208,8 +272,14 @@ const Sidebar = ({ toggleSidebar }) => {
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )
-                    ) : (
+                    ) : item.label === "Additional Settings" ? (
                       isSettingsOpen ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )
+                    ) : (
+                      isUserRolesOpen ? (
                         <ChevronUp className="w-4 h-4" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
@@ -217,7 +287,11 @@ const Sidebar = ({ toggleSidebar }) => {
                     )}
                   </button>
                   <AnimatePresence>
-                    {(item.label === "Pre-Job" ? isPreJobOpen : item.label === "Job Execution" ? isJobExecutionOpen : item.label === "Post Job Phase" ? isPostJobPhaseOpen : isSettingsOpen) && (
+                    {(item.label === "Pre-Job" ? isPreJobOpen : 
+                      item.label === "Job Execution" ? isJobExecutionOpen : 
+                      item.label === "Post Job Phase" ? isPostJobPhaseOpen : 
+                      item.label === "Additional Settings" ? isSettingsOpen : 
+                      isUserRolesOpen) && (
                       <motion.ul
                         className="ml-4 mt-1 space-y-1"
                         initial={{ height: 0, opacity: 0 }}
