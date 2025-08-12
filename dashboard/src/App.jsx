@@ -3,7 +3,7 @@ import {
   RouterProvider,
   Navigate,
 } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./index.css";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -34,10 +34,69 @@ import CompletedWO from "./pages/PostJobPhase/CompletedWo";
 import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
+import apiClient from "../../../prime/dashboard/src/helpers/apiClient";
 
-const ProtectedRoute = ({ children, isAuthenticated }) => {
-  console.log("ProtectedRoute - isAuthenticated:", isAuthenticated);
-  return isAuthenticated ? children : <Navigate to="/login" />;
+const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasPermission, setHasPermission] = useState(false);
+
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+
+        if (user.is_superuser || user.role?.name === "Superadmin") {
+          setHasPermission(true);
+          setIsLoading(false);
+          return;
+        }
+
+        const roleId = user.role?.id;
+        if (!roleId) {
+          setHasPermission(false);
+          setIsLoading(false);
+          return;
+        }
+
+        const roleResponse = await apiClient.get(`/roles/${roleId}/`);
+        const perms = roleResponse.data.permissions || [];
+        const pagePerm = perms.find((p) => p.page === requiredPage);
+
+        if (pagePerm && pagePerm[`can_${requiredAction}`]) {
+          setHasPermission(true);
+        } else {
+          setHasPermission(false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch permissions:", error);
+        setHasPermission(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkPermissions();
+  }, [isAuthenticated, requiredPage, requiredAction]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!hasPermission) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 };
 
 function App() {
@@ -57,130 +116,204 @@ function App() {
     {
       path: "/",
       element: (
-        <ProtectedRoute isAuthenticated={isAuthenticated}>
-          <Layout
-            isAuthenticated={isAuthenticated}
-            setIsAuthenticated={setIsAuthenticated}
-          />
+        <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="dashboard">
+          <Layout isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
         </ProtectedRoute>
       ),
-      errorElement: (
-        <div>Something went wrong. Please try again or contact support.</div>
-      ),
+      errorElement: <div>Something went wrong. Please try again or contact support.</div>,
       children: [
-        // pages
-        {
-          index: true,
-          element: <Dashboard />,
-        },
+        { index: true, element: <Dashboard /> },
         {
           path: "/add-rfq",
-          element: <AddRFQ />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="add">
+              <AddRFQ />
+            </ProtectedRoute>
+          ),
         },
-        {
-          path: "/existing-client",
-          element: <ExistingClient />,
-        },
+        { path: "/existing-client", element: <ExistingClient /> },
         {
           path: "/edit-rfq/:id",
-          element: <EditRFQ />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="edit">
+              <EditRFQ />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/view-rfq",
-          element: <ViewRFQ />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="view">
+              <ViewRFQ />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/view-quotation",
-          element: <ViewQuotation />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="view">
+              <ViewQuotation />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/edit-quotation/:id",
-          element: <EditQuotation />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
+              <EditQuotation />
+            </ProtectedRoute>
+          ),
         },
-        {
-          path: "/pre-job/partial-order-selection",
-          element: <PartialOrderSelection />,
-        },
+        { path: "/pre-job/partial-order-selection", element: <PartialOrderSelection /> },
         {
           path: "/job-execution/initiate-work-order/list-all-purchase-orders",
-          element: <ListPurchaseOrders />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="purchase_orders" requiredAction="view">
+              <ListPurchaseOrders />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/initiate-work-order/add-wo-without-po",
-          element: <AddWOWithoutPO />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="work_orders" requiredAction="add">
+              <AddWOWithoutPO />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/processing-work-orders/list-all-processing-work-orders",
-          element: <ListProcessingWorkOrders />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processing_work_orders" requiredAction="view">
+              <ListProcessingWorkOrders />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/processing-work-orders/edit-work-order/:id",
-          element: <EditProcessingWorkOrders />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processing_work_orders" requiredAction="edit">
+              <EditProcessingWorkOrders />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/processing-work-orders/manager-approval",
-          element: <ManagerApproval />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="manager_approval" requiredAction="view">
+              <ManagerApproval />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/processing-work-orders/delivery",
-          element: <Delivery />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="view">
+              <Delivery />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/job-execution/processing-work-orders/close-work-orders",
-          element: <CloseWorkOrder />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="close_work_orders" requiredAction="view">
+              <CloseWorkOrder />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/post-job-phase/pending-invoices",
-          element: <PendingInvoices />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="pending_invoices" requiredAction="view">
+              <PendingInvoices />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/post-job-phase/completed-wo",
-          element: <CompletedWO />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="completed_work_orders" requiredAction="view">
+              <CompletedWO />
+            </ProtectedRoute>
+          ),
         },
-        // profile
         {
           path: "/profile",
-          element: <Profile />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="profile" requiredAction="view">
+              <Profile />
+            </ProtectedRoute>
+          ),
         },
-        // additional settings
         {
           path: "/additional-settings/add-series",
-          element: <Series />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="series" requiredAction="view">
+              <Series />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/additional-settings/add-item",
-          element: <Item />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="item" requiredAction="view">
+              <Item />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/additional-settings/add-unit",
-          element: <Unit />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="unit" requiredAction="view">
+              <Unit />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/additional-settings/add-team",
-          element: <Team />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="team" requiredAction="view">
+              <Team />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/additional-settings/add-rfq-channel",
-          element: <Channels />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq_channel" requiredAction="view">
+              <Channels />
+            </ProtectedRoute>
+          ),
         },
-        // user roles
         {
           path: "/user-roles/users",
-          element: <Users />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="users" requiredAction="view">
+              <Users />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/user-roles/roles",
-          element: <Roles />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="roles" requiredAction="view">
+              <Roles />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/user-roles/permissions",
-          element: <Permissions />,
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="permissions" requiredAction="view">
+              <Permissions />
+            </ProtectedRoute>
+          ),
         },
       ],
     },
   ]);
 
-  return <RouterProvider router={router} fallbackElement={<p>Loading...</p>} />;
+  return <RouterProvider router={router} />;
 }
 
 export default App;

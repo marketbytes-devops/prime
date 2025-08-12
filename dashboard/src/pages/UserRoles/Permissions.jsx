@@ -1,56 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings } from "lucide-react";
 import Button from "../../components/Button";
 import Modal from "../../components/Modal";
+import apiClient from "../../helpers/apiClient";
 
 const Permissions = () => {
-  const [roles] = useState([
-    { id: 1, name: "superadmin" },
-    { id: 2, name: "sales" },
-    { id: 3, name: "technician" },
-    { id: 4, name: "manager" },
-  ]);
-
+  const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
-  const [permissions, setPermissions] = useState({
-    Dashboard: { view: true, add: true, edit: true, delete: true },
-    "Pre-Job": { view: true, add: true, edit: true, delete: true },
-    "Job Execution": { view: true, add: true, edit: true, delete: true },
-    "Post Job Phase": { view: true, add: true, edit: true, delete: true },
-    Profile: { view: true, add: false, edit: true, delete: false },
-    "Additional Settings": { view: true, add: true, edit: true, delete: true },
-    "User Roles": { view: true, add: true, edit: true, delete: true },
-  });
-
-  const [error] = useState("");
+  const [permissions, setPermissions] = useState({});
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const openPermissionsModal = (role) => {
+  useEffect(() => {
+    fetchRoles();
+  }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const response = await apiClient.get("roles/");
+      setRoles(response.data);
+    } catch (error) {
+      setError("Failed to fetch roles");
+    }
+  };
+
+  const openPermissionsModal = async (role) => {
     setSelectedRole(role);
-    if (role.name !== "superadmin") {
-      setPermissions({
-        Dashboard: { view: true, add: false, edit: false, delete: false },
-        "Pre-Job": { view: role.name === "sales", add: role.name === "sales", edit: role.name === "sales", delete: false },
-        "Job Execution": { view: role.name === "technician" || role.name === "manager", add: role.name === "technician", edit: role.name === "technician" || role.name === "manager", delete: false },
-        "Post Job Phase": { view: role.name === "manager", add: false, edit: role.name === "manager", delete: false },
-        Profile: { view: true, add: false, edit: true, delete: false },
-        "Additional Settings": { view: false, add: false, edit: false, delete: false },
-        "User Roles": { view: false, add: false, edit: false, delete: false },
+    try {
+      const response = await apiClient.get(`roles/${role.id}/`);
+      const rolePermissions = response.data.permissions || [];
+      const permissionsMap = {};
+      rolePermissions.forEach((perm) => {
+        permissionsMap[perm.page] = {
+          view: perm.can_view,
+          add: perm.can_add,
+          edit: perm.can_edit,
+          delete: perm.can_delete,
+        };
       });
+      setPermissions(permissionsMap);
+    } catch (error) {
+      setError("Failed to fetch permissions");
     }
   };
 
   const handlePermissionChange = (page, action) => {
     setPermissions((prev) => ({
       ...prev,
-      [page]: { ...prev[page], [action]: !prev[page][action] },
+      [page]: {
+        ...prev[page],
+        [action]: !prev[page]?.[action],
+      },
     }));
   };
 
-  const handleSavePermissions = () => {
-    setMessage(`Permissions updated for ${selectedRole.name}`);
-    setSelectedRole(null);
+  const handleSavePermissions = async () => {
+    try {
+      const permissionsToSave = Object.keys(permissions).map((page) => ({
+        page,
+        can_view: permissions[page].view,
+        can_add: permissions[page].add,
+        can_edit: permissions[page].edit,
+        can_delete: permissions[page].delete,
+      }));
+
+      await apiClient.put(`roles/${selectedRole.id}/`, {
+        ...selectedRole,
+        permissions: permissionsToSave,
+      });
+
+      setMessage(`Permissions updated for ${selectedRole.name}`);
+      setSelectedRole(null);
+    } catch (error) {
+      setError("Failed to update permissions");
+    }
   };
 
   return (
@@ -60,9 +84,8 @@ const Permissions = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <h1 className="text-2xl font-bold mb-6">Roles Management</h1>
-      <p className="text-gray-600 mb-8">View existing roles and manage their permissions.</p>
-
+      <h1 className="text-2xl font-bold mb-6">Permissions Management</h1>
+      <p className="text-gray-600 mb-8">View and manage permissions for roles.</p>
       {error && (
         <motion.p
           className="text-red-600 bg-red-50 p-4 rounded-xl text-center font-medium mb-6"
@@ -83,7 +106,6 @@ const Permissions = () => {
           {message}
         </motion.p>
       )}
-
       <motion.div
         className="bg-white rounded-2xl shadow-xl p-6"
         initial={{ opacity: 0, x: -20 }}
@@ -117,7 +139,6 @@ const Permissions = () => {
           </table>
         </div>
       </motion.div>
-
       <AnimatePresence>
         {selectedRole && (
           <Modal
@@ -143,7 +164,7 @@ const Permissions = () => {
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
-                          checked={permissions[page].view}
+                          checked={permissions[page]?.view || false}
                           onChange={() => handlePermissionChange(page, "view")}
                           className="h-5 w-5"
                         />
@@ -151,7 +172,7 @@ const Permissions = () => {
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
-                          checked={permissions[page].add}
+                          checked={permissions[page]?.add || false}
                           onChange={() => handlePermissionChange(page, "add")}
                           className="h-5 w-5"
                         />
@@ -159,7 +180,7 @@ const Permissions = () => {
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
-                          checked={permissions[page].edit}
+                          checked={permissions[page]?.edit || false}
                           onChange={() => handlePermissionChange(page, "edit")}
                           className="h-5 w-5"
                         />
@@ -167,7 +188,7 @@ const Permissions = () => {
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
-                          checked={permissions[page].delete}
+                          checked={permissions[page]?.delete || false}
                           onChange={() => handlePermissionChange(page, "delete")}
                           className="h-5 w-5"
                         />

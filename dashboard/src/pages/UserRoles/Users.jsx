@@ -8,14 +8,12 @@ import Modal from "../../components/Modal";
 
 const Users = () => {
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({
     email: "",
-    first_name: "",
-    last_name: "",
-    role: "sales",
-    password: "",
+    name: "",
+    role_id: "",
   });
-
   const [editUser, setEditUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
@@ -23,6 +21,7 @@ const Users = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   const fetchUsers = async () => {
@@ -34,20 +33,30 @@ const Users = () => {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const response = await apiClient.get("roles/");
+      setRoles(response.data);
+    } catch (error) {
+      setError("Failed to fetch roles");
+    }
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
     try {
-      const response = await apiClient.post("users/", formData);
+      const response = await apiClient.post("users/", {
+        ...formData,
+        role_id: parseInt(formData.role_id),
+      });
       setUsers([...users, response.data]);
       setMessage("User created successfully");
       setFormData({
         email: "",
-        first_name: "",
-        last_name: "",
-        role: "sales",
-        password: "",
+        name: "",
+        role_id: "",
       });
     } catch (error) {
       setError(error.response?.data?.detail || "Failed to create user");
@@ -59,10 +68,11 @@ const Users = () => {
     setError("");
     setMessage("");
     try {
-      const response = await apiClient.put(`users/${editUser.id}/`, editUser);
-      setUsers(
-        users.map((user) => (user.id === editUser.id ? response.data : user))
-      );
+      const response = await apiClient.put(`users/${editUser.id}/`, {
+        ...editUser,
+        role_id: parseInt(editUser.role_id),
+      });
+      setUsers(users.map((user) => (user.id === editUser.id ? response.data : user)));
       setMessage("User updated successfully");
       setEditUser(null);
     } catch (error) {
@@ -86,17 +96,13 @@ const Users = () => {
     setEditUser({
       id: user.id,
       email: user.email,
-      first_name: user.first_name || "",
-      last_name: user.last_name || "",
-      role: user.role,
-      password: "",
+      name: user.name,
+      role_id: user.role?.id || "",
     });
   };
 
   const filteredUsers = users.filter(
-    (user) =>
-      user.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    (user) => user.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -106,7 +112,7 @@ const Users = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <h1 className="text-2xl font-bold mb-6">User Roles Management</h1>
+      <h1 className="text-2xl font-bold mb-6">User Management</h1>
       <p className="text-gray-600 mb-8">Create and manage users and their roles.</p>
       {error && (
         <motion.p
@@ -146,38 +152,31 @@ const Users = () => {
             />
             <InputField
               type="text"
-              label="First Name"
-              value={formData.first_name}
-              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-            />
-            <InputField
-              type="text"
-              label="Last Name"
-              value={formData.last_name}
-              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+              label="Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">User Role</label>
               <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                value={formData.role_id}
+                onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
                 className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
               >
-                {["sales", "technician", "manager", "superadmin"].map((role) => (
-                  <option key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                <option value="">Select Role</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
                   </option>
                 ))}
               </select>
             </div>
-            <InputField
-              type="password"
-              label="Password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-            />
-            <Button type="submit" className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300">
+            <Button
+              type="submit"
+              className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300"
+            >
               Create User
             </Button>
           </form>
@@ -212,8 +211,7 @@ const Users = () => {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="px-4 py-2 text-left text-sm font-semibold">Email</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold">First Name</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold">Last Name</th>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">Name</th>
                   <th className="px-4 py-2 text-left text-sm font-semibold">Role</th>
                   <th className="px-4 py-2 text-left text-sm font-semibold">Actions</th>
                 </tr>
@@ -222,9 +220,8 @@ const Users = () => {
                 {filteredUsers.map((user) => (
                   <tr key={user.id} className="border-b">
                     <td className="px-4 py-2">{user.email}</td>
-                    <td className="px-4 py-2">{user.first_name || "-"}</td>
-                    <td className="px-4 py-2">{user.last_name || "-"}</td>
-                    <td className="px-4 py-2">{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</td>
+                    <td className="px-4 py-2">{user.name || "-"}</td>
+                    <td className="px-4 py-2">{user.role?.name || "-"}</td>
                     <td className="px-4 py-2 flex space-x-2">
                       <Button
                         onClick={() => openEditModal(user)}
@@ -248,11 +245,7 @@ const Users = () => {
       </div>
       <AnimatePresence>
         {editUser && (
-          <Modal
-            isOpen={!!editUser}
-            onClose={() => setEditUser(null)}
-            title="Edit User"
-          >
+          <Modal isOpen={!!editUser} onClose={() => setEditUser(null)} title="Edit User">
             <form onSubmit={handleEditUser} className="space-y-4">
               <InputField
                 type="email"
@@ -263,37 +256,27 @@ const Users = () => {
               />
               <InputField
                 type="text"
-                label="First Name"
-                value={editUser.first_name}
-                onChange={(e) => setEditUser({ ...editUser, first_name: e.target.value })}
-              />
-              <InputField
-                type="text"
-                label="Last Name"
-                value={editUser.last_name}
-                onChange={(e) => setEditUser({ ...editUser, last_name: e.target.value })}
+                label="Name"
+                value={editUser.name}
+                onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
+                required
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">User Role</label>
                 <select
-                  value={editUser.role}
-                  onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}
+                  value={editUser.role_id}
+                  onChange={(e) => setEditUser({ ...editUser, role_id: e.target.value })}
                   className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
                 >
-                  {["sales", "technician", "manager", "superadmin"].map((role) => (
-                    <option key={role} value={role}>
-                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                  <option value="">Select Role</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
                     </option>
                   ))}
                 </select>
               </div>
-              <InputField
-                type="password"
-                label="Password (optional)"
-                value={editUser.password}
-                onChange={(e) => setEditUser({ ...editUser, password: e.target.value })}
-                placeholder="Leave blank to keep unchanged"
-              />
               <div className="flex justify-end space-x-4">
                 <Button
                   type="button"

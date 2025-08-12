@@ -121,7 +121,6 @@ const Roles = () => {
             </Button>
           </form>
         </motion.div>
-
         <motion.div
           className="bg-white rounded-2xl shadow-xl p-6"
           initial={{ opacity: 0, x: 20 }}
