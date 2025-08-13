@@ -12,6 +12,39 @@ const Channels = () => {
     currentPage: 1,
     itemsPerPage: 20,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   useEffect(() => {
     apiClient.get('channels/')
@@ -21,6 +54,10 @@ const Channels = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!hasPermission('rfq_channel', 'add')) {
+      setState(prev => ({ ...prev, error: 'You do not have permission to add a channel.' }));
+      return;
+    }
     if (!state.channel_name.trim()) {
       setState(prev => ({ ...prev, error: 'Channel name is required.' }));
       return;
@@ -37,6 +74,10 @@ const Channels = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!hasPermission('rfq_channel', 'delete')) {
+      setState(prev => ({ ...prev, error: 'You do not have permission to delete a channel.' }));
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this channel?')) {
       try {
         await apiClient.delete(`channels/${id}/`);
@@ -88,6 +129,11 @@ const Channels = () => {
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Channel Management</h1>
+      {state.error && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+          {state.error.message || 'An error occurred.'}
+        </div>
+      )}
       <form onSubmit={handleCreate} className="mb-6">
         <div className="mb-4">
           <label htmlFor="channelName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -104,7 +150,12 @@ const Channels = () => {
         </div>
         <button
           type="submit"
-          className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+          disabled={!hasPermission('rfq_channel', 'add')}
+          className={`px-4 py-2 rounded ${
+            hasPermission('rfq_channel', 'add')
+              ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           Add Channel
         </button>
@@ -149,7 +200,12 @@ const Channels = () => {
               </div>
               <button
                 onClick={() => handleDelete(channel.id)}
-                className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                disabled={!hasPermission('rfq_channel', 'delete')}
+                className={`px-3 py-1 rounded ${
+                  hasPermission('rfq_channel', 'delete')
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
                 Delete
               </button>

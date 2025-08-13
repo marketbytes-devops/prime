@@ -27,6 +27,39 @@ const ViewQuotation = () => {
     poUploads: {},
     fullOrderPo: { clientPoNumber: '', poFile: null },
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error("Unable to fetch user profile:", error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchQuotations = async () => {
     try {
@@ -578,10 +611,10 @@ const ViewQuotation = () => {
                         </Button>
                         <Button
                           onClick={() => navigate(`/edit-quotation/${quotation.id}`)}
-                          disabled={isPoComplete(quotation)}
+                          disabled={isPoComplete(quotation) || !hasPermission('quotation', 'edit')}
                           className={`px-3 py-1 rounded-md text-sm ${
-                            isPoComplete(quotation)
-                              ? 'bg-gray-300 text-gray-500'
+                            isPoComplete(quotation) || !hasPermission('quotation', 'edit')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
@@ -601,7 +634,7 @@ const ViewQuotation = () => {
                             disabled={isPoComplete(quotation)}
                             className={`px-3 py-1 rounded-md text-sm ${
                               isPoComplete(quotation)
-                                ? 'bg-gray-300 text-gray-500'
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-yellow-600 text-white hover:bg-yellow-700'
                             }`}
                           >
@@ -614,7 +647,7 @@ const ViewQuotation = () => {
                             className={`px-3 py-1 rounded-md text-sm ${
                               quotation.quotation_status === 'Approved' && !isPoComplete(quotation)
                                 ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                : 'bg-gray-300 text-gray-500'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                           >
                             Convert to PO
@@ -622,7 +655,12 @@ const ViewQuotation = () => {
                         )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          disabled={!hasPermission('quotation', 'delete')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            !hasPermission('quotation', 'delete')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
                         >
                           Delete
                         </Button>

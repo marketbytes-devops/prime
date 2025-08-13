@@ -23,6 +23,39 @@ const CloseWorkOrder = () => {
     selectedViewWO: null,
     uploadDocumentType: null,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchWorkOrders = async () => {
     try {
@@ -224,7 +257,12 @@ const CloseWorkOrder = () => {
                         </Button>
                         <Button
                           onClick={() => handleOpenModal(wo)}
-                          className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                          disabled={!hasPermission('close_work_order', 'edit')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            hasPermission('close_work_order', 'edit')
+                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Submit for Invoicing
                         </Button>
@@ -287,7 +325,7 @@ const CloseWorkOrder = () => {
           <h3 className="text-lg font-medium text-black">Submit for Invoicing</h3>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Order (Optional)</label>
-           <select
+            <select
               onChange={(e) => e.target.value === "upload" && handleOpenUploadModal("purchase_order")}
               className="p-2 border rounded focus:outline-indigo-500 w-full"
             >
@@ -296,7 +334,7 @@ const CloseWorkOrder = () => {
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Work Order (Optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Work Order (Optional)</label>
             <select
               onChange={(e) => e.target.value === "upload" && handleOpenUploadModal("work_order")}
               className="p-2 border rounded focus:outline-indigo-500 w-full"
@@ -318,11 +356,11 @@ const CloseWorkOrder = () => {
           <div className="flex justify-end gap-4 mt-4">
             <Button
               onClick={handleCloseWO}
-              disabled={!state.signedDeliveryNoteFile}
+              disabled={!state.signedDeliveryNoteFile || !hasPermission('close_work_order', 'edit')}
               className={`px-3 py-1 rounded-md text-sm ${
-                state.signedDeliveryNoteFile
+                state.signedDeliveryNoteFile && hasPermission('close_work_order', 'edit')
                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                  : "bg-gray-300 text-gray-500"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
               Submit

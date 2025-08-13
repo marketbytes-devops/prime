@@ -11,10 +11,64 @@ const Permissions = () => {
   const [permissions, setPermissions] = useState({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissionsData, setPermissionsData] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  const pageNameMap = {
+    Dashboard: { apiName: "Dashboard", displayName: "Dashboard" },
+    Profile: { apiName: "Profile", displayName: "Profile" },
+    rfq: { apiName: "rfq", displayName: "RFQ" },
+    quotation: { apiName: "quotation", displayName: "Quotation" },
+    purchase_orders: { apiName: "purchase_orders", displayName: "Purchase Orders" },
+    work_orders: { apiName: "work_orders", displayName: "Work Orders" },
+    processing_work_orders: { apiName: "processing_work_orders", displayName: "Processing Work Orders" },
+    manager_approval: { apiName: "manager_approval", displayName: "Manager Approval" },
+    delivery: { apiName: "delivery", displayName: "Delivery" },
+    close_work_orders: { apiName: "close_work_orders", displayName: "Close Work Orders" },
+    pending_invoices: { apiName: "pending_invoices", displayName: "Pending Invoices" },
+    completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
+    series: { apiName: "series", displayName: "Series" },
+    rfq_channel: { apiName: "rfq_channel", displayName: "RFQ Channel" },
+    item: { apiName: "item", displayName: "Item" },
+    unit: { apiName: "unit", displayName: "Unit" },
+    team: { apiName: "team", displayName: "Team" },
+    users: { apiName: "users", displayName: "Users" },
+    roles: { apiName: "roles", displayName: "Roles" },
+    permissions: { apiName: "permissions", displayName: "Permissions" },
+  };
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissionsData(res.data.permissions || []);
+        } else {
+          setPermissionsData([]);
+        }
+      } catch (error) {
+        console.error("Unable to fetch user profile:", error);
+        setPermissionsData([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
     fetchRoles();
   }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissionsData.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchRoles = async () => {
     try {
@@ -26,39 +80,31 @@ const Permissions = () => {
   };
 
   const openPermissionsModal = async (role) => {
+    if (!hasPermission("permissions", "edit")) {
+      setError("You do not have permission to edit permissions.");
+      return;
+    }
     setSelectedRole(role);
     try {
       const response = await apiClient.get(`roles/${role.id}/`);
       const rolePermissions = response.data.permissions || [];
-      const permissionsMap = {
-        Dashboard: { view: false, add: false, edit: false, delete: false },
-        Profile: { view: false, add: false, edit: false, delete: false },
-        rfq: { view: false, add: false, edit: false, delete: false },
-        quotation: { view: false, add: false, edit: false, delete: false },
-        purchase_orders: { view: false, add: false, edit: false, delete: false },
-        work_orders: { view: false, add: false, edit: false, delete: false },
-        processing_work_orders: { view: false, add: false, edit: false, delete: false },
-        manager_approval: { view: false, add: false, edit: false, delete: false },
-        delivery: { view: false, add: false, edit: false, delete: false },
-        close_work_orders: { view: false, add: false, edit: false, delete: false },
-        pending_invoices: { view: false, add: false, edit: false, delete: false },
-        completed_work_orders: { view: false, add: false, edit: false, delete: false },
-        series: { view: false, add: false, edit: false, delete: false },
-        rfq_channel: { view: false, add: false, edit: false, delete: false },
-        item: { view: false, add: false, edit: false, delete: false },
-        unit: { view: false, add: false, edit: false, delete: false },
-        team: { view: false, add: false, edit: false, delete: false },
-        users: { view: false, add: false, edit: false, delete: false },
-        roles: { view: false, add: false, edit: false, delete: false },
-        permissions: { view: false, add: false, edit: false, delete: false },
-      };
+      const permissionsMap = Object.keys(pageNameMap).reduce((acc, key) => {
+        acc[key] = { id: null, view: false, add: false, edit: false, delete: false };
+        return acc;
+      }, {});
       rolePermissions.forEach((perm) => {
-        permissionsMap[perm.page] = {
-          view: perm.can_view,
-          add: perm.can_add,
-          edit: perm.can_edit,
-          delete: perm.can_delete,
-        };
+        const pageKey = Object.keys(pageNameMap).find(
+          (key) => pageNameMap[key].apiName === perm.page
+        );
+        if (pageKey) {
+          permissionsMap[pageKey] = {
+            id: perm.id,
+            view: perm.can_view,
+            add: perm.can_add,
+            edit: perm.can_edit,
+            delete: perm.can_delete,
+          };
+        }
       });
       setPermissions(permissionsMap);
     } catch (error) {
@@ -71,32 +117,57 @@ const Permissions = () => {
       ...prev,
       [page]: {
         ...prev[page],
-        [action]: !prev[page]?.[action],
+        [action]: !prev[page][action],
       },
     }));
   };
 
   const handleSavePermissions = async () => {
+    if (!hasPermission("permissions", "edit")) {
+      setError("You do not have permission to edit permissions.");
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    setMessage("");
     try {
-      const permissionsToSave = Object.keys(permissions).map((page) => ({
-        page,
-        can_view: permissions[page].view,
-        can_add: permissions[page].add,
-        can_edit: permissions[page].edit,
-        can_delete: permissions[page].delete,
-      }));
-
-      await apiClient.put(`roles/${selectedRole.id}/`, {
-        ...selectedRole,
-        permissions: permissionsToSave,
+      const updatePromises = Object.keys(permissions).map(async (page) => {
+        const perm = permissions[page];
+        const apiPageName = pageNameMap[page].apiName;
+        if (perm.id) {
+          return apiClient.put(`permissions/${perm.id}/`, {
+            role: selectedRole.id,
+            page: apiPageName,
+            can_view: perm.view,
+            can_add: perm.add,
+            can_edit: perm.edit,
+            can_delete: perm.delete,
+          });
+        } else {
+          return apiClient.post(`permissions/`, {
+            role: selectedRole.id,
+            page: apiPageName,
+            can_view: perm.view,
+            can_add: perm.add,
+            can_edit: perm.edit,
+            can_delete: perm.delete,
+          });
+        }
       });
-
+      await Promise.all(updatePromises);
       setMessage(`Permissions updated for ${selectedRole.name}`);
       setSelectedRole(null);
     } catch (error) {
+      console.error("Save Permissions Error:", error);
       setError("Failed to update permissions. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  if (isLoadingPermissions) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
 
   return (
     <motion.div
@@ -149,9 +220,14 @@ const Permissions = () => {
                   <td className="px-4 py-2">
                     <Button
                       onClick={() => openPermissionsModal(role)}
-                      className="flex items-center justify-start w-fit text-indigo-600 hover:text-indigo-800"
+                      disabled={!hasPermission("permissions", "edit")}
+                      className={`flex items-center justify-start ${
+                        hasPermission("permissions", "edit")
+                          ? "text-indigo-600 hover:text-indigo-800"
+                          : "text-gray-400 cursor-not-allowed"
+                      }`}
                     >
-                      <Settings className="w-5 h-5 mr-1" /> Permissions
+                      <Settings className="w-5 h-5 mr-2" /> Permissions
                     </Button>
                   </td>
                 </tr>
@@ -181,13 +257,14 @@ const Permissions = () => {
                 <tbody>
                   {Object.keys(permissions).map((page) => (
                     <tr key={page} className="border-b">
-                      <td className="px-4 py-2">{page}</td>
+                      <td className="px-4 py-2">{pageNameMap[page].displayName}</td>
                       <td className="px-4 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={permissions[page]?.view || false}
                           onChange={() => handlePermissionChange(page, "view")}
                           className="h-5 w-5"
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -196,6 +273,7 @@ const Permissions = () => {
                           checked={permissions[page]?.add || false}
                           onChange={() => handlePermissionChange(page, "add")}
                           className="h-5 w-5"
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -204,6 +282,7 @@ const Permissions = () => {
                           checked={permissions[page]?.edit || false}
                           onChange={() => handlePermissionChange(page, "edit")}
                           className="h-5 w-5"
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -212,6 +291,7 @@ const Permissions = () => {
                           checked={permissions[page]?.delete || false}
                           onChange={() => handlePermissionChange(page, "delete")}
                           className="h-5 w-5"
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                     </tr>
@@ -228,9 +308,14 @@ const Permissions = () => {
               </Button>
               <Button
                 onClick={handleSavePermissions}
-                className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
+                disabled={isSaving || !hasPermission("permissions", "edit")}
+                className={`px-4 py-2 rounded-lg ${
+                  isSaving || !hasPermission("permissions", "edit")
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-indigo-500 text-white hover:bg-indigo-600"
+                }`}
               >
-                Save
+                {isSaving ? "Saving..." : "Save"}
               </Button>
             </div>
           </Modal>

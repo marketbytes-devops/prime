@@ -20,6 +20,39 @@ const ListProcessingWorkOrders = () => {
     isViewModalOpen: false,
     selectedWO: null,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error("Unable to fetch user profile:", error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchWorkOrders = async () => {
     try {
@@ -203,7 +236,12 @@ const ListProcessingWorkOrders = () => {
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => handleEditWO(wo)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          disabled={!hasPermission('processing_work_orders', 'edit')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            hasPermission('processing_work_orders', 'edit')
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Edit WO
                         </Button>
@@ -215,7 +253,12 @@ const ListProcessingWorkOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleDeleteWO(wo.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          disabled={!hasPermission('processing_work_orders', 'delete')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            hasPermission('processing_work_orders', 'delete')
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Delete
                         </Button>
@@ -225,7 +268,7 @@ const ListProcessingWorkOrders = () => {
                           className={`px-3 py-1 rounded-md text-sm ${
                             isEligibleForApproval(wo)
                               ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                              : "bg-gray-300 text-gray-500"
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
                           }`}
                         >
                           Move to Manager Approval

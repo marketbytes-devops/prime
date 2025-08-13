@@ -27,6 +27,39 @@ const PendingInvoices = () => {
     dueInDays: '',
     receivedDate: '',
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchData = async () => {
     try {
@@ -99,7 +132,6 @@ const PendingInvoices = () => {
         receivedDate: '',
       }));
     } else {
-      // For pending, no additional input needed
       confirmStatusUpdate(workOrderId, newStatus, null, null);
     }
   };
@@ -116,7 +148,6 @@ const PendingInvoices = () => {
       console.log('Sending POST payload:', payload);
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
-      // Close modal and reset state on successful submission
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
@@ -268,7 +299,12 @@ const PendingInvoices = () => {
                       <select
                         value={workOrder.invoice_status || 'pending'}
                         onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
-                        className="w-full p-2 border rounded focus:outline-indigo-500"
+                        disabled={!hasPermission('pending_invoices', 'edit')}
+                        className={`w-full p-2 border rounded focus:outline-indigo-500 ${
+                          hasPermission('pending_invoices', 'edit')
+                            ? ''
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
                         <option value="pending">Pending</option>
                         <option value="Raised">Raised</option>
@@ -513,7 +549,12 @@ const PendingInvoices = () => {
             </Button>
             <Button
               onClick={handleStatusModalSubmit}
-              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              disabled={!hasPermission('pending_invoices', 'edit')}
+              className={`px-3 py-1 rounded-md ${
+                hasPermission('pending_invoices', 'edit')
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               Submit
             </Button>

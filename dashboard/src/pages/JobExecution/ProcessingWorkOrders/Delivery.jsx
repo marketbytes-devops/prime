@@ -22,6 +22,39 @@ const Delivery = () => {
     isViewModalOpen: false,
     selectedWO: null,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchData = async () => {
     try {
@@ -224,7 +257,12 @@ const Delivery = () => {
                       </Button>
                       <Button
                         onClick={() => handleOpenModal(dn)}
-                        className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        disabled={!hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'}
+                        className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                          hasPermission('delivery', 'edit') && dn.delivery_status !== 'Delivered'
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
                         Upload Signed DN
                       </Button>
@@ -282,8 +320,12 @@ const Delivery = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleUploadSignedNote}
-              disabled={!state.signedDeliveryNote}
-              className={`whitespace-nowrap px-4 py-2 rounded-md ${state.signedDeliveryNote ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+              disabled={!state.signedDeliveryNote || !hasPermission('delivery', 'edit')}
+              className={`whitespace-nowrap px-4 py-2 rounded-md ${
+                state.signedDeliveryNote && hasPermission('delivery', 'edit')
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               Upload
             </Button>

@@ -40,6 +40,39 @@ const ListPurchaseOrders = () => {
     splitOrderAssignedTo: "",
     isSubmitting: false,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error("Unable to fetch user profile:", error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchData = async () => {
     try {
@@ -355,7 +388,7 @@ const ListPurchaseOrders = () => {
             item.assigned_to !== "" &&
             state.technicians.some((t) => t.id === parseInt(item.assigned_to))
         );
-        if (!allHaveAssignedTo) {
+        if (!ანHaveAssignedTo) {
           toast.error("All items must be assigned to a valid technician.");
           setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
@@ -810,7 +843,12 @@ const ListPurchaseOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleDeletePO(po.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          disabled={!hasPermission('purchase_orders', 'delete')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            !hasPermission('purchase_orders', 'delete')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
                         >
                           Delete
                         </Button>

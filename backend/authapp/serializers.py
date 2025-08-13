@@ -6,21 +6,17 @@ from django.core.mail import send_mail
 import random
 import string
 
-
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
-
 class RequestOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
-
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6, min_length=6)
     new_password = serializers.CharField(write_only=True)
-
 
 class ChangePasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True)
@@ -31,12 +27,12 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError("Passwords do not match")
         return data
 
-
 class PermissionSerializer(serializers.ModelSerializer):
+    role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
+
     class Meta:
         model = Permission
-        fields = ['id', 'page', 'can_view', 'can_add', 'can_edit', 'can_delete']
-
+        fields = ['id', 'role', 'page', 'can_view', 'can_add', 'can_edit', 'can_delete']
 
 class RoleSerializer(serializers.ModelSerializer):
     permissions = PermissionSerializer(many=True, read_only=True)
@@ -45,22 +41,11 @@ class RoleSerializer(serializers.ModelSerializer):
         model = Role
         fields = ['id', 'name', 'description', 'permissions']
 
-
 class RoleCreateSerializer(serializers.ModelSerializer):
-    permissions = PermissionSerializer(many=True, required=False)
-
     class Meta:
         model = Role
-        fields = ['id', 'name', 'description', 'permissions']
+        fields = ['id', 'name', 'description']
         read_only_fields = ['id']
-
-    def create(self, validated_data):
-        permissions_data = validated_data.pop('permissions', [])
-        role = Role.objects.create(**validated_data)
-        for perm_data in permissions_data:
-            Permission.objects.create(role=role, **perm_data)
-        return role
-
 
 class ProfileSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(
@@ -82,7 +67,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['email', 'name', 'username', 'address', 'phone_number', 'image', 'role', 'role_id']
         read_only_fields = ['email']
 
-
 class UserSerializer(serializers.ModelSerializer):
     role = RoleSerializer(read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(
@@ -93,7 +77,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['id', 'email', 'username', 'name', 'role', 'role_id']
         read_only_fields = ['id']
-
 
 class UserCreateSerializer(serializers.ModelSerializer):
     role_id = serializers.PrimaryKeyRelatedField(
@@ -134,7 +117,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
         )
 
         return user
-
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod

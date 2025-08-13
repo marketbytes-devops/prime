@@ -23,6 +23,39 @@ const ManagerApproval = () => {
     deliveryNoteType: 'single',
     isWorkOrderComplete: true,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchData = async () => {
     try {
@@ -147,7 +180,6 @@ const ManagerApproval = () => {
     }
   };
 
-  // Calculate total quantity of items
   const getTotalItemQuantity = (items) => {
     return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
   };
@@ -214,13 +246,23 @@ const ManagerApproval = () => {
                         </Button>
                         <Button
                           onClick={() => setState((prev) => ({ ...prev, isApproveModalOpen: true, selectedWO: wo }))}
-                          className="whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                          disabled={!hasPermission('manager_approval', 'edit')}
+                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                            hasPermission('manager_approval', 'edit')
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Approve
                         </Button>
                         <Button
                           onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: true, selectedWO: wo }))}
-                          className="whitespace-nowrap px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                          disabled={!hasPermission('manager_approval', 'edit')}
+                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                            hasPermission('manager_approval', 'edit')
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Decline
                         </Button>
@@ -370,8 +412,12 @@ const ManagerApproval = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleApprove}
-              disabled={!state.isWorkOrderComplete}
-              className={`px-4 py-2 rounded-md ${state.isWorkOrderComplete ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+              disabled={!state.isWorkOrderComplete || !hasPermission('manager_approval', 'edit')}
+              className={`px-4 py-2 rounded-md ${
+                state.isWorkOrderComplete && hasPermission('manager_approval', 'edit')
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               Submit
             </Button>
@@ -402,8 +448,12 @@ const ManagerApproval = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleDecline}
-              disabled={!state.declineReason}
-              className={`px-4 py-2 rounded-md ${state.declineReason ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500'}`}
+              disabled={!state.declineReason || !hasPermission('manager_approval', 'edit')}
+              className={`px-4 py-2 rounded-md ${
+                state.declineReason && hasPermission('manager_approval', 'edit')
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               Submit
             </Button>

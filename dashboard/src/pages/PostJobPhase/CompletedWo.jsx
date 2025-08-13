@@ -24,6 +24,39 @@ const CompletedWO = () => {
     selectedPO: null,
     selectedDN: null,
   });
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get('/profile/');
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error('Unable to fetch user profile:', error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
 
   const fetchData = async () => {
     try {
@@ -206,7 +239,7 @@ const CompletedWO = () => {
                 currentWOs.map((wo, index) => (
                   <tr key={wo.id} className="border hover:bg-gray-50">
                     <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">08/08/2025</td>
+                    <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
                     <td className="border p-2">{wo.wo_number || 'N/A'}</td>
                     <td className="border p-2">{getAssignedTechnicians(wo.items || [])}</td>
                     <td className="border p-2">
@@ -235,7 +268,12 @@ const CompletedWO = () => {
                     <td className="border p-2">
                       <Button
                         onClick={() => handleDeleteWorkOrder(wo.id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                        disabled={!hasPermission('completed_work_orders', 'delete')}
+                        className={`px-3 py-1 rounded-md text-sm ${
+                          hasPermission('completed_work_orders', 'delete')
+                            ? 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
                         Delete
                       </Button>

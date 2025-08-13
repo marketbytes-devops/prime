@@ -11,17 +11,52 @@ const Roles = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await apiClient.get("/profile/");
+        const user = response.data;
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        const roleId = user.role?.id;
+        if (roleId) {
+          const res = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(res.data.permissions || []);
+        } else {
+          setPermissions([]);
+        }
+      } catch (error) {
+        console.error("Unable to fetch user profile:", error);
+        setPermissions([]);
+        setIsSuperadmin(false);
+      } finally {
+        setIsLoadingPermissions(false);
+      }
+    };
+    fetchProfile();
     fetchRoles();
   }, []);
 
+  const hasPermission = (page, action) => {
+    if (isSuperadmin) return true;
+    const perm = permissions.find((p) => p.page === page);
+    return perm && perm[`can_${action}`];
+  };
+
   const fetchRoles = async () => {
+    setIsLoading(true);
     try {
       const response = await apiClient.get("roles/");
       setRoles(response.data);
     } catch (error) {
       setError("Failed to fetch roles. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -29,10 +64,15 @@ const Roles = () => {
     e.preventDefault();
     setError("");
     setMessage("");
+    if (!hasPermission("roles", "add")) {
+      setError("You do not have permission to create a role.");
+      return;
+    }
     if (!formData.name) {
       setError("Role name is required");
       return;
     }
+    setIsCreating(true);
     try {
       const response = await apiClient.post("roles/", formData);
       setRoles([...roles, response.data]);
@@ -40,10 +80,16 @@ const Roles = () => {
       setFormData({ name: "", description: "" });
     } catch (error) {
       setError(error.response?.data?.detail || "Failed to create role. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleDeleteRole = async (id) => {
+    if (!hasPermission("roles", "delete")) {
+      setError("You do not have permission to delete a role.");
+      return;
+    }
     if (window.confirm("Are you sure you want to delete this role?")) {
       try {
         await apiClient.delete(`roles/${id}/`);
@@ -58,6 +104,10 @@ const Roles = () => {
   const filteredRoles = roles.filter((role) =>
     role.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (isLoading || isLoadingPermissions) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
 
   return (
     <motion.div
@@ -115,9 +165,14 @@ const Roles = () => {
             </div>
             <Button
               type="submit"
-              className="w-full p-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition duration-300"
+              disabled={isCreating || !hasPermission("roles", "add")}
+              className={`w-full p-3 rounded-lg ${
+                isCreating || !hasPermission("roles", "add")
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-indigo-500 text-white hover:bg-indigo-600"
+              } transition duration-300`}
             >
-              Create Role
+              {isCreating ? "Creating..." : "Create Role"}
             </Button>
           </form>
         </motion.div>
@@ -163,9 +218,14 @@ const Roles = () => {
                     <td className="px-4 py-2">
                       <Button
                         onClick={() => handleDeleteRole(role.id)}
-                        className="text-red-600 hover:text-red-800"
+                        disabled={!hasPermission("roles", "delete")}
+                        className={`flex items-center justify-center ${
+                          hasPermission("roles", "delete")
+                            ? "text-red-600 hover:text-red-800"
+                            : "text-gray-400 cursor-not-allowed"
+                        }`}
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-5 h-5 mr-2" /> Delete
                       </Button>
                     </td>
                   </tr>
