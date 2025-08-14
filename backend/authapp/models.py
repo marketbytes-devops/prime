@@ -13,6 +13,7 @@ class CustomUser(AbstractUser):
     role = models.ForeignKey('Role', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
 
     USERNAME_FIELD = "email"
+    # REQUIRED_FIELDS = ["username"]
     REQUIRED_FIELDS = []
 
     def __str__(self):

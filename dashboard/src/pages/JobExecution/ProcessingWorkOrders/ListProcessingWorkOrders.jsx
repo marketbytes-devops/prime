@@ -5,6 +5,8 @@ import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
+import ReactDOMServer from 'react-dom/server';
+import Template2 from "../../../components/Templates/RFQ/Template2";
 
 const ListProcessingWorkOrders = () => {
   const navigate = useNavigate();
@@ -140,6 +142,37 @@ const ListProcessingWorkOrders = () => {
     return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
   };
 
+  const handlePrint = (wo) => {
+    const techniciansAssigned = getAssignedTechnicians(wo.items);
+    const itemsData = (wo.items || []).map(item => ({
+      id: item.id,
+      name: state.itemsList.find(i => i.id === item.item)?.name || 'N/A',
+      quantity: item.quantity || 'N/A',
+      unit: state.units.find(u => u.id === item.unit)?.name || 'N/A',
+      unit_price: item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A',
+      assigned_to: state.technicians.find(t => t.id === item.assigned_to)?.name || 'N/A',
+      certificate_uut_label: item.certificate_uut_label || 'N/A',
+      certificate_number: item.certificate_number || 'N/A',
+      calibration_date: item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A',
+      calibration_due_date: item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A',
+      uuc_serial_number: item.uuc_serial_number || 'N/A',
+    }));
+
+    const data = {
+      ...wo,
+      techniciansAssigned,
+      items: itemsData,
+      purchase_order: wo.purchase_order || {},
+      delivery_note: wo.delivery_note || {},
+    };
+
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template2 data={data} />);
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(htmlString);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const filteredWOs = state.workOrders
     .filter((wo) =>
       (wo.wo_number || "").toLowerCase().includes(state.searchTerm.toLowerCase())
@@ -272,6 +305,12 @@ const ListProcessingWorkOrders = () => {
                           }`}
                         >
                           Move to Manager Approval
+                        </Button>
+                        <Button
+                          onClick={() => handlePrint(wo)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                        >
+                          Print
                         </Button>
                       </div>
                     </td>

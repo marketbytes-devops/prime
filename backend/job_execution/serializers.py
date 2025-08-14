@@ -55,15 +55,23 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
         return value
 
 class DeliveryNoteSerializer(serializers.ModelSerializer):
+    work_order_id = serializers.PrimaryKeyRelatedField(
+        source='work_order',
+        read_only=True
+    )
+
     class Meta:
         model = DeliveryNote
         fields = [
             "id",
             "dn_number",
+            "work_order",
+            "work_order_id",  # Add this field
             "signed_delivery_note",
             "delivery_status",
             "created_at",
         ]
+
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(

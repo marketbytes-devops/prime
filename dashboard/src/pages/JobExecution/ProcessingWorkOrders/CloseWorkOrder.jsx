@@ -9,6 +9,8 @@ const CloseWorkOrder = () => {
   const [state, setState] = useState({
     workOrders: [],
     technicians: [],
+    itemsList: [],
+    units: [],
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -59,9 +61,11 @@ const CloseWorkOrder = () => {
 
   const fetchWorkOrders = async () => {
     try {
-      const [woRes, techRes] = await Promise.all([
+      const [woRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get("work-orders/", { params: { status: "Approved" } }),
         apiClient.get("technicians/"),
+        apiClient.get("items/"),
+        apiClient.get("units/"),
       ]);
       const userEmail = localStorage.getItem("userEmail");
       const filteredWOs = woRes.data
@@ -74,6 +78,8 @@ const CloseWorkOrder = () => {
         ...prev,
         workOrders: filteredWOs || [],
         technicians: techRes.data || [],
+        itemsList: itemsRes.data || [],
+        units: unitsRes.data || [],
       }));
     } catch (error) {
       console.error("Error fetching work orders:", error);
@@ -448,16 +454,16 @@ const CloseWorkOrder = () => {
                     <tbody>
                       {state.selectedViewWO.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{item.item?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
                               <a
@@ -469,7 +475,7 @@ const CloseWorkOrder = () => {
                                 View Certificate
                               </a>
                             ) : (
-                              "N/A"
+                              'N/A'
                             )}
                           </td>
                         </tr>
