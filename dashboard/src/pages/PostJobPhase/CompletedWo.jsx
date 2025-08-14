@@ -329,6 +329,13 @@ const CompletedWO = () => {
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
+              <p><strong>Due in Days:</strong> {state.selectedWO.due_in_days || 'N/A'}</p>
+              <p><strong>Received Date:</strong> {state.selectedWO.received_date ? new Date(state.selectedWO.received_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
+              {state.selectedWO.manager_approval_status === 'Declined' && (
+                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+              )}
               <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
               <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
@@ -337,6 +344,7 @@ const CompletedWO = () => {
               <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Purchase Order ID:</strong> {state.selectedWO.purchase_order || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -349,6 +357,12 @@ const CompletedWO = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -358,6 +372,25 @@ const CompletedWO = () => {
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.certificate_file ? (
+                              <a
+                                href={item.certificate_file}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View Certificate
+                              </a>
+                            ) : (
+                              'N/A'
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

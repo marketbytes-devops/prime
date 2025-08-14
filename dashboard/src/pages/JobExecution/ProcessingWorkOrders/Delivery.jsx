@@ -22,6 +22,7 @@ const Delivery = () => {
     isViewModalOpen: false,
     selectedWO: null,
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -64,15 +65,18 @@ const Delivery = () => {
         apiClient.get('items/'),
         apiClient.get('units/'),
       ]);
+
       const deliveryNotes = dnRes.data || [];
+
+      // Fetch work orders for each delivery note using the correct ID
       const workOrdersPromises = deliveryNotes.map((dn) =>
-        apiClient.get(`/work-orders/?id=${dn.work_order}`).then((res) => ({
+        apiClient.get(`/work-orders/${dn.work_order_id}/`).then((res) => ({
           id: dn.id,
-          work_order: res.data[0] || {},
+          work_order: res.data || {},
         }))
       );
-      const workOrdersData = await Promise.all(workOrdersPromises);
 
+      const workOrdersData = await Promise.all(workOrdersPromises);
       const updatedDeliveryNotes = deliveryNotes.map((dn) => {
         const woData = workOrdersData.find((w) => w.id === dn.id);
         return {
@@ -130,11 +134,11 @@ const Delivery = () => {
 
   const handleViewWO = (woId) => {
     if (woId) {
-      const workOrder = state.deliveryNotes.find((dn) => dn.work_order?.id === woId)?.work_order;
+      const deliveryNote = state.deliveryNotes.find((dn) => dn.work_order?.id === woId);
       setState((prev) => ({
         ...prev,
         isViewModalOpen: true,
-        selectedWO: workOrder || null,
+        selectedWO: deliveryNote?.work_order || null,
       }));
     }
   };
@@ -164,7 +168,6 @@ const Delivery = () => {
   const totalPages = Math.ceil(filteredDNs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentDNs = filteredDNs.slice(startIndex, startIndex + state.itemsPerPage);
-
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
