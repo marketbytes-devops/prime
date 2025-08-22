@@ -123,13 +123,21 @@ const ListProcessingWorkOrders = () => {
 
   const isEligibleForApproval = (wo) => {
     return (
+      wo.date_received &&
+      wo.expected_completion_date &&
+      wo.onsite_or_lab &&
+      wo.range &&
       wo.items &&
       wo.items.length > 0 &&
       wo.items.every(
         (item) =>
+          item.assigned_to &&
+          item.certificate_uut_label &&
           item.certificate_number &&
+          item.calibration_date &&
           item.calibration_due_date &&
-          wo.range
+          item.uuc_serial_number &&
+          item.certificate_file
       )
     );
   };
