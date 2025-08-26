@@ -133,10 +133,14 @@ const PartialOrderSelection = () => {
       ...prev,
       createdPartialOrders: [
         ...prev.createdPartialOrders,
-        { ...response.data, items: response.data.items.map(item => ({
-          ...item,
-          total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
-        })) },
+        { 
+          ...response.data, 
+          items: response.data.items.map(item => ({
+            ...item,
+            total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
+          })),
+          itemIds: [...prev.selectedItemIds] // Store the item IDs for this order
+        }
       ],
       usedItemIds: [...prev.usedItemIds, ...state.selectedItemIds],
       selectedItemIds: [],
@@ -146,6 +150,40 @@ const PartialOrderSelection = () => {
     if (state.createdPartialOrders.length + 1 === state.numberOfPartialOrders && state.usedItemIds.length === state.savedItems.length) {
       navigate("/view-quotation", { state: { quotationId: quotationData.id, partialOrders: state.createdPartialOrders } });
     }
+  };
+
+  const handleCancelPartial = async (index) => {
+    const orderToCancel = state.createdPartialOrders[index];
+    if (!orderToCancel) return;
+
+    try {
+      // Delete the partial order from the backend
+      await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`);
+      
+      setState(prev => {
+        const newCreatedPartialOrders = prev.createdPartialOrders.filter((_, i) => i !== index);
+        const newUsedItemIds = prev.usedItemIds.filter(id => !orderToCancel.itemIds.includes(id));
+        return {
+          ...prev,
+          createdPartialOrders: newCreatedPartialOrders,
+          usedItemIds: newUsedItemIds,
+        };
+      });
+      toast.success(`Partial order ${index + 1} canceled successfully.`);
+    } catch (error) {
+      console.error("Error canceling partial order:", error);
+      toast.error("Failed to cancel partial order.");
+    }
+  };
+
+  const handleCancel = () => {
+    setState(prev => ({
+      ...prev,
+      createdPartialOrders: [],
+      usedItemIds: [],
+      selectedItemIds: [],
+    }));
+    toast.info("All created partial orders have been reset.");
   };
 
   const handleFinish = () => {
@@ -221,8 +259,16 @@ const PartialOrderSelection = () => {
             <h3 className="text-md font-semibold mb-2 text-black">Created Partial Orders</h3>
             {state.createdPartialOrders.map((order, index) => (
               <div key={index} className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700">Partial Order {index + 1}</h4>
-                <div className="overflow-x-auto rounded-lg shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-700">Partial Order {index + 1}</h4>
+                  <button
+                    onClick={() => handleCancelPartial(index)}
+                    className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="overflow-x-auto rounded-lg shadow-sm mt-2">
                   <table className="min-w-full bg-white border border-gray-200">
                     <thead>
                       <tr className="bg-gray-100">
@@ -269,6 +315,12 @@ const PartialOrderSelection = () => {
             disabled={isGenerateDisabled()}
           >
             Generate Partial
+          </button>
+          <button
+            onClick={handleCancel}
+            className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
+          >
+            Cancel All
           </button>
           <button
             onClick={handleFinish}
