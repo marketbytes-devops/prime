@@ -294,7 +294,7 @@ const handleNotApprovedSubmit = async () => {
           <h1>Quotation Details</h1>
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Company Details</h2>
-            <p><strong>Quotation ID:</strong> ${quotation.id}</p>
+            <p><strong>Series Number:</strong> ${quotation.series_number || 'N/A'}</p>
             <p><strong>RFQ ID:</strong> ${quotation.rfq || 'N/A'}</p>
             <p><strong>Company Name:</strong> ${quotation.company_name || 'N/A'}</p>
             <p><strong>Company Address:</strong> ${quotation.company_address || 'N/A'}</p>
@@ -607,7 +607,8 @@ const handleNotApprovedSubmit = async () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation ID</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Series Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Series Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Sales Person</th>
@@ -628,7 +629,7 @@ const handleNotApprovedSubmit = async () => {
                 currentQuotations.map((quotation, index) => (
                   <tr key={quotation.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{quotation.id}</td>
+                    <td className="border p-2 whitespace-nowrap">{quotation.series_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{quotation.company_name || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(quotation.created_at).toLocaleDateString()}
@@ -778,8 +779,7 @@ const handleNotApprovedSubmit = async () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Quotation ID:</strong> {state.selectedQuotation.id}</p>
-              <p><strong>RFQ ID:</strong> {state.selectedQuotation.rfq || 'N/A'}</p>
+              <p><strong>Series Number:</strong> {state.selectedQuotation.series_number || 'N/A'}</p>
               <p><strong>Company Name:</strong> {state.selectedQuotation.company_name || 'N/A'}</p>
               <p><strong>Company Address:</strong> {state.selectedQuotation.company_address || 'N/A'}</p>
               <p><strong>Company Phone:</strong> {state.selectedQuotation.company_phone || 'N/A'}</p>
