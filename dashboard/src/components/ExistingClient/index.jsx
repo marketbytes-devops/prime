@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../../helpers/apiClient";
 import { toast } from "react-toastify";
+import Loading from "../Loading";
 
 const ExistingClient = () => {
   const location = useLocation();
@@ -208,7 +209,7 @@ const ExistingClient = () => {
           </div>
         )}
 
-        {loading && <p className="text-gray-600">Loading...</p>}
+        {loading && <div className="flex justify-center items-center min-h-screen"><Loading/></div>}
         {error && <p className="text-red-500">{error}</p>}
 
         {selectedClient && (

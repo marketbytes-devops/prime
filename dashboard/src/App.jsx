@@ -35,6 +35,7 @@ import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
 import apiClient from "./helpers/apiClient";
+import Loading from "./components/Loading";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -89,7 +90,7 @@ const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredActio
   }
 
   if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
   }
 
   if (!hasPermission) {

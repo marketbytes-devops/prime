@@ -5,6 +5,7 @@ import { Search, Trash2, Edit } from "lucide-react";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
 import Modal from "../../components/Modal";
+import Loading from "../../components/Loading";
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -168,7 +169,7 @@ const Users = () => {
   );
 
   if (isLoading || isLoadingPermissions) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
   }
 
   return (

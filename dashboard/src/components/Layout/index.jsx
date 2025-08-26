@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { motion } from "framer-motion";
 import apiClient from "../../helpers/apiClient";
+import Loading from "../Loading";
 
 const Layout = ({ isAuthenticated, setIsAuthenticated }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -85,7 +86,7 @@ const Layout = ({ isAuthenticated, setIsAuthenticated }) => {
           className={`bg-gradient-to-b from-blue-50 via-gray-50 to-indigo-50 flex-1 pt-20 p-6 ${isSidebarOpen ? "md:ml-72" : "ml-0"
             } overflow-auto`}
         >
-          {loading ? <p>Loading...</p> : <Outlet />}
+          {loading ? <div className="flex justify-center items-center min-h-screen"><Loading/></div> : <Outlet />}
         </main>
       </div>
     </div>

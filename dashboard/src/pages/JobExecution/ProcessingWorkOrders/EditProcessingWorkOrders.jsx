@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
+import Loading from "../../../components/Loading";
  
 const EditProcessingWorkOrders = () => {
   const { id } = useParams();
@@ -163,7 +164,7 @@ const EditProcessingWorkOrders = () => {
     }
   };
  
-  if (!state.workOrder) return <div>Loading...</div>;
+  if (!state.workOrder) return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
  
   return (
     <div className="mx-auto p-4">

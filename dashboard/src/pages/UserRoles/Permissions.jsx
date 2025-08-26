@@ -4,6 +4,7 @@ import { Settings } from "lucide-react";
 import Button from "../../components/Button";
 import Modal from "../../components/Modal";
 import apiClient from "../../helpers/apiClient";
+import Loading from "../../components/Loading";
 
 const Permissions = () => {
   const [roles, setRoles] = useState([]);
@@ -166,7 +167,7 @@ const Permissions = () => {
   };
 
   if (isLoadingPermissions) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
   }
 
   return (

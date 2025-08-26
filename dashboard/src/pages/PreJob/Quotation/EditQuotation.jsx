@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
+import Loading from '../../../components/Loading';
 
 const debounce = (func, delay) => {
   let timeoutId;
@@ -569,7 +570,7 @@ const EditQuotation = () => {
   );
 
   if (state.loading) {
-    return <div className="text-center p-4">Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
   }
 
   return (
