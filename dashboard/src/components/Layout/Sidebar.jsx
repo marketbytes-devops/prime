@@ -281,17 +281,17 @@ const Sidebar = ({ toggleSidebar }) => {
       action: "view",
       subItems: [
         {
-          to: "/user-roles/users",
-          label: "Users",
-          icon: <Users className="w-5 h-5 mr-3" />,
-          page: "users",
-          action: "view",
-        },
-        {
           to: "/user-roles/roles",
           label: "Roles",
           icon: <ShieldCheck className="w-5 h-5 mr-3" />,
           page: "roles",
+          action: "view",
+        },
+        {
+          to: "/user-roles/users",
+          label: "Users",
+          icon: <Users className="w-5 h-5 mr-3" />,
+          page: "users",
           action: "view",
         },
         {
