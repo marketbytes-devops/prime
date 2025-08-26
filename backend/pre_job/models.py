@@ -16,7 +16,7 @@ class RFQ(models.Model):
     due_date_for_quotation = models.DateField(null=True, blank=True)
     rfq_status = models.CharField(
         max_length=20,
-        choices=[('Processing', 'Processing'), ('Completed', 'Completed')],
+        choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')],
         null=True,
         blank=True
     )
@@ -50,9 +50,10 @@ class Quotation(models.Model):
     due_date_for_quotation = models.DateField(null=True, blank=True)
     quotation_status = models.CharField(
         max_length=20,
-        choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created')],
+        choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created'), ('Not Approved', 'Not Approved')],
         default='Pending'
     )
+    not_approved_reason_remark = models.TextField(null=True, blank=True)
     next_followup_date = models.DateField(null=True, blank=True)
     followup_frequency = models.CharField(
         max_length=20,

@@ -58,7 +58,7 @@ class RFQSerializer(serializers.ModelSerializer):
     rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
     assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
     items = RFQItemSerializer(many=True, required=False)
-    rfq_status = serializers.ChoiceField(choices=[('Processing', 'Processing'), ('Completed', 'Completed')], allow_null=True, required=False)
+    rfq_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')], allow_null=True, required=False)
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
 
@@ -334,11 +334,12 @@ class QuotationSerializer(serializers.ModelSerializer):
     rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
     assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
     items = QuotationItemSerializer(many=True, required=True)
-    quotation_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created')], required=False)
+    quotation_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created'), ('Not Approved', 'Not Approved')], required=False)
     followup_frequency = serializers.ChoiceField(choices=[('24_hours', '24 Hours'), ('3_days', '3 Days'), ('7_days', '7 Days'), ('every_7th_day', 'Every 7th Day')], required=False)
     purchase_orders = serializers.SerializerMethodField()
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
+    not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = Quotation
@@ -348,7 +349,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
             'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
             'series_number', 'created_at', 'items', 'purchase_orders',
-            'assigned_sales_person_name', 'assigned_sales_person_email'
+            'assigned_sales_person_name', 'assigned_sales_person_email', 'not_approved_reason_remark'
         ]
 
     def get_purchase_orders(self, obj):
@@ -680,6 +681,75 @@ class QuotationSerializer(serializers.ModelSerializer):
 
         return email_sent
 
+    def send_not_approved_notification(self, quotation, assigned_sales_person):
+        email_sent = False
+        if (assigned_sales_person and assigned_sales_person.email and
+                quotation.quotation_status == 'Not Approved'):
+            # Email to assigned person
+            subject = f'Quotation #{quotation.series_number} Not Approved'
+            message = (
+                f'Dear {assigned_sales_person.name},\n\n'
+                f'The following Quotation has been marked as Not Approved:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Status: {quotation.quotation_status}\n'
+                f'🔹 Reason for Non-Approval: {quotation.not_approved_reason_remark or "Not specified"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please review the details and take any necessary actions. '
+                f'Log in to your PrimeCRM dashboard for details.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=None,
+                    recipient_list=[assigned_sales_person.email],
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"Not approved notification email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send not approved notification email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
+
+            # Email to admin
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f'Quotation #{quotation.series_number} Not Approved Notification'
+            admin_message = (
+                f'Dear Admin,\n\n'
+                f'The following Quotation has been marked as Not Approved:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 Quotation Number: {quotation.series_number}\n'
+                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
+                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Status: {quotation.quotation_status}\n'
+                f'🔹 Reason for Non-Approval: {quotation.not_approved_reason_remark or "Not specified"}\n'
+                f'------------------------------------------------------------\n'
+                f'Please take any necessary actions or follow up as required.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=None,
+                    recipient_list=[admin_email],
+                    fail_silently=True,
+                )
+                print(f"Not approved notification email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
+            except Exception as e:
+                print(f"Failed to send not approved notification email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         assigned_sales_person = validated_data.pop('assigned_sales_person', None)
@@ -721,7 +791,12 @@ class QuotationSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
+        not_approved_reason_remark = validated_data.get('not_approved_reason_remark', instance.not_approved_reason_remark)
         
+        # Validate not_approved_reason_remark when status is 'Not Approved'
+        if validated_data.get('quotation_status') == 'Not Approved' and not not_approved_reason_remark:
+            raise serializers.ValidationError("A reason must be provided when setting status to 'Not Approved'.")
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
@@ -763,6 +838,10 @@ class QuotationSerializer(serializers.ModelSerializer):
                 self.send_po_followup_reminder(instance, assigned_sales_person)
             if instance.next_followup_date and instance.next_followup_date < date.today():
                 self.send_po_past_due_alert(instance, assigned_sales_person)
+        
+        # Send not approved notification if status is 'Not Approved'
+        if instance.quotation_status == 'Not Approved' and (not hasattr(instance, '_original_status') or instance._original_status != 'Not Approved'):
+            self.send_not_approved_notification(instance, assigned_sales_person)
         
         return instance
 

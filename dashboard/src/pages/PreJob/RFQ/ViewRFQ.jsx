@@ -6,6 +6,7 @@ import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
 import ReactDOMServer from 'react-dom/server';
 import Template1 from '../../../components/Templates/RFQ/Template1';
+import { toast } from 'react-toastify';
 
 const ViewRFQ = () => {
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ const ViewRFQ = () => {
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
-      alert('Failed to load RFQs.');
+      toast.error('Failed to load RFQs.');
     }
   };
 
@@ -104,9 +105,10 @@ const ViewRFQ = () => {
       try {
         await apiClient.delete(`rfqs/${id}/`);
         await fetchRFQs();
+        toast.success('RFQ deleted successfully!');
       } catch (error) {
         console.error('Error deleting RFQ:', error);
-        alert('Failed to delete RFQ.');
+        toast.error('Failed to delete RFQ.');
       }
     }
   };
@@ -122,18 +124,29 @@ const ViewRFQ = () => {
       await apiClient.patch(`rfqs/${id}/`, payload);
       console.log(`Status updated for RFQ ${id} to ${newStatus}`);
       await fetchRFQs();
+      toast.success('RFQ status updated successfully!');
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update status.');
+      toast.error('Failed to update status.');
     }
   };
 
   const handleConvertToQuotation = async (rfq) => {
     try {
+      const rfqResponse = await apiClient.get(`rfqs/${rfq.id}/`);
+      const currentRfq = rfqResponse.data;
+      const payload = {
+        rfq_status: 'Completed',
+        items: currentRfq.items || [],
+      };
+      await apiClient.patch(`rfqs/${rfq.id}/`, payload);
+      console.log(`Status updated for RFQ ${rfq.id} to Completed`);
+      toast.success('RFQ status updated to Completed!');
+      
       navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
     } catch (error) {
       console.error('Error initiating quotation conversion:', error);
-      alert('Failed to initiate quotation conversion.');
+      toast.error('Failed to initiate quotation conversion.');
     }
   };
 
@@ -143,7 +156,7 @@ const ViewRFQ = () => {
 
     const itemsData = (rfq.items || []).map(item => ({
       id: item.id,
-      name: state.itemsList.find(i => i.id === item.item)?.name || 'N/A',
+      name: typeof item.item === 'string' ? item.item : (state.itemsList.find(i => i.id === item.item)?.name || 'N/A'),
       quantity: item.quantity || '',
       unit: state.units.find(u => u.id === item.unit)?.name || 'N/A',
       unit_price: item.unit_price || ''
@@ -303,10 +316,11 @@ const ViewRFQ = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
-                        value={rfq.rfq_status || ''}
+                        value={rfq.rfq_status || 'Pending'}
                         onChange={e => handleStatusChange(rfq.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
+                        <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
                         <option value="Completed">Completed</option>
                       </select>
@@ -321,11 +335,11 @@ const ViewRFQ = () => {
                         </Button>
                         <Button
                           onClick={() => handleConvertToQuotation(rfq)}
-                          disabled={rfq.rfq_status !== 'Completed' || rfq.hasQuotation}
-                          className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Completed' && !rfq.hasQuotation
+                          disabled={rfq.rfq_status !== 'Processing'}
+                          className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Processing'
                             ? 'bg-purple-600 text-white hover:bg-purple-700'
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
+                          }`}
                         >
                           Convert to Quotation
                         </Button>
@@ -382,7 +396,7 @@ const ViewRFQ = () => {
               className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+              }`}
             >
               {page}
             </Button>
@@ -422,7 +436,7 @@ const ViewRFQ = () => {
               <h3 className="text-lg font-medium text-black">Assignment & Status</h3>
               <p><strong>Assigned Sales Person:</strong> {state.teamMembers.find(m => m.id === state.selectedRfq.assigned_sales_person)?.name || 'N/A'}</p>
               <p><strong>Due Date:</strong> {state.selectedRfq.due_date_for_quotation ? new Date(state.selectedRfq.due_date_for_quotation).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedRfq.rfq_status || 'N/A'}</p>
+              <p><strong>Status:</strong> {state.selectedRfq.rfq_status || 'Pending'}</p>
               <p><strong>Created:</strong> {new Date(state.selectedRfq.created_at).toLocaleDateString()}</p>
             </div>
             <div>
@@ -442,7 +456,7 @@ const ViewRFQ = () => {
                     <tbody>
                       {state.selectedRfq.items.map(item => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find(i => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{typeof item.item === 'string' ? item.item : (state.itemsList.find(i => i.id === item.item)?.name || 'N/A')}</td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find(u => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>

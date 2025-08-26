@@ -6,6 +6,159 @@ import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 
+const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddItem, apiEndpoint }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+  const [addingItem, setAddingItem] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const selectedOption = options.find((option) => option.id === value);
+    setSearchTerm(selectedOption ? selectedOption.name : "");
+  }, [value, options]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter((option) =>
+    option.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSelect = (option) => {
+    onChange(option.id, options);
+    setSearchTerm(option.name);
+    setIsOpen(false);
+  };
+
+  const handleAddItem = async (itemName) => {
+    if (!itemName.trim()) {
+      toast.error("Please enter a valid name.");
+      return;
+    }
+
+    if (options.some((option) => option.name.toLowerCase() === itemName.toLowerCase())) {
+      toast.error("This name already exists.");
+      return;
+    }
+
+    setAddingItem(true);
+    try {
+      const response = await apiClient.post(apiEndpoint, { name: itemName });
+      toast.success("Added successfully!");
+      const newItem = response.data;
+      setNewItemName("");
+      setSearchTerm(newItem.name);
+      onChange(newItem.id, [...options, newItem]);
+    } catch (error) {
+      console.error(`Error adding to ${apiEndpoint}:`, error);
+      toast.error(`Failed to add ${apiEndpoint === "items/" ? "item" : "unit"}.`);
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (searchTerm.trim()) {
+        const selectedOption = filteredOptions.find(
+          (option) => option.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (selectedOption) {
+          handleSelect(selectedOption);
+        } else if (allowAddItem) {
+          handleAddItem(searchTerm);
+        }
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (searchTerm.trim()) {
+      const selectedOption = filteredOptions.find(
+        (option) => option.name.toLowerCase() === searchTerm.toLowerCase()
+      );
+      if (selectedOption) {
+        handleSelect(selectedOption);
+      } else if (allowAddItem) {
+        handleAddItem(searchTerm);
+      } else {
+        setSearchTerm(options.find((option) => option.id === value)?.name || "");
+        onChange(value, options);
+      }
+    } else {
+      setSearchTerm(options.find((option) => option.id === value)?.name || "");
+      onChange(value, options);
+    }
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e) => {
+    setSearchTerm(e.target.value);
+    setIsOpen(true);
+  };
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <InputField
+        type="text"
+        placeholder={placeholder}
+        value={searchTerm}
+        onChange={handleInputChange}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        className="w-full p-2 border rounded focus:outline-indigo-500"
+        disabled={addingItem}
+      />
+      {isOpen && (
+        <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 transition-all duration-200 ease-in-out">
+          {allowAddItem && (
+            <div className="p-2 border-b grid grid-cols-2 items-center gap-2">
+              <InputField
+                type="text"
+                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                className="flex-1 p-2 border rounded"
+                disabled={addingItem}
+              />
+              <Button
+                onClick={() => handleAddItem(newItemName)}
+                className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                disabled={addingItem}
+              >
+                {addingItem ? "Adding..." : "+"}
+              </Button>
+            </div>
+          )}
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <div
+                key={option.id}
+                className="p-2 hover:bg-indigo-100 cursor-pointer"
+                onClick={() => handleSelect(option)}
+              >
+                {option.name}
+              </div>
+            ))
+          ) : (
+            <div className="p-2 text-gray-500">No options found</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AddRFQ = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -28,7 +181,7 @@ const AddRFQ = () => {
     isNewClient: false,
   });
   const [isModalOpen, setIsModalOpen] = useState(true);
-  const [loading, setLoading] = useState(false); // Added loading state
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -73,11 +226,16 @@ const AddRFQ = () => {
     }));
   };
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (index, field, value, newOptions) => {
     setState((prev) => {
       const newItems = [...prev.items];
       newItems[index][field] = value;
-      return { ...prev, items: newItems };
+      return {
+        ...prev,
+        items: newItems,
+        ...(newOptions && field === "item" && { itemsList: newOptions }),
+        ...(newOptions && field === "unit" && { units: newOptions }),
+      };
     });
   };
 
@@ -96,13 +254,28 @@ const AddRFQ = () => {
     } else if (step === 2) {
       return state.assigned_sales_person && state.due_date_for_quotation;
     } else if (step === 3) {
-      return state.items.every((item) => item.item && item.quantity && item.unit);
+      return state.items.every(
+        (item) =>
+          item.item !== "" &&
+          item.item !== null &&
+          item.item !== undefined &&
+          item.quantity !== "" &&
+          item.quantity !== null &&
+          item.quantity !== undefined &&
+          item.unit !== "" &&
+          item.unit !== null &&
+          item.unit !== undefined
+      );
     }
     return false;
   };
 
   const handleNext = () => {
-    setStep((prev) => prev + 1);
+    if (isStepValid()) {
+      setStep((prev) => prev + 1);
+    } else {
+      toast.error("Please fill all required fields.");
+    }
   };
 
   const handlePrev = () => {
@@ -111,40 +284,52 @@ const AddRFQ = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isStepValid()) return;
+    if (!isStepValid()) {
+      console.log("Validation failed:", state.items);
+      toast.error("Please fill all required fields.");
+      return;
+    }
 
-    setLoading(true); // Start loading when submission begins
-
-    const payload = {
-      company_name: state.company_name || null,
-      company_address: state.company_address || null,
-      company_phone: state.company_phone || null,
-      company_email: state.company_email || null,
-      rfq_channel: state.rfq_channel || null,
-      point_of_contact_name: state.point_of_contact_name || null,
-      point_of_contact_email: state.point_of_contact_email || null,
-      point_of_contact_phone: state.point_of_contact_phone || null,
-      assigned_sales_person: state.assigned_sales_person || null,
-      due_date_for_quotation: state.due_date_for_quotation || null,
-      rfq_status: "Processing", // Set initial status to Processing
+    setLoading(true);
+    console.log("Submitting payload:", {
+      ...state,
       items: state.items.map((item) => ({
-        item: item.item || null,
+        item: item.item ? parseInt(item.item) : null,
         quantity: item.quantity ? parseInt(item.quantity) : null,
-        unit: item.unit || null,
+        unit: item.unit ? parseInt(item.unit) : null,
         unit_price: null,
       })),
-    };
+    });
 
     try {
-      await apiClient.post("rfqs/", payload);
+      await apiClient.post("rfqs/", {
+        company_name: state.company_name || null,
+        company_address: state.company_address || null,
+        company_phone: state.company_phone || null,
+        company_email: state.company_email || null,
+        rfq_channel: state.rfq_channel || null,
+        point_of_contact_name: state.point_of_contact_name || null,
+        point_of_contact_email: state.point_of_contact_email || null,
+        point_of_contact_phone: state.point_of_contact_phone || null,
+        assigned_sales_person: state.assigned_sales_person || null,
+        due_date_for_quotation: state.due_date_for_quotation || null,
+        rfq_status: "Pending", // Set initial status to Pending
+        items: state.items.map((item) => ({
+          item: item.item ? parseInt(item.item) : null,
+          quantity: item.quantity ? parseInt(item.quantity) : null,
+          unit: item.unit ? parseInt(item.unit) : null,
+          unit_price: null,
+        })),
+      });
+
       toast.success("RFQ created successfully!");
       navigate("/view-rfq");
     } catch (error) {
       console.error("Error submitting RFQ:", error);
-      setError("Failed to create RFQ. Please try again.");
-      toast.error("Failed to create RFQ.");
+      setError("Failed to create RFQ. Please check the item and unit selections.");
+      toast.error("Failed to create RFQ. Please check the item and unit selections.");
     } finally {
-      setLoading(false); // Stop loading regardless of success or failure
+      setLoading(false);
     }
   };
 
@@ -341,100 +526,89 @@ const AddRFQ = () => {
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="grid gap-4">
-      {state.items.map((item, index) => (
-        <div key={index} className="border p-4 rounded bg-gray-50">
-          <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
-          <div className="flex items-center justify-between gap-4">
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Item
-              </label>
-              <select
-                value={item.item}
-                onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-              >
-                <option value="">Select Item</option>
-                {state.itemsList.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
+  const renderStep3 = () => {
+    console.log("state.items:", state.items);
+    return (
+      <div className="grid gap-4">
+        {state.items.map((item, index) => (
+          <div key={index} className="border p-4 rounded bg-gray-50">
+            <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
+            <div className="flex items-center justify-between gap-4">
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item
+                </label>
+                <SearchableDropdown
+                  options={state.itemsList}
+                  value={item.item}
+                  onChange={(value, newOptions) => handleItemChange(index, "item", value, newOptions)}
+                  placeholder="Search or enter item..."
+                  allowAddItem={true}
+                  apiEndpoint="items/"
+                />
+              </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <InputField
+                  type="number"
+                  placeholder="Enter quantity"
+                  value={item.quantity}
+                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                  min={0}
+                />
+              </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <SearchableDropdown
+                  options={state.units}
+                  value={item.unit}
+                  onChange={(value, newOptions) => handleItemChange(index, "unit", value, newOptions)}
+                  placeholder="Search or enter unit..."
+                  allowAddItem={true}
+                  apiEndpoint="units/"
+                />
+              </div>
+              {state.items.length > 1 && (
+                <Button
+                  onClick={() => removeItem(index)}
+                  className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Remove Item
+                </Button>
+              )}
             </div>
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Quantity
-              </label>
-              <InputField
-                type="number"
-                placeholder="Enter quantity"
-                value={item.quantity}
-                onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                min={0}
-              />
-            </div>
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Unit
-              </label>
-              <select
-                value={item.unit}
-                onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-              >
-                <option value="">Select Unit</option>
-                {state.units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {state.items.length > 1 && (
-              <Button
-                onClick={() => removeItem(index)}
-                className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Remove Item
-              </Button>
-            )}
           </div>
-        </div>
-      ))}
-      <Button
-        onClick={addItem}
-        className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
-      >
-        Add Another Item
-      </Button>
-    </div>
-  );
+        ))}
+        <Button
+          onClick={addItem}
+          className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
+        >
+          Add Another Item
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Add RFQ</h1>
       <div className="flex justify-between mb-6">
         <div
-          className={`flex-1 text-start ${
-            step === 1 ? "font-bold text-indigo-600" : "text-gray-500"
-          }`}
+          className={`flex-1 text-start ${step === 1 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 1: Company & Contact
         </div>
         <div
-          className={`flex-1 text-center ${
-            step === 2 ? "font-bold text-indigo-600" : "text-gray-500"
-          }`}
+          className={`flex-1 text-center ${step === 2 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 2: Assignment & Dates
         </div>
         <div
-          className={`flex-1 text-end ${
-            step === 3 ? "font-bold text-indigo-600" : "text-gray-500"
-          }`}
+          className={`flex-1 text-end ${step === 3 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 3: Items
         </div>
@@ -447,13 +621,13 @@ const AddRFQ = () => {
         <div className="flex flex-col space-y-4">
           <Button
             onClick={() => handleClientSelect("new")}
-            className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg scale-100 hover:scale-[1.02] transition-all duration-300"
+            className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             New Client
           </Button>
           <Button
             onClick={() => handleClientSelect("existing")}
-            className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 shadow-md hover:shadow-lg scale-100 hover:scale-[1.02] transition-all duration-300"
+            className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             Existing Client
           </Button>
@@ -483,12 +657,10 @@ const AddRFQ = () => {
             ) : (
               <Button
                 type="submit"
-                disabled={!isStepValid() || loading} // Disable button when loading
-                className={`bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ml-auto ${
-                  !isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                disabled={!isStepValid() || loading}
+                className={`bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ml-auto ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                {loading ? "Submitting..." : "Submit RFQ"} {/* Show loading text */}
+                {loading ? "Submitting..." : "Submit RFQ"}
               </Button>
             )}
           </div>

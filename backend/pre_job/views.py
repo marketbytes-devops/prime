@@ -2,8 +2,8 @@ from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .models import RFQ, Quotation, PurchaseOrder
-from rest_framework.decorators import action
 from .serializers import RFQSerializer, QuotationSerializer, PurchaseOrderSerializer
+from rest_framework.decorators import action
 
 class RFQViewSet(viewsets.ModelViewSet):
     queryset = RFQ.objects.all()
@@ -55,6 +55,36 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 quotation.series_number = f"QUO-PRIME-{new_sequence:06d}"
                 quotation.save()
         return Response(status=204)
+
+    @action(detail=True, methods=['patch'], url_path='update_status')
+    def update_status(self, request, pk=None):
+        quotation = self.get_object()
+        status = request.data.get('status')
+        not_approved_reason_remark = request.data.get('not_approved_reason_remark')
+        
+        valid_statuses = [choice[0] for choice in Quotation._meta.get_field('quotation_status').choices]
+        if status not in valid_statuses:
+            return Response({"detail": "Invalid status"}, status=400)
+        
+        if status == 'Not Approved' and not not_approved_reason_remark:
+            return Response({"detail": "Reason is required when setting status to 'Not Approved'"}, status=400)
+        
+        # Check if the status is changing to 'Not Approved'
+        was_not_approved = quotation.quotation_status == 'Not Approved'
+        quotation.quotation_status = status
+        if status == 'Not Approved':
+            quotation.not_approved_reason_remark = not_approved_reason_remark
+        else:
+            quotation.not_approved_reason_remark = None
+        quotation.save()
+        
+        # Send notification if status changed to 'Not Approved'
+        if status == 'Not Approved' and not was_not_approved:
+            serializer = self.get_serializer(quotation)
+            serializer.send_not_approved_notification(quotation, quotation.assigned_sales_person)
+        
+        serializer = self.get_serializer(quotation)
+        return Response(serializer.data)
 
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.all()

@@ -26,10 +26,14 @@ const ViewQuotation = () => {
     partialOrders: [],
     poUploads: {},
     fullOrderPo: { clientPoNumber: '', poFile: null },
+    isNotApprovedModalOpen: false,
+    notApprovedReason: '',
+    selectedQuotationId: null,
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -229,6 +233,56 @@ const ViewQuotation = () => {
     }
   };
 
+  const handleStatusChange = (id, value) => {
+    if (value === 'Not Approved') {
+      setState(prev => ({
+        ...prev,
+        isNotApprovedModalOpen: true,
+        selectedQuotationId: id,
+        notApprovedReason: '',
+      }));
+    } else {
+      handleUpdateField(id, 'quotation_status', value);
+    }
+  };
+
+const handleNotApprovedSubmit = async () => {
+    if (!state.notApprovedReason.trim()) {
+      toast.error('Please provide a reason for non-approval.');
+      return;
+    }
+    try {
+      setIsSubmitting(true); 
+      await apiClient.patch(`/quotations/${state.selectedQuotationId}/update_status/`, {
+        status: 'Not Approved',
+        not_approved_reason_remark: state.notApprovedReason,
+      });
+      await fetchQuotations();
+      setState(prev => ({
+        ...prev,
+        isNotApprovedModalOpen: false,
+        selectedQuotationId: null,
+        notApprovedReason: '',
+      }));
+      toast.success('Quotation status updated to Not Approved.');
+    } catch (error) {
+      console.error('Error updating quotation status:', error);
+      toast.error('Failed to update quotation status.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const closeNotApprovedModal = () => {
+    setState(prev => ({
+      ...prev,
+      isNotApprovedModalOpen: false,
+      selectedQuotationId: null,
+      notApprovedReason: '',
+    }));
+    setIsSubmitting(false); 
+  };
+
   const handlePrint = quotation => {
     const channelName = state.channels.find(c => c.id === quotation.rfq_channel)?.channel_name || 'N/A';
     const salesPersonName = state.teamMembers.find(m => m.id === quotation.assigned_sales_person)?.name || 'N/A';
@@ -264,6 +318,11 @@ const ViewQuotation = () => {
             }</p>
             <p><strong>Created:</strong> ${new Date(quotation.created_at).toLocaleDateString()}</p>
             <p><strong>Quotation Status:</strong> ${quotation.quotation_status || 'N/A'}</p>
+            ${
+              quotation.quotation_status === 'Not Approved'
+                ? `<p><strong>Not Approved Reason:</strong> ${quotation.not_approved_reason_remark || 'N/A'}</p>`
+                : ''
+            }
             <p><strong>Next Follow-up Date:</strong> ${
               quotation.next_followup_date
                 ? new Date(quotation.next_followup_date).toLocaleDateString()
@@ -580,12 +639,13 @@ const ViewQuotation = () => {
                     <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
                         value={quotation.quotation_status || 'Pending'}
-                        onChange={e => handleUpdateField(quotation.id, 'quotation_status', e.target.value)}
+                        onChange={e => handleStatusChange(quotation.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Approved">Approved</option>
                         <option value="PO Created">PO Created</option>
+                        <option value="Not Approved">Not Approved</option>
                       </select>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -622,7 +682,12 @@ const ViewQuotation = () => {
                         </Button>
                         <Button
                           onClick={() => handlePrint(quotation)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                          disabled={quotation.quotation_status !== 'Approved'}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            quotation.quotation_status === 'Approved'
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
                           Print
                         </Button>
@@ -749,6 +814,11 @@ const ViewQuotation = () => {
               <p>
                 <strong>Quotation Status:</strong> {state.selectedQuotation.quotation_status || 'N/A'}
               </p>
+              {state.selectedQuotation.quotation_status === 'Not Approved' && (
+                <p>
+                  <strong>Not Approved Reason:</strong> {state.selectedQuotation.not_approved_reason_remark || 'N/A'}
+                </p>
+              )}
               <p>
                 <strong>Next Follow-up Date:</strong>{' '}
                 {state.selectedQuotation.next_followup_date
@@ -974,6 +1044,48 @@ const ViewQuotation = () => {
           >
             Submit
           </Button>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={state.isNotApprovedModalOpen}
+        onClose={closeNotApprovedModal}
+        title="Reason for Not Approved"
+      >
+        <div className="space-y-4">
+          <InputField
+            label="Reason for Non-Approval"
+            type="textarea"
+            value={state.notApprovedReason}
+            onChange={e =>
+              setState(prev => ({ ...prev, notApprovedReason: e.target.value }))
+            }
+            className="w-full"
+            rows="4"
+          />
+          <div className="flex gap-4">
+            <Button
+              onClick={handleNotApprovedSubmit}
+              disabled={isSubmitting}
+              className={`px-4 py-2 rounded-md ${
+                isSubmitting
+                  ? 'bg-indigo-400 text-white cursor-not-allowed'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+            <Button
+              onClick={closeNotApprovedModal}
+              disabled={isSubmitting}
+              className={`px-4 py-2 rounded-md ${
+                isSubmitting
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+              }`}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
