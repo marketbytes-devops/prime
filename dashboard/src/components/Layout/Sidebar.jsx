@@ -43,7 +43,8 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRFQOpen, setIsRFQOpen] = useState(false);
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
-  const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
+  const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] =
+    useState(false);
   const [isPostJobPhaseOpen, setIsPostJobPhaseOpen] = useState(false);
   const [isUserRolesOpen, setIsUserRolesOpen] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -86,8 +87,10 @@ const Sidebar = ({ toggleSidebar }) => {
   const togglePostJobPhase = () => setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
   const toggleUserRoles = () => setIsUserRolesOpen(!isUserRolesOpen);
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
-  const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
-  const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
+  const toggleInitiateWorkOrder = () =>
+    setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
+  const toggleProcessingWorkOrders = () =>
+    setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -225,13 +228,6 @@ const Sidebar = ({ toggleSidebar }) => {
       ],
     },
     {
-      to: "/profile",
-      label: "Profile",
-      icon: <User className="w-5 h-5 mr-3" />,
-      page: "Profile",
-      action: "view",
-    },
-    {
       label: "Additional Settings",
       icon: <Settings className="w-5 h-5 mr-3" />,
       page: "additional_settings",
@@ -303,6 +299,13 @@ const Sidebar = ({ toggleSidebar }) => {
         },
       ],
     },
+    {
+      to: "/profile",
+      label: "Profile",
+      icon: <User className="w-5 h-5 mr-3" />,
+      page: "Profile",
+      action: "view",
+    },
   ];
 
   const renderMenuItem = (item) => {
@@ -318,7 +321,9 @@ const Sidebar = ({ toggleSidebar }) => {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter((subItem) => {
         if (subItem.subItems) {
-          return subItem.subItems.some((nestedItem) => hasPermission(nestedItem.page, nestedItem.action));
+          return subItem.subItems.some((nestedItem) =>
+            hasPermission(nestedItem.page, nestedItem.action)
+          );
         }
         return hasPermission(subItem.page, subItem.action);
       });
@@ -328,7 +333,9 @@ const Sidebar = ({ toggleSidebar }) => {
       const isActiveSubmenu = (subItems) => {
         return subItems.some((subItem) => {
           if (subItem.subItems) {
-            return subItem.subItems.some((nestedItem) => location.pathname === nestedItem.to);
+            return subItem.subItems.some(
+              (nestedItem) => location.pathname === nestedItem.to
+            );
           }
           return location.pathname === subItem.to;
         });
@@ -344,18 +351,28 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Additional Settings") toggleSettings();
               else if (item.label === "User Roles") toggleUserRoles();
               else if (item.label === "RFQ") toggleRFQ();
-              else if (item.label === "Initiate Work Order") toggleInitiateWorkOrder();
-              else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
+              else if (item.label === "Initiate Work Order")
+                toggleInitiateWorkOrder();
+              else if (item.label === "Processing Work Orders")
+                toggleProcessingWorkOrders();
             }}
             className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-              (item.label === "Pre-Job" && (isPreJobOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "Job Execution" && (isJobExecutionOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "Post Job Phase" && (isPostJobPhaseOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "Additional Settings" && (isSettingsOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "User Roles" && (isUserRolesOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "RFQ" && (isRFQOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen || isActiveSubmenu(item.subItems))) ||
-              (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen || isActiveSubmenu(item.subItems)))
+              (item.label === "Pre-Job" &&
+                (isPreJobOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Job Execution" &&
+                (isJobExecutionOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Post Job Phase" &&
+                (isPostJobPhaseOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Additional Settings" &&
+                (isSettingsOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "User Roles" &&
+                (isUserRolesOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "RFQ" &&
+                (isRFQOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Initiate Work Order" &&
+                (isInitiateWorkOrderOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Processing Work Orders" &&
+                (isProcessingWorkOrdersOpen || isActiveSubmenu(item.subItems)))
                 ? "bg-indigo-100 text-indigo-600"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
             }`}
@@ -364,24 +381,71 @@ const Sidebar = ({ toggleSidebar }) => {
               {item.icon}
               {item.label}
             </span>
-            {(item.label === "Pre-Job" && (isPreJobOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "Job Execution" && (isJobExecutionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "Post Job Phase" && (isPostJobPhaseOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "Additional Settings" && (isSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "User Roles" && (isUserRolesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "RFQ" && (isRFQOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-             (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
+            {(item.label === "Pre-Job" &&
+              (isPreJobOpen ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              ))) ||
+              (item.label === "Job Execution" &&
+                (isJobExecutionOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Post Job Phase" &&
+                (isPostJobPhaseOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Additional Settings" &&
+                (isSettingsOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "User Roles" &&
+                (isUserRolesOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "RFQ" &&
+                (isRFQOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Initiate Work Order" &&
+                (isInitiateWorkOrderOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Processing Work Orders" &&
+                (isProcessingWorkOrdersOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )))}
           </button>
           <AnimatePresence>
-            {(item.label === "Pre-Job" ? isPreJobOpen :
-              item.label === "Job Execution" ? isJobExecutionOpen :
-              item.label === "Post Job Phase" ? isPostJobPhaseOpen :
-              item.label === "Additional Settings" ? isSettingsOpen :
-              item.label === "User Roles" ? isUserRolesOpen :
-              item.label === "RFQ" ? isRFQOpen :
-              item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
-              isProcessingWorkOrdersOpen) && (
+            {(item.label === "Pre-Job"
+              ? isPreJobOpen
+              : item.label === "Job Execution"
+              ? isJobExecutionOpen
+              : item.label === "Post Job Phase"
+              ? isPostJobPhaseOpen
+              : item.label === "Additional Settings"
+              ? isSettingsOpen
+              : item.label === "User Roles"
+              ? isUserRolesOpen
+              : item.label === "RFQ"
+              ? isRFQOpen
+              : item.label === "Initiate Work Order"
+              ? isInitiateWorkOrderOpen
+              : isProcessingWorkOrdersOpen) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}
@@ -391,12 +455,16 @@ const Sidebar = ({ toggleSidebar }) => {
               >
                 {filteredSubItems.map((subItem, subIndex) => (
                   <li key={subIndex}>
-                    {subItem.subItems ? renderMenuItem(subItem) : (
+                    {subItem.subItems ? (
+                      renderMenuItem(subItem)
+                    ) : (
                       <NavLink
                         to={subItem.to}
                         className={({ isActive }) =>
                           `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                            isActive ? "bg-indigo-500 text-white" : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
+                            isActive
+                              ? "bg-indigo-500 text-white"
+                              : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
                           }`
                         }
                         onClick={() => isMobile() && toggleSidebar()}
@@ -420,7 +488,9 @@ const Sidebar = ({ toggleSidebar }) => {
           to={item.to}
           className={({ isActive }) =>
             `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-              isActive ? "bg-indigo-500 text-white" : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+              isActive
+                ? "bg-indigo-500 text-white"
+                : "text-gray-700 hover:bg-indigo-500 hover:text-white"
             }`
           }
           onClick={() => isMobile() && toggleSidebar()}
