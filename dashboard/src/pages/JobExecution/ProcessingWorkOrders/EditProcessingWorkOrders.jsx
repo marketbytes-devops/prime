@@ -99,7 +99,23 @@ const EditProcessingWorkOrders = () => {
     }));
   };
  
+  const isFormValid = () => {
+    return state.items.every((item, index) => 
+      item.certificate_uut_label &&
+      item.certificate_number &&
+      item.calibration_date &&
+      item.calibration_due_date &&
+      item.uuc_serial_number &&
+      (item.certificate_file || state.fileChanges[index])
+    );
+  };
+ 
   const handleSubmit = async () => {
+    if (!isFormValid()) {
+      toast.error("Please fill all required certificate details for every item before saving.");
+      return;
+    }
+
     setState((prev) => ({ ...prev, isSaving: true }));
     try {
       const hasFileUploads = Object.keys(state.fileChanges).length > 0;
@@ -263,6 +279,7 @@ const EditProcessingWorkOrders = () => {
                   value={item.certificate_uut_label || ""}
                   onChange={(e) => handleItemChange(index, "certificate_uut_label", e.target.value)}
                   className="w-full"
+                  required
                 />
               </div>
               <div>
@@ -272,6 +289,7 @@ const EditProcessingWorkOrders = () => {
                   value={item.certificate_number || ""}
                   onChange={(e) => handleItemChange(index, "certificate_number", e.target.value)}
                   className="w-full"
+                  required
                 />
               </div>
               <div>
@@ -281,6 +299,7 @@ const EditProcessingWorkOrders = () => {
                   value={item.calibration_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_date", e.target.value)}
                   className="w-full"
+                  required
                 />
               </div>
               <div>
@@ -290,6 +309,7 @@ const EditProcessingWorkOrders = () => {
                   value={item.calibration_due_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_due_date", e.target.value)}
                   className="w-full"
+                  required
                 />
               </div>
               <div>
@@ -299,6 +319,7 @@ const EditProcessingWorkOrders = () => {
                   value={item.uuc_serial_number || ""}
                   onChange={(e) => handleItemChange(index, "uuc_serial_number", e.target.value)}
                   className="w-full"
+                  required
                 />
               </div>
               <div>
@@ -323,6 +344,7 @@ const EditProcessingWorkOrders = () => {
                   onChange={(e) => handleFileChange(index, e.target.files[0])}
                   className="w-full p-2 border rounded"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  required={!item.certificate_file}
                 />
                 {state.fileChanges[index] && (
                   <div className="mt-1 text-sm text-green-600">
@@ -336,8 +358,8 @@ const EditProcessingWorkOrders = () => {
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSubmit}
-            disabled={state.isSaving}
-            className={`px-4 py-2 rounded-md ${state.isSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            disabled={!isFormValid() || state.isSaving}
+            className={`px-4 py-2 rounded-md ${!isFormValid() || state.isSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
           >
             {state.isSaving ? "Saving..." : "Save Changes"}
           </Button>
