@@ -40,6 +40,7 @@ const ListPurchaseOrders = () => {
     splitOrderAssignedTo: "",
     isSubmitting: false,
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -85,7 +86,6 @@ const ListPurchaseOrders = () => {
           apiClient.get("quotations/"),
           apiClient.get("series/"),
         ]);
-
       const purchaseOrders = poRes.data || [];
       const workOrdersPromises = purchaseOrders.map((po) =>
         apiClient.get(`/work-orders/?purchase_order=${po.id}`).then((res) => ({
@@ -94,12 +94,10 @@ const ListPurchaseOrders = () => {
         }))
       );
       const workOrdersData = await Promise.all(workOrdersPromises);
-
       const updatedPurchaseOrders = purchaseOrders.map((po) => {
         const woData = workOrdersData.find((w) => w.id === po.id);
         return { ...po, work_orders: woData ? woData.work_orders : [] };
       });
-
       const workOrderStatusMap = {};
       updatedPurchaseOrders.forEach((po) => {
         workOrderStatusMap[po.id] =
@@ -107,7 +105,6 @@ const ListPurchaseOrders = () => {
             ? po.work_orders.map((wo) => ({ id: wo.id, status: wo.status }))
             : [];
       });
-
       setState((prev) => ({
         ...prev,
         purchaseOrders: updatedPurchaseOrders,
@@ -127,6 +124,15 @@ const ListPurchaseOrders = () => {
   useEffect(() => {
     fetchData();
   }, [location.pathname]);
+
+  const canConvertToWorkOrder = (poId) => {
+    const po = state.purchaseOrders.find((p) => p.id === poId);
+    return (
+      po &&
+      ["Collection Pending", "Collected"].includes(po.status) &&
+      (!state.workOrderStatusMap[poId] || state.workOrderStatusMap[poId].length === 0)
+    );
+  };
 
   const handleConvertToWO = (po) => {
     const savedItems = po.items.map((item) => ({
@@ -209,7 +215,6 @@ const ListPurchaseOrders = () => {
             }
           : item
       );
-
       const selectedItem = updatedItems.find((item) => item.id === itemId);
       if (
         assignedQuantity !== "" &&
@@ -222,7 +227,6 @@ const ListPurchaseOrders = () => {
         );
         return prev;
       }
-
       return { ...prev, savedItems: updatedItems };
     });
   };
@@ -253,7 +257,6 @@ const ListPurchaseOrders = () => {
     ) {
       return true;
     }
-
     const selectedItems = state.savedItems.filter((item) =>
       state.selectedItemIds.includes(item.id)
     );
@@ -265,7 +268,6 @@ const ListPurchaseOrders = () => {
         item.assigned_quantity <= item.remaining_quantity
     );
     if (!allHaveValidAssignedQuantity) return true;
-
     const isLastSplitOrder =
       state.createdSplitOrders.length + 1 === state.numberOfSplitOrders;
     if (isLastSplitOrder) {
@@ -283,7 +285,6 @@ const ListPurchaseOrders = () => {
       );
       if (!allItemsFullyAssigned) return true;
     }
-
     return false;
   };
 
@@ -319,7 +320,6 @@ const ListPurchaseOrders = () => {
       toast.error("No valid items selected.");
       return;
     }
-
     setState((prev) => {
       const updatedItems = prev.savedItems.map((item) =>
         prev.selectedItemIds.includes(item.id)
@@ -331,7 +331,6 @@ const ListPurchaseOrders = () => {
             }
           : item
       );
-
       return {
         ...prev,
         createdSplitOrders: [
@@ -380,7 +379,6 @@ const ListPurchaseOrders = () => {
         remarks: state.remarks,
         items: [],
       };
-
       let responses = [];
       if (state.woType === "Single") {
         const allHaveAssignedTo = state.savedItems.every(
@@ -388,7 +386,7 @@ const ListPurchaseOrders = () => {
             item.assigned_to !== "" &&
             state.technicians.some((t) => t.id === parseInt(item.assigned_to))
         );
-        if (!ანHaveAssignedTo) {
+        if (!allHaveAssignedTo) {
           toast.error("All items must be assigned to a valid technician.");
           setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
@@ -435,9 +433,7 @@ const ListPurchaseOrders = () => {
           responses.push(response.data);
         }
       }
-
       toast.success("Work Order(s) created successfully");
-
       const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
       responses.forEach((response) => {
         updatedWorkOrderStatusMap[state.selectedPO.id] = [
@@ -445,7 +441,6 @@ const ListPurchaseOrders = () => {
           { id: response.id, status: "Submitted" },
         ];
       });
-
       setState((prev) => ({
         ...prev,
         workOrderStatusMap: updatedWorkOrderStatusMap,
@@ -466,7 +461,6 @@ const ListPurchaseOrders = () => {
         splitOrderAssignedTo: "",
         isSubmitting: false,
       }));
-
       await fetchData();
     } catch (error) {
       console.error("Error creating work order:", {
@@ -713,15 +707,6 @@ const ListPurchaseOrders = () => {
   const getStatusDisplay = (poId) => {
     const po = state.purchaseOrders.find((p) => p.id === poId);
     return po ? po.status : "Collection Pending";
-  };
-
-  const canConvertToWorkOrder = (poId) => {
-    const po = state.purchaseOrders.find((p) => p.id === poId);
-    return (
-      po &&
-      po.status === "Collected" &&
-      (!state.workOrderStatusMap[poId] || state.workOrderStatusMap[poId].length === 0)
-    );
   };
 
   const remainingItems = state.savedItems.filter(
