@@ -145,9 +145,16 @@ const ListProcessingWorkOrders = () => {
   const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
     if (technicianIds.length === 0) return "None";
-    if (technicianIds.length > 1) return "Multiple";
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+    if (technicianIds.length === 1) {
+      const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+      return technician ? `${technician.name} (${technician.designation || "N/A"})` : "N/A";
+    }
+    // For Single work orders, list all technicians to avoid confusion
+    const technicians = technicianIds
+      .map((id) => state.technicians.find((t) => t.id === id))
+      .filter((t) => t)
+      .map((t) => `${t.name} (${t.designation || "N/A"})`);
+    return technicians.join(", ");
   };
 
   const handlePrint = (wo) => {

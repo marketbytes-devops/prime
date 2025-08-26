@@ -23,7 +23,7 @@ const ListPurchaseOrders = () => {
     isModalOpen: false,
     isWOModalOpen: false,
     selectedPO: null,
-    woType: "",
+    woType: "", // Changed to empty string for dropdown
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
@@ -125,13 +125,10 @@ const ListPurchaseOrders = () => {
     fetchData();
   }, [location.pathname]);
 
-  const canConvertToWorkOrder = (poId) => {
-    const po = state.purchaseOrders.find((p) => p.id === poId);
-    return (
-      po &&
-      ["Collection Pending", "Collected"].includes(po.status) &&
-      (!state.workOrderStatusMap[poId] || state.workOrderStatusMap[poId].length === 0)
-    );
+  // Removed canConvertToWorkOrder function as it's no longer needed
+  // The "Convert to Work Order" button is enabled unless a work order exists
+  const hasWorkOrder = (poId) => {
+    return state.workOrderStatusMap[poId]?.length > 0;
   };
 
   const handleConvertToWO = (po) => {
@@ -144,22 +141,16 @@ const ListPurchaseOrders = () => {
       unit_price: item.unit_price,
       remaining_quantity: item.quantity || 0,
       assigned_quantity: "",
-      assigned_to: state.woType === "Single" ? "" : undefined,
+      assigned_to: "",
     }));
-    const totalQuantity = savedItems.reduce(
-      (sum, item) => sum + (item.quantity || 0),
-      0
-    );
-    const woType = totalQuantity === 1 ? "Single" : "Split";
     setState((prev) => ({
       ...prev,
       isWOModalOpen: true,
       selectedPO: po,
       savedItems,
-      woType,
+      woType: "", // Reset to empty for dropdown
       numberOfSplitOrders: "",
-      selectedItemIds:
-        woType === "Single" ? savedItems.map((item) => item.id) : [],
+      selectedItemIds: [],
       createdSplitOrders: [],
       usedItemIds: [],
       splitOrderAssignedTo: "",
@@ -289,6 +280,7 @@ const ListPurchaseOrders = () => {
   };
 
   const isSubmitDisabled = () => {
+    if (!state.woType) return true; // Disable submit if no WO type selected
     if (state.woType === "Single") {
       const allHaveAssignedTo = state.savedItems.every(
         (item) =>
@@ -378,6 +370,7 @@ const ListPurchaseOrders = () => {
         site_location: state.site_location,
         remarks: state.remarks,
         items: [],
+        wo_type: state.woType,
       };
       let responses = [];
       if (state.woType === "Single") {
@@ -433,7 +426,11 @@ const ListPurchaseOrders = () => {
           responses.push(response.data);
         }
       }
-      toast.success("Work Order(s) created successfully");
+      // Update PO status to Completed
+      await apiClient.patch(`/purchase-orders/${state.selectedPO.id}/update_status/`, {
+        status: "Completed",
+      });
+      toast.success("Work Order(s) created successfully and Purchase Order marked as Completed.");
       const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
       responses.forEach((response) => {
         updatedWorkOrderStatusMap[state.selectedPO.id] = [
@@ -758,6 +755,7 @@ const ListPurchaseOrders = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Created At
                 </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Purchase Order Series Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   PO Number
                 </th>
@@ -791,6 +789,7 @@ const ListPurchaseOrders = () => {
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(po.created_at).toLocaleDateString()}
                     </td>
+                    <td className="border p-2 whitespace-nowrap">{po.series_number || "N/A"}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {po.client_po_number || "N/A"}
                     </td>
@@ -809,6 +808,7 @@ const ListPurchaseOrders = () => {
                           Collection Pending
                         </option>
                         <option value="Collected">Collected</option>
+                        <option value="Completed">Completed</option>
                       </select>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -821,8 +821,12 @@ const ListPurchaseOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleConvertToWO(po)}
-                          className="px-3 py-1 text-white rounded-md text-sm bg-blue-600 hover:bg-blue-700"
-                          disabled={!canConvertToWorkOrder(po.id)}
+                          disabled={hasWorkOrder(po.id)}
+                          className={`px-3 py-1 text-white rounded-md text-sm ${
+                            hasWorkOrder(po.id)
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : "bg-blue-600 hover:bg-blue-700"
+                          }`}
                         >
                           Convert to Work Order
                         </Button>
@@ -894,9 +898,7 @@ const ListPurchaseOrders = () => {
               <h3 className="text-lg font-medium text-black">
                 Purchase Order Details
               </h3>
-              <p>
-                <strong>PO ID:</strong> {state.selectedPO.id}
-              </p>
+              <p><strong>Series Number:</strong> {state.selectedPO.series_number || "N/A"}</p>
               <p>
                 <strong>Client PO Number:</strong>{" "}
                 {state.selectedPO.client_po_number || "N/A"}
@@ -985,13 +987,15 @@ const ListPurchaseOrders = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Work Order Type
             </label>
-            <InputField
-              type="text"
+            <select
               value={state.woType}
-              onChange={() => {}}
-              disabled
-              className="w-full p-2 border rounded bg-gray-100"
-            />
+              onChange={(e) => setState((prev) => ({ ...prev, woType: e.target.value }))}
+              className="p-2 border rounded w-full"
+            >
+              <option value="">Select Work Order Type</option>
+              <option value="Single">Single</option>
+              <option value="Split">Split</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

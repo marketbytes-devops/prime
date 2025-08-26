@@ -50,7 +50,8 @@ class WorkOrder(models.Model):
     )
     due_in_days = models.IntegerField(null=True, blank=True)
     received_date = models.DateField(null=True, blank=True)
-
+    wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
+    
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 

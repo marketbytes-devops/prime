@@ -66,12 +66,11 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "id",
             "dn_number",
             "work_order",
-            "work_order_id",  # Add this field
+            "work_order_id",
             "signed_delivery_note",
             "delivery_status",
             "created_at",
         ]
-
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
@@ -95,7 +94,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     )
     due_in_days = serializers.IntegerField(required=False, allow_null=True)
     received_date = serializers.DateField(required=False, allow_null=True)
-
+    wo_type = serializers.CharField(required=False, allow_null=True)
+    
     class Meta:
         model = WorkOrder
         fields = [
@@ -124,65 +124,96 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "invoice_status",
             "due_in_days",
             "received_date",
+            "wo_type",
         ]
 
     def send_assignment_email(self, work_order, items_data):
-        assigned_technicians = {
-            item_data.get("assigned_to")
-            for item_data in items_data
-            if item_data.get("assigned_to")
-        }
-        for technician in assigned_technicians:
-            if technician and technician.email:
-                assigned_items = [
-                    item_data
-                    for item_data in items_data
-                    if item_data.get("assigned_to") == technician
-                ]
-                item_details = "\n".join(
-                    f"- {Item.objects.get(id=item_data['item'].id if hasattr(item_data['item'], 'id') else item_data['item']).name}: "
-                    f"{item_data['quantity']} {Unit.objects.get(id=item_data['unit'].id if hasattr(item_data['unit'], 'id') else item_data['unit']).name}"
-                    for item_data in assigned_items
-                )
-                subject = f"You Have Been Assigned to Work Order #{work_order.wo_number}"
-                message = (
-                    f"Dear {technician.name},\n\n"
-                    f"You have been assigned to Work Order #{work_order.wo_number}:\n"
-                    f'Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                    f"Status: {work_order.status}\n"
-                    f'Expected Completion: {work_order.expected_completion_date or "Not specified"}\n'
-                    f"Assigned Items:\n{item_details}\n\n"
-                    f"Please check PrimeCRM for details.\n\n"
-                    f"Best regards,\nPrimeCRM Team"
-                )
+        """
+        Send an email to each technician with all their assigned items.
+        Ensures all items for a technician are included, even for 'Single' work orders.
+        """
+        # Group items by technician
+        technician_items = {}
+        for item_data in items_data:
+            technician = item_data.get("assigned_to")
+            if technician and hasattr(technician, 'email') and technician.email:
+                technician_id = technician.id
+                if technician_id not in technician_items:
+                    technician_items[technician_id] = {
+                        'name': technician.name,
+                        'email': technician.email,
+                        'items': []
+                    }
                 try:
-                    send_mail(
-                        subject, message, None, [technician.email], fail_silently=True
+                    # Retrieve item and unit names
+                    item_id = item_data['item'].id if hasattr(item_data['item'], 'id') else item_data['item']
+                    unit_id = item_data['unit'].id if hasattr(item_data['unit'], 'id') else item_data['unit']
+                    item_name = Item.objects.get(id=item_id).name if item_id else "N/A"
+                    unit_name = Unit.objects.get(id=unit_id).name if unit_id else "N/A"
+                    quantity = item_data.get('quantity', 'N/A')
+                    technician_items[technician_id]['items'].append(
+                        f"- {item_name}: {quantity} {unit_name}"
                     )
-                    logger.info(f"Email sent to {technician.email} for WO #{work_order.wo_number}")
-                except Exception as e:
-                    logger.error(f"Failed to send email to {technician.email}: {str(e)}")
+                except (Item.DoesNotExist, Unit.DoesNotExist) as e:
+                    logger.error(f"Error retrieving item/unit for WO #{work_order.wo_number}: {str(e)}")
+                    technician_items[technician_id]['items'].append(
+                        f"- Unknown Item: {item_data.get('quantity', 'N/A')} N/A"
+                    )
 
-                admin_email = settings.ADMIN_EMAIL
-                admin_subject = f"Work Order Assignment – #{work_order.wo_number}"
-                admin_message = (
-                    f"Work Order #{work_order.wo_number} assigned to {technician.name} ({technician.email}).\n"
-                    f'Project: {work_order.quotation.company_name or "Unnamed"}\n'
-                    f"Status: {work_order.status}\n"
-                    f'Expected Completion: {work_order.expected_completion_date or "Not specified"}\n'
-                    f"Assigned Items:\n{item_details}"
+        # Get project name
+        project_name = (
+            work_order.quotation.company_name
+            if work_order.quotation and hasattr(work_order.quotation, 'company_name')
+            else "Unnamed"
+        )
+
+        # Send email to each technician
+        for tech_id, tech_info in technician_items.items():
+            subject = f"You Have Been Assigned to Work Order #{work_order.wo_number}"
+            item_details = "\n".join(tech_info['items']) if tech_info['items'] else "No items assigned"
+            message = (
+                f"Dear {tech_info['name']},\n\n"
+                f"You have been assigned to Work Order #{work_order.wo_number}:\n"
+                f"Project: {project_name}\n"
+                f"Status: {work_order.status}\n"
+                f"Expected Completion: {work_order.expected_completion_date or 'Not specified'}\n"
+                f"Assigned Items:\n{item_details}\n\n"
+                f"Please check PrimeCRM for details.\n\n"
+                f"Best regards,\nPrimeCRM Team"
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[tech_info['email']],
+                    fail_silently=True
                 )
-                try:
-                    send_mail(
-                        admin_subject,
-                        admin_message,
-                        None,
-                        [admin_email],
-                        fail_silently=True,
-                    )
-                    logger.info(f"Admin email sent to {admin_email} for WO #{work_order.wo_number}")
-                except Exception as e:
-                    logger.error(f"Failed to send admin email to {admin_email}: {str(e)}")
+                logger.info(f"Email sent to {tech_info['email']} for WO #{work_order.wo_number}")
+            except Exception as e:
+                logger.error(f"Failed to send email to {tech_info['email']} for WO #{work_order.wo_number}: {str(e)}")
+
+            # Send admin notification
+            admin_email = settings.ADMIN_EMAIL
+            admin_subject = f"Work Order Assignment – #{work_order.wo_number}"
+            admin_message = (
+                f"Work Order #{work_order.wo_number} assigned to {tech_info['name']} ({tech_info['email']}).\n"
+                f"Project: {project_name}\n"
+                f"Status: {work_order.status}\n"
+                f"Expected Completion: {work_order.expected_completion_date or 'Not specified'}\n"
+                f"Assigned Items:\n{item_details}"
+            )
+            try:
+                send_mail(
+                    subject=admin_subject,
+                    message=admin_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[admin_email],
+                    fail_silently=True
+                )
+                logger.info(f"Admin email sent to {admin_email} for WO #{work_order.wo_number}")
+            except Exception as e:
+                logger.error(f"Failed to send admin email to {admin_email} for WO #{work_order.wo_number}: {str(e)}")
 
     def send_invoice_status_change_email(self, work_order, new_status):
         """Send email to admin when invoice_status changes."""
