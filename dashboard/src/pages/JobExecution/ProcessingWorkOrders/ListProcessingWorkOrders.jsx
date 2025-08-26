@@ -253,7 +253,6 @@ const ListProcessingWorkOrders = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Equipment Collection Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -272,7 +271,6 @@ const ListProcessingWorkOrders = () => {
                     <td className="border p-2 whitespace-nowrap">{wo.wo_number || "N/A"}</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(wo.items)}</td>
                     <td className="border p-2 whitespace-nowrap">{wo.equipment_collection_status || "Pending"}</td>
-                    <td className="border p-2 whitespace-nowrap">{wo.manager_approval_status || "Pending"}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
