@@ -33,7 +33,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import logo from "../../assets/images/img-logo.png";
+import logo from "../../assets/images/img-logo.webp";
 import apiClient from "../../helpers/apiClient";
 
 const Sidebar = ({ toggleSidebar }) => {
