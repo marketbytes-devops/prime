@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import WorkOrder, WorkOrderItem, DeliveryNote
+from .models import WorkOrder, WorkOrderItem, DeliveryNote, DeliveryNoteItem
 from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
 from unit.models import Unit
@@ -13,6 +13,34 @@ from datetime import date, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
+
+class DeliveryNoteItemSerializer(serializers.ModelSerializer):
+    item = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(), allow_null=True
+    )
+
+    class Meta:
+        model = DeliveryNoteItem
+        fields = [
+            "id",
+            "item",
+            "make",
+            "dial_size",
+            "case",
+            "connection",
+            "wetted_parts",
+            "range",
+            "quantity",
+            "delivered_quantity",
+            "uom",
+        ]
+
+    def validate(self, data):
+        if data.get("quantity") != data.get("delivered_quantity"):
+            raise serializers.ValidationError(
+                {"delivered_quantity": "Delivered quantity must equal quantity."}
+            )
+        return data
 
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
@@ -34,7 +62,7 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit",
             "unit_price",
-            "range", 
+            "range",
             "certificate_uut_label",
             "certificate_number",
             "calibration_date",
@@ -56,7 +84,6 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        """Ensure required fields are provided during updates if they were previously set."""
         instance = getattr(self, "instance", None)
         is_update = instance is not None
         if is_update and instance.range is not None and "range" not in data:
@@ -65,11 +92,11 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             )
         return data
 
-
 class DeliveryNoteSerializer(serializers.ModelSerializer):
     work_order_id = serializers.PrimaryKeyRelatedField(
         source="work_order", read_only=True
     )
+    items = DeliveryNoteItemSerializer(many=True, required=False)
 
     class Meta:
         model = DeliveryNote
@@ -81,8 +108,17 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "signed_delivery_note",
             "delivery_status",
             "created_at",
+            "items",
         ]
 
+class InitiateDeliverySerializer(serializers.Serializer):
+    delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])
+    items = DeliveryNoteItemSerializer(many=True)
+
+    def validate(self, data):
+        if not data.get("items"):
+            raise serializers.ValidationError({"items": "At least one item is required."})
+        return data
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
@@ -164,18 +200,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                         if hasattr(item_data["unit"], "id")
                         else item_data["unit"]
                     )
-                    item_name = Item.objects.get(id=item_id).name if item_id else "N/A"
-                    unit_name = Unit.objects.get(id=unit_id).name if unit_id else "N/A"
-                    quantity = item_data.get("quantity", "N/A")
+                    item_name = Item.objects.get(id=item_id).name if item_id else "Not Provided"
+                    unit_name = Unit.objects.get(id=unit_id).name if unit_id else "Not Provided"
+                    quantity = item_data.get("quantity", "Not Provided")
                     technician_items[technician_id]["items"].append(
-                        f"- {item_name}: {quantity} {unit_name} (Range: {item_data.get('range', 'N/A')})"
+                        f"- {item_name}: {quantity} {unit_name} (Range: {item_data.get('range', 'Not Provided')})"
                     )
                 except (Item.DoesNotExist, Unit.DoesNotExist) as e:
                     logger.error(
                         f"Error retrieving item/unit for WO #{work_order.wo_number}: {str(e)}"
                     )
                     technician_items[technician_id]["items"].append(
-                        f"- Unknown Item: {item_data.get('quantity', 'N/A')} N/A"
+                        f"- Unknown Item: {item_data.get('quantity', 'Not Provided')} Not Provided"
                     )
 
         project_name = (
@@ -435,7 +471,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 f"{prefix}quantity": "quantity",
                 f"{prefix}unit": "unit",
                 f"{prefix}unit_price": "unit_price",
-                f"{prefix}range": "range", 
+                f"{prefix}range": "range",
                 f"{prefix}certificate_uut_label": "certificate_uut_label",
                 f"{prefix}certificate_number": "certificate_number",
                 f"{prefix}calibration_date": "calibration_date",
@@ -526,7 +562,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
         for item_data in items_data:
-            item_data.setdefault("range", None)  
+            item_data.setdefault("range", None)
             logger.info(f"Creating item with data: {dict(item_data)}")
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")

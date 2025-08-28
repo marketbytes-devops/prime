@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
@@ -6,6 +7,7 @@ import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
 
 const Delivery = () => {
+  const navigate = useNavigate();
   const [state, setState] = useState({
     deliveryNotes: [],
     technicians: [],
@@ -67,22 +69,30 @@ const Delivery = () => {
       ]);
 
       const deliveryNotes = dnRes.data || [];
+      console.log('Fetched deliveryNotes:', deliveryNotes); 
 
       const workOrdersPromises = deliveryNotes.map((dn) =>
         apiClient.get(`/work-orders/${dn.work_order_id}/`).then((res) => ({
-          id: dn.id,
+          id: dn.work_order_id, 
           work_order: res.data || {},
-        }))
+        })).catch((error) => {
+          console.error(`Error fetching work order ${dn.work_order_id}:`, error);
+          return { id: dn.work_order_id, work_order: {} };
+        })
       );
 
       const workOrdersData = await Promise.all(workOrdersPromises);
+      console.log('Fetched workOrdersData:', workOrdersData);
+
       const updatedDeliveryNotes = deliveryNotes.map((dn) => {
-        const woData = workOrdersData.find((w) => w.id === dn.id);
+        const woData = workOrdersData.find((w) => w.id === dn.work_order_id);
         return {
           ...dn,
           work_order: woData ? woData.work_order : {},
         };
       });
+
+      console.log('Updated deliveryNotes:', updatedDeliveryNotes);
 
       setState((prev) => ({
         ...prev,
@@ -108,7 +118,6 @@ const Delivery = () => {
       await apiClient.post(`delivery-notes/${state.selectedDN.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      await apiClient.patch(`delivery-notes/${state.selectedDN.id}/`, { delivery_status: 'Delivered' });
       toast.success('Signed Delivery Note uploaded and status updated to Delivered.');
       setState((prev) => ({
         ...prev,
@@ -142,12 +151,12 @@ const Delivery = () => {
     }
   };
 
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'None';
+  const handleInitiateDelivery = (workOrder) => {
+    navigate(`/job-execution/processing-work-orders/delivery/${workOrder.id}`);
+  };
+
+  const hasDeliveryNote = (workOrderId) => {
+    return state.deliveryNotes.some((dn) => dn.work_order_id === workOrderId);
   };
 
   const filteredDNs = state.deliveryNotes
@@ -164,9 +173,13 @@ const Delivery = () => {
       return 0;
     });
 
+  console.log('Filtered deliveryNotes:', filteredDNs);
+
   const totalPages = Math.ceil(filteredDNs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentDNs = filteredDNs.slice(startIndex, startIndex + state.itemsPerPage);
+  console.log('Current deliveryNotes:', currentDNs);
+
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
@@ -192,6 +205,9 @@ const Delivery = () => {
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Delivery</h1>
+      {filteredDNs.length === 0 && (
+        <p className="text-gray-500 mb-4">No delivery notes match the current filter.</p>
+      )}
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4 items-center">
           <div className="flex-1">
@@ -231,47 +247,78 @@ const Delivery = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivery Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {currentDNs.map((dn, index) => (
-                <tr key={dn.id} className="border hover:bg-gray-50">
-                  <td className="border p-2">{startIndex + index + 1}</td>
-                  <td className="border p-2">{dn.dn_number || 'N/A'}</td>
-                  <td className="border p-2">{dn.work_order?.wo_number || 'N/A'}</td>
-                  <td className="border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
-                  <td className="border p-2">{dn.work_order?.items ? getAssignedTechnicians(dn.work_order.items) : 'None'}</td>
-                  <td className="border p-2">{dn.delivery_status}</td>
-                  <td className="border p-2">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => handleViewWO(dn.work_order?.id)}
-                        className="whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                      >
-                        View WO
-                      </Button>
-                      <Button
-                        onClick={() => handleOpenModal(dn)}
-                        disabled={!hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'}
-                        className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                          hasPermission('delivery', 'edit') && dn.delivery_status !== 'Delivered'
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
-                      >
-                        Upload Signed DN
-                      </Button>
-                    </div>
+              {currentDNs.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                    No delivery notes available.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                currentDNs.map((dn, index) => (
+                  <tr key={dn.id} className="border hover:bg-gray-50">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{dn.dn_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{dn.work_order?.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {dn.created_at ? new Date(dn.created_at).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="border p-2 whitespace-nowrap">{dn.delivery_status || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleViewWO(dn.work_order?.id)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
+                        >
+                          View WO
+                        </Button>
+                        <Button
+                          onClick={() => handleOpenModal(dn)}
+                          disabled={
+                            !hasPermission('delivery', 'edit') ||
+                            !hasDeliveryNote(dn.work_order?.id) ||
+                            dn.delivery_status === 'Delivered'
+                          }
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            hasPermission('delivery', 'edit') &&
+                            hasDeliveryNote(dn.work_order?.id) &&
+                            dn.delivery_status !== 'Delivered'
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Upload Signed DN
+                        </Button>
+                        <Button
+                          onClick={() => handleInitiateDelivery(dn.work_order)}
+                          disabled={
+                            !hasPermission('delivery', 'edit') ||
+                            hasDeliveryNote(dn.work_order?.id) ||
+                            dn.work_order?.status !== 'Approved'
+                          }
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            hasPermission('delivery', 'edit') &&
+                            !hasDeliveryNote(dn.work_order?.id) &&
+                            dn.work_order?.status === 'Approved'
+                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Initiate Delivery
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -280,7 +327,7 @@ const Delivery = () => {
             <Button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit whitespace-nowrap"
             >
               Prev
             </Button>
@@ -288,7 +335,7 @@ const Delivery = () => {
               <Button
                 key={page}
                 onClick={() => handlePageChange(page)}
-                className={`px-3 py-1 rounded-md min-w-fit ${
+                className={`px-3 py-1 rounded-md min-w-fit whitespace-nowrap ${
                   state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
@@ -298,7 +345,7 @@ const Delivery = () => {
             <Button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit whitespace-nowrap"
             >
               Next
             </Button>
@@ -323,7 +370,7 @@ const Delivery = () => {
             <Button
               onClick={handleUploadSignedNote}
               disabled={!state.signedDeliveryNote || !hasPermission('delivery', 'edit')}
-              className={`whitespace-nowrap px-4 py-2 rounded-md ${
+              className={`px-4 py-2 rounded-md whitespace-nowrap ${
                 state.signedDeliveryNote && hasPermission('delivery', 'edit')
                   ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -333,7 +380,7 @@ const Delivery = () => {
             </Button>
             <Button
               onClick={() => setState((prev) => ({ ...prev, isModalOpen: false, selectedDN: null, signedDeliveryNote: null }))}
-              className="whitespace-nowrap px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 whitespace-nowrap"
             >
               Cancel
             </Button>
@@ -345,13 +392,13 @@ const Delivery = () => {
         onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
-        {state.selectedWO && (
+        {state.selectedWO ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
@@ -369,7 +416,6 @@ const Delivery = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
@@ -386,7 +432,6 @@ const Delivery = () => {
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
@@ -412,6 +457,8 @@ const Delivery = () => {
               )}
             </div>
           </div>
+        ) : (
+          <p className="text-gray-500">No work order selected.</p>
         )}
       </Modal>
     </div>

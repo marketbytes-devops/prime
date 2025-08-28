@@ -182,7 +182,7 @@ const Sidebar = ({ toggleSidebar }) => {
             },
             {
               to: "/job-execution/processing-work-orders/delivery",
-              label: "For-Delivery",
+              label: "For Delivery",
               icon: <Truck className="w-5 h-5 mr-3" />,
               page: "delivery",
               action: "view",

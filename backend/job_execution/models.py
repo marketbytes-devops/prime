@@ -59,7 +59,7 @@ class WorkOrderItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    range = models.CharField(max_length=100,null=True, blank=True)  # Added range field
+    range = models.CharField(max_length=100, null=True, blank=True)
     certificate_uut_label = models.CharField(max_length=100, null=True, blank=True)
     certificate_number = models.CharField(max_length=100, null=True, blank=True)
     calibration_date = models.DateField(null=True, blank=True)
@@ -83,3 +83,19 @@ class DeliveryNote(models.Model):
 
     def __str__(self):
         return f"DN {self.dn_number} - {self.work_order.wo_number}"
+
+class DeliveryNoteItem(models.Model):
+    delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')
+    item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
+    make = models.CharField(max_length=100, null=True, blank=True)
+    dial_size = models.CharField(max_length=100, null=True, blank=True)
+    case = models.CharField(max_length=100, null=True, blank=True)
+    connection = models.CharField(max_length=100, null=True, blank=True)
+    wetted_parts = models.CharField(max_length=100, null=True, blank=True)
+    range = models.CharField(max_length=100, null=True, blank=True)
+    quantity = models.PositiveIntegerField(null=True, blank=True)
+    delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
+    uom = models.CharField(max_length=50, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.item} - {self.delivery_note}"

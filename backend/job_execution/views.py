@@ -2,10 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import WorkOrder, DeliveryNote
-from .serializers import WorkOrderSerializer, DeliveryNoteSerializer
+from .models import WorkOrder, DeliveryNote, DeliveryNoteItem
+from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer
 from django.db.models import Max
 import logging
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         work_order.manager_approval_status = 'Declined'
-        work_order.status = 'Declined'  # Updated to 'Declined' instead of 'Submitted'
+        work_order.status = 'Declined'
         work_order.decline_reason = decline_reason
         work_order.save()
 
@@ -132,7 +133,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         work_order.manager_approval_status = 'Pending'
         work_order.status = 'Manager Approval'
-        work_order.decline_reason = None  # Clear the decline reason on resubmit
+        work_order.decline_reason = None
         work_order.save()
 
         logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
@@ -140,7 +141,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
-        """Custom action to update invoice_status with due_in_days or received_date."""
         work_order = self.get_object()
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
@@ -166,7 +166,100 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         logger.error(f"Invoice status update failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    @action(detail=True, methods=['post'], url_path='initiate-delivery')
+    def initiate_delivery(self, request, pk=None):
+        work_order = self.get_object()
+        if work_order.status != 'Approved':
+            logger.warning(f"WorkOrder {pk} not in Approved status for initiating delivery")
+            return Response({'error': 'Work Order must be in Approved status to initiate delivery'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = InitiateDeliverySerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.error(f"Initiate delivery failed: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        delivery_type = serializer.validated_data['delivery_type']
+        items_data = serializer.validated_data['items']
+
+        from series.models import NumberSeries
+        try:
+            dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
+            prefix = dn_series.prefix
+        except NumberSeries.DoesNotExist:
+            logger.error("Delivery Note series not found, using default prefix 'DN'")
+            prefix = 'DN'
+
+        with transaction.atomic():
+            if delivery_type == 'Single':
+                max_sequence = DeliveryNote.objects.filter(dn_number__startswith=prefix).aggregate(
+                    Max('dn_number')
+                )['dn_number__max']
+                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                dn_number = f"{prefix}-{sequence:06d}"
+
+                delivery_note = DeliveryNote.objects.create(
+                    work_order=work_order,
+                    dn_number=dn_number,
+                    delivery_status='Delivery Pending'
+                )
+
+                for item_data in items_data:
+                    DeliveryNoteItem.objects.create(
+                        delivery_note=delivery_note,
+                        item=item_data.get('item'),
+                        make=item_data.get('make'),
+                        dial_size=item_data.get('dial_size'),
+                        case=item_data.get('case'),
+                        connection=item_data.get('connection'),
+                        wetted_parts=item_data.get('wetted_parts'),
+                        range=item_data.get('range'),
+                        quantity=item_data.get('quantity'),
+                        delivered_quantity=item_data.get('delivered_quantity'),
+                        uom=item_data.get('uom')
+                    )
+                logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items_data)} items")
+
+            else:  # Multiple
+                technician_items = {}
+                for item_data in items_data:
+                    assigned_to = work_order.items.filter(item=item_data.get('item')).first().assigned_to
+                    technician_id = assigned_to.id if assigned_to else 'unassigned'
+                    if technician_id not in technician_items:
+                        technician_items[technician_id] = []
+                    technician_items[technician_id].append(item_data)
+
+                for technician_id, items in technician_items.items():
+                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=prefix).aggregate(
+                        Max('dn_number')
+                    )['dn_number__max']
+                    sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                    dn_number = f"{prefix}-{sequence:06d}"
+
+                    delivery_note = DeliveryNote.objects.create(
+                        work_order=work_order,
+                        dn_number=dn_number,
+                        delivery_status='Delivery Pending'
+                    )
+
+                    for item_data in items:
+                        DeliveryNoteItem.objects.create(
+                            delivery_note=delivery_note,
+                            item=item_data.get('item'),
+                            make=item_data.get('make'),
+                            dial_size=item_data.get('dial_size'),
+                            case=item_data.get('case'),
+                            connection=item_data.get('connection'),
+                            wetted_parts=item_data.get('wetted_parts'),
+                            range=item_data.get('range'),
+                            quantity=item_data.get('quantity'),
+                            delivered_quantity=item_data.get('delivered_quantity'),
+                            uom=item_data.get('uom')
+                        )
+                    logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items)} items for technician {technician_id}")
+
+        return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type})
+
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
     serializer_class = DeliveryNoteSerializer

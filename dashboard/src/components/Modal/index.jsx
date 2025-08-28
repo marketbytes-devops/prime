@@ -1,13 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, className }) => {
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 backdrop-brightness-50 flex items-center justify-center z-50"
+          className={`fixed inset-0 backdrop-brightness-50 flex items-center justify-center z-50 ${className}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

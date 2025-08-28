@@ -37,6 +37,7 @@ import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
 import apiClient from "./helpers/apiClient";
 import Loading from "./components/Loading";
+import InitiateDelivery from "./pages/JobExecution/ProcessingWorkOrders/InitiateDelivery";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -215,6 +216,14 @@ function App() {
           element: (
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="view">
               <Delivery />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/job-execution/processing-work-orders/delivery/:id",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="view">
+              <InitiateDelivery />
             </ProtectedRoute>
           ),
         },
