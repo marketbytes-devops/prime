@@ -25,7 +25,7 @@ const ViewQuotation = () => {
     isUploadPoModalOpen: false,
     partialOrders: [],
     poUploads: {},
-    fullOrderPo: { clientPoNumber: '', poFile: null },
+    fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
     isNotApprovedModalOpen: false,
     notApprovedReason: '',
     selectedQuotationId: null,
@@ -155,7 +155,7 @@ const ViewQuotation = () => {
       partialOrders: currentPartialOrders,
       poUploads: currentPartialOrders.reduce((acc, po) => ({
         ...acc,
-        [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null },
+        [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null, poStatus: po.client_po_number || po.po_file ? 'available' : 'not_available' },
       }), {}),
     }));
   };
@@ -180,11 +180,13 @@ const ViewQuotation = () => {
       const formData = new FormData();
       formData.append('quotation', state.selectedQuotation.id);
       formData.append('order_type', 'full');
-      if (state.fullOrderPo.clientPoNumber) {
-        formData.append('client_po_number', state.fullOrderPo.clientPoNumber);
-      }
-      if (state.fullOrderPo.poFile) {
-        formData.append('po_file', state.fullOrderPo.poFile);
+      if (state.fullOrderPo.poStatus === 'available') {
+        if (state.fullOrderPo.clientPoNumber) {
+          formData.append('client_po_number', state.fullOrderPo.clientPoNumber);
+        }
+        if (state.fullOrderPo.poFile) {
+          formData.append('po_file', state.fullOrderPo.poFile);
+        }
       }
 
       await apiClient.post('/purchase-orders/', formData, {
@@ -196,7 +198,7 @@ const ViewQuotation = () => {
         ...prev,
         isFullOrderModalOpen: false,
         selectedQuotation: null,
-        fullOrderPo: { clientPoNumber: '', poFile: null },
+        fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
       }));
       toast.success('Full Purchase Order created successfully.');
     } catch (error) {
@@ -208,11 +210,18 @@ const ViewQuotation = () => {
   const handlePoUploadSubmit = async () => {
     try {
       for (const poId of Object.keys(state.poUploads)) {
-        const { clientPoNumber, poFile } = state.poUploads[poId];
-        if (clientPoNumber || poFile) {
+        const { clientPoNumber, poFile, poStatus } = state.poUploads[poId];
+        if (poStatus === 'available' && (clientPoNumber || poFile)) {
           const formData = new FormData();
           if (clientPoNumber) formData.append('client_po_number', clientPoNumber);
           if (poFile) formData.append('po_file', poFile);
+          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } else if (poStatus === 'not_available') {
+          const formData = new FormData();
+          formData.append('client_po_number', '');
+          formData.append('po_file', '');
           await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
@@ -246,13 +255,13 @@ const ViewQuotation = () => {
     }
   };
 
-const handleNotApprovedSubmit = async () => {
+  const handleNotApprovedSubmit = async () => {
     if (!state.notApprovedReason.trim()) {
       toast.error('Please provide a reason for non-approval.');
       return;
     }
     try {
-      setIsSubmitting(true); 
+      setIsSubmitting(true);
       await apiClient.patch(`/quotations/${state.selectedQuotationId}/update_status/`, {
         status: 'Not Approved',
         not_approved_reason_remark: state.notApprovedReason,
@@ -280,7 +289,7 @@ const handleNotApprovedSubmit = async () => {
       selectedQuotationId: null,
       notApprovedReason: '',
     }));
-    setIsSubmitting(false); 
+    setIsSubmitting(false);
   };
 
   const handlePrint = quotation => {
@@ -468,7 +477,7 @@ const handleNotApprovedSubmit = async () => {
       ...prev,
       isFullOrderModalOpen: false,
       selectedQuotation: null,
-      fullOrderPo: { clientPoNumber: '', poFile: null },
+      fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
     }));
   };
 
@@ -970,27 +979,74 @@ const handleNotApprovedSubmit = async () => {
         title={`Create Full PO for Quotation ${state.selectedQuotation?.id}`}
       >
         <div className="space-y-4">
-          <InputField
-            label="Client PO Number"
-            type="text"
-            value={state.fullOrderPo.clientPoNumber}
-            onChange={e =>
-              setState(prev => ({
-                ...prev,
-                fullOrderPo: { ...prev.fullOrderPo, clientPoNumber: e.target.value },
-              }))
-            }
-          />
-          <InputField
-            label="Upload PO File"
-            type="file"
-            onChange={e =>
-              setState(prev => ({
-                ...prev,
-                fullOrderPo: { ...prev.fullOrderPo, poFile: e.target.files[0] },
-              }))
-            }
-          />
+          <h3 className="text-lg font-medium text-black">PO Status</h3>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={state.fullOrderPo.poStatus === 'available'}
+                onChange={() =>
+                  setState(prev => ({
+                    ...prev,
+                    fullOrderPo: {
+                      ...prev.fullOrderPo,
+                      poStatus: 'available',
+                      clientPoNumber: '',
+                      poFile: null,
+                    },
+                  }))
+                }
+                className="mr-2"
+              />
+              PO Available
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={state.fullOrderPo.poStatus === 'not_available'}
+                onChange={() =>
+                  setState(prev => ({
+                    ...prev,
+                    fullOrderPo: {
+                      ...prev.fullOrderPo,
+                      poStatus: 'not_available',
+                      clientPoNumber: '',
+                      poFile: null,
+                    },
+                  }))
+                }
+                className="mr-2"
+              />
+              Not Available
+            </label>
+          </div>
+          {state.fullOrderPo.poStatus === 'available' ? (
+            <div className="space-y-4">
+              <InputField
+                label="Client PO Number"
+                type="text"
+                value={state.fullOrderPo.clientPoNumber}
+                onChange={e =>
+                  setState(prev => ({
+                    ...prev,
+                    fullOrderPo: { ...prev.fullOrderPo, clientPoNumber: e.target.value },
+                  }))
+                }
+              />
+              <InputField
+                label="Upload PO File"
+                type="file"
+                onChange={e =>
+                  setState(prev => ({
+                    ...prev,
+                    fullOrderPo: { ...prev.fullOrderPo, poFile: e.target.files[0] },
+                  }))
+                }
+              />
+            </div>
+          ) : (
+            <p className="text-gray-500">Nil</p>
+          )}
           <Button
             onClick={handleFullOrderSubmit}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
@@ -1008,33 +1064,92 @@ const handleNotApprovedSubmit = async () => {
           {state.partialOrders.map(po => (
             <div key={po.id} className="border p-2 rounded space-y-4">
               <h4 className="text-md font-medium">PO ID: {po.id}</h4>
-              <InputField
-                label="Client PO Number"
-                type="text"
-                value={state.poUploads[po.id]?.clientPoNumber || ''}
-                onChange={e =>
-                  setState(prev => ({
-                    ...prev,
-                    poUploads: {
-                      ...prev.poUploads,
-                      [po.id]: { ...prev.poUploads[po.id], clientPoNumber: e.target.value },
-                    },
-                  }))
-                }
-              />
-              <InputField
-                label="Upload PO File"
-                type="file"
-                onChange={e =>
-                  setState(prev => ({
-                    ...prev,
-                    poUploads: {
-                      ...prev.poUploads,
-                      [po.id]: { ...prev.poUploads[po.id], poFile: e.target.files[0] },
-                    },
-                  }))
-                }
-              />
+              <h5 className="text-sm font-medium text-black">PO Status</h5>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={state.poUploads[po.id]?.poStatus === 'available'}
+                    onChange={() =>
+                      setState(prev => ({
+                        ...prev,
+                        poUploads: {
+                          ...prev.poUploads,
+                          [po.id]: {
+                            ...prev.poUploads[po.id],
+                            poStatus: 'available',
+                            clientPoNumber: prev.poUploads[po.id]?.clientPoNumber || '',
+                            poFile: null,
+                          },
+                        },
+                      }))
+                    }
+                    className="mr-2"
+                  />
+                  PO Available
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={state.poUploads[po.id]?.poStatus === 'not_available'}
+                    onChange={() =>
+                      setState(prev => ({
+                        ...prev,
+                        poUploads: {
+                          ...prev.poUploads,
+                          [po.id]: {
+                            ...prev.poUploads[po.id],
+                            poStatus: 'not_available',
+                            clientPoNumber: '',
+                            poFile: null,
+                          },
+                        },
+                      }))
+                    }
+                    className="mr-2"
+                  />
+                  Not Available
+                </label>
+              </div>
+              {state.poUploads[po.id]?.poStatus === 'available' ? (
+                <div className="space-y-4">
+                  <InputField
+                    label="Client PO Number"
+                    type="text"
+                    value={state.poUploads[po.id]?.clientPoNumber || ''}
+                    onChange={e =>
+                      setState(prev => ({
+                        ...prev,
+                        poUploads: {
+                          ...prev.poUploads,
+                          [po.id]: {
+                            ...prev.poUploads[po.id],
+                            clientPoNumber: e.target.value,
+                          },
+                        },
+                      }))
+                    }
+                  />
+                  <InputField
+                    label="Upload PO File"
+                    type="file"
+                    onChange={e =>
+                      setState(prev => ({
+                        ...prev,
+                        poUploads: {
+                          ...prev.poUploads,
+                          [po.id]: {
+                            ...prev.poUploads[po.id],
+                            poFile: e.target.files[0],
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                <p className="text-gray-500">Nil</p>
+              )}
             </div>
           ))}
           <Button
