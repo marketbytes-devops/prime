@@ -238,17 +238,6 @@ const DeclinedWorkOrders = () => {
                           View WO & Certificates
                         </Button>
                         <Button
-                          onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: true, selectedWO: wo }))}
-                          disabled={!hasPermission('declined_work_orders', 'edit')}
-                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                            hasPermission('declined_work_orders', 'edit')
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Decline
-                        </Button>
-                        <Button
                           onClick={() => handleResubmit(wo.id)}
                           disabled={!hasPermission('declined_work_orders', 'edit')}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
@@ -316,7 +305,7 @@ const DeclinedWorkOrders = () => {
               <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+              <p><strong>Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
