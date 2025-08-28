@@ -107,9 +107,7 @@ const PendingInvoices = () => {
     } else if (type === 'po') {
       console.log('workOrder:', workOrder);
       const poId = workOrder.purchase_order;
-      console.log('workOrder.purchase_order:', poId);
       const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
-      console.log('Found PO:', purchaseOrder);
       setState((prev) => ({
         ...prev,
         isPOModalOpen: true,
@@ -362,21 +360,16 @@ const PendingInvoices = () => {
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
               <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
-              <p><strong>Due in Days:</strong> {state.selectedWO.due_in_days || 'N/A'}</p>
-              <p><strong>Received Date:</strong> {state.selectedWO.received_date ? new Date(state.selectedWO.received_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
               {state.selectedWO.manager_approval_status === 'Declined' && (
                 <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               )}
               <p><strong>Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Range:</strong> {state.selectedWO.range || 'N/A'}</p>
-              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Purchase Order ID:</strong> {state.selectedWO.purchase_order || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -389,6 +382,7 @@ const PendingInvoices = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
@@ -404,6 +398,7 @@ const PendingInvoices = () => {
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
@@ -441,13 +436,13 @@ const PendingInvoices = () => {
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
-        title={`Purchase Order Details - ID ${state.selectedPO?.id || 'N/A'}`}
+        title={`Purchase Order Details - ${state.selectedPO?.series_number || 'N/A'}`}
       >
         {state.selectedPO ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>PO ID:</strong> {state.selectedPO.id || 'N/A'}</p>
+              <p><strong>PO Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
               <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
               <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
               <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
