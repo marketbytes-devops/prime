@@ -116,12 +116,27 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         work_order.manager_approval_status = 'Declined'
-        work_order.status = 'Submitted'
+        work_order.status = 'Declined'  # Updated to 'Declined' instead of 'Submitted'
         work_order.decline_reason = decline_reason
         work_order.save()
 
-        logger.info(f"WorkOrder {pk} declined and returned to Submitted status")
+        logger.info(f"WorkOrder {pk} declined and status set to Declined")
         return Response({'status': 'Work Order declined and returned to Processing Work Orders'})
+
+    @action(detail=True, methods=['post'], url_path='resubmit')
+    def resubmit(self, request, pk=None):
+        work_order = self.get_object()
+        if work_order.status != 'Declined':
+            logger.warning(f"WorkOrder {pk} not in Declined status for resubmit")
+            return Response({'error': 'Work Order must be in Declined status to resubmit'}, status=status.HTTP_400_BAD_REQUEST)
+
+        work_order.manager_approval_status = 'Pending'
+        work_order.status = 'Manager Approval'
+        work_order.decline_reason = None  # Clear the decline reason on resubmit
+        work_order.save()
+
+        logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
+        return Response({'status': 'Work Order resubmitted for Manager Approval'})
 
     @action(detail=True, methods=['post'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
