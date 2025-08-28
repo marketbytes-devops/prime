@@ -306,6 +306,12 @@ const PartialOrderSelection = () => {
         )}
         <div className="flex justify-end space-x-2">
           <button
+            onClick={handleCancel}
+            className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
+          >
+            Cancel All
+          </button>
+          <button
             onClick={handleGeneratePartialOrder}
             className={`px-3 py-2 rounded transition-colors duration-200 flex items-center ${
               isGenerateDisabled()
@@ -315,12 +321,6 @@ const PartialOrderSelection = () => {
             disabled={isGenerateDisabled()}
           >
             Generate Partial
-          </button>
-          <button
-            onClick={handleCancel}
-            className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
-          >
-            Cancel All
           </button>
           <button
             onClick={handleFinish}

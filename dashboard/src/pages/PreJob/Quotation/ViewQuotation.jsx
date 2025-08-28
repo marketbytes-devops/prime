@@ -26,6 +26,7 @@ const ViewQuotation = () => {
     partialOrders: [],
     poUploads: {},
     fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
+    fullOrderErrors: { clientPoNumber: '', poFile: '' },
     isNotApprovedModalOpen: false,
     notApprovedReason: '',
     selectedQuotationId: null,
@@ -155,7 +156,12 @@ const ViewQuotation = () => {
       partialOrders: currentPartialOrders,
       poUploads: currentPartialOrders.reduce((acc, po) => ({
         ...acc,
-        [po.id]: { clientPoNumber: po.client_po_number || '', poFile: null, poStatus: po.client_po_number || po.po_file ? 'available' : 'not_available' },
+        [po.id]: { 
+          clientPoNumber: po.client_po_number || '', 
+          poFile: null, 
+          poStatus: po.client_po_number || po.po_file ? 'available' : 'not_available',
+          errors: { clientPoNumber: '', poFile: '' }
+        },
       }), {}),
     }));
   };
@@ -175,18 +181,34 @@ const ViewQuotation = () => {
     }
   };
 
+  const validateFullOrder = () => {
+    let isValid = true;
+    const errors = { clientPoNumber: '', poFile: '' };
+    if (state.fullOrderPo.poStatus === 'available') {
+      if (!state.fullOrderPo.clientPoNumber.trim()) {
+        errors.clientPoNumber = 'Client PO Number is required';
+        isValid = false;
+      }
+      if (!state.fullOrderPo.poFile) {
+        errors.poFile = 'PO File is required';
+        isValid = false;
+      }
+    }
+    setState(prev => ({ ...prev, fullOrderErrors: errors }));
+    return isValid;
+  };
+
   const handleFullOrderSubmit = async () => {
+    if (state.fullOrderPo.poStatus === 'available' && !validateFullOrder()) {
+      return;
+    }
     try {
       const formData = new FormData();
       formData.append('quotation', state.selectedQuotation.id);
       formData.append('order_type', 'full');
       if (state.fullOrderPo.poStatus === 'available') {
-        if (state.fullOrderPo.clientPoNumber) {
-          formData.append('client_po_number', state.fullOrderPo.clientPoNumber);
-        }
-        if (state.fullOrderPo.poFile) {
-          formData.append('po_file', state.fullOrderPo.poFile);
-        }
+        formData.append('client_po_number', state.fullOrderPo.clientPoNumber);
+        formData.append('po_file', state.fullOrderPo.poFile);
       }
 
       await apiClient.post('/purchase-orders/', formData, {
@@ -199,6 +221,7 @@ const ViewQuotation = () => {
         isFullOrderModalOpen: false,
         selectedQuotation: null,
         fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
+        fullOrderErrors: { clientPoNumber: '', poFile: '' },
       }));
       toast.success('Full Purchase Order created successfully.');
     } catch (error) {
@@ -207,14 +230,46 @@ const ViewQuotation = () => {
     }
   };
 
+  const validatePartialOrder = (poId) => {
+    let isValid = true;
+    const errors = { clientPoNumber: '', poFile: '' };
+    if (state.poUploads[poId]?.poStatus === 'available') {
+      if (!state.poUploads[poId]?.clientPoNumber.trim()) {
+        errors.clientPoNumber = 'Client PO Number is required';
+        isValid = false;
+      }
+      if (!state.poUploads[poId]?.poFile) {
+        errors.poFile = 'PO File is required';
+        isValid = false;
+      }
+    }
+    setState(prev => ({
+      ...prev,
+      poUploads: {
+        ...prev.poUploads,
+        [poId]: { ...prev.poUploads[poId], errors },
+      },
+    }));
+    return isValid;
+  };
+
   const handlePoUploadSubmit = async () => {
+    let allValid = true;
+    for (const poId of Object.keys(state.poUploads)) {
+      if (!validatePartialOrder(poId)) {
+        allValid = false;
+      }
+    }
+    if (!allValid) {
+      return;
+    }
     try {
       for (const poId of Object.keys(state.poUploads)) {
         const { clientPoNumber, poFile, poStatus } = state.poUploads[poId];
-        if (poStatus === 'available' && (clientPoNumber || poFile)) {
+        if (poStatus === 'available') {
           const formData = new FormData();
-          if (clientPoNumber) formData.append('client_po_number', clientPoNumber);
-          if (poFile) formData.append('po_file', poFile);
+          formData.append('client_po_number', clientPoNumber);
+          formData.append('po_file', poFile);
           await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
@@ -478,6 +533,7 @@ const ViewQuotation = () => {
       isFullOrderModalOpen: false,
       selectedQuotation: null,
       fullOrderPo: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
+      fullOrderErrors: { clientPoNumber: '', poFile: '' },
     }));
   };
 
@@ -994,6 +1050,7 @@ const ViewQuotation = () => {
                       clientPoNumber: '',
                       poFile: null,
                     },
+                    fullOrderErrors: { clientPoNumber: '', poFile: '' },
                   }))
                 }
                 className="mr-2"
@@ -1013,6 +1070,7 @@ const ViewQuotation = () => {
                       clientPoNumber: '',
                       poFile: null,
                     },
+                    fullOrderErrors: { clientPoNumber: '', poFile: '' },
                   }))
                 }
                 className="mr-2"
@@ -1022,27 +1080,39 @@ const ViewQuotation = () => {
           </div>
           {state.fullOrderPo.poStatus === 'available' ? (
             <div className="space-y-4">
-              <InputField
-                label="Client PO Number"
-                type="text"
-                value={state.fullOrderPo.clientPoNumber}
-                onChange={e =>
-                  setState(prev => ({
-                    ...prev,
-                    fullOrderPo: { ...prev.fullOrderPo, clientPoNumber: e.target.value },
-                  }))
-                }
-              />
-              <InputField
-                label="Upload PO File"
-                type="file"
-                onChange={e =>
-                  setState(prev => ({
-                    ...prev,
-                    fullOrderPo: { ...prev.fullOrderPo, poFile: e.target.files[0] },
-                  }))
-                }
-              />
+              <div>
+                <InputField
+                  label="Client PO Number"
+                  type="text"
+                  value={state.fullOrderPo.clientPoNumber}
+                  onChange={e =>
+                    setState(prev => ({
+                      ...prev,
+                      fullOrderPo: { ...prev.fullOrderPo, clientPoNumber: e.target.value },
+                      fullOrderErrors: { ...prev.fullOrderErrors, clientPoNumber: '' },
+                    }))
+                  }
+                />
+                {state.fullOrderErrors.clientPoNumber && (
+                  <p className="text-red-500 text-sm mt-1">{state.fullOrderErrors.clientPoNumber}</p>
+                )}
+              </div>
+              <div>
+                <InputField
+                  label="Upload PO File"
+                  type="file"
+                  onChange={e =>
+                    setState(prev => ({
+                      ...prev,
+                      fullOrderPo: { ...prev.fullOrderPo, poFile: e.target.files[0] },
+                      fullOrderErrors: { ...prev.fullOrderErrors, poFile: '' },
+                    }))
+                  }
+                />
+                {state.fullOrderErrors.poFile && (
+                  <p className="text-red-500 text-sm mt-1">{state.fullOrderErrors.poFile}</p>
+                )}
+              </div>
             </div>
           ) : (
             <p className="text-gray-500">Nil</p>
@@ -1080,6 +1150,7 @@ const ViewQuotation = () => {
                             poStatus: 'available',
                             clientPoNumber: prev.poUploads[po.id]?.clientPoNumber || '',
                             poFile: null,
+                            errors: { clientPoNumber: '', poFile: '' },
                           },
                         },
                       }))
@@ -1102,6 +1173,7 @@ const ViewQuotation = () => {
                             poStatus: 'not_available',
                             clientPoNumber: '',
                             poFile: null,
+                            errors: { clientPoNumber: '', poFile: '' },
                           },
                         },
                       }))
@@ -1113,39 +1185,51 @@ const ViewQuotation = () => {
               </div>
               {state.poUploads[po.id]?.poStatus === 'available' ? (
                 <div className="space-y-4">
-                  <InputField
-                    label="Client PO Number"
-                    type="text"
-                    value={state.poUploads[po.id]?.clientPoNumber || ''}
-                    onChange={e =>
-                      setState(prev => ({
-                        ...prev,
-                        poUploads: {
-                          ...prev.poUploads,
-                          [po.id]: {
-                            ...prev.poUploads[po.id],
-                            clientPoNumber: e.target.value,
+                  <div>
+                    <InputField
+                      label="Client PO Number"
+                      type="text"
+                      value={state.poUploads[po.id]?.clientPoNumber || ''}
+                      onChange={e =>
+                        setState(prev => ({
+                          ...prev,
+                          poUploads: {
+                            ...prev.poUploads,
+                            [po.id]: {
+                              ...prev.poUploads[po.id],
+                              clientPoNumber: e.target.value,
+                              errors: { ...prev.poUploads[po.id].errors, clientPoNumber: '' },
+                            },
                           },
-                        },
-                      }))
-                    }
-                  />
-                  <InputField
-                    label="Upload PO File"
-                    type="file"
-                    onChange={e =>
-                      setState(prev => ({
-                        ...prev,
-                        poUploads: {
-                          ...prev.poUploads,
-                          [po.id]: {
-                            ...prev.poUploads[po.id],
-                            poFile: e.target.files[0],
+                        }))
+                      }
+                    />
+                    {state.poUploads[po.id]?.errors.clientPoNumber && (
+                      <p className="text-red-500 text-sm mt-1">{state.poUploads[po.id].errors.clientPoNumber}</p>
+                    )}
+                  </div>
+                  <div>
+                    <InputField
+                      label="Upload PO File"
+                      type="file"
+                      onChange={e =>
+                        setState(prev => ({
+                          ...prev,
+                          poUploads: {
+                            ...prev.poUploads,
+                            [po.id]: {
+                              ...prev.poUploads[po.id],
+                              poFile: e.target.files[0],
+                              errors: { ...prev.poUploads[po.id].errors, poFile: '' },
+                            },
                           },
-                        },
-                      }))
-                    }
-                  />
+                        }))
+                      }
+                    />
+                    {state.poUploads[po.id]?.errors.poFile && (
+                      <p className="text-red-500 text-sm mt-1">{state.poUploads[po.id].errors.poFile}</p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="text-gray-500">Nil</p>
