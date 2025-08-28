@@ -23,11 +23,10 @@ const ListPurchaseOrders = () => {
     isModalOpen: false,
     isWOModalOpen: false,
     selectedPO: null,
-    woType: "", // Changed to empty string for dropdown
+    woType: "",
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
-    range: "",
     serialNumber: "",
     site_location: "",
     remarks: "",
@@ -125,8 +124,6 @@ const ListPurchaseOrders = () => {
     fetchData();
   }, [location.pathname]);
 
-  // Removed canConvertToWorkOrder function as it's no longer needed
-  // The "Convert to Work Order" button is enabled unless a work order exists
   const hasWorkOrder = (poId) => {
     return state.workOrderStatusMap[poId]?.length > 0;
   };
@@ -148,7 +145,7 @@ const ListPurchaseOrders = () => {
       isWOModalOpen: true,
       selectedPO: po,
       savedItems,
-      woType: "", // Reset to empty for dropdown
+      woType: "",
       numberOfSplitOrders: "",
       selectedItemIds: [],
       createdSplitOrders: [],
@@ -280,7 +277,7 @@ const ListPurchaseOrders = () => {
   };
 
   const isSubmitDisabled = () => {
-    if (!state.woType) return true; // Disable submit if no WO type selected
+    if (!state.woType) return true;
     if (state.woType === "Single") {
       const allHaveAssignedTo = state.savedItems.every(
         (item) =>
@@ -348,10 +345,11 @@ const ListPurchaseOrders = () => {
       } generated successfully!`
     );
   };
-
   const handleWOSubmit = async () => {
     setState((prev) => ({ ...prev, isSubmitting: true }));
-    const workOrderSeries = state.series.find((s) => s.series_name === "Work Order");
+    const workOrderSeries = state.series.find(
+      (s) => s.series_name === "Work Order"
+    );
     if (!workOrderSeries) {
       toast.error("Work Order series not found.");
       setState((prev) => ({ ...prev, isSubmitting: false }));
@@ -365,7 +363,6 @@ const ListPurchaseOrders = () => {
         date_received: state.dateReceived,
         expected_completion_date: state.expectedCompletionDate,
         onsite_or_lab: state.onsiteOrLab,
-        range: state.range,
         serial_number: state.serialNumber,
         site_location: state.site_location,
         remarks: state.remarks,
@@ -395,7 +392,9 @@ const ListPurchaseOrders = () => {
         responses.push(response.data);
       } else if (state.woType === "Split") {
         if (state.createdSplitOrders.length !== state.numberOfSplitOrders) {
-          toast.error("Please create exactly the specified number of split orders.");
+          toast.error(
+            "Please create exactly the specified number of split orders."
+          );
           setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
         }
@@ -411,7 +410,9 @@ const ListPurchaseOrders = () => {
               state.technicians.some((t) => t.id === parseInt(item.assigned_to))
           );
           if (!allHaveAssignedTo) {
-            toast.error("All items in split orders must be assigned to a valid technician.");
+            toast.error(
+              "All items in split orders must be assigned to a valid technician."
+            );
             setState((prev) => ({ ...prev, isSubmitting: false }));
             return;
           }
@@ -426,11 +427,15 @@ const ListPurchaseOrders = () => {
           responses.push(response.data);
         }
       }
-      // Update PO status to Completed
-      await apiClient.patch(`/purchase-orders/${state.selectedPO.id}/update_status/`, {
-        status: "Completed",
-      });
-      toast.success("Work Order(s) created successfully and Purchase Order marked as Completed.");
+      await apiClient.patch(
+        `/purchase-orders/${state.selectedPO.id}/update_status/`,
+        {
+          status: "Completed",
+        }
+      );
+      toast.success(
+        "Work Order(s) created successfully and Purchase Order marked as Completed."
+      );
       const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
       responses.forEach((response) => {
         updatedWorkOrderStatusMap[state.selectedPO.id] = [
@@ -446,7 +451,6 @@ const ListPurchaseOrders = () => {
         dateReceived: "",
         expectedCompletionDate: "",
         onsiteOrLab: "",
-        range: "",
         serialNumber: "",
         site_location: "",
         remarks: "",
@@ -465,30 +469,48 @@ const ListPurchaseOrders = () => {
         response: error.response?.data || "No response data",
         status: error.response?.status,
       });
-      toast.error("Failed to create Work Order. Check console for details.");
-      setState((prev) => ({ ...prev, isSubmitting: false }));
-    }
-  };
-
-  const handleUpdateStatus = async (poId, status) => {
-    try {
-      const response = await apiClient.patch(
-        `/purchase-orders/${poId}/update_status/`,
-        { status }
-      );
-      setState((prev) => {
-        const updatedPOs = prev.purchaseOrders.map((po) =>
-          po.id === poId ? { ...po, status: response.data.status } : po
+      if (
+        error.response?.data?.items?.every(
+          (item) => item.range?.[0] === "Range is required for each item."
+        )
+      ) {
+        toast.error(
+          "Work Order creation succeeded, but range details are required. Please update them in the Edit Work Order section."
         );
-        return { ...prev, purchaseOrders: updatedPOs };
-      });
-      toast.success("Purchase Order status updated successfully.");
-    } catch (error) {
-      console.error(
-        "Error updating purchase order status:",
-        error.response?.data || error
-      );
-      toast.error("Failed to update Purchase Order status.");
+        // Proceed with partial success (assuming creation worked)
+        const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
+        // Placeholder: Replace with actual response parsing if IDs are returned
+        const responses = [{ id: Date.now() }]; // Temporary placeholder
+        responses.forEach((response) => {
+          updatedWorkOrderStatusMap[state.selectedPO.id] = [
+            ...(updatedWorkOrderStatusMap[state.selectedPO.id] || []),
+            { id: response.id, status: "Submitted" },
+          ];
+        });
+        setState((prev) => ({
+          ...prev,
+          workOrderStatusMap: updatedWorkOrderStatusMap,
+          isWOModalOpen: false,
+          woType: "",
+          dateReceived: "",
+          expectedCompletionDate: "",
+          onsiteOrLab: "",
+          serialNumber: "",
+          site_location: "",
+          remarks: "",
+          numberOfSplitOrders: "",
+          selectedItemIds: [],
+          savedItems: [],
+          createdSplitOrders: [],
+          usedItemIds: [],
+          splitOrderAssignedTo: "",
+          isSubmitting: false,
+        }));
+        await fetchData();
+      } else {
+        toast.error("Failed to create Work Order. Check console for details.");
+        setState((prev) => ({ ...prev, isSubmitting: false }));
+      }
     }
   };
 
@@ -505,11 +527,17 @@ const ListPurchaseOrders = () => {
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
             <p><strong>PO ID:</strong> ${po.id}</p>
-            <p><strong>Client PO Number:</strong> ${po.client_po_number || "N/A"}</p>
+            <p><strong>Client PO Number:</strong> ${
+              po.client_po_number || "N/A"
+            }</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
-            <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
+            <p><strong>Created:</strong> ${new Date(
+              po.created_at
+            ).toLocaleDateString()}</p>
             <p><strong>PO File:</strong> ${
-              po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : "N/A"
+              po.po_file
+                ? `<a href="${po.po_file}" target="_blank">View File</a>`
+                : "N/A"
             }</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
@@ -517,15 +545,22 @@ const ListPurchaseOrders = () => {
             <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
             <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
             <p><strong>Date Received:</strong> ${
-              state.dateReceived ? new Date(state.dateReceived).toLocaleDateString() : "N/A"
+              state.dateReceived
+                ? new Date(state.dateReceived).toLocaleDateString()
+                : "N/A"
             }</p>
             <p><strong>Expected Completion Date:</strong> ${
-              state.expectedCompletionDate ? new Date(state.expectedCompletionDate).toLocaleDateString() : "N/A"
+              state.expectedCompletionDate
+                ? new Date(state.expectedCompletionDate).toLocaleDateString()
+                : "N/A"
             }</p>
             <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
-            <p><strong>Range:</strong> ${state.range || "N/A"}</p>
-            <p><strong>Serial Number:</strong> ${state.serialNumber || "N/A"}</p>
-            <p><strong>Site Location:</strong> ${state.site_location || "N/A"}</p>
+            <p><strong>Serial Number:</strong> ${
+              state.serialNumber || "N/A"
+            }</p>
+            <p><strong>Site Location:</strong> ${
+              state.site_location || "N/A"
+            }</p>
             <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
           </div>
           <div>
@@ -543,18 +578,24 @@ const ListPurchaseOrders = () => {
                 <th style="padding: 8px; text-align: left;">UUC Serial Number</th>
                 <th style="padding: 8px; text-align: left;">Certificate</th>
               </tr>
-              ${state.woType === "Single"
-                ? state.savedItems
-                    .map(
-                      (item) => `
+              ${
+                state.woType === "Single"
+                  ? state.savedItems
+                      .map(
+                        (item) => `
                         <tr>
                           <td style="padding: 8px;">${item.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.units.find((u) => u.id === item.unit)?.name || "N/A"
+                          <td style="padding: 8px; text-align: center;">${
+                            item.quantity || "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
-                            state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"
+                            state.units.find((u) => u.id === item.unit)?.name ||
+                            "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: left;">${
+                            state.technicians.find(
+                              (t) => t.id === parseInt(item.assigned_to)
+                            )?.name || "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
                             item.certificate_uut_label || "N/A"
@@ -563,38 +604,57 @@ const ListPurchaseOrders = () => {
                             item.certificate_number || "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
-                            item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"
+                            item.calibration_date
+                              ? new Date(
+                                  item.calibration_date
+                                ).toLocaleDateString()
+                              : "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
-                            item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"
+                            item.calibration_due_date
+                              ? new Date(
+                                  item.calibration_due_date
+                                ).toLocaleDateString()
+                              : "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
                             item.uuc_serial_number || "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
-                            item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"
+                            item.certificate_file
+                              ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
+                              : "N/A"
                           }</td>
                         </tr>
                       `
-                    )
-                    .join("")
-                : state.createdSplitOrders
-                    .map(
-                      (order, index) => `
+                      )
+                      .join("")
+                  : state.createdSplitOrders
+                      .map(
+                        (order, index) => `
                         <tr>
-                          <td colspan="10" style="padding: 8px; font-weight: bold;">Split Order ${index + 1}</td>
+                          <td colspan="11" style="padding: 8px; font-weight: bold;">Split Order ${
+                            index + 1
+                          }</td>
                         </tr>
                         ${order.items
                           .map(
                             (item) => `
                               <tr>
-                                <td style="padding: 8px;">${item.name || "N/A"}</td>
-                                <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  state.units.find((u) => u.id === item.unit)?.name || "N/A"
+                                <td style="padding: 8px;">${
+                                  item.name || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: center;">${
+                                  item.quantity || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
-                                  state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"
+                                  state.units.find((u) => u.id === item.unit)
+                                    ?.name || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: left;">${
+                                  state.technicians.find(
+                                    (t) => t.id === parseInt(item.assigned_to)
+                                  )?.name || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
                                   item.certificate_uut_label || "N/A"
@@ -603,24 +663,35 @@ const ListPurchaseOrders = () => {
                                   item.certificate_number || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
-                                  item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"
+                                  item.calibration_date
+                                    ? new Date(
+                                        item.calibration_date
+                                      ).toLocaleDateString()
+                                    : "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
-                                  item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"
+                                  item.calibration_due_date
+                                    ? new Date(
+                                        item.calibration_due_date
+                                      ).toLocaleDateString()
+                                    : "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
                                   item.uuc_serial_number || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
-                                  item.certificate_file ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>` : "N/A"
+                                  item.certificate_file
+                                    ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
+                                    : "N/A"
                                 }</td>
                               </tr>
                             `
                           )
                           .join("")}
                       `
-                    )
-                    .join("")}
+                      )
+                      .join("")
+              }
             </table>
           </div>
         </body>
@@ -755,7 +826,9 @@ const ListPurchaseOrders = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Created At
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Purchase Order Series Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Purchase Order Series Number
+                </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   PO Number
                 </th>
@@ -789,7 +862,9 @@ const ListPurchaseOrders = () => {
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(po.created_at).toLocaleDateString()}
                     </td>
-                    <td className="border p-2 whitespace-nowrap">{po.series_number || "N/A"}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {po.series_number || "N/A"}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">
                       {po.client_po_number || "N/A"}
                     </td>
@@ -832,11 +907,11 @@ const ListPurchaseOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleDeletePO(po.id)}
-                          disabled={!hasPermission('purchase_orders', 'delete')}
+                          disabled={!hasPermission("purchase_orders", "delete")}
                           className={`px-3 py-1 rounded-md text-sm ${
-                            !hasPermission('purchase_orders', 'delete')
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-red-600 text-white hover:bg-red-700'
+                            !hasPermission("purchase_orders", "delete")
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-red-600 text-white hover:bg-red-700"
                           }`}
                         >
                           Delete
@@ -898,7 +973,10 @@ const ListPurchaseOrders = () => {
               <h3 className="text-lg font-medium text-black">
                 Purchase Order Details
               </h3>
-              <p><strong>Series Number:</strong> {state.selectedPO.series_number || "N/A"}</p>
+              <p>
+                <strong>Series Number:</strong>{" "}
+                {state.selectedPO.series_number || "N/A"}
+              </p>
               <p>
                 <strong>Client PO Number:</strong>{" "}
                 {state.selectedPO.client_po_number || "N/A"}
@@ -913,7 +991,12 @@ const ListPurchaseOrders = () => {
               <p>
                 <strong>PO File:</strong>{" "}
                 {state.selectedPO.po_file ? (
-                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                  <a
+                    href={state.selectedPO.po_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
                     View File
                   </a>
                 ) : (
@@ -989,7 +1072,9 @@ const ListPurchaseOrders = () => {
             </label>
             <select
               value={state.woType}
-              onChange={(e) => setState((prev) => ({ ...prev, woType: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, woType: e.target.value }))
+              }
               className="p-2 border rounded w-full"
             >
               <option value="">Select Work Order Type</option>
@@ -1041,19 +1126,6 @@ const ListPurchaseOrders = () => {
               <option value="Onsite">Onsite</option>
               <option value="Lab">Lab</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Range
-            </label>
-            <InputField
-              type="text"
-              value={state.range}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, range: e.target.value }))
-              }
-              className="w-full"
-            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -6,7 +6,7 @@ import Modal from '../../../components/Modal';
 import InputField from '../../../components/InputField';
 import { useNavigate } from 'react-router-dom';
 
-const ManagerApproval = () => {
+const DeclinedWorkOrders = () => {
   const [state, setState] = useState({
     workOrders: [],
     itemsList: [],
@@ -17,12 +17,9 @@ const ManagerApproval = () => {
     currentPage: 1,
     itemsPerPage: 20,
     isViewModalOpen: false,
-    isApproveModalOpen: false,
     isDeclineModalOpen: false,
     selectedWO: null,
     declineReason: '',
-    deliveryNoteType: 'single',
-    isWorkOrderComplete: true,
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -62,7 +59,7 @@ const ManagerApproval = () => {
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Manager Approval' } }),
+        apiClient.get('work-orders/', { params: { status: 'Declined' } }),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('technicians/'),
@@ -76,7 +73,7 @@ const ManagerApproval = () => {
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Failed to load work orders.');
+      toast.error('Failed to load declined work orders.');
     }
   };
 
@@ -92,33 +89,12 @@ const ManagerApproval = () => {
     }));
   };
 
-  const handleApprove = async (id) => {
-    if (window.confirm("Are you sure you want to move this work order to Delivery?")) {
-      try {
-        const selectedWO = state.workOrders.find(wo => wo.id === id);
-        const payload = {
-          delivery_note_type: 'single', // Defaulting to 'single' as per original modal
-          wo_number: selectedWO.wo_number,
-        };
-        await apiClient.post(`work-orders/${id}/approve/`, payload);
-        toast.success(`Work Order approved and single Delivery Note created.`);
-        // Refresh the current page data to ensure state is updated
-        await fetchData();
-        // Navigate to Delivery page to view the updated work order
-        navigate('/job-execution/processing-work-orders/delivery');
-      } catch (error) {
-        console.error('Error approving work order:', error);
-        toast.error(error.response?.data?.error || 'Failed to approve Work Order.');
-      }
-    }
-  };
-
   const handleDecline = async () => {
     try {
       await apiClient.post(`work-orders/${state.selectedWO.id}/decline/`, {
         decline_reason: state.declineReason,
       });
-      toast.success('Work Order declined and returned to Processing Work Orders.');
+      toast.success('Work Order declined and updated.');
       setState((prev) => ({
         ...prev,
         isDeclineModalOpen: false,
@@ -129,6 +105,20 @@ const ManagerApproval = () => {
     } catch (error) {
       console.error('Error declining work order:', error);
       toast.error(error.response?.data?.error || 'Failed to decline Work Order.');
+    }
+  };
+
+  const handleResubmit = async (id) => {
+    if (window.confirm("Are you sure you want to resubmit this work order for Manager Approval?")) {
+      try {
+        await apiClient.post(`work-orders/${id}/resubmit/`);
+        toast.success('Work Order resubmitted for Manager Approval.');
+        fetchData();
+        navigate('/job-execution/processing-work-orders/manager-approval');
+      } catch (error) {
+        console.error('Error resubmitting work order:', error);
+        toast.error(error.response?.data?.error || 'Failed to resubmit Work Order.');
+      }
     }
   };
 
@@ -187,7 +177,7 @@ const ManagerApproval = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Manager Approval</h1>
+      <h1 className="text-2xl font-bold mb-4">Declined Work Orders</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
@@ -220,14 +210,15 @@ const ManagerApproval = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Decline Reason</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="border p-2 text-center text-gray-500">
-                    No work orders found.
+                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                    No declined work orders found.
                   </td>
                 </tr>
               ) : (
@@ -237,6 +228,7 @@ const ManagerApproval = () => {
                     <td className="border p-2">{wo.wo_number || 'N/A'}</td>
                     <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
                     <td className="border p-2">{getAssignedTechnicians(wo.items)}</td>
+                    <td className="border p-2">{wo.decline_reason || 'N/A'}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
@@ -246,26 +238,26 @@ const ManagerApproval = () => {
                           View WO & Certificates
                         </Button>
                         <Button
-                          onClick={() => handleApprove(wo.id)}
-                          disabled={!hasPermission('manager_approval', 'edit')}
-                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                            hasPermission('manager_approval', 'edit')
-                              ? 'bg-green-600 text-white hover:bg-green-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Approve
-                        </Button>
-                        <Button
                           onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: true, selectedWO: wo }))}
-                          disabled={!hasPermission('manager_approval', 'edit')}
+                          disabled={!hasPermission('declined_work_orders', 'edit')}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                            hasPermission('manager_approval', 'edit')
+                            hasPermission('declined_work_orders', 'edit')
                               ? 'bg-red-600 text-white hover:bg-red-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                         >
                           Decline
+                        </Button>
+                        <Button
+                          onClick={() => handleResubmit(wo.id)}
+                          disabled={!hasPermission('declined_work_orders', 'edit')}
+                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                            hasPermission('declined_work_orders', 'edit')
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Resubmit for Manager Approval
                         </Button>
                       </div>
                     </td>
@@ -324,6 +316,7 @@ const ManagerApproval = () => {
               <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -397,9 +390,9 @@ const ManagerApproval = () => {
           <div className="flex justify-end gap-2">
             <Button
               onClick={handleDecline}
-              disabled={!state.declineReason || !hasPermission('manager_approval', 'edit')}
+              disabled={!state.declineReason || !hasPermission('declined_work_orders', 'edit')}
               className={`px-4 py-2 rounded-md ${
-                state.declineReason && hasPermission('manager_approval', 'edit')
+                state.declineReason && hasPermission('declined_work_orders', 'edit')
                   ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
@@ -419,4 +412,4 @@ const ManagerApproval = () => {
   );
 };
 
-export default ManagerApproval;
+export default DeclinedWorkOrders;

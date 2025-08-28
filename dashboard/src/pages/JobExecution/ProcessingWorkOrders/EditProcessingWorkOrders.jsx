@@ -5,7 +5,7 @@ import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Loading from "../../../components/Loading";
- 
+
 const EditProcessingWorkOrders = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -18,7 +18,6 @@ const EditProcessingWorkOrders = () => {
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
-    range: "",
     serialNumber: "",
     siteLocation: "",
     remarks: "",
@@ -26,7 +25,7 @@ const EditProcessingWorkOrders = () => {
     fileChanges: {},
     isSaving: false,
   });
- 
+
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
@@ -38,7 +37,7 @@ const EditProcessingWorkOrders = () => {
       const workOrder = woRes.data;
       const expandedItems = workOrder.items.flatMap((item) =>
         Array.from({ length: item.quantity }, (_, idx) => ({
-          id: `${item.item}_${idx + 1}`.padStart(6, '0'), // e.g., "Soap001"
+          id: `${item.item}_${idx + 1}`.padStart(6, '0'),
           item: item.item,
           quantity: 1,
           unit: item.unit,
@@ -50,9 +49,10 @@ const EditProcessingWorkOrders = () => {
           uuc_serial_number: item.uuc_serial_number || "",
           assigned_to: item.assigned_to || "",
           certificate_file: item.certificate_file || null,
+          range: item.range || "",
         }))
       );
- 
+
       setState((prev) => ({
         ...prev,
         workOrder,
@@ -63,7 +63,6 @@ const EditProcessingWorkOrders = () => {
         dateReceived: workOrder.date_received || "",
         expectedCompletionDate: workOrder.expected_completion_date || "",
         onsiteOrLab: workOrder.onsite_or_lab || "",
-        range: workOrder.range || "",
         serialNumber: workOrder.serial_number || "",
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
@@ -76,11 +75,11 @@ const EditProcessingWorkOrders = () => {
       navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
     }
   };
- 
+
   useEffect(() => {
     fetchData();
   }, [id]);
- 
+
   const handleItemChange = (index, field, value) => {
     setState((prev) => ({
       ...prev,
@@ -89,7 +88,7 @@ const EditProcessingWorkOrders = () => {
       ),
     }));
   };
- 
+
   const handleFileChange = (index, file) => {
     setState((prev) => ({
       ...prev,
@@ -99,9 +98,9 @@ const EditProcessingWorkOrders = () => {
       },
     }));
   };
- 
+
   const isFormValid = () => {
-    return state.items.every((item, index) => 
+    return state.items.every((item, index) =>
       item.certificate_uut_label &&
       item.certificate_number &&
       item.calibration_date &&
@@ -110,29 +109,26 @@ const EditProcessingWorkOrders = () => {
       (item.certificate_file || state.fileChanges[index])
     );
   };
- 
+
   const handleSubmit = async () => {
     if (!isFormValid()) {
       toast.error("Please fill all required certificate details for every item before saving.");
       return;
     }
-
     setState((prev) => ({ ...prev, isSaving: true }));
     try {
-      const hasFileUploads = Object.keys(state.fileChanges).length > 0;
       const formData = new FormData();
- 
+
       formData.append('purchase_order', state.workOrder?.purchase_order || '');
       formData.append('quotation', state.workOrder?.quotation || '');
       formData.append('date_received', state.dateReceived || '');
       formData.append('expected_completion_date', state.expectedCompletionDate || '');
       formData.append('onsite_or_lab', state.onsiteOrLab || '');
-      formData.append('range', state.range || '');
       formData.append('serial_number', state.serialNumber || '');
       formData.append('site_location', state.siteLocation || '');
       formData.append('remarks', state.remarks || '');
       formData.append('created_by', state.assignedTo || '');
- 
+
       state.items.forEach((item, index) => {
         formData.append(`items[${index}]id`, item.id || '');
         formData.append(`items[${index}]item`, item.item || '');
@@ -145,15 +141,16 @@ const EditProcessingWorkOrders = () => {
         formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || '');
         formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || '');
         formData.append(`items[${index}]assigned_to`, item.assigned_to || '');
+        formData.append(`items[${index}]range`, item.range || '');
         if (state.fileChanges[index]) {
           formData.append(`items[${index}]certificate_file`, state.fileChanges[index]);
         }
       });
- 
+
       await apiClient.put(`work-orders/${id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
- 
+
       toast.success("Work Order updated successfully.");
       navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
     } catch (error) {
@@ -163,13 +160,14 @@ const EditProcessingWorkOrders = () => {
       setState((prev) => ({ ...prev, isSaving: false }));
     }
   };
- 
+
   if (!state.workOrder) return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
- 
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Edit Work Order - {state.workOrder.wo_number}</h1>
       <div className="bg-white p-6 space-y-6 rounded-md shadow">
+        {/* Work Order Metadata Fields */}
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date Received</label>
@@ -200,15 +198,6 @@ const EditProcessingWorkOrders = () => {
               <option value="Onsite">Onsite</option>
               <option value="Lab">Lab</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Range</label>
-            <InputField
-              type="text"
-              value={state.range}
-              onChange={(e) => setState((prev) => ({ ...prev, range: e.target.value }))}
-              className="w-full"
-            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
@@ -253,6 +242,8 @@ const EditProcessingWorkOrders = () => {
             </select>
           </div>
         </div>
+
+        {/* Device Under Test Details */}
         <div>
           <h3 className="text-lg font-medium text-black mb-4">Device Under Test Details</h3>
           {state.items.map((item, index) => (
@@ -314,6 +305,15 @@ const EditProcessingWorkOrders = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Range</label>
+                <InputField
+                  type="text"
+                  value={item.range || ""}
+                  onChange={(e) => handleItemChange(index, "range", e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">UUC Serial Number</label>
                 <InputField
                   type="text"
@@ -356,6 +356,8 @@ const EditProcessingWorkOrders = () => {
             </div>
           ))}
         </div>
+
+        {/* Save and Cancel Buttons */}
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSubmit}
@@ -375,5 +377,5 @@ const EditProcessingWorkOrders = () => {
     </div>
   );
 };
- 
+
 export default EditProcessingWorkOrders;

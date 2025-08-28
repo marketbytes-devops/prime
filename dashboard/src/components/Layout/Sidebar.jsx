@@ -158,13 +158,6 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "purchase_orders",
               action: "view",
             },
-            {
-              to: "/job-execution/initiate-work-order/add-wo-without-po",
-              label: "Add WO Without PO",
-              icon: <FilePlus2 className="w-5 h-5 mr-3" />,
-              page: "work_orders",
-              action: "add",
-            },
           ],
         },
         {
@@ -189,16 +182,23 @@ const Sidebar = ({ toggleSidebar }) => {
             },
             {
               to: "/job-execution/processing-work-orders/delivery",
-              label: "Delivery",
+              label: "For-Delivery",
               icon: <Truck className="w-5 h-5 mr-3" />,
               page: "delivery",
               action: "view",
             },
             {
-              to: "/job-execution/processing-work-orders/close-work-orders",
-              label: "Close Work Order",
-              icon: <Archive className="w-5 h-5 mr-3" />,
-              page: "close_work_orders",
+              to: "/job-execution/processing-work-orders/pending-deliveries",
+              label: "Pending Deliveries",
+              icon: <Truck className="w-5 h-5 mr-3" />, // Reused Truck icon
+              page: "pending_deliveries",
+              action: "view",
+            },
+            {
+              to: "/job-execution/processing-work-orders/declined-work-orders",
+              label: "Declined Work Orders",
+              icon: <FileCheck className="w-5 h-5 mr-3" />, // Reused FileCheck icon
+              page: "declined_work_orders",
               action: "view",
             },
           ],

@@ -25,7 +25,6 @@ class WorkOrder(models.Model):
     date_received = models.DateField(null=True, blank=True)
     expected_completion_date = models.DateField(null=True, blank=True)
     onsite_or_lab = models.CharField(max_length=20, choices=[('Onsite', 'Onsite'), ('Lab', 'Lab')], null=True, blank=True)
-    range = models.CharField(max_length=100, null=True, blank=True)
     serial_number = models.CharField(max_length=100, null=True, blank=True)
     site_location = models.TextField(null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
@@ -61,6 +60,7 @@ class WorkOrderItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    range = models.CharField(max_length=100,null=True, blank=True)  # Added range field
     certificate_uut_label = models.CharField(max_length=100, null=True, blank=True)
     certificate_number = models.CharField(max_length=100, null=True, blank=True)
     calibration_date = models.DateField(null=True, blank=True)
@@ -73,7 +73,7 @@ class WorkOrderItem(models.Model):
         return f"{self.item} - {self.work_order}"
 
 class DeliveryNote(models.Model):
-    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='delivery_notes')  # Changed to ForeignKey
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='delivery_notes')
     dn_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     signed_delivery_note = models.FileField(upload_to='delivery_notes/', null=True, blank=True)
     delivery_status = models.CharField(
