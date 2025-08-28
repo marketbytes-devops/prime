@@ -27,7 +27,6 @@ const ListPurchaseOrders = () => {
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
-    serialNumber: "",
     site_location: "",
     remarks: "",
     numberOfSplitOrders: "",
@@ -37,6 +36,7 @@ const ListPurchaseOrders = () => {
     usedItemIds: [],
     workOrderStatusMap: {},
     splitOrderAssignedTo: "",
+    singleOrderAssignedTo: "",
     isSubmitting: false,
   });
 
@@ -151,6 +151,7 @@ const ListPurchaseOrders = () => {
       createdSplitOrders: [],
       usedItemIds: [],
       splitOrderAssignedTo: "",
+      singleOrderAssignedTo: "", 
     }));
   };
 
@@ -232,6 +233,17 @@ const ListPurchaseOrders = () => {
     setState((prev) => ({ ...prev, splitOrderAssignedTo: value }));
   };
 
+  const handleSingleOrderAssignedToChange = (value) => {
+    setState((prev) => ({
+      ...prev,
+      singleOrderAssignedTo: value,
+      savedItems: prev.savedItems.map((item) => ({
+        ...item,
+        assigned_to: value, 
+      })),
+    }));
+  };
+
   const isGenerateDisabled = () => {
     if (!state.numberOfSplitOrders || state.woType !== "Split") return true;
     if (state.createdSplitOrders.length >= state.numberOfSplitOrders)
@@ -279,12 +291,10 @@ const ListPurchaseOrders = () => {
   const isSubmitDisabled = () => {
     if (!state.woType) return true;
     if (state.woType === "Single") {
-      const allHaveAssignedTo = state.savedItems.every(
-        (item) =>
-          item.assigned_to !== "" &&
-          state.technicians.some((t) => t.id === parseInt(item.assigned_to))
-      );
-      return !allHaveAssignedTo;
+      return !state.singleOrderAssignedTo ||
+        !state.technicians.some(
+          (t) => t.id === parseInt(state.singleOrderAssignedTo)
+        );
     }
     if (state.woType === "Split") {
       if (state.createdSplitOrders.length !== state.numberOfSplitOrders)
@@ -345,6 +355,7 @@ const ListPurchaseOrders = () => {
       } generated successfully!`
     );
   };
+
   const handleWOSubmit = async () => {
     setState((prev) => ({ ...prev, isSubmitting: true }));
     const workOrderSeries = state.series.find(
@@ -363,7 +374,6 @@ const ListPurchaseOrders = () => {
         date_received: state.dateReceived,
         expected_completion_date: state.expectedCompletionDate,
         onsite_or_lab: state.onsiteOrLab,
-        serial_number: state.serialNumber,
         site_location: state.site_location,
         remarks: state.remarks,
         items: [],
@@ -371,13 +381,13 @@ const ListPurchaseOrders = () => {
       };
       let responses = [];
       if (state.woType === "Single") {
-        const allHaveAssignedTo = state.savedItems.every(
-          (item) =>
-            item.assigned_to !== "" &&
-            state.technicians.some((t) => t.id === parseInt(item.assigned_to))
-        );
-        if (!allHaveAssignedTo) {
-          toast.error("All items must be assigned to a valid technician.");
+        if (
+          !state.singleOrderAssignedTo ||
+          !state.technicians.some(
+            (t) => t.id === parseInt(state.singleOrderAssignedTo)
+          )
+        ) {
+          toast.error("Please select a valid technician for all items.");
           setState((prev) => ({ ...prev, isSubmitting: false }));
           return;
         }
@@ -386,7 +396,7 @@ const ListPurchaseOrders = () => {
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
-          assigned_to: item.assigned_to ? parseInt(item.assigned_to) : null,
+          assigned_to: parseInt(state.singleOrderAssignedTo), 
         }));
         const response = await apiClient.post("work-orders/", basePayload);
         responses.push(response.data);
@@ -451,7 +461,6 @@ const ListPurchaseOrders = () => {
         dateReceived: "",
         expectedCompletionDate: "",
         onsiteOrLab: "",
-        serialNumber: "",
         site_location: "",
         remarks: "",
         numberOfSplitOrders: "",
@@ -460,6 +469,7 @@ const ListPurchaseOrders = () => {
         createdSplitOrders: [],
         usedItemIds: [],
         splitOrderAssignedTo: "",
+        singleOrderAssignedTo: "",
         isSubmitting: false,
       }));
       await fetchData();
@@ -477,10 +487,8 @@ const ListPurchaseOrders = () => {
         toast.error(
           "Work Order creation succeeded, but range details are required. Please update them in the Edit Work Order section."
         );
-        // Proceed with partial success (assuming creation worked)
         const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
-        // Placeholder: Replace with actual response parsing if IDs are returned
-        const responses = [{ id: Date.now() }]; // Temporary placeholder
+        const responses = [{ id: Date.now() }]; 
         responses.forEach((response) => {
           updatedWorkOrderStatusMap[state.selectedPO.id] = [
             ...(updatedWorkOrderStatusMap[state.selectedPO.id] || []),
@@ -495,7 +503,6 @@ const ListPurchaseOrders = () => {
           dateReceived: "",
           expectedCompletionDate: "",
           onsiteOrLab: "",
-          serialNumber: "",
           site_location: "",
           remarks: "",
           numberOfSplitOrders: "",
@@ -504,6 +511,7 @@ const ListPurchaseOrders = () => {
           createdSplitOrders: [],
           usedItemIds: [],
           splitOrderAssignedTo: "",
+          singleOrderAssignedTo: "",
           isSubmitting: false,
         }));
         await fetchData();
@@ -528,7 +536,7 @@ const ListPurchaseOrders = () => {
             <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
             <p><strong>PO ID:</strong> ${po.id}</p>
             <p><strong>Client PO Number:</strong> ${
-              po.client_po_number || "Nil"
+              po.client_po_number || "Not Provided"
             }</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
             <p><strong>Created:</strong> ${new Date(
@@ -537,7 +545,7 @@ const ListPurchaseOrders = () => {
             <p><strong>PO File:</strong> ${
               po.po_file
                 ? `<a href="${po.po_file}" target="_blank">View File</a>`
-                : "N/A"
+                : "Not Provided"
             }</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
@@ -555,9 +563,6 @@ const ListPurchaseOrders = () => {
                 : "N/A"
             }</p>
             <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
-            <p><strong>Serial Number:</strong> ${
-              state.serialNumber || "N/A"
-            }</p>
             <p><strong>Site Location:</strong> ${
               state.site_location || "N/A"
             }</p>
@@ -716,6 +721,19 @@ const ListPurchaseOrders = () => {
     }
   };
 
+  const handleUpdateStatus = async (poId, status) => {
+    try {
+      await apiClient.patch(`/purchase-orders/${poId}/update_status/`, {
+        status,
+      });
+      toast.success("Purchase order status updated successfully.");
+      await fetchData();
+    } catch (error) {
+      console.error("Error updating purchase order status:", error);
+      toast.error("Failed to update purchase order status.");
+    }
+  };
+
   const filteredPOs = state.purchaseOrders
     .filter(
       (po) =>
@@ -866,7 +884,7 @@ const ListPurchaseOrders = () => {
                       {po.series_number || "N/A"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {po.client_po_number || "Nil"}
+                      {po.client_po_number || "Not Provided"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       {getAssignedSalesPersonName(po)}
@@ -979,7 +997,7 @@ const ListPurchaseOrders = () => {
               </p>
               <p>
                 <strong>Client PO Number:</strong>{" "}
-                {state.selectedPO.client_po_number || "Nil"}
+                {state.selectedPO.client_po_number || "Not Provided"}
               </p>
               <p>
                 <strong>Order Type:</strong> {state.selectedPO.order_type}
@@ -1000,7 +1018,7 @@ const ListPurchaseOrders = () => {
                     View File
                   </a>
                 ) : (
-                  "N/A"
+                  "Not Provided"
                 )}
               </p>
               <p>
@@ -1061,6 +1079,7 @@ const ListPurchaseOrders = () => {
             ...prev,
             isWOModalOpen: false,
             selectedPO: null,
+            singleOrderAssignedTo: "",
           }))
         }
         title="Create Work Order"
@@ -1073,7 +1092,15 @@ const ListPurchaseOrders = () => {
             <select
               value={state.woType}
               onChange={(e) =>
-                setState((prev) => ({ ...prev, woType: e.target.value }))
+                setState((prev) => ({
+                  ...prev,
+                  woType: e.target.value,
+                  singleOrderAssignedTo: "",
+                  savedItems: prev.savedItems.map((item) => ({
+                    ...item,
+                    assigned_to: "", 
+                  })),
+                }))
               }
               className="p-2 border rounded w-full"
             >
@@ -1126,19 +1153,6 @@ const ListPurchaseOrders = () => {
               <option value="Onsite">Onsite</option>
               <option value="Lab">Lab</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Serial Number
-            </label>
-            <InputField
-              type="text"
-              value={state.serialNumber}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, serialNumber: e.target.value }))
-              }
-              className="w-full"
-            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1225,9 +1239,28 @@ const ListPurchaseOrders = () => {
             {state.woType === "Single" && (
               <div className="mt-4">
                 <h4 className="text-md font-medium mb-2">
-                  Assign Technicians to Items
+                  Assign Technician to All Items
                 </h4>
-                <div className="overflow-x-auto">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Assigned To
+                  </label>
+                  <select
+                    value={state.singleOrderAssignedTo}
+                    onChange={(e) =>
+                      handleSingleOrderAssignedToChange(e.target.value)
+                    }
+                    className="p-2 border rounded w-full"
+                  >
+                    <option value="">Select Technician</option>
+                    {state.technicians.map((technician) => (
+                      <option key={technician.id} value={technician.id}>
+                        {technician.name} ({technician.designation})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="overflow-x-auto mt-4">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
@@ -1239,9 +1272,6 @@ const ListPurchaseOrders = () => {
                         </th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Assigned To
                         </th>
                       </tr>
                     </thead>
@@ -1257,25 +1287,6 @@ const ListPurchaseOrders = () => {
                           <td className="border p-2 whitespace-nowrap">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <select
-                              value={item.assigned_to}
-                              onChange={(e) =>
-                                handleAssignedToChange(item.id, e.target.value)
-                              }
-                              className="p-2 border rounded w-full"
-                            >
-                              <option value="">Select Technician</option>
-                              {state.technicians.map((technician) => (
-                                <option
-                                  key={technician.id}
-                                  value={technician.id}
-                                >
-                                  {technician.name} ({technician.designation})
-                                </option>
-                              ))}
-                            </select>
                           </td>
                         </tr>
                       ))}
@@ -1459,6 +1470,7 @@ const ListPurchaseOrders = () => {
                   ...prev,
                   isWOModalOpen: false,
                   selectedPO: null,
+                  singleOrderAssignedTo: "",
                 }))
               }
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"

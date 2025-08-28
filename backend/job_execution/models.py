@@ -25,7 +25,6 @@ class WorkOrder(models.Model):
     date_received = models.DateField(null=True, blank=True)
     expected_completion_date = models.DateField(null=True, blank=True)
     onsite_or_lab = models.CharField(max_length=20, choices=[('Onsite', 'Onsite'), ('Lab', 'Lab')], null=True, blank=True)
-    serial_number = models.CharField(max_length=100, null=True, blank=True)
     site_location = models.TextField(null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

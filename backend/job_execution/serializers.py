@@ -34,7 +34,7 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit",
             "unit_price",
-            "range",  # Range field
+            "range", 
             "certificate_uut_label",
             "certificate_number",
             "calibration_date",
@@ -123,7 +123,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "date_received",
             "expected_completion_date",
             "onsite_or_lab",
-            "serial_number",
             "site_location",
             "remarks",
             "created_at",
@@ -436,7 +435,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 f"{prefix}quantity": "quantity",
                 f"{prefix}unit": "unit",
                 f"{prefix}unit_price": "unit_price",
-                f"{prefix}range": "range",  # Handle range at item level
+                f"{prefix}range": "range", 
                 f"{prefix}certificate_uut_label": "certificate_uut_label",
                 f"{prefix}certificate_number": "certificate_number",
                 f"{prefix}calibration_date": "calibration_date",
@@ -517,7 +516,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             date_received=validated_data.get("date_received"),
             expected_completion_date=validated_data.get("expected_completion_date"),
             onsite_or_lab=validated_data.get("onsite_or_lab"),
-            serial_number=validated_data.get("serial_number"),
             site_location=validated_data.get("site_location"),
             remarks=validated_data.get("remarks"),
             invoice_status=validated_data.get("invoice_status", "pending"),
@@ -528,8 +526,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
         for item_data in items_data:
-            # Allow range to be None during creation
-            item_data.setdefault("range", None)  # Default to None if not provided
+            item_data.setdefault("range", None)  
             logger.info(f"Creating item with data: {dict(item_data)}")
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
