@@ -27,8 +27,9 @@ import AddWOWithoutPO from "./pages/JobExecution/InitiateWorkOrder/AddWOWithoutP
 import ListProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/ListProcessingWorkOrders";
 import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerApproval";
 import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
-import CloseWorkOrder from "./pages/JobExecution/ProcessingWorkOrders/CloseWorkOrder";
 import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
+import PendingDeliveries from "./pages/JobExecution/ProcessingWorkOrders/PendingDeliveries";
+import DeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/DeclinedWorkOrders";
 import PendingInvoices from "./pages/PostJobPhase/PendingInvoices";
 import CompletedWO from "./pages/PostJobPhase/CompletedWO";
 import Users from "./pages/UserRoles/Users";
@@ -218,10 +219,18 @@ function App() {
           ),
         },
         {
-          path: "/job-execution/processing-work-orders/close-work-orders",
+          path: "/job-execution/processing-work-orders/pending-deliveries",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="close_work_orders" requiredAction="view">
-              <CloseWorkOrder />
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="pending_deliveries" requiredAction="view">
+              <PendingDeliveries />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/job-execution/processing-work-orders/declined-work-orders",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="declined_work_orders" requiredAction="view">
+              <DeclinedWorkOrders />
             </ProtectedRoute>
           ),
         },
