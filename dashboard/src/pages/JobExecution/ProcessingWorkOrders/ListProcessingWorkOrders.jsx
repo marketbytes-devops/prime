@@ -109,6 +109,27 @@ const ListProcessingWorkOrders = () => {
   };
 
   const handleMoveToApproval = async (woId) => {
+    const wo = state.workOrders.find((w) => w.id === woId);
+    if (!wo) {
+      toast.error("Work order not found.");
+      return;
+    }
+    const isComplete = wo.items.every(
+      (item) =>
+        item.certificate_number &&
+        item.certificate_uut_label &&
+        item.calibration_date &&
+        item.calibration_due_date &&
+        item.uuc_serial_number &&
+        item.certificate_file &&
+        item.range !== null &&
+        item.range !== undefined
+    );
+    if (!isComplete) {
+      toast.warn("Please complete all Device Under Test details before moving to approval.");
+      navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`);
+      return;
+    }
     try {
       const response = await apiClient.post(`/work-orders/${woId}/move-to-approval/`);
       toast.success(response.data.status);
@@ -128,19 +149,17 @@ const ListProcessingWorkOrders = () => {
           <h1>Work Order Details</h1>
           <div style="margin-bottom: 20px;">
             <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
-            <p><strong>Work Order Number:</strong> ${wo.wo_number || "N/A"}</p>
-            <p><strong>Work Order Type:</strong> ${wo.wo_type || "N/A"}</p>
+            <p><strong>Work Order Number:</strong> ${wo.wo_number || "Not Provided"}</p>
+            <p><strong>Work Order Type:</strong> ${wo.wo_type || "Not Provided"}</p>
             <p><strong>Date Received:</strong> ${
-              wo.date_received ? new Date(wo.date_received).toLocaleDateString() : "N/A"
+              wo.date_received ? new Date(wo.date_received).toLocaleDateString() : "Not Provided"
             }</p>
             <p><strong>Expected Completion Date:</strong> ${
-              wo.expected_completion_date ? new Date(wo.expected_completion_date).toLocaleDateString() : "N/A"
+              wo.expected_completion_date ? new Date(wo.expected_completion_date).toLocaleDateString() : "Not Provided"
             }</p>
-            <p><strong>Onsite or Lab:</strong> ${wo.onsite_or_lab || "N/A"}</p>
-            <p><strong>Serial Number:</strong> ${wo.serial_number || "N/A"}</p>
-            <p><strong>Site Location:</strong> ${wo.site_location || "N/A"}</p>
-            <p><strong>Remarks:</strong> ${wo.remarks || "N/A"}</p>
-            <p><strong>Created By:</strong> ${wo.created_by_name || "N/A"}</p>
+            <p><strong>Onsite or Lab:</strong> ${wo.onsite_or_lab || "Not Provided"}</p>
+            <p><strong>Site Location:</strong> ${wo.site_location || "Not Provided"}</p>
+            <p><strong>Remarks:</strong> ${wo.remarks || "Not Provided"}</p>
           </div>
           <div>
             <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
@@ -163,35 +182,35 @@ const ListProcessingWorkOrders = () => {
                   (item) => `
                     <tr>
                       <td style="padding: 8px;">${
-                        state.itemsList.find((i) => i.id === item.item)?.name || "N/A"
+                        state.itemsList.find((i) => i.id === item.item)?.name || "Not Provided"
                       }</td>
-                      <td style="padding: 8px; text-align: center;">${item.quantity || "N/A"}</td>
+                      <td style="padding: 8px; text-align: center;">${item.quantity || "Not Provided"}</td>
                       <td style="padding: 8px; text-align: left;">${
-                        state.units.find((u) => u.id === item.unit)?.name || "N/A"
+                        state.units.find((u) => u.id === item.unit)?.name || "Not Provided"
                       }</td>
-                      <td style="padding: 8px; text-align: left;">${item.range || "N/A"}</td>
+                      <td style="padding: 8px; text-align: left;">${item.range || "Not Provided"}</td>
                       <td style="padding: 8px; text-align: left;">${
-                        state.technicians.find((t) => t.id === item.assigned_to)?.name || "N/A"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.certificate_uut_label || "N/A"
+                        state.technicians.find((t) => t.id === item.assigned_to)?.name || "Not Provided"
                       }</td>
                       <td style="padding: 8px; text-align: left;">${
-                        item.certificate_number || "N/A"
+                        item.certificate_uut_label || "Not Provided"
                       }</td>
                       <td style="padding: 8px; text-align: left;">${
-                        item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "N/A"
+                        item.certificate_number || "Not Provided"
                       }</td>
                       <td style="padding: 8px; text-align: left;">${
-                        item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "N/A"
+                        item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "Not Provided"
                       }</td>
                       <td style="padding: 8px; text-align: left;">${
-                        item.uuc_serial_number || "N/A"
+                        item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "Not Provided"
+                      }</td>
+                      <td style="padding: 8px; text-align: left;">${
+                        item.uuc_serial_number || "Not Provided"
                       }</td>
                       <td style="padding: 8px; text-align: left;">${
                         item.certificate_file
                           ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
-                          : "N/A"
+                          : "Not Provided"
                       }</td>
                     </tr>
                   `
@@ -333,14 +352,14 @@ const ListProcessingWorkOrders = () => {
                       {new Date(wo.created_at).toLocaleDateString()}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {wo.wo_number || "N/A"}
+                      {wo.wo_number || "Not Provided"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       {wo.items
                         .map(
                           (item) =>
                             state.technicians.find((t) => t.id === item.assigned_to)
-                              ?.name || "N/A"
+                              ?.name || "Not Provided"
                         )
                         .filter((name, index, self) => self.indexOf(name) === index)
                         .join(", ")}
@@ -380,23 +399,9 @@ const ListProcessingWorkOrders = () => {
                         </Button>
                         <Button
                           onClick={() => handleMoveToApproval(wo.id)}
-                          disabled={
-                            !wo.items.every(
-                              (item) =>
-                                item.certificate_number &&
-                                item.calibration_due_date &&
-                                item.range !== null &&
-                                item.range !== undefined
-                            )
-                          }
+                          disabled={!hasPermission("work_orders", "edit")} // Only permission-based disable
                           className={`px-3 py-1 rounded-md text-sm ${
-                            !wo.items.every(
-                              (item) =>
-                                item.certificate_number &&
-                                item.calibration_due_date &&
-                                item.range !== null &&
-                                item.range !== undefined
-                            )
+                            !hasPermission("work_orders", "edit")
                               ? "bg-gray-300 cursor-not-allowed"
                               : "bg-indigo-600 text-white hover:bg-indigo-700"
                           }`}
@@ -458,7 +463,7 @@ const ListProcessingWorkOrders = () => {
             selectedWO: null,
           }))
         }
-        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"}`}
       >
         {state.selectedWO && (
           <div className="space-y-4">
@@ -468,17 +473,17 @@ const ListProcessingWorkOrders = () => {
               </h3>
               <p>
                 <strong>Work Order Number:</strong>{" "}
-                {state.selectedWO.wo_number || "N/A"}
+                {state.selectedWO.wo_number || "Not Provided"}
               </p>
               <p>
                 <strong>Work Order Type:</strong>{" "}
-                {state.selectedWO.wo_type || "N/A"}
+                {state.selectedWO.wo_type || "Not Provided"}
               </p>
               <p>
                 <strong>Date Received:</strong>{" "}
                 {state.selectedWO.date_received
                   ? new Date(state.selectedWO.date_received).toLocaleDateString()
-                  : "N/A"}
+                  : "Not Provided"}
               </p>
               <p>
                 <strong>Expected Completion Date:</strong>{" "}
@@ -486,26 +491,18 @@ const ListProcessingWorkOrders = () => {
                   ? new Date(
                       state.selectedWO.expected_completion_date
                     ).toLocaleDateString()
-                  : "N/A"}
+                  : "Not Provided"}
               </p>
               <p>
                 <strong>Onsite or Lab:</strong>{" "}
-                {state.selectedWO.onsite_or_lab || "N/A"}
-              </p>
-              <p>
-                <strong>Serial Number:</strong>{" "}
-                {state.selectedWO.serial_number || "N/A"}
+                {state.selectedWO.onsite_or_lab || "Not Provided"}
               </p>
               <p>
                 <strong>Site Location:</strong>{" "}
-                {state.selectedWO.site_location || "N/A"}
+                {state.selectedWO.site_location || "Not Provided"}
               </p>
               <p>
-                <strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}
-              </p>
-              <p>
-                <strong>Created By:</strong>{" "}
-                {state.selectedWO.created_by_name || "N/A"}
+                <strong>Remarks:</strong> {state.selectedWO.remarks || "Not Provided"}
               </p>
             </div>
             <div>
@@ -557,42 +554,42 @@ const ListProcessingWorkOrders = () => {
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
                             {state.itemsList.find((i) => i.id === item.item)
-                              ?.name || "N/A"}
+                              ?.name || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.quantity || "N/A"}
+                            {item.quantity || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {state.units.find((u) => u.id === item.unit)?.name ||
-                              "N/A"}
+                              "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.range || "N/A"}
+                            {item.range || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {state.technicians.find((t) => t.id === item.assigned_to)
-                              ?.name || "N/A"}
+                              ?.name || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_uut_label || "N/A"}
+                            {item.certificate_uut_label || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.certificate_number || "N/A"}
+                            {item.certificate_number || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_date
                               ? new Date(item.calibration_date).toLocaleDateString()
-                              : "N/A"}
+                              : "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_due_date
                               ? new Date(
                                   item.calibration_due_date
                                 ).toLocaleDateString()
-                              : "N/A"}
+                              : "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.uuc_serial_number || "N/A"}
+                            {item.uuc_serial_number || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
@@ -605,7 +602,7 @@ const ListProcessingWorkOrders = () => {
                                 View Certificate
                               </a>
                             ) : (
-                              "N/A"
+                              "Not Provided"
                             )}
                           </td>
                         </tr>

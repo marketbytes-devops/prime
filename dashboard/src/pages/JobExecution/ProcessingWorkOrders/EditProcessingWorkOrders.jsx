@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
@@ -9,6 +9,8 @@ import Loading from "../../../components/Loading";
 const EditProcessingWorkOrders = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const dutRef = useRef(null); 
   const [state, setState] = useState({
     workOrder: null,
     itemsList: [],
@@ -18,13 +20,21 @@ const EditProcessingWorkOrders = () => {
     dateReceived: "",
     expectedCompletionDate: "",
     onsiteOrLab: "",
-    serialNumber: "",
     siteLocation: "",
     remarks: "",
     assignedTo: "",
     fileChanges: {},
     isSaving: false,
   });
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    if (queryParams.get("scrollToDUT") === "true" && dutRef.current) {
+      const element = dutRef.current;
+      const y = element.getBoundingClientRect().top + window.scrollY - 80; 
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  }, [location, state.workOrder]);
 
   const fetchData = async () => {
     try {
@@ -37,7 +47,7 @@ const EditProcessingWorkOrders = () => {
       const workOrder = woRes.data;
       const expandedItems = workOrder.items.flatMap((item) =>
         Array.from({ length: item.quantity }, (_, idx) => ({
-          id: `${item.item}_${idx + 1}`.padStart(6, '0'),
+          id: `${item.item}_${idx + 1}`.padStart(6, "0"),
           item: item.item,
           quantity: 1,
           unit: item.unit,
@@ -63,7 +73,6 @@ const EditProcessingWorkOrders = () => {
         dateReceived: workOrder.date_received || "",
         expectedCompletionDate: workOrder.expected_completion_date || "",
         onsiteOrLab: workOrder.onsite_or_lab || "",
-        serialNumber: workOrder.serial_number || "",
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
         assignedTo: workOrder.created_by || "",
@@ -119,36 +128,35 @@ const EditProcessingWorkOrders = () => {
     try {
       const formData = new FormData();
 
-      formData.append('purchase_order', state.workOrder?.purchase_order || '');
-      formData.append('quotation', state.workOrder?.quotation || '');
-      formData.append('date_received', state.dateReceived || '');
-      formData.append('expected_completion_date', state.expectedCompletionDate || '');
-      formData.append('onsite_or_lab', state.onsiteOrLab || '');
-      formData.append('serial_number', state.serialNumber || '');
-      formData.append('site_location', state.siteLocation || '');
-      formData.append('remarks', state.remarks || '');
-      formData.append('created_by', state.assignedTo || '');
+      formData.append("purchase_order", state.workOrder?.purchase_order || "");
+      formData.append("quotation", state.workOrder?.quotation || "");
+      formData.append("date_received", state.dateReceived || "");
+      formData.append("expected_completion_date", state.expectedCompletionDate || "");
+      formData.append("onsite_or_lab", state.onsiteOrLab || "");
+      formData.append("site_location", state.siteLocation || "");
+      formData.append("remarks", state.remarks || "");
+      formData.append("created_by", state.assignedTo || "");
 
       state.items.forEach((item, index) => {
-        formData.append(`items[${index}]id`, item.id || '');
-        formData.append(`items[${index}]item`, item.item || '');
+        formData.append(`items[${index}]id`, item.id || "");
+        formData.append(`items[${index}]item`, item.item || "");
         formData.append(`items[${index}]quantity`, item.quantity || 1);
-        formData.append(`items[${index}]unit`, item.unit || '');
-        formData.append(`items[${index}]unit_price`, item.unit_price || '');
-        formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || '');
-        formData.append(`items[${index}]certificate_number`, item.certificate_number || '');
-        formData.append(`items[${index}]calibration_date`, item.calibration_date || '');
-        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || '');
-        formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || '');
-        formData.append(`items[${index}]assigned_to`, item.assigned_to || '');
-        formData.append(`items[${index}]range`, item.range || '');
+        formData.append(`items[${index}]unit`, item.unit || "");
+        formData.append(`items[${index}]unit_price`, item.unit_price || "");
+        formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || "");
+        formData.append(`items[${index}]certificate_number`, item.certificate_number || "");
+        formData.append(`items[${index}]calibration_date`, item.calibration_date || "");
+        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || "");
+        formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || "");
+        formData.append(`items[${index}]assigned_to`, item.assigned_to || "");
+        formData.append(`items[${index}]range`, item.range || "");
         if (state.fileChanges[index]) {
           formData.append(`items[${index}]certificate_file`, state.fileChanges[index]);
         }
       });
 
       await apiClient.put(`work-orders/${id}/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       toast.success("Work Order updated successfully.");
@@ -161,11 +169,11 @@ const EditProcessingWorkOrders = () => {
     }
   };
 
-  if (!state.workOrder) return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
+  if (!state.workOrder) return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Edit Work Order - {state.workOrder.wo_number}</h1>
+      <h1 className="text-2xl font-bold mb-4">Edit Work Order - {state.workOrder.wo_number || "Not Provided"}</h1>
       <div className="bg-white p-6 space-y-6 rounded-md shadow">
         {/* Work Order Metadata Fields */}
         <div className="space-y-4">
@@ -200,15 +208,6 @@ const EditProcessingWorkOrders = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
-            <InputField
-              type="text"
-              value={state.serialNumber}
-              onChange={(e) => setState((prev) => ({ ...prev, serialNumber: e.target.value }))}
-              className="w-full"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Site Location</label>
             <InputField
               type="text"
@@ -226,29 +225,16 @@ const EditProcessingWorkOrders = () => {
               className="w-full"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
-            <select
-              value={state.assignedTo}
-              onChange={(e) => setState((prev) => ({ ...prev, assignedTo: e.target.value }))}
-              className="p-2 border rounded w-full"
-            >
-              <option value="">Select Technician</option>
-              {state.technicians.map((technician) => (
-                <option key={technician.id} value={technician.id}>
-                  {technician.name} ({technician.designation})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Device Under Test Details */}
-        <div>
+        <div ref={dutRef}>
           <h3 className="text-lg font-medium text-black mb-4">Device Under Test Details</h3>
           {state.items.map((item, index) => (
             <div key={item.id} className="border p-4 rounded-md mb-4 space-y-4">
-              <h4 className="text-md font-medium text-gray-700">Item: {state.itemsList.find((i) => i.id === item.item)?.name || "N/A"} #{item.id.split('_')[1]}</h4>
+              <h4 className="text-md font-medium text-gray-700">
+                Item: {state.itemsList.find((i) => i.id === item.item)?.name || "Not Provided"} #{item.id.split('_')[1]}
+              </h4>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
                 <select
@@ -362,7 +348,7 @@ const EditProcessingWorkOrders = () => {
           <Button
             onClick={handleSubmit}
             disabled={!isFormValid() || state.isSaving}
-            className={`px-4 py-2 rounded-md ${!isFormValid() || state.isSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            className={`px-4 py-2 rounded-md ${!isFormValid() || state.isSaving ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
           >
             {state.isSaving ? "Saving..." : "Save Changes"}
           </Button>
