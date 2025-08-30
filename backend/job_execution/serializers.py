@@ -140,13 +140,14 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         choices=[
             ("pending", "pending"),
             ("Raised", "Raised"),
-            ("processed", "processed"),
+            ("processed", "processed")
         ],
         required=False,
     )
     due_in_days = serializers.IntegerField(required=False, allow_null=True)
     received_date = serializers.DateField(required=False, allow_null=True)
     wo_type = serializers.CharField(required=False, allow_null=True)
+    application_status = serializers.CharField(max_length=20, allow_null=True, required=False)  # Added with flexibility
 
     class Meta:
         model = WorkOrder
@@ -175,6 +176,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "due_in_days",
             "received_date",
             "wo_type",
+            "application_status",  # Added to fields
         ]
 
     def send_assignment_email(self, work_order, items_data):
@@ -558,6 +560,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             due_in_days=validated_data.get("due_in_days"),
             received_date=validated_data.get("received_date"),
             wo_type=validated_data.get("wo_type"),
+            application_status=validated_data.get("application_status"),  # Set from validated data
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
