@@ -15,8 +15,9 @@ import {
   Users,
   MessageSquareQuote,
   CheckSquare,
-  Truck,
-  Archive,
+  MailCheck,
+  MailQuestionMark,
+  MailWarning,
   FileSearch,
   MessagesSquare,
   ClipboardList,
@@ -24,7 +25,6 @@ import {
   Shield,
   Search,
   File,
-  FilePlus2,
   List,
   CheckCircle,
   UserPlus,
@@ -43,8 +43,8 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRFQOpen, setIsRFQOpen] = useState(false);
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
-  const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] =
-    useState(false);
+  const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
+  const [isForDeliveryPendingOpen, setIsForDeliveryPendingOpen] = useState(false);
   const [isPostJobPhaseOpen, setIsPostJobPhaseOpen] = useState(false);
   const [isUserRolesOpen, setIsUserRolesOpen] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -87,10 +87,9 @@ const Sidebar = ({ toggleSidebar }) => {
   const togglePostJobPhase = () => setIsPostJobPhaseOpen(!isPostJobPhaseOpen);
   const toggleUserRoles = () => setIsUserRolesOpen(!isUserRolesOpen);
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
-  const toggleInitiateWorkOrder = () =>
-    setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
-  const toggleProcessingWorkOrders = () =>
-    setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
+  const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
+  const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
+  const toggleForDeliveryPending = () => setIsForDeliveryPendingOpen(!isForDeliveryPendingOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -181,23 +180,31 @@ const Sidebar = ({ toggleSidebar }) => {
               action: "view",
             },
             {
-              to: "/job-execution/processing-work-orders/delivery",
-              label: "For Delivery",
-              icon: <Truck className="w-5 h-5 mr-3" />,
+              label: "Delivery",
+              icon: <MailQuestionMark className="w-5 h-5 mr-3" />,
               page: "delivery",
               action: "view",
-            },
-            {
-              to: "/job-execution/processing-work-orders/pending-deliveries",
-              label: "Pending Deliveries",
-              icon: <Truck className="w-5 h-5 mr-3" />, // Reused Truck icon
-              page: "pending_deliveries",
-              action: "view",
+              subItems: [
+                {
+                  to: "/job-execution/processing-work-orders/delivery",
+                  label: "For Delivery",
+                  icon: <MailCheck className="w-5 h-5 mr-3" />,
+                  page: "delivery",
+                  action: "view",
+                },
+                {
+                  to: "/job-execution/processing-work-orders/pending-deliveries",
+                  label: "Pending Delivery",
+                  icon: <MailWarning className="w-5 h-5 mr-3" />, 
+                  page: "pending_deliveries",
+                  action: "view",
+                },
+              ],
             },
             {
               to: "/job-execution/processing-work-orders/declined-work-orders",
               label: "Declined Work Orders",
-              icon: <FileCheck className="w-5 h-5 mr-3" />, // Reused FileCheck icon
+              icon: <FileCheck className="w-5 h-5 mr-3" />,
               page: "declined_work_orders",
               action: "view",
             },
@@ -351,10 +358,9 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Additional Settings") toggleSettings();
               else if (item.label === "User Roles") toggleUserRoles();
               else if (item.label === "RFQ") toggleRFQ();
-              else if (item.label === "Initiate Work Order")
-                toggleInitiateWorkOrder();
-              else if (item.label === "Processing Work Orders")
-                toggleProcessingWorkOrders();
+              else if (item.label === "Initiate Work Order") toggleInitiateWorkOrder();
+              else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
+              else if (item.label === "Delivery") toggleForDeliveryPending();
             }}
             className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
               (item.label === "Pre-Job" &&
@@ -372,7 +378,9 @@ const Sidebar = ({ toggleSidebar }) => {
               (item.label === "Initiate Work Order" &&
                 (isInitiateWorkOrderOpen || isActiveSubmenu(item.subItems))) ||
               (item.label === "Processing Work Orders" &&
-                (isProcessingWorkOrdersOpen || isActiveSubmenu(item.subItems)))
+                (isProcessingWorkOrdersOpen || isActiveSubmenu(item.subItems))) ||
+              (item.label === "Delivery" &&
+                (isForDeliveryPendingOpen || isActiveSubmenu(item.subItems)))
                 ? "bg-indigo-100 text-indigo-600"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
             }`}
@@ -428,6 +436,12 @@ const Sidebar = ({ toggleSidebar }) => {
                   <ChevronUp className="w-4 h-4" />
                 ) : (
                   <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Delivery" &&
+                (isForDeliveryPendingOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
                 )))}
           </button>
           <AnimatePresence>
@@ -445,7 +459,9 @@ const Sidebar = ({ toggleSidebar }) => {
               ? isRFQOpen
               : item.label === "Initiate Work Order"
               ? isInitiateWorkOrderOpen
-              : isProcessingWorkOrdersOpen) && (
+              : item.label === "Processing Work Orders"
+              ? isProcessingWorkOrdersOpen
+              : isForDeliveryPendingOpen) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}
