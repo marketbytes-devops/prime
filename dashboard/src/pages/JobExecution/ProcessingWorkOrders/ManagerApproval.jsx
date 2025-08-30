@@ -102,9 +102,7 @@ const ManagerApproval = () => {
         };
         await apiClient.post(`work-orders/${id}/approve/`, payload);
         toast.success(`Work Order approved and single Delivery Note created.`);
-        // Refresh the current page data to ensure state is updated
         await fetchData();
-        // Navigate to Delivery page to view the updated work order
         navigate('/job-execution/processing-work-orders/delivery');
       } catch (error) {
         console.error('Error approving work order:', error);
@@ -185,6 +183,10 @@ const ManagerApproval = () => {
     return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
   };
 
+  const getApplicationStatus = (wo) => {
+    return wo.decline_reason ? 'Declined' : 'New';
+  };
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Manager Approval</h1>
@@ -220,13 +222,14 @@ const ManagerApproval = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">Application Status</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="border p-2 text-center text-gray-500">
+                  <td colSpan="6" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
@@ -237,6 +240,7 @@ const ManagerApproval = () => {
                     <td className="border p-2">{wo.wo_number || 'N/A'}</td>
                     <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
                     <td className="border p-2">{getAssignedTechnicians(wo.items)}</td>
+                    <td className="border p-2">{getApplicationStatus(wo)}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button

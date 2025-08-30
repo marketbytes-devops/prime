@@ -117,7 +117,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         work_order.manager_approval_status = 'Declined'
-        work_order.status = 'Declined'
+        work_order.status = 'Declined'  # Updated to 'Declined'
         work_order.decline_reason = decline_reason
         work_order.save()
 
@@ -133,7 +133,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         work_order.manager_approval_status = 'Pending'
         work_order.status = 'Manager Approval'
-        work_order.decline_reason = None
+        # Removed work_order.decline_reason = None to preserve the reason for history
         work_order.save()
 
         logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
@@ -141,6 +141,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
+        """Custom action to update invoice_status with due_in_days or received_date."""
         work_order = self.get_object()
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
@@ -183,20 +184,15 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         items_data = serializer.validated_data['items']
 
         from series.models import NumberSeries
-        try:
-            dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
-            prefix = dn_series.prefix
-        except NumberSeries.DoesNotExist:
-            logger.error("Delivery Note series not found, using default prefix 'DN'")
-            prefix = 'DN'
+        dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
 
         with transaction.atomic():
             if delivery_type == 'Single':
-                max_sequence = DeliveryNote.objects.filter(dn_number__startswith=prefix).aggregate(
+                max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
                     Max('dn_number')
                 )['dn_number__max']
                 sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                dn_number = f"{prefix}-{sequence:06d}"
+                dn_number = f"{dn_series.prefix}-{sequence:06d}"
 
                 delivery_note = DeliveryNote.objects.create(
                     work_order=work_order,
@@ -230,11 +226,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     technician_items[technician_id].append(item_data)
 
                 for technician_id, items in technician_items.items():
-                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=prefix).aggregate(
+                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
                         Max('dn_number')
                     )['dn_number__max']
                     sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                    dn_number = f"{prefix}-{sequence:06d}"
+                    dn_number = f"{dn_series.prefix}-{sequence:06d}"
 
                     delivery_note = DeliveryNote.objects.create(
                         work_order=work_order,

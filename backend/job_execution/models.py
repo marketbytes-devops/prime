@@ -8,20 +8,15 @@ class WorkOrder(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     wo_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('Processing', 'Processing'),
-            ('Manager Approval', 'Manager Approval'),
-            ('Approved', 'Approved'),
-            ('Declined', 'Declined'),
-            ('Delivered', 'Delivered'),
-            ('Closed', 'Closed'),
-            ('Submitted', 'Submitted')
-        ],
-        default='Collection Pending',
-        null=True, blank=True
-    )
+    status = models.CharField(max_length=20, choices=[
+        ('Processing', 'Processing'),
+        ('Manager Approval', 'Manager Approval'),
+        ('Approved', 'Approved'),
+        ('Declined', 'Declined'),
+        ('Delivered', 'Delivered'),
+        ('Closed', 'Closed'),
+        ('Submitted', 'Submitted')
+    ], default='Collection Pending', null=True, blank=True)
     date_received = models.DateField(null=True, blank=True)
     expected_completion_date = models.DateField(null=True, blank=True)
     onsite_or_lab = models.CharField(max_length=20, choices=[('Onsite', 'Onsite'), ('Lab', 'Lab')], null=True, blank=True)
@@ -49,7 +44,8 @@ class WorkOrder(models.Model):
     due_in_days = models.IntegerField(null=True, blank=True)
     received_date = models.DateField(null=True, blank=True)
     wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
-    
+    application_status = models.CharField(max_length=20, null=True, blank=True)  # Added with null=True
+
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 
