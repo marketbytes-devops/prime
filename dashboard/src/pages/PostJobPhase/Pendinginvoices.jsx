@@ -105,7 +105,6 @@ const PendingInvoices = () => {
         selectedWO: workOrder,
       }));
     } else if (type === 'po') {
-      console.log('workOrder:', workOrder);
       const poId = workOrder.purchase_order;
       const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
       setState((prev) => ({
@@ -116,6 +115,17 @@ const PendingInvoices = () => {
       if (!purchaseOrder) {
         toast.error('Purchase order not found. Please check if the purchase order ID matches.');
       }
+    }
+  };
+
+  const handleViewDN = (workOrder) => {
+    const poId = workOrder.purchase_order;
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+    if (purchaseOrder && purchaseOrder.client_po_number) {
+      // Navigate to DN view or show DN details (placeholder action)
+      toast.info('Viewing Delivery Note (placeholder action)');
+    } else {
+      toast.error('Delivery Note not available. Upload PO first.');
     }
   };
 
@@ -186,6 +196,12 @@ const PendingInvoices = () => {
     if (!po) return 'N/A';
     const quotation = state.quotations.find((q) => q.id === po.quotation);
     return quotation?.assigned_sales_person_name || 'N/A';
+  };
+
+  const isPOEmpty = (workOrder) => {
+    const poId = workOrder.purchase_order;
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+    return !purchaseOrder || !purchaseOrder.client_po_number || purchaseOrder.client_po_number.trim() === '';
   };
 
   const filteredWorkOrders = state.workOrders
@@ -283,13 +299,24 @@ const PendingInvoices = () => {
                           onClick={() => handleViewDocument(workOrder, 'po')}
                           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
-                          View PO
+                          {isPOEmpty(workOrder) ? 'Upload PO' : 'View PO'}
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(workOrder, 'wo')}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           View WO
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDN(workOrder)}
+                          disabled={isPOEmpty(workOrder)}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            isPOEmpty(workOrder)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                        >
+                          View DN
                         </Button>
                       </div>
                     </td>
