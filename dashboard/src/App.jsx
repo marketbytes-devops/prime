@@ -220,9 +220,9 @@ function App() {
           ),
         },
         {
-          path: "/job-execution/processing-work-orders/delivery/:id",
+          path: "/job-execution/processing-work-orders/initiate-delivery/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="view">
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="edit">
               <InitiateDelivery />
             </ProtectedRoute>
           ),

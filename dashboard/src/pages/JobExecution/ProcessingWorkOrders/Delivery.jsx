@@ -69,11 +69,11 @@ const Delivery = () => {
       ]);
 
       const deliveryNotes = dnRes.data || [];
-      console.log('Fetched deliveryNotes:', deliveryNotes); 
+      console.log('Fetched deliveryNotes:', deliveryNotes);
 
       const workOrdersPromises = deliveryNotes.map((dn) =>
         apiClient.get(`/work-orders/${dn.work_order_id}/`).then((res) => ({
-          id: dn.work_order_id, 
+          id: dn.work_order_id,
           work_order: res.data || {},
         })).catch((error) => {
           console.error(`Error fetching work order ${dn.work_order_id}:`, error);
@@ -152,11 +152,16 @@ const Delivery = () => {
   };
 
   const handleInitiateDelivery = (workOrder) => {
-    navigate(`/job-execution/processing-work-orders/delivery/${workOrder.id}`);
+    navigate(`/job-execution/processing-work-orders/initiate-delivery/${workOrder.id}`);
   };
 
   const hasDeliveryNote = (workOrderId) => {
     return state.deliveryNotes.some((dn) => dn.work_order_id === workOrderId);
+  };
+
+  // Always enable the Initiate Delivery button
+  const isInitiateDeliveryDisabled = () => {
+    return false;
   };
 
   const filteredDNs = state.deliveryNotes
@@ -299,17 +304,11 @@ const Delivery = () => {
                         </Button>
                         <Button
                           onClick={() => handleInitiateDelivery(dn.work_order)}
-                          disabled={
-                            !hasPermission('delivery', 'edit') ||
-                            hasDeliveryNote(dn.work_order?.id) ||
-                            dn.work_order?.status !== 'Approved'
-                          }
+                          disabled={isInitiateDeliveryDisabled()}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            hasPermission('delivery', 'edit') &&
-                            !hasDeliveryNote(dn.work_order?.id) &&
-                            dn.work_order?.status === 'Approved'
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            isInitiateDeliveryDisabled()
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
                           Initiate Delivery

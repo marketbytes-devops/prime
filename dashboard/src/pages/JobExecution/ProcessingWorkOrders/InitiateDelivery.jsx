@@ -11,25 +11,7 @@ const InitiateDelivery = () => {
   const [state, setState] = useState({
     selectedWorkOrder: null,
     deliveryType: 'Single',
-    deliveryItems: [
-      {
-        id: Date.now(),
-        item: '',
-        make: '',
-        dial_size: '',
-        case: '',
-        connection: '',
-        wetted_parts: '',
-        range: '',
-        quantity: '',
-        delivered_quantity: '',
-        uom: '',
-        remaining_quantity: 0,
-        assigned_quantity: '',
-        showAdditionalInfo: false,
-        error: '',
-      },
-    ],
+    deliveryItems: [],
     numberOfSplitDNs: '',
     createdSplitDNs: [],
     selectedItemIds: [],
@@ -57,6 +39,7 @@ const InitiateDelivery = () => {
         const initialItems = workOrder.items.map((item) => ({
           id: item.id,
           item: item.item,
+          name: itemsRes.data.find((i) => i.id === item.item)?.name || 'N/A',
           make: '',
           dial_size: '',
           case: '',
@@ -65,7 +48,7 @@ const InitiateDelivery = () => {
           range: item.range || '',
           quantity: item.quantity || '',
           delivered_quantity: item.quantity || '',
-          uom: unitsRes.data.find((u) => u.id === item.unit)?.name || '',
+          uom: unitsRes.data.find((u) => u.id === item.unit)?.id || '',
           remaining_quantity: item.quantity || 0,
           assigned_quantity: '',
           showAdditionalInfo: false,
@@ -76,7 +59,6 @@ const InitiateDelivery = () => {
           ...prev,
           selectedWorkOrder: workOrder,
           deliveryItems: initialItems.length > 0 ? initialItems : prev.deliveryItems,
-          deliveryType: workOrder.wo_type === 'Split' ? 'Multiple' : 'Single',
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
           isLoading: false,
@@ -223,10 +205,7 @@ const InitiateDelivery = () => {
           ),
         };
       });
-      return {
-        ...prev,
-        createdSplitDNs: updatedSplitDNs,
-      };
+      return { ...prev, createdSplitDNs: updatedSplitDNs };
     });
   };
 
@@ -247,6 +226,7 @@ const InitiateDelivery = () => {
         {
           id: Date.now() + index,
           item: prev.deliveryItems[index].item,
+          name: prev.itemsList.find((i) => i.id === prev.deliveryItems[index].item)?.name || 'N/A',
           make: '',
           dial_size: '',
           case: '',
@@ -300,20 +280,33 @@ const InitiateDelivery = () => {
     const selectedItems = state.deliveryItems.filter((item) =>
       state.selectedItemIds.includes(item.id)
     );
-    return !selectedItems.every(
+    const allHaveValidAssignedQuantity = selectedItems.every(
       (item) =>
-        item.item &&
-        item.uom &&
         item.assigned_quantity !== '' &&
         !isNaN(item.assigned_quantity) &&
         item.assigned_quantity > 0 &&
         item.assigned_quantity <= item.remaining_quantity
     );
+    if (!allHaveValidAssignedQuantity) return true;
+    const isLastSplitDN = state.createdSplitDNs.length + 1 === state.numberOfSplitDNs;
+    if (isLastSplitDN) {
+      const updatedItems = state.deliveryItems.map((item) =>
+        selectedItems.find((selected) => selected.id === item.id)
+          ? {
+              ...item,
+              remaining_quantity: item.remaining_quantity - (item.assigned_quantity || 0),
+            }
+          : item
+      );
+      return !updatedItems.every((item) => item.remaining_quantity === 0);
+    }
+    return false;
   };
 
-  const isDeliveryFormValid = () => {
+  const isSubmitDisabled = () => {
+    if (!state.deliveryType) return true;
     if (state.deliveryType === 'Single') {
-      return state.deliveryItems.every(
+      return !state.deliveryItems.every(
         (item) =>
           item.item &&
           item.quantity &&
@@ -323,9 +316,9 @@ const InitiateDelivery = () => {
       );
     }
     if (state.deliveryType === 'Multiple') {
-      if (state.createdSplitDNs.length !== state.numberOfSplitDNs) return false;
-      return state.deliveryItems.every((item) => item.remaining_quantity === 0) &&
-        state.createdSplitDNs.every((dn) =>
+      if (state.createdSplitDNs.length !== state.numberOfSplitDNs) return true;
+      return !state.deliveryItems.every((item) => item.remaining_quantity === 0) ||
+        !state.createdSplitDNs.every((dn) =>
           dn.items.every(
             (item) =>
               item.item &&
@@ -340,11 +333,15 @@ const InitiateDelivery = () => {
   };
 
   const handleGenerateSplitDN = () => {
-    const selectedItems = state.deliveryItems.filter((item) =>
-      state.selectedItemIds.includes(item.id)
-    );
-    if (!selectedItems.every((item) => item.item && item.uom)) {
-      toast.error('All selected items must have a valid item and unit.');
+    const selectedItems = state.deliveryItems
+      .filter((item) => state.selectedItemIds.includes(item.id))
+      .map((item) => ({
+        ...item,
+        quantity: item.assigned_quantity,
+        delivered_quantity: item.assigned_quantity,
+      }));
+    if (!selectedItems.length) {
+      toast.error('No valid items selected.');
       return;
     }
     setState((prev) => {
@@ -354,22 +351,12 @@ const InitiateDelivery = () => {
               ...item,
               remaining_quantity: item.remaining_quantity - (parseInt(item.assigned_quantity) || 0),
               assigned_quantity: '',
-              error: '',
             }
           : item
       );
       return {
         ...prev,
-        createdSplitDNs: [
-          ...prev.createdSplitDNs,
-          {
-            items: selectedItems.map((item) => ({
-              ...item,
-              quantity: item.assigned_quantity,
-              delivered_quantity: item.assigned_quantity,
-            })),
-          },
-        ],
+        createdSplitDNs: [...prev.createdSplitDNs, { items: selectedItems }],
         usedItemIds: [
           ...prev.usedItemIds,
           ...prev.selectedItemIds.filter((id) =>
@@ -384,7 +371,7 @@ const InitiateDelivery = () => {
   };
 
   const handleSubmitDelivery = async () => {
-    if (!isDeliveryFormValid()) {
+    if (isSubmitDisabled()) {
       toast.error('Please complete all required fields and ensure all quantities are assigned.');
       return;
     }
@@ -442,7 +429,7 @@ const InitiateDelivery = () => {
     }
   };
 
-  const remainingItems = state.deliveryItems;
+  const remainingItems = state.deliveryItems.filter((item) => !state.usedItemIds.includes(item.id));
 
   if (state.isLoading || isLoadingPermissions) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
@@ -459,20 +446,14 @@ const InitiateDelivery = () => {
               value={state.deliveryType}
               onChange={handleDeliveryTypeChange}
               className="w-full p-2 border rounded focus:outline-indigo-500"
-              disabled={state.selectedWorkOrder?.wo_type === 'Split'}
             >
               <option value="Single">Single DN</option>
               <option value="Multiple">Multiple DN</option>
             </select>
-            {state.selectedWorkOrder?.wo_type === 'Split' && (
-              <p className="text-sm text-gray-500 mt-1">Delivery type is set to Multiple due to Split Work Order.</p>
-            )}
           </div>
           {state.deliveryType === 'Multiple' && (
             <div className="w-1/3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Number of Split Delivery Notes
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Number of Split Delivery Notes</label>
               <InputField
                 type="number"
                 value={state.numberOfSplitDNs}
@@ -499,189 +480,199 @@ const InitiateDelivery = () => {
         )}
         <div>
           <h3 className="text-lg font-medium text-black mb-2">Items</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                    {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 'Select' : 'SL'}
-                  </th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Description of Item</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">QTY</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UOM</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered QTY</th>
-                  {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-                    <>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining QTY</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned QTY</th>
-                    </>
-                  )}
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.deliveryItems.map((item, index) => (
-                  <tr key={item.id} className="border">
-                    <td className="border p-2 whitespace-nowrap">
-                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? (
-                        <input
-                          type="checkbox"
-                          checked={state.selectedItemIds.includes(item.id)}
-                          onChange={() => handleItemSelection(item.id)}
-                          disabled={item.remaining_quantity === 0 || state.createdSplitDNs.length >= state.numberOfSplitDNs}
-                        />
-                      ) : (
-                        index + 1
-                      )}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <select
-                        value={item.item}
-                        onChange={(e) => handleItemChange(index, 'item', e.target.value)}
-                        className="w-full p-2 border rounded"
-                        disabled={
-                          state.deliveryType === 'Multiple' &&
-                          state.numberOfSplitDNs &&
-                          state.usedItemIds.includes(item.id)
-                        }
-                      >
-                        <option value="">Select Item</option>
-                        {state.itemsList.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name}
-                          </option>
-                        ))}
-                      </select>
-                      {item.showAdditionalInfo && (
-                        <div className="mt-2 p-2 border rounded bg-gray-50">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Make</label>
-                              <InputField
-                                type="text"
-                                value={item.make}
-                                onChange={(e) => handleItemChange(index, 'make', e.target.value)}
-                                className="w-full p-2 border rounded"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Dial Size</label>
-                              <InputField
-                                type="text"
-                                value={item.dial_size}
-                                onChange={(e) => handleItemChange(index, 'dial_size', e.target.value)}
-                                className="w-full p-2 border rounded"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Case</label>
-                              <InputField
-                                type="text"
-                                value={item.case}
-                                onChange={(e) => handleItemChange(index, 'case', e.target.value)}
-                                className="w-full p-2 border rounded"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Connection</label>
-                              <InputField
-                                type="text"
-                                value={item.connection}
-                                onChange={(e) => handleItemChange(index, 'connection', e.target.value)}
-                                className="w-full p-2 border rounded"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <label className="block text-sm font-medium text-gray-700">Wetted Parts</label>
-                              <InputField
-                                type="text"
-                                value={item.wetted_parts}
-                                onChange={(e) => handleItemChange(index, 'wetted_parts', e.target.value)}
-                                className="w-full p-2 border rounded"
-                              />
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => addNewItem(index)}
-                            className="mt-2 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
-                          >
-                            + Add Item
-                          </Button>
-                        </div>
-                      )}
-                      {item.error && <p className="text-red-500 text-sm mt-1">{item.error}</p>}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <InputField
-                        type="text"
-                        value={item.range}
-                        onChange={(e) => handleItemChange(index, 'range', e.target.value)}
-                        className="w-full p-2 border rounded"
-                      />
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <InputField
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                        className="w-full p-2 border rounded"
-                        min="0"
-                      />
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <InputField
-                        type="text"
-                        value={item.uom}
-                        onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                        className="w-full p-2 border rounded"
-                      />
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <InputField
-                        type="number"
-                        value={item.delivered_quantity}
-                        onChange={(e) => handleItemChange(index, 'delivered_quantity', e.target.value)}
-                        className="w-full p-2 border rounded"
-                        min="0"
-                      />
-                    </td>
+          {state.deliveryItems.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 'Select' : 'SL'}
+                    </th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Description of Item</th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
                     {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                       <>
-                        <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || '0'}</td>
-                        <td className="border p-2 whitespace-nowrap">
-                          <InputField
-                            type="number"
-                            value={item.assigned_quantity}
-                            onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
-                            className="w-full p-2 border rounded"
-                            min="0"
-                            max={item.remaining_quantity}
-                            disabled={
-                              !state.selectedItemIds.includes(item.id) ||
-                              item.remaining_quantity === 0 ||
-                              state.createdSplitDNs.length >= state.numberOfSplitDNs
-                            }
-                            placeholder="Enter quantity"
-                          />
-                        </td>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
                       </>
                     )}
-                    <td className="border p-2 whitespace-nowrap">
-                      <Button
-                        onClick={() => toggleAdditionalInfo(index)}
-                        className="px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm whitespace-nowrap"
-                      >
-                        {item.showAdditionalInfo ? 'Hide Additional Info' : 'Show Additional Info'}
-                      </Button>
-                    </td>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {state.deliveryItems.map((item, index) => (
+                    <tr key={item.id} className="border">
+                      <td className="border p-2 whitespace-nowrap">
+                        {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? (
+                          <input
+                            type="checkbox"
+                            checked={state.selectedItemIds.includes(item.id)}
+                            onChange={() => handleItemSelection(item.id)}
+                            disabled={item.remaining_quantity === 0 || state.createdSplitDNs.length >= state.numberOfSplitDNs}
+                          />
+                        ) : (
+                          index + 1
+                        )}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <select
+                          value={item.item}
+                          onChange={(e) => handleItemChange(index, 'item', e.target.value)}
+                          className="w-full p-2 border rounded"
+                          disabled={
+                            state.deliveryType === 'Multiple' &&
+                            state.numberOfSplitDNs &&
+                            state.usedItemIds.includes(item.id)
+                          }
+                        >
+                          <option value="">Select Item</option>
+                          {state.itemsList.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                        </select>
+                        {item.showAdditionalInfo && (
+                          <div className="mt-2 p-2 border rounded bg-gray-50">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Make</label>
+                                <InputField
+                                  type="text"
+                                  value={item.make}
+                                  onChange={(e) => handleItemChange(index, 'make', e.target.value)}
+                                  className="w-full p-2 border rounded"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Dial Size</label>
+                                <InputField
+                                  type="text"
+                                  value={item.dial_size}
+                                  onChange={(e) => handleItemChange(index, 'dial_size', e.target.value)}
+                                  className="w-full p-2 border rounded"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Case</label>
+                                <InputField
+                                  type="text"
+                                  value={item.case}
+                                  onChange={(e) => handleItemChange(index, 'case', e.target.value)}
+                                  className="w-full p-2 border rounded"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Connection</label>
+                                <InputField
+                                  type="text"
+                                  value={item.connection}
+                                  onChange={(e) => handleItemChange(index, 'connection', e.target.value)}
+                                  className="w-full p-2 border rounded"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700">Wetted Parts</label>
+                                <InputField
+                                  type="text"
+                                  value={item.wetted_parts}
+                                  onChange={(e) => handleItemChange(index, 'wetted_parts', e.target.value)}
+                                  className="w-full p-2 border rounded"
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => addNewItem(index)}
+                              className="mt-2 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
+                            >
+                              + Add Item
+                            </Button>
+                          </div>
+                        )}
+                        {item.error && <p className="text-red-500 text-sm mt-1">{item.error}</p>}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <InputField
+                          type="text"
+                          value={item.range}
+                          onChange={(e) => handleItemChange(index, 'range', e.target.value)}
+                          className="w-full p-2 border rounded"
+                        />
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <InputField
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          className="w-full p-2 border rounded"
+                          min="0"
+                        />
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <select
+                          value={item.uom}
+                          onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="">Select Unit</option>
+                          {state.units.map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                              {unit.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <InputField
+                          type="number"
+                          value={item.delivered_quantity}
+                          onChange={(e) => handleItemChange(index, 'delivered_quantity', e.target.value)}
+                          className="w-full p-2 border rounded"
+                          min="0"
+                        />
+                      </td>
+                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
+                        <>
+                          <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || '0'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            <InputField
+                              type="number"
+                              value={item.assigned_quantity}
+                              onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
+                              className="w-full p-2 border rounded"
+                              min="0"
+                              max={item.remaining_quantity}
+                              disabled={
+                                !state.selectedItemIds.includes(item.id) ||
+                                item.remaining_quantity === 0 ||
+                                state.createdSplitDNs.length >= state.numberOfSplitDNs
+                              }
+                              placeholder="Enter quantity"
+                            />
+                          </td>
+                        </>
+                      )}
+                      <td className="border p-2 whitespace-nowrap">
+                        <Button
+                          onClick={() => toggleAdditionalInfo(index)}
+                          className="px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm whitespace-nowrap"
+                        >
+                          {item.showAdditionalInfo ? 'Hide Additional Info' : 'Show Additional Info'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">No items available.</p>
+          )}
           {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4">
               <Button
                 onClick={handleGenerateSplitDN}
                 disabled={isGenerateDisabled()}
@@ -720,6 +711,7 @@ const InitiateDelivery = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Case</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Connection</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Wetted Parts</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                       </tr>
@@ -784,6 +776,14 @@ const InitiateDelivery = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             <InputField
+                              type="text"
+                              value={item.range}
+                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'range', e.target.value)}
+                              className="w-full p-2 border rounded"
+                            />
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            <InputField
                               type="number"
                               value={item.quantity}
                               onChange={(e) => handleSplitDNItemChange(index, item.id, 'quantity', e.target.value)}
@@ -792,12 +792,18 @@ const InitiateDelivery = () => {
                             />
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
+                            <select
                               value={item.uom}
                               onChange={(e) => handleSplitDNItemChange(index, item.id, 'uom', e.target.value)}
                               className="w-full p-2 border rounded"
-                            />
+                            >
+                              <option value="">Select Unit</option>
+                              {state.units.map((unit) => (
+                                <option key={unit.id} value={unit.id}>
+                                  {unit.name}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                         </tr>
                       ))}
@@ -811,9 +817,9 @@ const InitiateDelivery = () => {
         <div className="flex justify-end gap-2 mt-6">
           <Button
             onClick={handleSubmitDelivery}
-            disabled={state.isSubmitting || !hasPermission('delivery', 'edit') || !isDeliveryFormValid()}
+            disabled={state.isSubmitting || !hasPermission('delivery', 'edit') || isSubmitDisabled()}
             className={`px-4 py-2 rounded-md whitespace-nowrap ${
-              state.isSubmitting || !hasPermission('delivery', 'edit') || !isDeliveryFormValid()
+              state.isSubmitting || !hasPermission('delivery', 'edit') || isSubmitDisabled()
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-indigo-600 text-white hover:bg-indigo-700'
             }`}
