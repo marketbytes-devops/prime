@@ -101,7 +101,7 @@ const ProcessedInvoices = () => {
   const filteredWorkOrders = state.workOrders
     .filter(
       (workOrder) =>
-        workOrder.invoice_status === 'Processed' &&
+        workOrder.invoice_status === 'processed' &&
         (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
