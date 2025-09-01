@@ -536,7 +536,7 @@ const ListPurchaseOrders = () => {
             <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
             <p><strong>PO ID:</strong> ${po.id}</p>
             <p><strong>Client PO Number:</strong> ${
-              po.client_po_number || "Not Provided"
+              po.client_po_number || "Nil"
             }</p>
             <p><strong>Order Type:</strong> ${po.order_type}</p>
             <p><strong>Created:</strong> ${new Date(
@@ -545,7 +545,7 @@ const ListPurchaseOrders = () => {
             <p><strong>PO File:</strong> ${
               po.po_file
                 ? `<a href="${po.po_file}" target="_blank">View File</a>`
-                : "Not Provided"
+                : "Nil"
             }</p>
             <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
           </div>
@@ -884,7 +884,7 @@ const ListPurchaseOrders = () => {
                       {po.series_number || "N/A"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {po.client_po_number || "Not Provided"}
+                      {po.client_po_number || "Nil"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       {getAssignedSalesPersonName(po)}
@@ -997,7 +997,7 @@ const ListPurchaseOrders = () => {
               </p>
               <p>
                 <strong>Client PO Number:</strong>{" "}
-                {state.selectedPO.client_po_number || "Not Provided"}
+                {state.selectedPO.client_po_number || "Nil"}
               </p>
               <p>
                 <strong>Order Type:</strong> {state.selectedPO.order_type}
@@ -1018,7 +1018,7 @@ const ListPurchaseOrders = () => {
                     View File
                   </a>
                 ) : (
-                  "Not Provided"
+                  "Nil"
                 )}
               </p>
               <p>

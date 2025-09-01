@@ -30,7 +30,9 @@ import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
 import EditProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditProcessingWorkOrders";
 import PendingDeliveries from "./pages/JobExecution/ProcessingWorkOrders/PendingDeliveries";
 import DeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/DeclinedWorkOrders";
-import PendingInvoices from "./pages/PostJobPhase/PendingInvoices";
+import PendingInvoices from "./pages/PostJobPhase/Pendinginvoices";
+import RaisedInvoices from "./pages/PostJobPhase/Raisedinvoices";
+import ProcessedInvoices from "./pages/PostJobPhase/ProcessedInvoices";
 import CompletedWO from "./pages/PostJobPhase/CompletedWO";
 import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
@@ -92,7 +94,7 @@ const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredActio
   }
 
   if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
   }
 
   if (!hasPermission) {
@@ -248,6 +250,22 @@ function App() {
           element: (
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="pending_invoices" requiredAction="view">
               <PendingInvoices />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/post-job-phase/raised-invoices",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="raised_invoices" requiredAction="view">
+              <RaisedInvoices />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/post-job-phase/processed-invoices",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processed_invoices" requiredAction="view">
+              <ProcessedInvoices />
             </ProtectedRoute>
           ),
         },

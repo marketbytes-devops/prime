@@ -1075,7 +1075,7 @@ const ViewQuotation = () => {
                 }
                 className="mr-2"
               />
-              Not Available
+              Nil
             </label>
           </div>
           {state.fullOrderPo.poStatus === 'available' ? (
@@ -1180,7 +1180,7 @@ const ViewQuotation = () => {
                     }
                     className="mr-2"
                   />
-                  Not Available
+                  Nil
                 </label>
               </div>
               {state.poUploads[po.id]?.poStatus === 'available' ? (
@@ -1232,7 +1232,7 @@ const ViewQuotation = () => {
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-500">Nil</p>
+                <p className="text-gray-500"></p>
               )}
             </div>
           ))}

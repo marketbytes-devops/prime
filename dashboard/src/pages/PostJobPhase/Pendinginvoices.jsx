@@ -9,6 +9,7 @@ const PendingInvoices = () => {
   const [state, setState] = useState({
     workOrders: [],
     purchaseOrders: [],
+    deliveryNotes: [],
     technicians: [],
     itemsList: [],
     units: [],
@@ -26,6 +27,14 @@ const PendingInvoices = () => {
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
+    isUploadPOModalOpen: false,
+    selectedPOForUpload: null,
+    poUpload: { clientPoNumber: '', poFile: null },
+    poUploadErrors: { clientPoNumber: '', poFile: '' },
+    isUploadDNModalOpen: false,
+    selectedDNForUpload: null,
+    dnUpload: { signedDeliveryNote: null },
+    dnUploadErrors: { signedDeliveryNote: '' },
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -63,30 +72,26 @@ const PendingInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, techRes, itemsRes, unitsRes, quotationsRes] = await Promise.all([
+      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
+        apiClient.get('delivery-notes/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('quotations/'),
       ]);
 
-      const newState = {
-        ...state,
+      setState((prev) => ({
+        ...prev,
         workOrders: woRes.data || [],
         purchaseOrders: poRes.data || [],
+        deliveryNotes: dnRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
-      };
-      setState(newState);
-      console.log('Fetched workOrders:', newState.workOrders);
-      console.log('Fetched purchaseOrders:', newState.purchaseOrders);
-      console.log('Fetched itemsList:', newState.itemsList);
-      console.log('Fetched units:', newState.units);
-      console.log('Fetched quotations:', newState.quotations);
+      }));
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data.');
@@ -113,19 +118,140 @@ const PendingInvoices = () => {
         selectedPO: purchaseOrder || null,
       }));
       if (!purchaseOrder) {
-        toast.error('Purchase order not found. Please check if the purchase order ID matches.');
+        toast.error('Purchase order not found.');
       }
     }
   };
 
-  const handleViewDN = (workOrder) => {
+  const handleUploadPO = (workOrder) => {
     const poId = workOrder.purchase_order;
     const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
-    if (purchaseOrder && purchaseOrder.client_po_number) {
-      // Navigate to DN view or show DN details (placeholder action)
-      toast.info('Viewing Delivery Note (placeholder action)');
+    if (!purchaseOrder) {
+      toast.error('Purchase order not found.');
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      isUploadPOModalOpen: true,
+      selectedPOForUpload: purchaseOrder,
+      poUpload: {
+        clientPoNumber: purchaseOrder.client_po_number || '',
+        poFile: null,
+      },
+      poUploadErrors: { clientPoNumber: '', poFile: '' },
+    }));
+  };
+
+  const validatePOUpload = () => {
+    let isValid = true;
+    const errors = { clientPoNumber: '', poFile: '' };
+    if (!state.poUpload.clientPoNumber.trim()) {
+      errors.clientPoNumber = 'Client PO Number is required';
+      isValid = false;
+    }
+    if (!state.poUpload.poFile) {
+      errors.poFile = 'PO File is required';
+      isValid = false;
+    }
+    setState((prev) => ({ ...prev, poUploadErrors: errors }));
+    return isValid;
+  };
+
+  const handlePOUploadSubmit = async () => {
+    if (!validatePOUpload()) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('client_po_number', state.poUpload.clientPoNumber || '');
+      formData.append('po_file', state.poUpload.poFile || '');
+      await apiClient.patch(`/purchase-orders/${state.selectedPOForUpload.id}/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      await fetchData();
+      setState((prev) => ({
+        ...prev,
+        isUploadPOModalOpen: false,
+        selectedPOForUpload: null,
+        poUpload: { clientPoNumber: '', poFile: null },
+        poUploadErrors: { clientPoNumber: '', poFile: '' },
+      }));
+      toast.success('PO details uploaded successfully.');
+    } catch (error) {
+      console.error('Error uploading PO details:', error);
+      toast.error('Failed to upload PO details.');
+    }
+  };
+
+  const isPOEmpty = (workOrder) => {
+    const poId = workOrder.purchase_order;
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+    return !purchaseOrder || (!purchaseOrder.client_po_number && !purchaseOrder.po_file);
+  };
+
+  const isDNEmpty = (workOrder) => {
+    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
+    return !dn || !dn.signed_delivery_note;
+  };
+
+  const handleUploadDN = (workOrder) => {
+    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
+    if (!dn) {
+      toast.error('Delivery note not found.');
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      isUploadDNModalOpen: true,
+      selectedDNForUpload: dn,
+      dnUpload: { signedDeliveryNote: null },
+      dnUploadErrors: { signedDeliveryNote: '' },
+    }));
+  };
+
+  const validateDNUpload = () => {
+    let isValid = true;
+    const errors = { signedDeliveryNote: '' };
+    if (!state.dnUpload.signedDeliveryNote) {
+      errors.signedDeliveryNote = 'Signed Delivery Note is required';
+      isValid = false;
+    }
+    setState((prev) => ({ ...prev, dnUploadErrors: errors }));
+    return isValid;
+  };
+
+  const handleUploadDNSubmit = async () => {
+    if (!validateDNUpload()) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('signed_delivery_note', state.dnUpload.signedDeliveryNote);
+      await apiClient.post(`/delivery-notes/${state.selectedDNForUpload.id}/upload-signed-note/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Signed Delivery Note uploaded and status updated to Delivered.');
+      setState((prev) => ({
+        ...prev,
+        isUploadDNModalOpen: false,
+        selectedDNForUpload: null,
+        dnUpload: { signedDeliveryNote: null },
+        dnUploadErrors: { signedDeliveryNote: '' },
+      }));
+      await fetchData();
+    } catch (error) {
+      console.error('Error uploading signed delivery note:', error);
+      toast.error('Failed to upload signed delivery note.');
+    }
+  };
+
+  const viewDN = (workOrder) => {
+    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
+    if (dn && dn.signed_delivery_note) {
+      window.open(dn.signed_delivery_note, '_blank', 'noopener,noreferrer');
     } else {
-      toast.error('Delivery Note not available. Upload PO first.');
+      toast.error('Signed Delivery Note not available.');
     }
   };
 
@@ -153,7 +279,6 @@ const PendingInvoices = () => {
         payload.received_date = receivedDate;
       }
 
-      console.log('Sending POST payload:', payload);
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
       setState((prev) => ({
@@ -196,12 +321,6 @@ const PendingInvoices = () => {
     if (!po) return 'N/A';
     const quotation = state.quotations.find((q) => q.id === po.quotation);
     return quotation?.assigned_sales_person_name || 'N/A';
-  };
-
-  const isPOEmpty = (workOrder) => {
-    const poId = workOrder.purchase_order;
-    const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
-    return !purchaseOrder || !purchaseOrder.client_po_number || purchaseOrder.client_po_number.trim() === '';
   };
 
   const filteredWorkOrders = state.workOrders
@@ -296,8 +415,12 @@ const PendingInvoices = () => {
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
-                          onClick={() => handleViewDocument(workOrder, 'po')}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          onClick={() => (isPOEmpty(workOrder) ? handleUploadPO(workOrder) : handleViewDocument(workOrder, 'po'))}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            isPOEmpty(workOrder)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
                         >
                           {isPOEmpty(workOrder) ? 'Upload PO' : 'View PO'}
                         </Button>
@@ -308,15 +431,17 @@ const PendingInvoices = () => {
                           View WO
                         </Button>
                         <Button
-                          onClick={() => handleViewDN(workOrder)}
+                          onClick={() => (isDNEmpty(workOrder) ? handleUploadDN(workOrder) : viewDN(workOrder))}
                           disabled={isPOEmpty(workOrder)}
                           className={`px-3 py-1 rounded-md text-sm ${
                             isPOEmpty(workOrder)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : isDNEmpty(workOrder)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-purple-600 text-white hover:bg-purple-700'
                           }`}
                         >
-                          View DN
+                          {isDNEmpty(workOrder) ? 'Upload DN' : 'View DN'}
                         </Button>
                       </div>
                     </td>
@@ -470,7 +595,7 @@ const PendingInvoices = () => {
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
               <p><strong>PO Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
-              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'Nil'}</p>
               <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
               <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
               <p><strong>PO File:</strong> {state.selectedPO.po_file ? (
@@ -482,7 +607,7 @@ const PendingInvoices = () => {
                 >
                   {state.selectedPO.po_file.split('/').pop() || 'View File'}
                 </a>
-              ) : 'N/A'}</p>
+              ) : 'Nil'}</p>
               <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
@@ -516,6 +641,130 @@ const PendingInvoices = () => {
         ) : (
           <p className="text-gray-500">No purchase order found.</p>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={state.isUploadPOModalOpen}
+        onClose={() => setState((prev) => ({
+          ...prev,
+          isUploadPOModalOpen: false,
+          selectedPOForUpload: null,
+          poUpload: { clientPoNumber: '', poFile: null },
+          poUploadErrors: { clientPoNumber: '', poFile: '' },
+        }))}
+        title={`Upload PO Details for ${state.selectedPOForUpload?.series_number || 'N/A'}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <InputField
+              label="Client PO Number"
+              type="text"
+              value={state.poUpload.clientPoNumber}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  poUpload: { ...prev.poUpload, clientPoNumber: e.target.value },
+                  poUploadErrors: { ...prev.poUploadErrors, clientPoNumber: '' },
+                }))
+              }
+            />
+            {state.poUploadErrors.clientPoNumber && (
+              <p className="text-red-500 text-sm mt-1">{state.poUploadErrors.clientPoNumber}</p>
+            )}
+          </div>
+          <div>
+            <InputField
+              label="Upload PO File"
+              type="file"
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  poUpload: { ...prev.poUpload, poFile: e.target.files[0] },
+                  poUploadErrors: { ...prev.poUploadErrors, poFile: '' },
+                }))
+              }
+            />
+            {state.poUploadErrors.poFile && (
+              <p className="text-red-500 text-sm mt-1">{state.poUploadErrors.poFile}</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setState((prev) => ({
+                ...prev,
+                isUploadPOModalOpen: false,
+                selectedPOForUpload: null,
+                poUpload: { clientPoNumber: '', poFile: null },
+                poUploadErrors: { clientPoNumber: '', poFile: '' },
+              }))}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePOUploadSubmit}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={state.isUploadDNModalOpen}
+        onClose={() => setState((prev) => ({
+          ...prev,
+          isUploadDNModalOpen: false,
+          selectedDNForUpload: null,
+          dnUpload: { signedDeliveryNote: null },
+          dnUploadErrors: { signedDeliveryNote: '' },
+        }))}
+        title={`Upload Signed Delivery Note for ${state.selectedDNForUpload?.dn_number || 'N/A'}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <InputField
+              label="Signed Delivery Note"
+              type="file"
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  dnUpload: { ...prev.dnUpload, signedDeliveryNote: e.target.files[0] },
+                  dnUploadErrors: { ...prev.dnUploadErrors, signedDeliveryNote: '' },
+                }))
+              }
+            />
+            {state.dnUploadErrors.signedDeliveryNote && (
+              <p className="text-red-500 text-sm mt-1">{state.dnUploadErrors.signedDeliveryNote}</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setState((prev) => ({
+                ...prev,
+                isUploadDNModalOpen: false,
+                selectedDNForUpload: null,
+                dnUpload: { signedDeliveryNote: null },
+                dnUploadErrors: { signedDeliveryNote: '' },
+              }))}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadDNSubmit}
+              disabled={!hasPermission('delivery', 'edit')}
+              className={`px-4 py-2 rounded-md ${
+                hasPermission('delivery', 'edit')
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal
