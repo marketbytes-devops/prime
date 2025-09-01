@@ -301,8 +301,6 @@ const DeclinedWorkOrders = () => {
               <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Range:</strong> {state.selectedWO.range || 'N/A'}</p>
-              <p><strong>Serial Number:</strong> {state.selectedWO.serial_number || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
               <p><strong>Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
@@ -318,6 +316,7 @@ const DeclinedWorkOrders = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
@@ -334,6 +333,7 @@ const DeclinedWorkOrders = () => {
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians([item])}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>

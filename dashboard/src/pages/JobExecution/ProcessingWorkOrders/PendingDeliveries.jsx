@@ -83,24 +83,18 @@ const PendingDeliveries = () => {
 
       const workOrdersData = await Promise.all(workOrdersPromises);
 
-      const updatedDeliveryNotes = await Promise.all(deliveryNotes.map(async (dn) => {
+      const updatedDeliveryNotes = deliveryNotes.map((dn) => {
         const woData = workOrdersData.find((w) => w.id === dn.work_order_id);
-        // Fetch components for each item
-        const itemsWithComponents = await Promise.all(dn.items.map(async (item) => {
-          try {
-            const componentsRes = await apiClient.get(`/delivery-note-item-components/?delivery_note_item=${item.id}`);
-            return { ...item, components: componentsRes.data || [] };
-          } catch (error) {
-            console.error(`Error fetching components for item ${item.id}:`, error);
-            return { ...item, components: [] };
-          }
-        }));
         return {
           ...dn,
           work_order: woData ? woData.work_order : {},
-          items: itemsWithComponents,
+          // Use the embedded components directly from the API response
+          items: dn.items.map((item) => ({
+            ...item,
+            components: item.components || [], // Ensure components is an array, default to empty if null/undefined
+          })),
         };
-      }));
+      });
 
       setState((prev) => ({
         ...prev,
@@ -375,7 +369,7 @@ const PendingDeliveries = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components {"(Component : Value)"}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -390,10 +384,10 @@ const PendingDeliveries = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.components && item.components.length > 0 ? (
-                              <ul className="list-disc pl-4">
+                              <ul className="list-decimal pl-4">
                                 {item.components.map((comp, index) => (
                                   <li key={index}>
-                                    {comp.component}: {comp.value}
+                                    {comp.component} : {comp.value}
                                   </li>
                                 ))}
                               </ul>
