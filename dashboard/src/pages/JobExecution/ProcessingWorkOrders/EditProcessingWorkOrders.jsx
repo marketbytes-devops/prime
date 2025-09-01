@@ -5,6 +5,7 @@ import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Loading from "../../../components/Loading";
+import { format, parse } from 'date-fns'; // Added date-fns imports
 
 const EditProcessingWorkOrders = () => {
   const { id } = useParams();
@@ -17,8 +18,8 @@ const EditProcessingWorkOrders = () => {
     units: [],
     technicians: [],
     items: [],
-    dateReceived: "",
-    expectedCompletionDate: "",
+    dateReceived: "", // Default to empty string to avoid null issues
+    expectedCompletionDate: "", // Default to empty string
     onsiteOrLab: "",
     siteLocation: "",
     remarks: "",
@@ -54,8 +55,8 @@ const EditProcessingWorkOrders = () => {
           unit_price: item.unit_price,
           certificate_uut_label: item.certificate_uut_label || "",
           certificate_number: item.certificate_number || "",
-          calibration_date: item.calibration_date || "",
-          calibration_due_date: item.calibration_due_date || "",
+          calibration_date: item.calibration_date || "", // Default to empty string
+          calibration_due_date: item.calibration_due_date || "", // Default to empty string
           uuc_serial_number: item.uuc_serial_number || "",
           assigned_to: item.assigned_to || "",
           certificate_file: item.certificate_file || null,
@@ -70,8 +71,8 @@ const EditProcessingWorkOrders = () => {
         units: unitsRes.data || [],
         technicians: techRes.data || [],
         items: expandedItems,
-        dateReceived: workOrder.date_received || "",
-        expectedCompletionDate: workOrder.expected_completion_date || "",
+        dateReceived: workOrder.date_received ? format(new Date(workOrder.date_received), 'dd-MM-yyyy') : "", // Format date if present
+        expectedCompletionDate: workOrder.expected_completion_date ? format(new Date(workOrder.expected_completion_date), 'dd-MM-yyyy') : "",
         onsiteOrLab: workOrder.onsite_or_lab || "",
         siteLocation: workOrder.site_location || "",
         remarks: workOrder.remarks || "",
@@ -130,8 +131,8 @@ const EditProcessingWorkOrders = () => {
 
       formData.append("purchase_order", state.workOrder?.purchase_order || "");
       formData.append("quotation", state.workOrder?.quotation || "");
-      formData.append("date_received", state.dateReceived || "");
-      formData.append("expected_completion_date", state.expectedCompletionDate || "");
+      formData.append("date_received", state.dateReceived || null); // Send null if empty
+      formData.append("expected_completion_date", state.expectedCompletionDate || null); // Send null if empty
       formData.append("onsite_or_lab", state.onsiteOrLab || "");
       formData.append("site_location", state.siteLocation || "");
       formData.append("remarks", state.remarks || "");
@@ -145,8 +146,8 @@ const EditProcessingWorkOrders = () => {
         formData.append(`items[${index}]unit_price`, item.unit_price || "");
         formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || "");
         formData.append(`items[${index}]certificate_number`, item.certificate_number || "");
-        formData.append(`items[${index}]calibration_date`, item.calibration_date || "");
-        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || "");
+        formData.append(`items[${index}]calibration_date`, item.calibration_date || null); // Send null if empty
+        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || null); // Send null if empty
         formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || "");
         formData.append(`items[${index}]assigned_to`, item.assigned_to || "");
         formData.append(`items[${index}]range`, item.range || "");
