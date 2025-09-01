@@ -2,21 +2,28 @@ from django.db import models
 from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
 from unit.models import Unit
-from team.models import Technician  
+from team.models import Technician
+from series.models import NumberSeries
 
 class WorkOrder(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     wo_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
-    status = models.CharField(max_length=20, choices=[
-        ('Processing', 'Processing'),
-        ('Manager Approval', 'Manager Approval'),
-        ('Approved', 'Approved'),
-        ('Declined', 'Declined'),
-        ('Delivered', 'Delivered'),
-        ('Closed', 'Closed'),
-        ('Submitted', 'Submitted')
-    ], default='Collection Pending', null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('Processing', 'Processing'),
+            ('Manager Approval', 'Manager Approval'),
+            ('Approved', 'Approved'),
+            ('Declined', 'Declined'),
+            ('Delivered', 'Delivered'),
+            ('Closed', 'Closed'),
+            ('Submitted', 'Submitted')
+        ],
+        default='Collection Pending',
+        null=True,
+        blank=True
+    )
     date_received = models.DateField(null=True, blank=True)
     expected_completion_date = models.DateField(null=True, blank=True)
     onsite_or_lab = models.CharField(max_length=20, choices=[('Onsite', 'Onsite'), ('Lab', 'Lab')], null=True, blank=True)
@@ -32,11 +39,7 @@ class WorkOrder(models.Model):
     created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
     invoice_status = models.CharField(
         max_length=20,
-        choices=[
-            ('pending', 'pending'),
-            ('Raised', 'Raised'),
-            ('processed', 'processed')
-        ],
+        choices=[('pending', 'pending'), ('Raised', 'Raised'), ('processed', 'processed')],
         default='pending',
         null=True,
         blank=True
@@ -75,6 +78,7 @@ class DeliveryNote(models.Model):
         max_length=20,
         choices=[('Delivery Pending', 'Delivery Pending'), ('Delivered', 'Delivered')],
     )
+    series = models.ForeignKey(NumberSeries, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -86,15 +90,15 @@ class DeliveryNoteItem(models.Model):
     range = models.CharField(max_length=100, null=True, blank=True)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
-    uom = models.CharField(max_length=50, null=True, blank=True)
+    uom = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.item} - {self.delivery_note}"
 
 class DeliveryNoteItemComponent(models.Model):
     delivery_note_item = models.ForeignKey(DeliveryNoteItem, on_delete=models.CASCADE, related_name='components')
-    component = models.CharField(max_length=100) 
-    value = models.CharField(max_length=200) 
+    component = models.CharField(max_length=100)
+    value = models.CharField(max_length=200)
 
     def __str__(self):
         return f"{self.component}: {self.value} - {self.delivery_note_item}"

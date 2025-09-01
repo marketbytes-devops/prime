@@ -131,8 +131,6 @@ const Series = () => {
     }
   };
 
-  const seriesOptions = ['Quotation', 'Work Order', 'Delivery Note'];
-
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Series Management</h1>
@@ -147,18 +145,14 @@ const Series = () => {
             <label htmlFor="seriesName" className="block text-sm font-medium text-gray-700 mb-1">
               Series Name
             </label>
-            <select
-              id="seriesName"
+            <InputField
+              type="text"
+              placeholder="Enter series name"
               value={state.series_name}
               onChange={(e) => setState(prev => ({ ...prev, series_name: e.target.value }))}
-              className="p-2 border rounded w-full focus:outline-indigo-500"
-              disabled={!hasPermission('series', 'add')}
-            >
-              <option value="">Select a series</option>
-              {seriesOptions.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+              maxLength={100}
+              title="Series name must be 100 characters or less"
+            />
           </div>
           <div>
             <label htmlFor="prefix" className="block text-sm font-medium text-gray-700 mb-1">

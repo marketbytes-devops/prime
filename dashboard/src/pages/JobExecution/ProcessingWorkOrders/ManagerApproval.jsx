@@ -95,13 +95,20 @@ const ManagerApproval = () => {
   const handleApprove = async (id) => {
     if (window.confirm("Are you sure you want to move this work order to Delivery?")) {
       try {
-        const selectedWO = state.workOrders.find(wo => wo.id === id);
+        const selectedWO = state.workOrders.find((wo) => wo.id === id);
+        let deliveryNote = null;
+        if (selectedWO.delivery_notes && Array.isArray(selectedWO.delivery_notes) && selectedWO.delivery_notes.length > 0) {
+          deliveryNote = selectedWO.delivery_notes[0]; 
+        }
         const payload = {
-          delivery_note_type: 'single', // Defaulting to 'single' as per original modal
+          delivery_note_type: state.deliveryNoteType,
           wo_number: selectedWO.wo_number,
         };
-        await apiClient.post(`work-orders/${id}/approve/`, payload);
-        toast.success(`Work Order approved and single Delivery Note created.`);
+        const url = deliveryNote ? `delivery-notes/${deliveryNote.id}/` : `work-orders/${id}/approve/`;
+        const method = deliveryNote ? 'patch' : 'post';
+
+        await apiClient[method](url, payload);
+        toast.success(`Work Order approved and ${state.deliveryNoteType} Delivery Note ${deliveryNote ? 'updated' : 'created'}.`);
         await fetchData();
         navigate('/job-execution/processing-work-orders/delivery');
       } catch (error) {

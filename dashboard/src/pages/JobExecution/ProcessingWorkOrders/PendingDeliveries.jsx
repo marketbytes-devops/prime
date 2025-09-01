@@ -68,34 +68,30 @@ const PendingDeliveries = () => {
         apiClient.get('items/'),
         apiClient.get('units/'),
       ]);
-
+      console.log('Units fetched:', unitsRes.data);
       const deliveryNotes = dnRes.data || [];
-
       const workOrdersPromises = deliveryNotes.map((dn) =>
-        apiClient.get(`/work-orders/${dn.work_order_id}/`).then((res) => ({
-          id: dn.work_order_id,
-          work_order: res.data || {},
-        })).catch((error) => {
-          console.error(`Error fetching work order ${dn.work_order_id}:`, error);
-          return { id: dn.work_order_id, work_order: {} };
-        })
+        apiClient
+          .get(`/work-orders/${dn.work_order_id}/`)
+          .then((res) => ({ id: dn.work_order_id, work_order: res.data || {} }))
+          .catch((error) => {
+            console.error(`Error fetching work order ${dn.work_order_id}:`, error);
+            return { id: dn.work_order_id, work_order: {} };
+          })
       );
-
       const workOrdersData = await Promise.all(workOrdersPromises);
-
       const updatedDeliveryNotes = deliveryNotes.map((dn) => {
         const woData = workOrdersData.find((w) => w.id === dn.work_order_id);
         return {
           ...dn,
           work_order: woData ? woData.work_order : {},
-          // Use the embedded components directly from the API response
           items: dn.items.map((item) => ({
             ...item,
-            components: item.components || [], // Ensure components is an array, default to empty if null/undefined
+            uom: item.uom ? Number(item.uom) : null,
+            components: item.components || [],
           })),
         };
       });
-
       setState((prev) => ({
         ...prev,
         deliveryNotes: updatedDeliveryNotes,
@@ -118,6 +114,16 @@ const PendingDeliveries = () => {
       ...prev,
       isViewModalOpen: true,
       selectedDN: dn,
+    }));
+  };
+
+  const handleOpenCompleteModal = (dn) => {
+    setState((prev) => ({
+      ...prev,
+      isCompleteModalOpen: true,
+      selectedDNForComplete: dn,
+      signedDeliveryNote: null,
+      dueInDays: '',
     }));
   };
 
@@ -163,16 +169,6 @@ const PendingDeliveries = () => {
     }
   };
 
-  const handleOpenCompleteModal = (dn) => {
-    setState((prev) => ({
-      ...prev,
-      isCompleteModalOpen: true,
-      selectedDNForComplete: dn,
-      signedDeliveryNote: null,
-      dueInDays: '',
-    }));
-  };
-
   const filteredDNs = state.deliveryNotes
     .filter(
       (dn) =>
@@ -216,22 +212,20 @@ const PendingDeliveries = () => {
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Pending Deliveries</h1>
-      {filteredDNs.length === 0 && (
-        <p className="text-gray-500 mb-4">No delivery notes match the current filter.</p>
-      )}
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
-        <div className="mb-6 flex gap-4 items-center">
-          <div className="flex-1">
+        {filteredDNs.length === 0 && (
+          <div className="text-center text-gray-500 mt-4">No delivery notes match the current filter.</div>
+        )}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Delivery Notes</label>
             <InputField
-              type="text"
-              placeholder="Search by WO Number or DN Number..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
           </div>
-          <div className="w-40">
+          <div className="flex-1 min-w-[150px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={state.sortBy}
@@ -241,7 +235,7 @@ const PendingDeliveries = () => {
               <option value="created_at">Creation Date</option>
             </select>
           </div>
-          <div className="w-40">
+          <div className="flex-1 min-w-[150px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Status Filter</label>
             <select
               value={state.statusFilter}
@@ -254,35 +248,31 @@ const PendingDeliveries = () => {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Series Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivery Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentDNs.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
-                    No delivery notes available.
-                  </td>
+        {currentDNs.length === 0 ? (
+          <div className="text-center text-gray-500 mt-4">No delivery notes available.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">DN Series Number</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
-              ) : (
-                currentDNs.map((dn, index) => (
+              </thead>
+              <tbody>
+                {currentDNs.map((dn, index) => (
                   <tr key={dn.id} className="border hover:bg-gray-50">
-                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{dn.dn_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{dn.work_order?.wo_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{new Date(dn.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2 whitespace-nowrap">{dn.delivery_status || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                    <td className="border p-2">{startIndex + index + 1}</td>
+                    <td className="border p-2">{dn.dn_number || 'N/A'}</td>
+                    <td className="border p-2">{dn.work_order?.wo_number || 'N/A'}</td>
+                    <td className="border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2">{dn.delivery_status || 'N/A'}</td>
+                    <td className="border p-2">
+                      <div className="flex gap-2">
                         <Button
                           onClick={() => handleViewDN(dn)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
@@ -303,17 +293,21 @@ const PendingDeliveries = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-4 w-fit">
+          <div className="flex justify-center gap-2 mt-4">
             <Button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit whitespace-nowrap"
+              className={`px-3 py-1 rounded-md text-sm ${
+                state.currentPage === 1
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               Prev
             </Button>
@@ -321,8 +315,10 @@ const PendingDeliveries = () => {
               <Button
                 key={page}
                 onClick={() => handlePageChange(page)}
-                className={`px-3 py-1 rounded-md min-w-fit whitespace-nowrap ${
-                  state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
+                  state.currentPage === page
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
                 {page}
@@ -331,7 +327,11 @@ const PendingDeliveries = () => {
             <Button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit whitespace-nowrap"
+              className={`px-3 py-1 rounded-md text-sm ${
+                state.currentPage === totalPages
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               Next
             </Button>
@@ -345,63 +345,102 @@ const PendingDeliveries = () => {
       >
         {state.selectedDN ? (
           <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
-              <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
-              <p><strong>Work Order Number:</strong> {state.selectedDN.work_order?.wo_number || 'N/A'}</p>
-              <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
-              <p><strong>Created At:</strong> {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Signed Delivery Note:</strong> {state.selectedDN.signed_delivery_note ? (
-                <a href={state.selectedDN.signed_delivery_note} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                  View Signed DN
-                </a>
-              ) : 'N/A'}</p>
+            <h2 className="text-xl font-semibold mb-2">Delivery Note Details</h2>
+            <div className="grid grid-cols-1 gap-2">
+              <p>
+                <strong className="text-sm font-medium text-gray-700">DN Number:</strong>{' '}
+                {state.selectedDN.dn_number || 'N/A'}
+              </p>
+              <p>
+                <strong className="text-sm font-medium text-gray-700">Work Order Number:</strong>{' '}
+                {state.selectedDN.work_order?.wo_number || 'N/A'}
+              </p>
+              <p>
+                <strong className="text-sm font-medium text-gray-700">Delivery Status:</strong>{' '}
+                {state.selectedDN.delivery_status || 'N/A'}
+              </p>
+              <p>
+                <strong className="text-sm font-medium text-gray-700">Created At:</strong>{' '}
+                {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}
+              </p>
+              <p>
+                <strong className="text-sm font-medium text-gray-700">Signed Delivery Note:</strong>{' '}
+                {state.selectedDN.signed_delivery_note ? (
+                  <a
+                    href={state.selectedDN.signed_delivery_note}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    View Signed DN
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Items</h3>
-              {state.selectedDN.items && state.selectedDN.items.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components {"(Component : Value)"}</th>
+            <h3 className="text-lg font-semibold mt-4">Items</h3>
+            {state.selectedDN.items && state.selectedDN.items.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Range</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivered Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Components</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.selectedDN.items.map((item) => (
+                      <tr key={item.id} className="border hover:bg-gray-50">
+                        <td className="border p-2">
+                          {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
+                        </td>
+                        <td className="border p-2">{item.range || 'N/A'}</td>
+                        <td className="border p-2">{item.quantity || 'N/A'}</td>
+                        <td className="border p-2">{item.delivered_quantity || 'N/A'}</td>
+                        <td className="border p-2">
+                          {state.units.find((u) => u.id === item.uom)?.name || 'N/A'}
+                        </td>
+                        <td className="border p-2">
+                          {item.components && item.components.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse bg-gray-50">
+                                <thead>
+                                  <tr className="bg-gray-100">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                      Component Name
+                                    </th>
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                      Component Value
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {item.components.map((comp, compIndex) => (
+                                    <tr key={compIndex} className="border hover:bg-gray-100">
+                                      <td className="border p-2">{comp.component || 'N/A'}</td>
+                                      <td className="border p-2">{comp.value || 'N/A'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            'None'
+                          )}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {state.selectedDN.items.map((item) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === parseInt(item.uom))?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.components && item.components.length > 0 ? (
-                              <ul className="list-decimal pl-4">
-                                {item.components.map((comp, index) => (
-                                  <li key={index}>
-                                    {comp.component} : {comp.value}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-gray-500">No items available.</p>
-              )}
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-500">No items available.</p>
+            )}
           </div>
         ) : (
           <p className="text-gray-500">No delivery note selected.</p>
@@ -409,23 +448,32 @@ const PendingDeliveries = () => {
       </Modal>
       <Modal
         isOpen={state.isCompleteModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isCompleteModalOpen: false, selectedDNForComplete: null, signedDeliveryNote: null, dueInDays: '' }))}
-        title="Complete Delivery"
+        onClose={() =>
+          setState((prev) => ({
+            ...prev,
+            isCompleteModalOpen: false,
+            selectedDNForComplete: null,
+            signedDeliveryNote: null,
+            dueInDays: '',
+          }))
+        }
+        title={`Complete Delivery - ${state.selectedDNForComplete?.dn_number || 'N/A'}`}
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Signed Delivery Note</label>
+          <h2 className="text-xl font-semibold mb-2">Complete Delivery</h2>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Upload Signed Delivery Note</label>
             <input
               type="file"
+              accept="application/pdf"
               onChange={(e) => setState((prev) => ({ ...prev, signedDeliveryNote: e.target.files[0] }))}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:outline-indigo-500"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days for Invoice</label>
             <InputField
               type="number"
-              placeholder="Enter number of days"
               value={state.dueInDays}
               onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -434,21 +482,24 @@ const PendingDeliveries = () => {
           </div>
           <div className="flex justify-end gap-2">
             <Button
-              onClick={handleCompleteDelivery}
-              disabled={!state.signedDeliveryNote || !state.dueInDays || !hasPermission('delivery', 'edit')}
-              className={`px-4 py-2 rounded-md whitespace-nowrap ${
-                state.signedDeliveryNote && state.dueInDays && hasPermission('delivery', 'edit')
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Complete
-            </Button>
-            <Button
-              onClick={() => setState((prev) => ({ ...prev, isCompleteModalOpen: false, selectedDNForComplete: null, signedDeliveryNote: null, dueInDays: '' }))}
-              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 whitespace-nowrap"
+              onClick={() =>
+                setState((prev) => ({
+                  ...prev,
+                  isCompleteModalOpen: false,
+                  selectedDNForComplete: null,
+                  signedDeliveryNote: null,
+                  dueInDays: '',
+                }))
+              }
+              className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
             >
               Cancel
+            </Button>
+            <Button
+              onClick={handleCompleteDelivery}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              Complete
             </Button>
           </div>
         </div>

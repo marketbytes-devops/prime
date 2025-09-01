@@ -5,8 +5,10 @@ from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
 from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemComponentSerializer
 from django.db.models import Max
+from series.models import NumberSeries
 import logging
 from django.db import transaction
+from unit.models import Unit
 
 logger = logging.getLogger(__name__)
 
@@ -83,30 +85,46 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         if work_order.status != 'Manager Approval':
             logger.warning(f"WorkOrder {pk} not in Manager Approval status")
             return Response({'error': 'Work Order must be in Manager Approval status'}, status=status.HTTP_400_BAD_REQUEST)
-
-        from series.models import NumberSeries
         try:
-            dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
+            dn_series = NumberSeries.objects.get(series_name='Delivery Note')
         except NumberSeries.DoesNotExist:
-            logger.error("Delivery Note series not found, using default prefix 'DN'")
-            dn_series = None
-
-        max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix if dn_series else 'DN').aggregate(
-            Max('dn_number')
-        )['dn_number__max']
-        sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-        dn_number = f"{dn_series.prefix if dn_series else 'DN'}-{sequence:06d}"
-
-        work_order.manager_approval_status = 'Approved'
-        work_order.status = 'Approved'
-        work_order.save()
-        DeliveryNote.objects.create(
-            work_order=work_order,
-            dn_number=dn_number,
-            delivery_status='Delivery Pending'
-        )
-        logger.info(f"WorkOrder {pk} approved, Delivery Note {dn_number} created")
-        return Response({'status': 'Work Order approved and Delivery Note created'})
+            logger.error("Delivery Note series not found")
+            return Response({'error': 'Delivery Note series not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        with transaction.atomic():
+            delivery_note = work_order.delivery_notes.first()
+            if delivery_note:
+                max_sequence = DeliveryNote.objects.filter(series=dn_series).aggregate(Max('dn_number'))['dn_number__max']
+                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                delivery_note.dn_number = dn_number
+                delivery_note.series = dn_series
+                delivery_note.delivery_status = 'Delivery Pending'
+                delivery_note.save()
+                logger.info(f"Updated existing Delivery Note {dn_number} for WorkOrder {pk}")
+            else:
+                max_sequence = DeliveryNote.objects.filter(series=dn_series).aggregate(Max('dn_number'))['dn_number__max']
+                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                delivery_note = DeliveryNote.objects.create(
+                    work_order=work_order,
+                    series=dn_series,
+                    dn_number=dn_number,
+                    delivery_status='Delivery Pending'
+                )
+                for item in work_order.items.all():
+                    DeliveryNoteItem.objects.create(
+                        delivery_note=delivery_note,
+                        item=item.item,
+                        range=item.range,
+                        quantity=item.quantity,
+                        delivered_quantity=item.quantity,
+                        uom=item.unit  
+                    )
+                logger.info(f"Created new Delivery Note {dn_number} for WorkOrder {pk}")
+            work_order.manager_approval_status = 'Approved'
+            work_order.status = 'Approved'
+            work_order.save()
+        return Response({'status': 'Work Order approved and Delivery Note updated/created'})
 
     @action(detail=True, methods=['post'], url_path='decline')
     def decline(self, request, pk=None):
@@ -181,7 +199,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         delivery_type = serializer.validated_data['delivery_type']
         items_data = serializer.validated_data['items']
 
-        from series.models import NumberSeries
         try:
             dn_series = NumberSeries.objects.get(series_name='Delivery Note')
         except NumberSeries.DoesNotExist:
@@ -190,59 +207,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             if delivery_type == 'Single':
-                max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
-                    Max('dn_number')
-                )['dn_number__max']
-                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                dn_number = f"{dn_series.prefix}-{sequence:06d}"
-
-                delivery_note = DeliveryNote.objects.create(
-                    work_order=work_order,
-                    dn_number=dn_number,
-                    delivery_status='Delivery Pending'
-                )
-
-                for item_data in items_data:
-                    components_data = item_data.pop('components', [])
-                    delivery_note_item = DeliveryNoteItem.objects.create(
-                        delivery_note=delivery_note,
-                        item=item_data.get('item'),
-                        range=item_data.get('range'),
-                        quantity=item_data.get('quantity'),
-                        delivered_quantity=item_data.get('delivered_quantity'),
-                        uom=item_data.get('uom')
-                    )
-                    for component_data in components_data:
-                        DeliveryNoteItemComponent.objects.create(
-                            delivery_note_item=delivery_note_item,
-                            component=component_data.get('component'),
-                            value=component_data.get('value')
-                        )
-                logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items_data)} items")
-
-            else:  # Multiple
-                technician_items = {}
-                for item_data in items_data:
-                    assigned_to = work_order.items.filter(item=item_data.get('item')).first().assigned_to
-                    technician_id = assigned_to.id if assigned_to else 'unassigned'
-                    if technician_id not in technician_items:
-                        technician_items[technician_id] = []
-                    technician_items[technician_id].append(item_data)
-
-                for technician_id, items in technician_items.items():
-                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
-                        Max('dn_number')
-                    )['dn_number__max']
-                    sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                    dn_number = f"{dn_series.prefix}-{sequence:06d}"
-
-                    delivery_note = DeliveryNote.objects.create(
-                        work_order=work_order,
-                        dn_number=dn_number,
-                        delivery_status='Delivery Pending'
-                    )
-
-                    for item_data in items:
+                # Check if a delivery note already exists
+                delivery_note = work_order.delivery_notes.first()
+                if delivery_note:
+                    # Update existing delivery note
+                    delivery_note.items.all().delete()
+                    for item_data in items_data:
                         components_data = item_data.pop('components', [])
                         delivery_note_item = DeliveryNoteItem.objects.create(
                             delivery_note=delivery_note,
@@ -258,7 +228,98 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                                 component=component_data.get('component'),
                                 value=component_data.get('value')
                             )
-                    logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items)} items for technician {technician_id}")
+                    logger.info(f"Updated Delivery Note {delivery_note.dn_number} for WorkOrder {pk}")
+                else:
+                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
+                        Max('dn_number')
+                    )['dn_number__max']
+                    sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                    dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                    delivery_note = DeliveryNote.objects.create(
+                        work_order=work_order,
+                        dn_number=dn_number,
+                        delivery_status='Delivery Pending',
+                        series=dn_series
+                    )
+                    for item_data in items_data:
+                        components_data = item_data.pop('components', [])
+                        delivery_note_item = DeliveryNoteItem.objects.create(
+                            delivery_note=delivery_note,
+                            item=item_data.get('item'),
+                            range=item_data.get('range'),
+                            quantity=item_data.get('quantity'),
+                            delivered_quantity=item_data.get('delivered_quantity'),
+                            uom=item_data.get('uom')
+                        )
+                        for component_data in components_data:
+                            DeliveryNoteItemComponent.objects.create(
+                                delivery_note_item=delivery_note_item,
+                                component=component_data.get('component'),
+                                value=component_data.get('value')
+                            )
+                    logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items_data)} items")
+            else:  # Multiple
+                technician_items = {}
+                for item_data in items_data:
+                    assigned_to = work_order.items.filter(item=item_data.get('item')).first().assigned_to
+                    technician_id = assigned_to.id if assigned_to else 'unassigned'
+                    if technician_id not in technician_items:
+                        technician_items[technician_id] = []
+                    technician_items[technician_id].append(item_data)
+
+                for technician_id, items in technician_items.items():
+                    existing_dn = work_order.delivery_notes.filter(
+                        items__item__in=[item.get('item') for item in items]
+                    ).first()
+                    if existing_dn:
+                        # Update existing delivery note
+                        existing_dn.items.all().delete()
+                        for item_data in items:
+                            components_data = item_data.pop('components', [])
+                            delivery_note_item = DeliveryNoteItem.objects.create(
+                                delivery_note=existing_dn,
+                                item=item_data.get('item'),
+                                range=item_data.get('range'),
+                                quantity=item_data.get('quantity'),
+                                delivered_quantity=item_data.get('delivered_quantity'),
+                                uom=item_data.get('uom')
+                            )
+                            for component_data in components_data:
+                                DeliveryNoteItemComponent.objects.create(
+                                    delivery_note_item=delivery_note_item,
+                                    component=component_data.get('component'),
+                                    value=component_data.get('value')
+                                )
+                        logger.info(f"Updated Delivery Note {existing_dn.dn_number} for WorkOrder {pk} for technician {technician_id}")
+                    else:
+                        max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
+                            Max('dn_number')
+                        )['dn_number__max']
+                        sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+                        dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                        delivery_note = DeliveryNote.objects.create(
+                            work_order=work_order,
+                            dn_number=dn_number,
+                            delivery_status='Delivery Pending',
+                            series=dn_series
+                        )
+                        for item_data in items:
+                            components_data = item_data.pop('components', [])
+                            delivery_note_item = DeliveryNoteItem.objects.create(
+                                delivery_note=delivery_note,
+                                item=item_data.get('item'),
+                                range=item_data.get('range'),
+                                quantity=item_data.get('quantity'),
+                                delivered_quantity=item_data.get('delivered_quantity'),
+                                uom=item_data.get('uom')
+                            )
+                            for component_data in components_data:
+                                DeliveryNoteItemComponent.objects.create(
+                                    delivery_note_item=delivery_note_item,
+                                    component=component_data.get('component'),
+                                    value=component_data.get('value')
+                                )
+                        logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items)} items for technician {technician_id}")
 
         return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type})
 
@@ -274,7 +335,7 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         if not signed_delivery_note:
             logger.warning(f"No signed delivery note provided for Delivery Note {pk}")
             return Response({'error': 'Signed Delivery Note is required'}, status=status.HTTP_400_BAD_REQUEST)
-       
+
         delivery_note.signed_delivery_note = signed_delivery_note
         delivery_note.delivery_status = 'Delivered'
         delivery_note.save()
