@@ -48,7 +48,9 @@ class WorkOrder(models.Model):
     received_date = models.DateField(null=True, blank=True)
     wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
     application_status = models.CharField(max_length=20, null=True, blank=True)
-
+    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
+    payment_reference_number = models.CharField(max_length=100, null=True, blank=True)
+    
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 

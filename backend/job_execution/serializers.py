@@ -137,6 +137,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order_file = serializers.FileField(required=False)
     work_order_file = serializers.FileField(required=False)
     signed_delivery_note_file = serializers.FileField(required=False)
+    invoice_file = serializers.FileField(required=False) 
     invoice_status = serializers.ChoiceField(
         choices=[("pending", "pending"), ("Raised", "Raised"), ("processed", "processed")],
         required=False,
@@ -147,7 +148,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     application_status = serializers.CharField(max_length=20, allow_null=True, required=False)
     date_received = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
     expected_completion_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
-
+    payment_reference_number = serializers.CharField(max_length=100, required=False, allow_null=True)
+    
     class Meta:
         model = WorkOrder
         fields = [
@@ -157,6 +159,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "items", "delivery_notes", "created_by_name", "purchase_order_file",
             "work_order_file", "signed_delivery_note_file", "invoice_status",
             "due_in_days", "received_date", "wo_type", "application_status",
+            "invoice_file", "payment_reference_number",
         ]
 
     def send_assignment_email(self, work_order, items_data):
@@ -493,30 +496,22 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
-        logger.info(f"Validated data received: {validated_data}")
-        logger.info(f"Items data received: {items_data}")
-
         previous_invoice_status = instance.invoice_status
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         logger.info(f"Updated WorkOrder {instance.id}")
-
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 logger.info(f"Creating item with data: {dict(item_data)}")
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
                 logger.info(f"Updated items for WorkOrder {instance.id}")
-
             if any(item_data.get("assigned_to") for item_data in items_data):
                 self.send_assignment_email(instance, items_data)
-
         if "invoice_status" in validated_data and validated_data["invoice_status"] != previous_invoice_status:
             self.send_invoice_status_change_email(instance, validated_data["invoice_status"])
-
         if instance.invoice_status == "Raised":
             self.send_due_date_reminder(instance)
             self.send_past_due_alert(instance)
-
         return instance

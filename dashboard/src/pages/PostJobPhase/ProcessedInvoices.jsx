@@ -17,6 +17,8 @@ const ProcessedInvoices = () => {
     itemsPerPage: 20,
     isWOModalOpen: false,
     selectedWO: null,
+    paymentReferenceNumbers: {}, // Store input values for each work order
+    paymentRefErrors: {}, // Store validation errors for each work order
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -61,12 +63,19 @@ const ProcessedInvoices = () => {
         apiClient.get('units/'),
       ]);
 
+      const paymentReferenceNumbers = {};
+      (woRes.data || []).forEach((wo) => {
+        paymentReferenceNumbers[wo.id] = wo.payment_reference_number || '';
+      });
+
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        paymentReferenceNumbers,
+        paymentRefErrors: {},
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -87,7 +96,81 @@ const ProcessedInvoices = () => {
   };
 
   const viewInvoice = (workOrder) => {
-    toast.info(`Viewing invoice for WO ${workOrder.wo_number} (placeholder action)`);
+    if (workOrder.invoice_file) {
+      window.open(workOrder.invoice_file, '_blank');
+    } else {
+      toast.error(`No invoice file found for WO ${workOrder.wo_number}`);
+    }
+  };
+
+  const validatePaymentRef = (value) => {
+    if (!value.trim()) {
+      return 'Payment Reference Number is required';
+    }
+    return '';
+  };
+
+  const handlePaymentRefChange = (workOrderId, value) => {
+    setState((prev) => ({
+      ...prev,
+      paymentReferenceNumbers: {
+        ...prev.paymentReferenceNumbers,
+        [workOrderId]: value,
+      },
+      paymentRefErrors: {
+        ...prev.paymentRefErrors,
+        [workOrderId]: validatePaymentRef(value),
+      },
+    }));
+  };
+
+  const handlePaymentRefSubmit = async (workOrderId) => {
+    const value = state.paymentReferenceNumbers[workOrderId];
+    const error = validatePaymentRef(value);
+    if (error) {
+      setState((prev) => ({
+        ...prev,
+        paymentRefErrors: {
+          ...prev.paymentRefErrors,
+          [workOrderId]: error,
+        },
+      }));
+      return;
+    }
+
+    try {
+      await apiClient.patch(`/work-orders/${workOrderId}/`, {
+        payment_reference_number: value,
+      });
+      toast.success(`Payment Reference Number updated for WO ${state.workOrders.find((wo) => wo.id === workOrderId)?.wo_number || 'N/A'}`);
+      // Update the workOrders state to reflect the change
+      setState((prev) => ({
+        ...prev,
+        workOrders: prev.workOrders.map((wo) =>
+          wo.id === workOrderId ? { ...wo, payment_reference_number: value } : wo
+        ),
+        paymentRefErrors: {
+          ...prev.paymentRefErrors,
+          [workOrderId]: '',
+        },
+      }));
+    } catch (error) {
+      console.error('Error updating payment reference number:', error);
+      toast.error('Failed to update payment reference number.');
+      // Revert input to original value on error
+      const originalValue = state.workOrders.find((wo) => wo.id === workOrderId)?.payment_reference_number || '';
+      setState((prev) => ({
+        ...prev,
+        paymentReferenceNumbers: {
+          ...prev.paymentReferenceNumbers,
+          [workOrderId]: originalValue,
+        },
+        paymentRefErrors: {
+          ...prev.paymentRefErrors,
+          [workOrderId]: '',
+        },
+      }));
+    }
   };
 
   const getAssignedTechnicians = (items) => {
@@ -197,7 +280,27 @@ const ProcessedInvoices = () => {
                     </td>
                     <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
                     <td className="border p-2">{getAssignedTechnicians(workOrder.items)}</td>
-                    <td className="border p-2">{workOrder.payment_reference_number || 'N/A'}</td>
+                    <td className="border p-2">
+                      <InputField
+                        type="text"
+                        value={state.paymentReferenceNumbers[workOrder.id] || ''}
+                        onChange={(e) => handlePaymentRefChange(workOrder.id, e.target.value)}
+                        onBlur={() => handlePaymentRefSubmit(workOrder.id)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handlePaymentRefSubmit(workOrder.id);
+                          }
+                        }}
+                        disabled={!hasPermission('processed_invoices', 'edit')}
+                        className={`w-full p-1 border rounded focus:outline-indigo-500 ${
+                          state.paymentRefErrors[workOrder.id] ? 'border-red-500' : ''
+                        }`}
+                        placeholder="Enter Payment Ref"
+                      />
+                      {state.paymentRefErrors[workOrder.id] && (
+                        <p className="text-red-500 text-xs mt-1">{state.paymentRefErrors[workOrder.id]}</p>
+                      )}
+                    </td>
                     <td className="border p-2">
                       {workOrder.received_date ? new Date(workOrder.received_date).toLocaleDateString() : 'N/A'}
                     </td>
@@ -205,6 +308,7 @@ const ProcessedInvoices = () => {
                       <Button
                         onClick={() => viewInvoice(workOrder)}
                         className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+                        disabled={!hasPermission('processed_invoices', 'view') || !workOrder.invoice_file}
                       >
                         View Invoice
                       </Button>
@@ -271,6 +375,16 @@ const ProcessedInvoices = () => {
               <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
               <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Invoice File:</strong> {state.selectedWO.invoice_file ? (
+                <a
+                  href={state.selectedWO.invoice_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  View Invoice
+                </a>
+              ) : 'Not Uploaded'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>

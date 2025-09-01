@@ -22,8 +22,8 @@ const PendingInvoices = () => {
     selectedWO: null,
     isPOModalOpen: false,
     selectedPO: null,
-    isDNModalOpen: false, // Added for View DN modal
-    selectedDN: null, // Added for View DN modal
+    isDNModalOpen: false,
+    selectedDN: null,
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
     newStatus: '',
@@ -37,7 +37,12 @@ const PendingInvoices = () => {
     selectedDNForUpload: null,
     dnUpload: { signedDeliveryNote: null },
     dnUploadErrors: { signedDeliveryNote: '' },
+    isUploadInvoiceModalOpen: false, // Added for invoice upload modal
+    selectedWOForInvoiceUpload: null, // Added for invoice upload
+    invoiceUpload: { invoiceFile: null }, // Added for invoice file
+    invoiceUploadErrors: { invoiceFile: '' }, // Added for invoice upload errors
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -83,7 +88,6 @@ const PendingInvoices = () => {
         apiClient.get('units/'),
         apiClient.get('quotations/'),
       ]);
-
       const deliveryNotes = dnRes.data.map((dn) => ({
         ...dn,
         items: dn.items.map((item) => ({
@@ -92,10 +96,12 @@ const PendingInvoices = () => {
           components: item.components || [],
         })),
       }));
-
       setState((prev) => ({
         ...prev,
-        workOrders: woRes.data || [],
+        workOrders: woRes.data.map(wo => ({
+          ...wo,
+          invoice_status: wo.invoice_status || 'pending', // Ensure initial status is 'pending'
+        })) || [],
         purchaseOrders: poRes.data || [],
         deliveryNotes: deliveryNotes || [],
         technicians: techRes.data || [],
@@ -142,6 +148,12 @@ const PendingInvoices = () => {
         isDNModalOpen: true,
         selectedDN: dn,
       }));
+    } else if (type === 'invoice') {
+      if (workOrder.invoice_file) {
+        window.open(workOrder.invoice_file, '_blank');
+      } else {
+        handleUploadInvoice(workOrder);
+      }
     }
   };
 
@@ -190,7 +202,6 @@ const PendingInvoices = () => {
       await apiClient.patch(`/purchase-orders/${state.selectedPOForUpload.id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
       await fetchData();
       setState((prev) => ({
         ...prev,
@@ -268,19 +279,61 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (workOrderId, newStatus) => {
-    if (newStatus === 'Raised' || newStatus === 'processed') {
+  const handleUploadInvoice = (workOrder) => {
+    setState((prev) => ({
+      ...prev,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: workOrder,
+      invoiceUpload: { invoiceFile: null },
+      invoiceUploadErrors: { invoiceFile: '' },
+    }));
+  };
+
+  const validateInvoiceUpload = () => {
+    let isValid = true;
+    const errors = { invoiceFile: '' };
+    if (!state.invoiceUpload.invoiceFile) {
+      errors.invoiceFile = 'Invoice File is required';
+      isValid = false;
+    }
+    setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
+    return isValid;
+  };
+
+  const handleInvoiceUploadSubmit = async () => {
+    if (!validateInvoiceUpload()) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
+      await apiClient.patch(`/work-orders/${state.selectedWOForInvoiceUpload.id}/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Invoice file uploaded successfully.');
       setState((prev) => ({
         ...prev,
-        isStatusModalOpen: true,
-        selectedWorkOrderId: workOrderId,
-        newStatus,
-        dueInDays: '',
-        receivedDate: '',
+        isUploadInvoiceModalOpen: false,
+        selectedWOForInvoiceUpload: null,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
       }));
-    } else {
-      confirmStatusUpdate(workOrderId, newStatus, null, null);
+      await fetchData();
+    } catch (error) {
+      console.error('Error uploading invoice file:', error);
+      toast.error('Failed to upload invoice file.');
     }
+  };
+
+  const handleUpdateStatus = (workOrderId, newStatus) => {
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: true,
+      selectedWorkOrderId: workOrderId,
+      newStatus,
+      dueInDays: '',
+      receivedDate: '',
+    }));
   };
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate) => {
@@ -291,9 +344,12 @@ const PendingInvoices = () => {
       } else if (newStatus === 'processed' && receivedDate) {
         payload.received_date = receivedDate;
       }
-
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
+      if (newStatus === 'Raised') {
+        const workOrder = state.workOrders.find((wo) => wo.id === workOrderId);
+        handleUploadInvoice(workOrder);
+      }
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
@@ -350,7 +406,6 @@ const PendingInvoices = () => {
   const totalPages = Math.ceil(filteredWorkOrders.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentWorkOrders = filteredWorkOrders.slice(startIndex, startIndex + state.itemsPerPage);
-
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
@@ -453,6 +508,16 @@ const PendingInvoices = () => {
                         >
                           {isDNEmpty(workOrder) ? 'Upload DN' : 'View DN'}
                         </Button>
+                        <Button
+                          onClick={() => handleViewDocument(workOrder, 'invoice')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            workOrder.invoice_file
+                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                              : 'bg-orange-600 text-white hover:bg-orange-700'
+                          }`}
+                        >
+                          {workOrder.invoice_file ? 'View Invoice' : 'Upload Invoice'}
+                        </Button>
                       </div>
                     </td>
                     <td className="border p-2">
@@ -517,7 +582,6 @@ const PendingInvoices = () => {
           </div>
         )}
       </div>
-
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -541,6 +605,16 @@ const PendingInvoices = () => {
                 <p><strong className="text-sm font-medium text-gray-700">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
                 <p><strong className="text-sm font-medium text-gray-700">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
                 <p><strong className="text-sm font-medium text-gray-700">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700">Invoice File:</strong> {state.selectedWO.invoice_file ? (
+                  <a
+                    href={state.selectedWO.invoice_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    View Invoice
+                  </a>
+                ) : 'Not Uploaded'}</p>
               </div>
             </div>
             <div>
@@ -604,7 +678,6 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No work order selected.</p>
         )}
       </Modal>
-
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
@@ -689,7 +762,6 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No purchase order found.</p>
         )}
       </Modal>
-
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
@@ -773,7 +845,6 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No delivery note selected.</p>
         )}
       </Modal>
-
       <Modal
         isOpen={state.isUploadPOModalOpen}
         onClose={() => setState((prev) => ({
@@ -843,7 +914,6 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
-
       <Modal
         isOpen={state.isUploadDNModalOpen}
         onClose={() => setState((prev) => ({
@@ -901,7 +971,63 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
-
+      <Modal
+        isOpen={state.isUploadInvoiceModalOpen}
+        onClose={() => setState((prev) => ({
+          ...prev,
+          isUploadInvoiceModalOpen: false,
+          selectedWOForInvoiceUpload: null,
+          invoiceUpload: { invoiceFile: null },
+          invoiceUploadErrors: { invoiceFile: '' },
+        }))}
+        title={`Upload Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Invoice File</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  invoiceUpload: { ...prev.invoiceUpload, invoiceFile: e.target.files[0] },
+                  invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
+                }))
+              }
+              className="w-full p-2 border rounded focus:outline-indigo-500"
+            />
+            {state.invoiceUploadErrors.invoiceFile && (
+              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setState((prev) => ({
+                ...prev,
+                isUploadInvoiceModalOpen: false,
+                selectedWOForInvoiceUpload: null,
+                invoiceUpload: { invoiceFile: null },
+                invoiceUploadErrors: { invoiceFile: '' },
+              }))}
+              className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleInvoiceUploadSubmit}
+              disabled={!hasPermission('pending_invoices', 'edit')}
+              className={`px-3 py-1 rounded-md text-sm ${
+                hasPermission('pending_invoices', 'edit')
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
+      </Modal>
       <Modal
         isOpen={state.isStatusModalOpen}
         onClose={() => setState((prev) => ({
