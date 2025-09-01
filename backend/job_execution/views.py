@@ -2,8 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import WorkOrder, DeliveryNote, DeliveryNoteItem
-from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer
+from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
+from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemComponentSerializer
 from django.db.models import Max
 import logging
 from django.db import transaction
@@ -117,7 +117,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         work_order.manager_approval_status = 'Declined'
-        work_order.status = 'Declined'  # Updated to 'Declined'
+        work_order.status = 'Declined'
         work_order.decline_reason = decline_reason
         work_order.save()
 
@@ -133,7 +133,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         work_order.manager_approval_status = 'Pending'
         work_order.status = 'Manager Approval'
-        # Removed work_order.decline_reason = None to preserve the reason for history
         work_order.save()
 
         logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
@@ -141,7 +140,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
-        """Custom action to update invoice_status with due_in_days or received_date."""
         work_order = self.get_object()
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
@@ -184,7 +182,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         items_data = serializer.validated_data['items']
 
         from series.models import NumberSeries
-        dn_series = NumberSeries.objects.get(series_name='DeliveryNote')
+        try:
+            dn_series = NumberSeries.objects.get(series_name='Delivery Note')
+        except NumberSeries.DoesNotExist:
+            logger.error("Delivery Note series not found")
+            return Response({'error': 'Delivery Note series not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         with transaction.atomic():
             if delivery_type == 'Single':
@@ -201,19 +203,21 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 )
 
                 for item_data in items_data:
-                    DeliveryNoteItem.objects.create(
+                    components_data = item_data.pop('components', [])
+                    delivery_note_item = DeliveryNoteItem.objects.create(
                         delivery_note=delivery_note,
                         item=item_data.get('item'),
-                        make=item_data.get('make'),
-                        dial_size=item_data.get('dial_size'),
-                        case=item_data.get('case'),
-                        connection=item_data.get('connection'),
-                        wetted_parts=item_data.get('wetted_parts'),
                         range=item_data.get('range'),
                         quantity=item_data.get('quantity'),
                         delivered_quantity=item_data.get('delivered_quantity'),
                         uom=item_data.get('uom')
                     )
+                    for component_data in components_data:
+                        DeliveryNoteItemComponent.objects.create(
+                            delivery_note_item=delivery_note_item,
+                            component=component_data.get('component'),
+                            value=component_data.get('value')
+                        )
                 logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items_data)} items")
 
             else:  # Multiple
@@ -239,19 +243,21 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     )
 
                     for item_data in items:
-                        DeliveryNoteItem.objects.create(
+                        components_data = item_data.pop('components', [])
+                        delivery_note_item = DeliveryNoteItem.objects.create(
                             delivery_note=delivery_note,
                             item=item_data.get('item'),
-                            make=item_data.get('make'),
-                            dial_size=item_data.get('dial_size'),
-                            case=item_data.get('case'),
-                            connection=item_data.get('connection'),
-                            wetted_parts=item_data.get('wetted_parts'),
                             range=item_data.get('range'),
                             quantity=item_data.get('quantity'),
                             delivered_quantity=item_data.get('delivered_quantity'),
                             uom=item_data.get('uom')
                         )
+                        for component_data in components_data:
+                            DeliveryNoteItemComponent.objects.create(
+                                delivery_note_item=delivery_note_item,
+                                component=component_data.get('component'),
+                                value=component_data.get('value')
+                            )
                     logger.info(f"Delivery Note {dn_number} created for WorkOrder {pk} with {len(items)} items for technician {technician_id}")
 
         return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type})
@@ -266,7 +272,7 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         delivery_note = self.get_object()
         signed_delivery_note = request.FILES.get('signed_delivery_note')
         if not signed_delivery_note:
-            logger.warning(f"No signed delivery note provided for DeliveryNote {pk}")
+            logger.warning(f"No signed delivery note provided for Delivery Note {pk}")
             return Response({'error': 'Signed Delivery Note is required'}, status=status.HTTP_400_BAD_REQUEST)
        
         delivery_note.signed_delivery_note = signed_delivery_note
@@ -275,5 +281,26 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         work_order = delivery_note.work_order
         work_order.status = 'Delivered'
         work_order.save()
-        logger.info(f"Signed Delivery Note uploaded for DeliveryNote {pk}, WorkOrder {work_order.id} set to Delivered")
+        logger.info(f"Signed Delivery Note uploaded for Delivery Note {pk}, WorkOrder {work_order.id} set to Delivered")
         return Response({'status': 'Signed Delivery Note uploaded and status updated'})
+
+class DeliveryNoteItemComponentViewSet(viewsets.ModelViewSet):
+    queryset = DeliveryNoteItemComponent.objects.all()
+    serializer_class = DeliveryNoteItemComponentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        delivery_note_item_id = self.request.query_params.get('delivery_note_item_id')
+        if delivery_note_item_id:
+            queryset = queryset.filter(delivery_note_item_id=delivery_note_item_id)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            logger.info(f"DeliveryNoteItemComponent created: {serializer.data['id']}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Create failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

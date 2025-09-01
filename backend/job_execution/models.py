@@ -44,7 +44,7 @@ class WorkOrder(models.Model):
     due_in_days = models.IntegerField(null=True, blank=True)
     received_date = models.DateField(null=True, blank=True)
     wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
-    application_status = models.CharField(max_length=20, null=True, blank=True)  # Added with null=True
+    application_status = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
@@ -83,11 +83,6 @@ class DeliveryNote(models.Model):
 class DeliveryNoteItem(models.Model):
     delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
-    make = models.CharField(max_length=100, null=True, blank=True)
-    dial_size = models.CharField(max_length=100, null=True, blank=True)
-    case = models.CharField(max_length=100, null=True, blank=True)
-    connection = models.CharField(max_length=100, null=True, blank=True)
-    wetted_parts = models.CharField(max_length=100, null=True, blank=True)
     range = models.CharField(max_length=100, null=True, blank=True)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
@@ -95,3 +90,11 @@ class DeliveryNoteItem(models.Model):
 
     def __str__(self):
         return f"{self.item} - {self.delivery_note}"
+
+class DeliveryNoteItemComponent(models.Model):
+    delivery_note_item = models.ForeignKey(DeliveryNoteItem, on_delete=models.CASCADE, related_name='components')
+    component = models.CharField(max_length=100) 
+    value = models.CharField(max_length=200) 
+
+    def __str__(self):
+        return f"{self.component}: {self.value} - {self.delivery_note_item}"

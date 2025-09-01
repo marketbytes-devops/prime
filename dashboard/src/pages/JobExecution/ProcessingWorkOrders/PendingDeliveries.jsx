@@ -23,7 +23,7 @@ const PendingDeliveries = () => {
     selectedDNForComplete: null,
     signedDeliveryNote: null,
     dueInDays: '',
-    statusFilter: 'all', // Changed to 'all' to show all delivery notes
+    statusFilter: 'all',
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -70,11 +70,10 @@ const PendingDeliveries = () => {
       ]);
 
       const deliveryNotes = dnRes.data || [];
-      console.log('Fetched deliveryNotes:', deliveryNotes); // Debugging
 
       const workOrdersPromises = deliveryNotes.map((dn) =>
         apiClient.get(`/work-orders/${dn.work_order_id}/`).then((res) => ({
-          id: dn.work_order_id, // Use work_order_id for matching
+          id: dn.work_order_id,
           work_order: res.data || {},
         })).catch((error) => {
           console.error(`Error fetching work order ${dn.work_order_id}:`, error);
@@ -83,17 +82,25 @@ const PendingDeliveries = () => {
       );
 
       const workOrdersData = await Promise.all(workOrdersPromises);
-      console.log('Fetched workOrdersData:', workOrdersData); // Debugging
 
-      const updatedDeliveryNotes = deliveryNotes.map((dn) => {
+      const updatedDeliveryNotes = await Promise.all(deliveryNotes.map(async (dn) => {
         const woData = workOrdersData.find((w) => w.id === dn.work_order_id);
+        // Fetch components for each item
+        const itemsWithComponents = await Promise.all(dn.items.map(async (item) => {
+          try {
+            const componentsRes = await apiClient.get(`/delivery-note-item-components/?delivery_note_item=${item.id}`);
+            return { ...item, components: componentsRes.data || [] };
+          } catch (error) {
+            console.error(`Error fetching components for item ${item.id}:`, error);
+            return { ...item, components: [] };
+          }
+        }));
         return {
           ...dn,
           work_order: woData ? woData.work_order : {},
+          items: itemsWithComponents,
         };
-      });
-
-      console.log('Updated deliveryNotes:', updatedDeliveryNotes); // Debugging
+      }));
 
       setState((prev) => ({
         ...prev,
@@ -136,14 +143,12 @@ const PendingDeliveries = () => {
     }
 
     try {
-      // Upload signed delivery note
       const formData = new FormData();
       formData.append('signed_delivery_note', signedDeliveryNote);
       await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Update work order invoice status to 'Raised'
       await apiClient.post(`work-orders/${selectedDNForComplete.work_order_id}/update-invoice-status/`, {
         invoice_status: 'Raised',
         due_in_days: parseInt(dueInDays),
@@ -188,12 +193,9 @@ const PendingDeliveries = () => {
       return 0;
     });
 
-  console.log('Filtered deliveryNotes:', filteredDNs); // Debugging
-
   const totalPages = Math.ceil(filteredDNs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentDNs = filteredDNs.slice(startIndex, startIndex + state.itemsPerPage);
-  console.log('Current deliveryNotes:', currentDNs); // Debugging
 
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
@@ -263,7 +265,7 @@ const PendingDeliveries = () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Series Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivery Status</th>
@@ -369,30 +371,34 @@ const PendingDeliveries = () => {
                     <thead>
                       <tr className="bg-gray-200">
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Make</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Dial Size</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Case</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Connection</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Wetted Parts</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedDN.items.map((item) => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.make || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.dial_size || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.case || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.connection || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.wetted_parts || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uom || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === parseInt(item.uom))?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.components && item.components.length > 0 ? (
+                              <ul className="list-disc pl-4">
+                                {item.components.map((comp, index) => (
+                                  <li key={index}>
+                                    {comp.component}: {comp.value}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : 'N/A'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

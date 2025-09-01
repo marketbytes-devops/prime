@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -19,6 +20,8 @@ const InitiateDelivery = () => {
     isSubmitting: false,
     itemsList: [],
     units: [],
+    series: [],
+    deliveryNoteSeriesId: null,
     isLoading: true,
   });
 
@@ -29,10 +32,11 @@ const InitiateDelivery = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [woRes, itemsRes, unitsRes] = await Promise.all([
+        const [woRes, itemsRes, unitsRes, seriesRes] = await Promise.all([
           apiClient.get(`/work-orders/${id}/`),
           apiClient.get('items/'),
           apiClient.get('units/'),
+          apiClient.get('/series/'),
         ]);
 
         const workOrder = woRes.data;
@@ -40,20 +44,21 @@ const InitiateDelivery = () => {
           id: item.id,
           item: item.item,
           name: itemsRes.data.find((i) => i.id === item.item)?.name || 'N/A',
-          make: '',
-          dial_size: '',
-          case: '',
-          connection: '',
-          wetted_parts: '',
           range: item.range || '',
           quantity: item.quantity || '',
           delivered_quantity: item.quantity || '',
           uom: unitsRes.data.find((u) => u.id === item.unit)?.id || '',
           remaining_quantity: item.quantity || 0,
           assigned_quantity: '',
+          components: [], // e.g., [{ component: 'Make', value: 'BrandX' }, { component: 'Dial Size', value: '2 inches' }]
           showAdditionalInfo: false,
           error: '',
         }));
+
+        const deliveryNoteSeries = seriesRes.data.find((s) => s.series_name === 'Delivery Note');
+        if (!deliveryNoteSeries) {
+          toast.error('Delivery Note series not found.');
+        }
 
         setState((prev) => ({
           ...prev,
@@ -61,6 +66,8 @@ const InitiateDelivery = () => {
           deliveryItems: initialItems.length > 0 ? initialItems : prev.deliveryItems,
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
+          series: seriesRes.data || [],
+          deliveryNoteSeriesId: deliveryNoteSeries?.id || null,
           isLoading: false,
         }));
       } catch (error) {
@@ -165,6 +172,50 @@ const InitiateDelivery = () => {
     }));
   };
 
+  const handleComponentChange = (itemIndex, compIndex, field, value) => {
+    setState((prev) => ({
+      ...prev,
+      deliveryItems: prev.deliveryItems.map((item, i) =>
+        i === itemIndex
+          ? {
+              ...item,
+              components: item.components.map((comp, ci) =>
+                ci === compIndex ? { ...comp, [field]: value } : comp
+              ),
+            }
+          : item
+      ),
+    }));
+  };
+
+  const addComponent = (itemIndex) => {
+    setState((prev) => ({
+      ...prev,
+      deliveryItems: prev.deliveryItems.map((item, i) =>
+        i === itemIndex
+          ? {
+              ...item,
+              components: [...item.components, { component: '', value: '' }],
+            }
+          : item
+      ),
+    }));
+  };
+
+  const removeComponent = (itemIndex, compIndex) => {
+    setState((prev) => ({
+      ...prev,
+      deliveryItems: prev.deliveryItems.map((item, i) =>
+        i === itemIndex
+          ? {
+              ...item,
+              components: item.components.filter((_, ci) => ci !== compIndex),
+            }
+          : item
+      ),
+    }));
+  };
+
   const handleAssignedQuantityChange = (itemId, value) => {
     const assignedQuantity = value === '' ? '' : parseInt(value, 10);
     setState((prev) => {
@@ -209,11 +260,91 @@ const InitiateDelivery = () => {
     });
   };
 
+  const handleSplitDNComponentChange = (dnIndex, itemId, compIndex, field, value) => {
+    setState((prev) => {
+      const updatedSplitDNs = prev.createdSplitDNs.map((dn, i) => {
+        if (i !== dnIndex) return dn;
+        return {
+          ...dn,
+          items: dn.items.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  components: item.components.map((comp, ci) =>
+                    ci === compIndex ? { ...comp, [field]: value } : comp
+                  ),
+                }
+              : item
+          ),
+        };
+      });
+      return { ...prev, createdSplitDNs: updatedSplitDNs };
+    });
+  };
+
+  const addSplitDNComponent = (dnIndex, itemId) => {
+    setState((prev) => {
+      const updatedSplitDNs = prev.createdSplitDNs.map((dn, i) => {
+        if (i !== dnIndex) return dn;
+        return {
+          ...dn,
+          items: dn.items.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  components: [...item.components, { component: '', value: '' }],
+                }
+              : item
+          ),
+        };
+      });
+      return { ...prev, createdSplitDNs: updatedSplitDNs };
+    });
+  };
+
+  const removeSplitDNComponent = (dnIndex, itemId, compIndex) => {
+    setState((prev) => {
+      const updatedSplitDNs = prev.createdSplitDNs.map((dn, i) => {
+        if (i !== dnIndex) return dn;
+        return {
+          ...dn,
+          items: dn.items.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  components: item.components.filter((_, ci) => ci !== compIndex),
+                }
+              : item
+          ),
+        };
+      });
+      return { ...prev, createdSplitDNs: updatedSplitDNs };
+    });
+  };
+
   const toggleAdditionalInfo = (index) => {
     setState((prev) => ({
       ...prev,
       deliveryItems: prev.deliveryItems.map((item, i) =>
         i === index ? { ...item, showAdditionalInfo: !item.showAdditionalInfo } : item
+      ),
+    }));
+  };
+
+  const toggleSplitDNAdditionalInfo = (dnIndex, itemId) => {
+    setState((prev) => ({
+      ...prev,
+      createdSplitDNs: prev.createdSplitDNs.map((dn, i) =>
+        i === dnIndex
+          ? {
+              ...dn,
+              items: dn.items.map((item) =>
+                item.id === itemId
+                  ? { ...item, showAdditionalInfo: !item.showAdditionalInfo }
+                  : item
+              ),
+            }
+          : dn
       ),
     }));
   };
@@ -227,17 +358,13 @@ const InitiateDelivery = () => {
           id: Date.now() + index,
           item: prev.deliveryItems[index].item,
           name: prev.itemsList.find((i) => i.id === prev.deliveryItems[index].item)?.name || 'N/A',
-          make: '',
-          dial_size: '',
-          case: '',
-          connection: '',
-          wetted_parts: '',
           range: '',
           quantity: '',
           delivered_quantity: '',
           uom: prev.deliveryItems[index].uom,
           remaining_quantity: 0,
           assigned_quantity: '',
+          components: [],
           showAdditionalInfo: false,
           error: '',
         },
@@ -304,7 +431,7 @@ const InitiateDelivery = () => {
   };
 
   const isSubmitDisabled = () => {
-    if (!state.deliveryType) return true;
+    if (!state.deliveryType || !state.deliveryNoteSeriesId) return true;
     if (state.deliveryType === 'Single') {
       return !state.deliveryItems.every(
         (item) =>
@@ -339,6 +466,8 @@ const InitiateDelivery = () => {
         ...item,
         quantity: item.assigned_quantity,
         delivered_quantity: item.assigned_quantity,
+        components: [...item.components], // Deep copy components
+        showAdditionalInfo: false, // Initialize showAdditionalInfo for split DN items
       }));
     if (!selectedItems.length) {
       toast.error('No valid items selected.');
@@ -385,36 +514,29 @@ const InitiateDelivery = () => {
     try {
       const basePayload = {
         delivery_type: state.deliveryType,
+        series: state.deliveryNoteSeriesId,
         items: [],
       };
 
       if (state.deliveryType === 'Single') {
         basePayload.items = state.deliveryItems.map((item) => ({
           item: item.item,
-          make: item.make || null,
-          dial_size: item.dial_size || null,
-          case: item.case || null,
-          connection: item.connection || null,
-          wetted_parts: item.wetted_parts || null,
           range: item.range || null,
           quantity: parseInt(item.quantity) || null,
           delivered_quantity: parseInt(item.delivered_quantity) || null,
           uom: item.uom || null,
+          components: item.components,
         }));
         await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, basePayload);
       } else if (state.deliveryType === 'Multiple') {
         for (const dn of state.createdSplitDNs) {
           basePayload.items = dn.items.map((item) => ({
             item: item.item,
-            make: item.make || null,
-            dial_size: item.dial_size || null,
-            case: item.case || null,
-            connection: item.connection || null,
-            wetted_parts: item.wetted_parts || null,
             range: item.range || null,
             quantity: parseInt(item.quantity) || null,
             delivered_quantity: parseInt(item.delivered_quantity) || null,
             uom: item.uom || null,
+            components: item.components,
           }));
           await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, basePayload);
         }
@@ -499,338 +621,337 @@ const InitiateDelivery = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
                       </>
                     )}
-                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
+                    {state.deliveryType === 'Single' && (
+                      <>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Additional Info</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {state.deliveryItems.map((item, index) => (
-                    <tr key={item.id} className="border">
-                      <td className="border p-2 whitespace-nowrap">
-                        {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? (
-                          <input
-                            type="checkbox"
-                            checked={state.selectedItemIds.includes(item.id)}
-                            onChange={() => handleItemSelection(item.id)}
-                            disabled={item.remaining_quantity === 0 || state.createdSplitDNs.length >= state.numberOfSplitDNs}
-                          />
-                        ) : (
-                          index + 1
-                        )}
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <select
-                          value={item.item}
-                          onChange={(e) => handleItemChange(index, 'item', e.target.value)}
-                          className="w-full p-2 border rounded"
-                          disabled={
-                            state.deliveryType === 'Multiple' &&
-                            state.numberOfSplitDNs &&
-                            state.usedItemIds.includes(item.id)
-                          }
-                        >
-                          <option value="">Select Item</option>
-                          {state.itemsList.map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name}
-                            </option>
-                          ))}
-                        </select>
-                        {item.showAdditionalInfo && (
-                          <div className="mt-2 p-2 border rounded bg-gray-50">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Make</label>
-                                <InputField
-                                  type="text"
-                                  value={item.make}
-                                  onChange={(e) => handleItemChange(index, 'make', e.target.value)}
-                                  className="w-full p-2 border rounded"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Dial Size</label>
-                                <InputField
-                                  type="text"
-                                  value={item.dial_size}
-                                  onChange={(e) => handleItemChange(index, 'dial_size', e.target.value)}
-                                  className="w-full p-2 border rounded"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Case</label>
-                                <InputField
-                                  type="text"
-                                  value={item.case}
-                                  onChange={(e) => handleItemChange(index, 'case', e.target.value)}
-                                  className="w-full p-2 border rounded"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Connection</label>
-                                <InputField
-                                  type="text"
-                                  value={item.connection}
-                                  onChange={(e) => handleItemChange(index, 'connection', e.target.value)}
-                                  className="w-full p-2 border rounded"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Wetted Parts</label>
-                                <InputField
-                                  type="text"
-                                  value={item.wetted_parts}
-                                  onChange={(e) => handleItemChange(index, 'wetted_parts', e.target.value)}
-                                  className="w-full p-2 border rounded"
-                                />
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => addNewItem(index)}
-                              className="mt-2 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
-                            >
-                              + Add Item
-                            </Button>
-                          </div>
-                        )}
-                        {item.error && <p className="text-red-500 text-sm mt-1">{item.error}</p>}
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <InputField
-                          type="text"
-                          value={item.range}
-                          onChange={(e) => handleItemChange(index, 'range', e.target.value)}
-                          className="w-full p-2 border rounded"
-                        />
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <InputField
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          className="w-full p-2 border rounded"
-                          min="0"
-                        />
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <select
-                          value={item.uom}
-                          onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                          className="w-full p-2 border rounded"
-                        >
-                          <option value="">Select Unit</option>
-                          {state.units.map((unit) => (
-                            <option key={unit.id} value={unit.id}>
-                              {unit.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <InputField
-                          type="number"
-                          value={item.delivered_quantity}
-                          onChange={(e) => handleItemChange(index, 'delivered_quantity', e.target.value)}
-                          className="w-full p-2 border rounded"
-                          min="0"
-                        />
-                      </td>
-                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-                        <>
-                          <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || '0'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="number"
-                              value={item.assigned_quantity}
-                              onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
-                              className="w-full p-2 border rounded"
-                              min="0"
-                              max={item.remaining_quantity}
-                              disabled={
-                                !state.selectedItemIds.includes(item.id) ||
-                                item.remaining_quantity === 0 ||
-                                state.createdSplitDNs.length >= state.numberOfSplitDNs
-                              }
-                              placeholder="Enter quantity"
+                  {remainingItems.map((item, index) => (
+                    <React.Fragment key={item.id}>
+                      <tr className="border hover:bg-gray-50">
+                        <td className="border p-2">
+                          {state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? (
+                            <input
+                              type="checkbox"
+                              checked={state.selectedItemIds.includes(item.id)}
+                              onChange={() => handleItemSelection(item.id)}
+                              disabled={state.usedItemIds.includes(item.id)}
                             />
+                          ) : (
+                            index + 1
+                          )}
+                        </td>
+                        <td className="border p-2">{item.name}</td>
+                        <td className="border p-2">
+                          <InputField
+                            type="text"
+                            value={item.range}
+                            onChange={(e) => handleItemChange(index, 'range', e.target.value)}
+                            className="w-full p-1 border rounded"
+                          />
+                        </td>
+                        <td className="border p-2">
+                          <InputField
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            className="w-full p-1 border rounded"
+                            min="0"
+                          />
+                        </td>
+                        <td className="border p-2">
+                          <select
+                            value={item.uom}
+                            onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                            className="w-full p-1 border rounded"
+                          >
+                            <option value="">Select Unit</option>
+                            {state.units.map((unit) => (
+                              <option key={unit.id} value={unit.id}>
+                                {unit.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="border p-2">
+                          <InputField
+                            type="number"
+                            value={item.delivered_quantity}
+                            onChange={(e) => handleItemChange(index, 'delivered_quantity', e.target.value)}
+                            className="w-full p-1 border rounded"
+                            min="0"
+                          />
+                        </td>
+                        {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
+                          <>
+                            <td className="border p-2">{item.remaining_quantity}</td>
+                            <td className="border p-2">
+                              <InputField
+                                type="number"
+                                value={item.assigned_quantity}
+                                onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
+                                className="w-full p-1 border rounded"
+                                min="0"
+                                max={item.remaining_quantity}
+                              />
+                              {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
+                            </td>
+                          </>
+                        )}
+                        {state.deliveryType === 'Single' && (
+                          <>
+                            <td className="border p-2">
+                              <Button
+                                onClick={() => toggleAdditionalInfo(index)}
+                                className="text-indigo-600 hover:text-indigo-800"
+                              >
+                                {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
+                              </Button>
+                            </td>
+                            <td className="border p-2">
+                              <Button
+                                onClick={() => addNewItem(index)}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                Add Item
+                              </Button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                      {state.deliveryType === 'Single' && item.showAdditionalInfo && (
+                        <tr>
+                          <td colSpan="8" className="border p-2">
+                            <div className="pl-8">
+                              <h4 className="text-sm font-medium text-gray-700 mb-2">Components for {item.name}</h4>
+                              {item.components.length > 0 ? (
+                                <table className="w-full border-collapse">
+                                  <thead>
+                                    <tr className="bg-gray-100">
+                                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Component Name</th>
+                                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Component Value</th>
+                                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {item.components.map((comp, compIndex) => (
+                                      <tr key={compIndex} className="border">
+                                        <td className="border p-2">
+                                          <InputField
+                                            type="text"
+                                            value={comp.component}
+                                            onChange={(e) => handleComponentChange(index, compIndex, 'component', e.target.value)}
+                                            placeholder="e.g., Make"
+                                            className="w-full p-1 border rounded"
+                                          />
+                                        </td>
+                                        <td className="border p-2">
+                                          <InputField
+                                            type="text"
+                                            value={comp.value}
+                                            onChange={(e) => handleComponentChange(index, compIndex, 'value', e.target.value)}
+                                            placeholder="e.g., BrandX"
+                                            className="w-full p-1 border rounded"
+                                          />
+                                        </td>
+                                        <td className="border p-2">
+                                          <Button
+                                            onClick={() => removeComponent(index, compIndex)}
+                                            className="text-red-600 hover:text-red-800"
+                                          >
+                                            Remove
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <p className="text-gray-500 text-sm">No components added yet.</p>
+                              )}
+                              <Button
+                                onClick={() => addComponent(index)}
+                                className="mt-2 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded"
+                              >
+                                + Add Component
+                              </Button>
+                            </div>
                           </td>
-                        </>
+                        </tr>
                       )}
-                      <td className="border p-2 whitespace-nowrap">
-                        <Button
-                          onClick={() => toggleAdditionalInfo(index)}
-                          className="px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm whitespace-nowrap"
-                        >
-                          {item.showAdditionalInfo ? 'Hide Additional Info' : 'Show Additional Info'}
-                        </Button>
-                      </td>
-                    </tr>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="text-gray-500">No items available.</p>
-          )}
-          {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-            <div className="mt-4">
-              <Button
-                onClick={handleGenerateSplitDN}
-                disabled={isGenerateDisabled()}
-                className={`px-4 py-2 rounded-md whitespace-nowrap ${
-                  isGenerateDisabled()
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                Generate Split DN {state.createdSplitDNs.length + 1}
-              </Button>
-            </div>
+            <p>No items available for this Work Order.</p>
           )}
         </div>
-        {state.createdSplitDNs.length > 0 && (
+        {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
           <div>
-            <h3 className="text-lg font-medium text-black mb-2">Created Split Delivery Notes</h3>
-            {state.createdSplitDNs.map((dn, index) => (
-              <div key={index} className="mb-4 p-4 border rounded bg-gray-50">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-md font-medium">Split Delivery Note {index + 1}</h4>
-                  <Button
-                    onClick={() => deleteSplitDN(index)}
-                    className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm whitespace-nowrap"
-                  >
-                    Delete
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Description of Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Make</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Dial Size</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Case</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Connection</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Wetted Parts</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dn.items.map((item) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
-                            <select
-                              value={item.item}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'item', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            >
-                              <option value="">Select Item</option>
-                              {state.itemsList.map((i) => (
-                                <option key={i.id} value={i.id}>
-                                  {i.name}
-                                </option>
-                              ))}
-                            </select>
-                            {item.error && <p className="text-red-500 text-sm mt-1">{item.error}</p>}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.make}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'make', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.dial_size}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'dial_size', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.case}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'case', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.connection}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'connection', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.wetted_parts}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'wetted_parts', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="text"
-                              value={item.range}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'range', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <InputField
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'quantity', e.target.value)}
-                              className="w-full p-2 border rounded"
-                              min="0"
-                            />
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            <select
-                              value={item.uom}
-                              onChange={(e) => handleSplitDNItemChange(index, item.id, 'uom', e.target.value)}
-                              className="w-full p-2 border rounded"
-                            >
-                              <option value="">Select Unit</option>
-                              {state.units.map((unit) => (
-                                <option key={unit.id} value={unit.id}>
-                                  {unit.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+            <Button
+              onClick={handleGenerateSplitDN}
+              disabled={isGenerateDisabled()}
+              className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded"
+            >
+              Generate Split Delivery Note
+            </Button>
+            {state.createdSplitDNs.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium text-black mb-2">Generated Split Delivery Notes</h3>
+                {state.createdSplitDNs.map((dn, dnIndex) => (
+                  <div key={dnIndex} className="mb-4 p-4 border rounded">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-md font-medium">Split Delivery Note {dnIndex + 1}</h4>
+                      <Button
+                        onClick={() => deleteSplitDN(dnIndex)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <table className="w-full border-collapse mt-2">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700">Description of Item</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700">Range</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
+                          <th className="border p-2 text-left text-sm font-medium text-gray-700">Components</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {dn.items.map((item) => (
+                          <React.Fragment key={item.id}>
+                            <tr className="border">
+                              <td className="border p-2">{item.name}</td>
+                              <td className="border p-2">
+                                <InputField
+                                  type="text"
+                                  value={item.range}
+                                  onChange={(e) => handleSplitDNItemChange(dnIndex, item.id, 'range', e.target.value)}
+                                  className="w-full p-1 border rounded"
+                                />
+                              </td>
+                              <td className="border p-2">
+                                <InputField
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleSplitDNItemChange(dnIndex, item.id, 'quantity', e.target.value)}
+                                  className="w-full p-1 border rounded"
+                                  min="0"
+                                />
+                                {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
+                              </td>
+                              <td className="border p-2">
+                                <select
+                                  value={item.uom}
+                                  onChange={(e) => handleSplitDNItemChange(dnIndex, item.id, 'uom', e.target.value)}
+                                  className="w-full p-1 border rounded"
+                                >
+                                  <option value="">Select Unit</option>
+                                  {state.units.map((unit) => (
+                                    <option key={unit.id} value={unit.id}>
+                                      {unit.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="border p-2">
+                                <Button
+                                  onClick={() => toggleSplitDNAdditionalInfo(dnIndex, item.id)}
+                                  className="text-indigo-600 hover:text-indigo-800"
+                                >
+                                  {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
+                                </Button>
+                              </td>
+                            </tr>
+                            {item.showAdditionalInfo && (
+                              <tr>
+                                <td colSpan="5" className="border p-2">
+                                  <div className="pl-8">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Components for {item.name}</h4>
+                                    {item.components.length > 0 ? (
+                                      <table className="w-full border-collapse">
+                                        <thead>
+                                          <tr className="bg-gray-100">
+                                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Component Name</th>
+                                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Component Value</th>
+                                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {item.components.map((comp, compIndex) => (
+                                            <tr key={compIndex} className="border">
+                                              <td className="border p-2">
+                                                <InputField
+                                                  type="text"
+                                                  value={comp.component}
+                                                  onChange={(e) => handleSplitDNComponentChange(dnIndex, item.id, compIndex, 'component', e.target.value)}
+                                                  placeholder="e.g., Make"
+                                                  className="w-full p-1 border rounded"
+                                                />
+                                              </td>
+                                              <td className="border p-2">
+                                                <InputField
+                                                  type="text"
+                                                  value={comp.value}
+                                                  onChange={(e) => handleSplitDNComponentChange(dnIndex, item.id, compIndex, 'value', e.target.value)}
+                                                  placeholder="e.g., BrandX"
+                                                  className="w-full p-1 border rounded"
+                                                />
+                                              </td>
+                                              <td className="border p-2">
+                                                <Button
+                                                  onClick={() => removeSplitDNComponent(dnIndex, item.id, compIndex)}
+                                                  className="text-red-600 hover:text-red-800"
+                                                >
+                                                  Remove
+                                                </Button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      <p className="text-gray-500 text-sm">No components added yet.</p>
+                                    )}
+                                    <Button
+                                      onClick={() => addSplitDNComponent(dnIndex, item.id)}
+                                      className="mt-2 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded"
+                                    >
+                                      + Add Component
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
-        <div className="flex justify-end gap-2 mt-6">
+        <div className="flex justify-end">
           <Button
             onClick={handleSubmitDelivery}
-            disabled={state.isSubmitting || !hasPermission('delivery', 'edit') || isSubmitDisabled()}
-            className={`px-4 py-2 rounded-md whitespace-nowrap ${
-              state.isSubmitting || !hasPermission('delivery', 'edit') || isSubmitDisabled()
+            disabled={state.isSubmitting || isSubmitDisabled() || !hasPermission('delivery', 'create')}
+            className={`px-4 py-2 rounded ${
+              state.isSubmitting || isSubmitDisabled() || !hasPermission('delivery', 'create')
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-indigo-600 text-white hover:bg-indigo-700'
             }`}
           >
             {state.isSubmitting ? 'Submitting...' : 'Submit Delivery'}
-          </Button>
-          <Button
-            onClick={() => navigate('/job-execution/processing-work-orders/delivery')}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 whitespace-nowrap"
-          >
-            Cancel
           </Button>
         </div>
       </div>

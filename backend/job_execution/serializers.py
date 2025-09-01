@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import WorkOrder, WorkOrderItem, DeliveryNote, DeliveryNoteItem
+from .models import WorkOrder, WorkOrderItem, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
 from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
 from unit.models import Unit
@@ -14,25 +14,27 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class DeliveryNoteItemComponentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryNoteItemComponent
+        fields = ['id', 'component', 'value']
+
 class DeliveryNoteItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
         queryset=Item.objects.all(), allow_null=True
     )
+    components = DeliveryNoteItemComponentSerializer(many=True, required=False)
 
     class Meta:
         model = DeliveryNoteItem
         fields = [
             "id",
             "item",
-            "make",
-            "dial_size",
-            "case",
-            "connection",
-            "wetted_parts",
             "range",
             "quantity",
             "delivered_quantity",
             "uom",
+            "components",
         ]
 
     def validate(self, data):
@@ -40,6 +42,62 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"delivered_quantity": "Delivered quantity must equal quantity."}
             )
+        return data
+
+    def create(self, validated_data):
+        components_data = validated_data.pop('components', [])
+        delivery_note_item = DeliveryNoteItem.objects.create(**validated_data)
+        for component_data in components_data:
+            DeliveryNoteItemComponent.objects.create(
+                delivery_note_item=delivery_note_item,
+                **component_data
+            )
+        return delivery_note_item
+
+    def update(self, instance, validated_data):
+        components_data = validated_data.pop('components', [])
+        instance.item = validated_data.get('item', instance.item)
+        instance.range = validated_data.get('range', instance.range)
+        instance.quantity = validated_data.get('quantity', instance.quantity)
+        instance.delivered_quantity = validated_data.get('delivered_quantity', instance.delivered_quantity)
+        instance.uom = validated_data.get('uom', instance.uom)
+        instance.save()
+
+        # Update components
+        instance.components.all().delete()
+        for component_data in components_data:
+            DeliveryNoteItemComponent.objects.create(
+                delivery_note_item=instance,
+                **component_data
+            )
+        return instance
+
+class DeliveryNoteSerializer(serializers.ModelSerializer):
+    work_order_id = serializers.PrimaryKeyRelatedField(
+        source="work_order", read_only=True
+    )
+    items = DeliveryNoteItemSerializer(many=True, required=False)
+
+    class Meta:
+        model = DeliveryNote
+        fields = [
+            "id",
+            "dn_number",
+            "work_order",
+            "work_order_id",
+            "signed_delivery_note",
+            "delivery_status",
+            "created_at",
+            "items",
+        ]
+
+class InitiateDeliverySerializer(serializers.Serializer):
+    delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])
+    items = DeliveryNoteItemSerializer(many=True)
+
+    def validate(self, data):
+        if not data.get("items"):
+            raise serializers.ValidationError({"items": "At least one item is required."})
         return data
 
 class WorkOrderItemSerializer(serializers.ModelSerializer):
@@ -92,34 +150,6 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             )
         return data
 
-class DeliveryNoteSerializer(serializers.ModelSerializer):
-    work_order_id = serializers.PrimaryKeyRelatedField(
-        source="work_order", read_only=True
-    )
-    items = DeliveryNoteItemSerializer(many=True, required=False)
-
-    class Meta:
-        model = DeliveryNote
-        fields = [
-            "id",
-            "dn_number",
-            "work_order",
-            "work_order_id",
-            "signed_delivery_note",
-            "delivery_status",
-            "created_at",
-            "items",
-        ]
-
-class InitiateDeliverySerializer(serializers.Serializer):
-    delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])
-    items = DeliveryNoteItemSerializer(many=True)
-
-    def validate(self, data):
-        if not data.get("items"):
-            raise serializers.ValidationError({"items": "At least one item is required."})
-        return data
-
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
         queryset=PurchaseOrder.objects.all(), allow_null=True
@@ -147,7 +177,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     due_in_days = serializers.IntegerField(required=False, allow_null=True)
     received_date = serializers.DateField(required=False, allow_null=True)
     wo_type = serializers.CharField(required=False, allow_null=True)
-    application_status = serializers.CharField(max_length=20, allow_null=True, required=False)  # Added with flexibility
+    application_status = serializers.CharField(max_length=20, allow_null=True, required=False)
 
     class Meta:
         model = WorkOrder
@@ -176,7 +206,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "due_in_days",
             "received_date",
             "wo_type",
-            "application_status",  # Added to fields
+            "application_status",
         ]
 
     def send_assignment_email(self, work_order, items_data):
@@ -560,7 +590,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             due_in_days=validated_data.get("due_in_days"),
             received_date=validated_data.get("received_date"),
             wo_type=validated_data.get("wo_type"),
-            application_status=validated_data.get("application_status"),  # Set from validated data
+            application_status=validated_data.get("application_status"),
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
 
