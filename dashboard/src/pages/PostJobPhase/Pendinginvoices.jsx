@@ -432,11 +432,8 @@ const PendingInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => (isDNEmpty(workOrder) ? handleUploadDN(workOrder) : viewDN(workOrder))}
-                          disabled={isPOEmpty(workOrder)}
                           className={`px-3 py-1 rounded-md text-sm ${
-                            isPOEmpty(workOrder)
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isDNEmpty(workOrder)
+                            isDNEmpty(workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-purple-600 text-white hover:bg-purple-700'
                           }`}
