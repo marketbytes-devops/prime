@@ -8,7 +8,7 @@ const Template1 = ({ data }) => {
   const grandTotal = calculateTotal(data.items || []);
 
   return (
-    <html>
+    <html lang="en">
       <head>
         <title>Quotation {data.series_number || data.id}</title>
         <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
@@ -21,9 +21,11 @@ const Template1 = ({ data }) => {
             .page-break { page-break-after: always; }
             .header { text-align: center; margin-bottom: 1.5rem; }
             .arabic { font-family: 'Traditional Arabic', sans-serif; }
-            .table-details { border: 1px solid #000; border-collapse: collapse; }
+            .table-details { border-collapse: collapse; width: 100%; }
             .table-details td { padding: 0.5rem; border-bottom: 1px solid #e5e7eb; }
+            .item-table { border-collapse: collapse; width: 100%; }
             .item-table th, .item-table td { border: 1px solid #000; padding: 0.5rem; }
+            .item-table th { background-color: #000; color: #fff; }
             .terms { margin-top: 1rem; font-size: 0.75rem; line-height: 1.25rem; }
             .signature { text-align: right; margin-top: 2rem; }
             .footer-row { display: flex; justify-content: space-between; margin-top: 1rem; }
@@ -37,7 +39,7 @@ const Template1 = ({ data }) => {
         <div className="mb-10">
           <div className="header">
             <img src="path/to/your/logo.png" alt="Prime Innovation Logo" className="w-32 mx-auto mb-2" />
-            <div className="text-xl font-bold mb-2">Prime Innovation Contracting Co.</div>
+            <div className="text-xl font-bold mb-2">Prime Innovation Contracting Company</div>
             <div className="text-lg mb-4 arabic">شركة ابتكار الرئيسية للمقاوﻻت</div>
           </div>
 
@@ -114,12 +116,11 @@ const Template1 = ({ data }) => {
           <table className="w-full item-table mb-6">
             <thead>
               <tr className="font-bold">
-                <th className="p-2.5 text-left">Sl. No.</th>
-                <th className="p-2.5 text-left">Description</th>
-                <th className="p-2.5 text-left">Unit</th>
+                <th className="p-2.5 text-left">#</th>
+                <th className="p-2.5 text-left">Item & Description</th>
                 <th className="p-2.5 text-left">Qty</th>
-                <th className="p-2.5 text-left">Unit price (SAR)</th>
-                <th className="p-2.5 text-left">Total Price (SAR)</th>
+                <th className="p-2.5 text-left">Rate</th>
+                <th className="p-2.5 text-left">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -128,7 +129,6 @@ const Template1 = ({ data }) => {
                   <tr key={item.id}>
                     <td className="p-2.5 text-left">{index + 1}</td>
                     <td className="p-2.5 text-left">{item.name || 'N/A'}</td>
-                    <td className="p-2.5 text-left">{item.unit || 'Nos'}</td>
                     <td className="p-2.5 text-left">{item.quantity || 'N/A'}</td>
                     <td className="p-2.5 text-left">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
                     <td className="p-2.5 text-left">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
@@ -136,35 +136,29 @@ const Template1 = ({ data }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="p-2.5 text-center">No items available.</td>
+                  <td colSpan="5" className="p-2.5 text-center">No items available.</td>
                 </tr>
               )}
               <tr className="font-bold">
-                <td colSpan="5" className="p-2.5 text-left">Grand Total (SAR)</td>
+                <td colSpan="4" className="p-2.5 text-left">Sub Total</td>
                 <td className="p-2.5 text-left">{grandTotal}</td>
+              </tr>
+              <tr className="font-bold">
+                <td colSpan="4" className="p-2.5 text-left">Total</td>
+                <td className="p-2.5 text-left">SAR{grandTotal}</td>
               </tr>
             </tbody>
           </table>
 
           <div className="terms">
-            <strong>Terms & Conditions</strong><br /><strong>
-            Calibration Service General Terms and Conditions</strong><br />
-            • Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers<br />
+            <strong>Notes</strong><br />
+            Looking forward for your business.<br />
+            <strong>Terms & Conditions</strong><br />
+            Calibration Service General Terms and Conditions<br />
+            • Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.<br />
             • Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.<br />
             • If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.<br />
-          </div>
-        </div>
-        <div className="page-break"></div>
-
-        {/* Page 3 */}
-        <div className="mb-10">
-          <div className="header">
-            <img src="path/to/your/logo.png" alt="Prime Innovation Logo" className="w-32 mx-auto mb-2" />
-            <div className="text-xl font-bold mb-2">Prime Innovation Contracting Co.</div>
-            <div className="text-lg mb-4 arabic">شركة ابتكار الرئيسية للمقاوﻻت</div>
-          </div>
-
-          <div className="terms">
+            • Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.<br />
             • Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.<br />
             • Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.<br />
             • Customers purchase order or written approval is required to start calibration.<br />
