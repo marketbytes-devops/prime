@@ -145,14 +145,17 @@ const Series = () => {
             <label htmlFor="seriesName" className="block text-sm font-medium text-gray-700 mb-1">
               Series Name
             </label>
-            <InputField
-              type="text"
-              placeholder="Enter series name"
+            <select
+              id="seriesName"
               value={state.series_name}
               onChange={(e) => setState(prev => ({ ...prev, series_name: e.target.value }))}
-              maxLength={100}
-              title="Series name must be 100 characters or less"
-            />
+              className="w-full p-2 border rounded focus:outline-indigo-500"
+            >
+              <option value="">Select Series Type</option>
+              <option value="Quotation">Quotation</option>
+              <option value="Work Order">Work Order</option>
+              <option value="Delivery Note">Delivery Note</option>
+            </select>
           </div>
           <div>
             <label htmlFor="prefix" className="block text-sm font-medium text-gray-700 mb-1">

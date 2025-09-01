@@ -429,7 +429,7 @@ const PendingInvoices = () => {
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => (isPOEmpty(workOrder) ? handleUploadPO(workOrder) : handleViewDocument(workOrder, 'po'))}
-                          className={`px-3 py-1 rounded-md text-sm ${
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             isPOEmpty(workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -439,13 +439,13 @@ const PendingInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(workOrder, 'wo')}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
                         >
                           View WO
                         </Button>
                         <Button
                           onClick={() => (isDNEmpty(workOrder) ? handleUploadDN(workOrder) : handleViewDocument(workOrder, 'dn'))}
-                          className={`px-3 py-1 rounded-md text-sm ${
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             isDNEmpty(workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-purple-600 text-white hover:bg-purple-700'

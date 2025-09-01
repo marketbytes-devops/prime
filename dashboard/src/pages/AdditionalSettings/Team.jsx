@@ -158,26 +158,26 @@ const Team = () => {
       <form onSubmit={handleCreate} className="mb-6">
         <div className="grid gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Member Type
             </label>
-            <div className="flex gap-4">
-              <label>
+            <div className="flex items-center space-x-4">
+              <div className='flex items-center justify-center space-x-1'>
                 <input
                   type="radio"
                   value="team"
                   checked={state.memberType === 'team'}
                   onChange={() => setState(prev => ({ ...prev, memberType: 'team' }))}
-                /> Team Member
-              </label>
-              <label>
+                /> <span>Team Member</span>
+              </div>
+
+              <div className='flex items-center justify-center space-x-1'>
                 <input
                   type="radio"
                   value="technician"
                   checked={state.memberType === 'technician'}
                   onChange={() => setState(prev => ({ ...prev, memberType: 'technician' }))}
-                /> Technician
-              </label>
+                /> <span>Technician</span></div>
             </div>
           </div>
           <div>
@@ -222,11 +222,10 @@ const Team = () => {
         <button
           type="submit"
           disabled={!hasPermission('team', 'add')}
-          className={`px-4 py-2 rounded ${
-            hasPermission('team', 'add')
-              ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-4 py-2 rounded ${hasPermission('team', 'add')
+            ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
         >
           Add {state.memberType === 'team' ? 'Member' : 'Technician'}
         </button>
@@ -279,11 +278,10 @@ const Team = () => {
               <button
                 onClick={() => handleDelete(member.id, state.memberType)}
                 disabled={!hasPermission('team', 'delete')}
-                className={`px-3 py-1 rounded ${
-                  hasPermission('team', 'delete')
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
+                className={`px-3 py-1 rounded ${hasPermission('team', 'delete')
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
               >
                 Delete
               </button>
@@ -304,11 +302,10 @@ const Team = () => {
             <button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded ${
-                state.currentPage === page
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-3 py-1 rounded ${state.currentPage === page
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
             >
               {page}
             </button>
