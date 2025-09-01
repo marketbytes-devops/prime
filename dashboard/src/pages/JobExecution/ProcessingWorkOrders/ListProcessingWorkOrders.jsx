@@ -61,9 +61,9 @@ const ListProcessingWorkOrders = () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
         apiClient.get("/work-orders/?status=Submitted"),
-        apiClient.get("/items/"),
-        apiClient.get("/units/"),
-        apiClient.get("/technicians/"),
+        apiClient.get("items/"),
+        apiClient.get("units/"),
+        apiClient.get("technicians/"),
       ]);
       setState((prev) => ({
         ...prev,
@@ -108,13 +108,8 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
-  const handleMoveToApproval = async (woId) => {
-    const wo = state.workOrders.find((w) => w.id === woId);
-    if (!wo) {
-      toast.error("Work order not found.");
-      return;
-    }
-    const isComplete = wo.items.every(
+  const isDUTComplete = (wo) => {
+    return wo.items.every(
       (item) =>
         item.certificate_number &&
         item.certificate_uut_label &&
@@ -125,11 +120,22 @@ const ListProcessingWorkOrders = () => {
         item.range !== null &&
         item.range !== undefined
     );
-    if (!isComplete) {
-      toast.warn("Please complete all Device Under Test details before moving to approval.");
-      navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`);
+  };
+
+  const handleAction = (woId) => {
+    const wo = state.workOrders.find((w) => w.id === woId);
+    if (!wo) {
+      toast.error("Work order not found.");
       return;
     }
+    if (!isDUTComplete(wo)) {
+      navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`);
+    } else {
+      handleMoveToApproval(woId);
+    }
+  };
+
+  const handleMoveToApproval = async (woId) => {
     try {
       const response = await apiClient.post(`/work-orders/${woId}/move-to-approval/`);
       toast.success(response.data.status);
@@ -398,15 +404,19 @@ const ListProcessingWorkOrders = () => {
                           Delete
                         </Button>
                         <Button
-                          onClick={() => handleMoveToApproval(wo.id)}
-                          disabled={!hasPermission("work_orders", "edit")} // Only permission-based disable
+                          onClick={() => handleAction(wo.id)}
+                          disabled={!hasPermission("work_orders", "edit")}
                           className={`px-3 py-1 rounded-md text-sm ${
                             !hasPermission("work_orders", "edit")
                               ? "bg-gray-300 cursor-not-allowed"
-                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : isDUTComplete(state.workOrders.find((w) => w.id === wo.id))
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "bg-yellow-600 text-white hover:bg-yellow-700"
                           }`}
                         >
-                          Move to Manager Approval
+                          {isDUTComplete(state.workOrders.find((w) => w.id === wo.id))
+                            ? "Move to Manager Approval"
+                            : "Update Device Test Details"}
                         </Button>
                         <Button
                           onClick={() => handlePrint(wo)}

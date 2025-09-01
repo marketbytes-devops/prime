@@ -111,6 +111,8 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
         queryset=Technician.objects.all(), allow_null=True, required=False
     )
     total_price = serializers.SerializerMethodField()
+    calibration_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    calibration_due_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
 
     class Meta:
         model = WorkOrderItem
@@ -175,9 +177,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         required=False,
     )
     due_in_days = serializers.IntegerField(required=False, allow_null=True)
-    received_date = serializers.DateField(required=False, allow_null=True)
+    received_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
     wo_type = serializers.CharField(required=False, allow_null=True)
     application_status = serializers.CharField(max_length=20, allow_null=True, required=False)
+    date_received = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    expected_completion_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
 
     class Meta:
         model = WorkOrder
@@ -542,6 +546,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                             value = float(value)
                         except (ValueError, TypeError):
                             value = None
+                    elif item_key in ["calibration_date", "calibration_due_date", "date_received", "expected_completion_date"] and value:
+                        # Log the received date value for debugging
+                        logger.info(f"Received date for {item_key}: {value}")
+                        item_data[item_key] = value
 
                     item_data[item_key] = value
 
