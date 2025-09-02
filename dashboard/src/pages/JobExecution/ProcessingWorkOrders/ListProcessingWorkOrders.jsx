@@ -5,7 +5,8 @@ import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
-import Template2 from "../../../components/Templates/RFQ/Template2";
+import Template1 from "../../../components/Templates/WorkOrder/Template1";
+import ReactDOMServer from 'react-dom/server';
 
 const ListProcessingWorkOrders = () => {
   const navigate = useNavigate();
@@ -147,84 +148,33 @@ const ListProcessingWorkOrders = () => {
   };
 
   const handlePrint = (wo) => {
+    const itemsData = wo.items.map(item => ({
+      id: item.id,
+      name: state.itemsList.find(i => i.id === item.item)?.name || 'Not Provided',
+      quantity: item.quantity || 'Not Provided',
+      unit: state.units.find(u => u.id === item.unit)?.name || 'Not Provided',
+      range: item.range || 'Not Provided',
+      assigned_to_name: state.technicians.find(t => t.id === item.assigned_to)?.name || 'Not Provided',
+      certificate_uut_label: item.certificate_uut_label || 'Not Provided',
+      certificate_number: item.certificate_number || 'Not Provided',
+      calibration_date: item.calibration_date,
+      calibration_due_date: item.calibration_due_date,
+      uuc_serial_number: item.uuc_serial_number || 'Not Provided',
+      certificate_file: item.certificate_file,
+    }));
+
+    const data = {
+      ...wo,
+      items: itemsData,
+    };
+
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
     const printWindow = window.open("", "_blank");
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head><title>Work Order ${wo.wo_number}</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1>Work Order Details</h1>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
-            <p><strong>Work Order Number:</strong> ${wo.wo_number || "Not Provided"}</p>
-            <p><strong>Work Order Type:</strong> ${wo.wo_type || "Not Provided"}</p>
-            <p><strong>Date Received:</strong> ${
-              wo.date_received ? new Date(wo.date_received).toLocaleDateString() : "Not Provided"
-            }</p>
-            <p><strong>Expected Completion Date:</strong> ${
-              wo.expected_completion_date ? new Date(wo.expected_completion_date).toLocaleDateString() : "Not Provided"
-            }</p>
-            <p><strong>Onsite or Lab:</strong> ${wo.onsite_or_lab || "Not Provided"}</p>
-            <p><strong>Site Location:</strong> ${wo.site_location || "Not Provided"}</p>
-            <p><strong>Remarks:</strong> ${wo.remarks || "Not Provided"}</p>
-          </div>
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
-            <table border="1" style="width: 100%; border-collapse: collapse;">
-              <tr style="background-color: #f2f2f2;">
-                <th style="padding: 8px; text-align: left;">Item</th>
-                <th style="padding: 8px; text-align: left;">Quantity</th>
-                <th style="padding: 8px; text-align: left;">Unit</th>
-                <th style="padding: 8px; text-align: left;">Range</th>
-                <th style="padding: 8px; text-align: left;">Assigned To</th>
-                <th style="padding: 8px; text-align: left;">Certificate UUT Label</th>
-                <th style="padding: 8px; text-align: left;">Certificate Number</th>
-                <th style="padding: 8px; text-align: left;">Calibration Date</th>
-                <th style="padding: 8px; text-align: left;">Calibration Due Date</th>
-                <th style="padding: 8px; text-align: left;">UUC Serial Number</th>
-                <th style="padding: 8px; text-align: left;">Certificate</th>
-              </tr>
-              ${wo.items
-                .map(
-                  (item) => `
-                    <tr>
-                      <td style="padding: 8px;">${
-                        state.itemsList.find((i) => i.id === item.item)?.name || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: center;">${item.quantity || "Not Provided"}</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        state.units.find((u) => u.id === item.unit)?.name || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${item.range || "Not Provided"}</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        state.technicians.find((t) => t.id === item.assigned_to)?.name || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.certificate_uut_label || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.certificate_number || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.uuc_serial_number || "Not Provided"
-                      }</td>
-                      <td style="padding: 8px; text-align: left;">${
-                        item.certificate_file
-                          ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
-                          : "Not Provided"
-                      }</td>
-                    </tr>
-                  `
-                )
-                .join("")}
-            </table>
-          </div>
-        </body>
+        <body>${htmlString}</body>
       </html>
     `);
     printWindow.document.close();
