@@ -5,6 +5,8 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
+import ReactDOMServer from 'react-dom/server';
+import Template1 from '../../../components/Templates/Quotation/Template1';
 
 const ViewQuotation = () => {
   const navigate = useNavigate();
@@ -347,158 +349,23 @@ const ViewQuotation = () => {
     setIsSubmitting(false);
   };
 
-  const handlePrint = quotation => {
+  const handlePrint = (quotation) => {
     const channelName = state.channels.find(c => c.id === quotation.rfq_channel)?.channel_name || 'N/A';
     const salesPersonName = state.teamMembers.find(m => m.id === quotation.assigned_sales_person)?.name || 'N/A';
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head><title>Quotation ${quotation.id}</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1>Quotation Details</h1>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Company Details</h2>
-            <p><strong>Series Number:</strong> ${quotation.series_number || 'N/A'}</p>
-            <p><strong>RFQ ID:</strong> ${quotation.rfq || 'N/A'}</p>
-            <p><strong>Company Name:</strong> ${quotation.company_name || 'N/A'}</p>
-            <p><strong>Company Address:</strong> ${quotation.company_address || 'N/A'}</p>
-            <p><strong>Company Phone:</strong> ${quotation.company_phone || 'N/A'}</p>
-            <p><strong>Company Email:</strong> ${quotation.company_email || 'N/A'}</p>
-            <p><strong>Channel:</strong> ${channelName}</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Contact Details</h2>
-            <p><strong>Contact Name:</strong> ${quotation.point_of_contact_name || 'N/A'}</p>
-            <p><strong>Contact Email:</strong> ${quotation.point_of_contact_email || 'N/A'}</p>
-            <p><strong>Contact Phone:</strong> ${quotation.point_of_contact_phone || 'N/A'}</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Assignment & Status</h2>
-            <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
-            <p><strong>Due Date:</strong> ${
-              quotation.due_date_for_quotation
-                ? new Date(quotation.due_date_for_quotation).toLocaleDateString()
-                : 'N/A'
-            }</p>
-            <p><strong>Created:</strong> ${new Date(quotation.created_at).toLocaleDateString()}</p>
-            <p><strong>Quotation Status:</strong> ${quotation.quotation_status || 'N/A'}</p>
-            ${
-              quotation.quotation_status === 'Not Approved'
-                ? `<p><strong>Not Approved Reason:</strong> ${quotation.not_approved_reason_remark || 'N/A'}</p>`
-                : ''
-            }
-            <p><strong>Next Follow-up Date:</strong> ${
-              quotation.next_followup_date
-                ? new Date(quotation.next_followup_date).toLocaleDateString()
-                : 'N/A'
-            }</p>
-            <p><strong>Remarks:</strong> ${quotation.remarks || 'N/A'}</p>
-          </div>
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Items</h2>
-            <table border="1" style="width: 100%; border-collapse: collapse;">
-              <tr style="background-color: #f2f2f2;">
-                <th style="padding: 8px; text-align: left;">Item</th>
-                <th style="padding: 8px; text-align: left;">Quantity</th>
-                <th style="padding: 8px; text-align: left;">Unit</th>
-                <th style="padding: 8px; text-align: left;">Unit Price</th>
-                <th style="padding: 8px; text-align: left;">Total Price</th>
-              </tr>
-              ${
-                quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0
-                  ? quotation.items
-                      .map(
-                        item => `
-                        <tr>
-                          <td style="padding: 8px;">${
-                            state.itemsList.find(i => i.id === item.item)?.name || 'N/A'
-                          }</td>
-                          <td style="padding: 8px; text-align: center;">${
-                            item.quantity || 'N/A'
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.units.find(u => u.id === item.unit)?.name || 'N/A'
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">$${
-                            item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">$${
-                            item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(2)
-                              : '0.00'
-                          }</td>
-                        </tr>
-                      `
-                      )
-                      .join('')
-                  : '<tr><td colspan="5" style="padding: 8px; text-align: center;">No items added.</td></tr>'
-              }
-            </table>
-          </div>
-          ${
-            quotation.purchase_orders && quotation.purchase_orders.length > 0
-              ? `
-          <div style="margin-top: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Orders</h2>
-            ${quotation.purchase_orders
-              .map(
-                (po, index) => `
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 1.1rem; font-weight: 600;">Purchase Order ${index + 1} (ID: ${po.id}, Type: ${po.order_type})</h3>
-                  <p><strong>Client PO Number:</strong> ${po.client_po_number || 'N/A'}</p>
-                  <p><strong>PO File:</strong> ${
-                    po.po_file ? `<a href="${po.po_file}" target="_blank">View File</a>` : 'N/A'
-                  }</p>
-                  <p><strong>Created:</strong> ${new Date(po.created_at).toLocaleDateString()}</p>
-                  <table border="1" style="width: 100%; border-collapse: collapse;">
-                    <tr style="background-color: #f2f2f2;">
-                      <th style="padding: 8px; text-align: left;">Item</th>
-                      <th style="padding: 8px; text-align: left;">Quantity</th>
-                      <th style="padding: 8px; text-align: left;">Unit</th>
-                      <th style="padding: 8px; text-align: left;">Unit Price</th>
-                      <th style="padding: 8px; text-align: left;">Total Price</th>
-                    </tr>
-                    ${
-                      po.items && po.items.length > 0
-                        ? po.items
-                            .map(
-                              item => `
-                              <tr>
-                                <td style="padding: 8px;">${
-                                  state.itemsList.find(i => i.id === item.item)?.name || item.item_name || 'N/A'
-                                }</td>
-                                <td style="padding: 8px; text-align: center;">${
-                                  item.quantity || 'N/A'
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  state.units.find(u => u.id === item.unit)?.name || 'N/A'
-                                }</td>
-                                <td style="padding: 8px; text-align: right;">$${
-                                  item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
-                                }</td>
-                                <td style="padding: 8px; text-align: right;">$${
-                                  item.quantity && item.unit_price
-                                    ? Number(item.quantity * item.unit_price).toFixed(2)
-                                    : '0.00'
-                                }</td>
-                              </tr>
-                            `
-                            )
-                            .join('')
-                        : '<tr><td colspan="5" style="padding: 8px; text-align: center;">No items added.</td></tr>'
-                    }
-                  </table>
-                </div>
-              `
-              )
-              .join('')}
-          </div>
-          `
-              : ''
-          }
-        </body>
-      </html>
-    `);
+
+    const itemsData = (quotation.items || []).map(item => ({
+      id: item.id,
+      name: state.itemsList.find(i => i.id === item.item)?.name || 'N/A',
+      quantity: item.quantity || '',
+      unit: state.units.find(u => u.id === item.unit)?.name || 'N/A',
+      unit_price: item.unit_price || ''
+    }));
+
+    const data = { ...quotation, channelName, salesPersonName, items: itemsData };
+
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(htmlString);
     printWindow.document.close();
     printWindow.print();
   };
