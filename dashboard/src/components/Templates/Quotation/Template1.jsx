@@ -1,23 +1,39 @@
-import React from 'react';
+import logo from "../../../assets/images/img-logo.webp";
 
 const Template1 = ({ data }) => {
   const { series_number, company_name, company_address, company_phone, company_email, channelName, point_of_contact_name, point_of_contact_email, point_of_contact_phone, assigned_sales_person, due_date_for_quotation, created_at, items, quotation_status, not_approved_reason_remark, next_followup_date, remarks, purchase_orders } = data;
   const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price || 0), 0);
 
+  // Function to format date as "24 Aug 2025"
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).replace(/ /g, ' ');
+  };
+
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', padding: '20px' }}>
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Quotation</h1>
-        <p style={{ fontSize: '14px' }}>#{series_number || 'N/A'}</p>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Prime Innovation Contracting Company</h2>
-          <p>Prince Nayif Bin Abdul Aziz St.</p>
-          <p>Ras Tanura Ash Shariyah 32817</p>
-          <p>TRN: 1116993003</p>
-          <p>danny@primeareagroup.com</p>
+      <div style={{ display: 'flex', alignItems: "start", justifyContent: 'space-between' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img src={logo} alt="Prime Logo" style={{ position:"relative", left:"-10px" }} />
         </div>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Quote</h1>
+          <p style={{ fontSize: '14px' }}>#{series_number || 'N/A'}</p>
+        </div>
+      </div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Prime Innovation Contracting Company</h2>
+        <p>Prince Nayif Bin Abdul Aziz St.</p>
+        <p>Ras Tanura Ash Shariyah 32817</p>
+        <p>TRN: 1116993003</p>
+        <p>danny@primeareagroup.com</p>
+      </div>
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: "end", justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Bill To</h2>
           <p>{company_name || 'N/A'}</p>
@@ -25,39 +41,48 @@ const Template1 = ({ data }) => {
           <p>Phone: {company_phone || 'N/A'}</p>
           <p>Email: {company_email || 'N/A'}</p>
         </div>
+        <div>
+          <p><strong>Quote Date: {formatDate(created_at)}</strong></p>
+        </div>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f2f2f2' }}>
-            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Item</th>
-            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Quantity</th>
-            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Unit</th>
-            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Unit Price</th>
-            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Total Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items && items.length > 0 ? (
-            items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.name}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.quantity}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.unit}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>${item.quantity && item.unit_price ? (item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="5" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>No items added.</td>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Subject:</h2>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>CALIBRATION INSTRUMENT & EQUIPMENT</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#403c3c' }}>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>#</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Item & Descriptio</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Qty</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Unit</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Amount</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Total Amount</th>
             </tr>
-          )}
-          <tr>
-            <td colSpan="4" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'right' }}><strong>Total</strong></td>
-            <td style={{ border: '1px solid #ddd', padding: '8px' }}>${totalAmount.toFixed(2)}</td>
-          </tr>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items && items.length > 0 ? (
+              items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{index + 1}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.name}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.quantity}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.unit}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.quantity && item.unit_price ? (item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center', backgroundColor: '#ffffff', color: '#000000' }}>No items added.</td>
+              </tr>
+            )}
+            <tr>
+              <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Total</strong></td>
+              <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>${totalAmount.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div style={{ marginTop: '20px' }}>
         <p><strong>Notes</strong></p>
         <p>Looking forward for your business.</p>
