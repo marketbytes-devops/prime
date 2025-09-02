@@ -47,7 +47,7 @@ const InitiateDelivery = () => {
           range: item.range || '',
           quantity: item.quantity || '',
           delivered_quantity: item.quantity || '',
-          uom: unitsRes.data.find((u) => u.id === Number(item.unit))?.id || '',
+          uom: item.unit || '', // Changed from itemsRes.data.find to use item.unit directly
           remaining_quantity: item.quantity || 0,
           assigned_quantity: '',
           components: [],
@@ -311,11 +311,12 @@ const InitiateDelivery = () => {
     });
   };
 
-  const toggleAdditionalInfo = (index) => {
+  // Fixed toggle function - using item.id instead of index for better consistency
+  const toggleAdditionalInfo = (itemId) => {
     setState((prev) => ({
       ...prev,
-      deliveryItems: prev.deliveryItems.map((item, i) =>
-        i === index ? { ...item, showAdditionalInfo: !item.showAdditionalInfo } : item
+      deliveryItems: prev.deliveryItems.map((item) =>
+        item.id === itemId ? { ...item, showAdditionalInfo: !item.showAdditionalInfo } : item
       ),
     }));
   };
@@ -342,13 +343,13 @@ const InitiateDelivery = () => {
       deliveryItems: [
         ...prev.deliveryItems.slice(0, index + 1),
         {
-          id: Date.now() + index,
-          item: prev.deliveryItems[index].item,
-          name: prev.itemsList.find((i) => i.id === prev.deliveryItems[index].item)?.name || 'N/A',
+          id: Date.now() + Math.random(), // More unique ID generation
+          item: prev.itemsList[0]?.id || '',
+          name: prev.itemsList[0]?.name || 'N/A',
           range: '',
           quantity: '',
           delivered_quantity: '',
-          uom: prev.deliveryItems[index].uom,
+          uom: prev.units[0]?.id || '',
           remaining_quantity: 0,
           assigned_quantity: '',
           components: [],
@@ -489,42 +490,50 @@ const InitiateDelivery = () => {
     setState((prev) => ({ ...prev, isSubmitting: true }));
 
     try {
-      const basePayload = {
-        delivery_type: state.deliveryType,
-        items: [],
-      };
-
       if (state.deliveryType === 'Single') {
-        basePayload.items = state.deliveryItems.map((item) => ({
-          item: item.item,
-          range: item.range || null,
-          quantity: parseInt(item.quantity) || null,
-          delivered_quantity: parseInt(item.delivered_quantity) || null,
-          uom: item.uom || null,
-          components: item.components,
-        }));
-        await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, basePayload);
-      } else if (state.deliveryType === 'Multiple') {
-        for (const dn of state.createdSplitDNs) {
-          basePayload.items = dn.items.map((item) => ({
+        const payload = {
+          delivery_type: state.deliveryType,
+          items: state.deliveryItems.map((item) => ({
             item: item.item,
             range: item.range || null,
             quantity: parseInt(item.quantity) || null,
             delivered_quantity: parseInt(item.delivered_quantity) || null,
             uom: item.uom || null,
             components: item.components,
-          }));
-          await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, basePayload);
+          })),
+        };
+        const response = await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, payload);
+        toast.success(`Delivery initiated successfully as ${state.deliveryType} Delivery Note (${response.data.dn_number}).`);
+      } else if (state.deliveryType === 'Multiple') {
+        for (const dn of state.createdSplitDNs) {
+          const payload = {
+            delivery_type: state.deliveryType,
+            items: dn.items.map((item) => ({
+              item: item.item,
+              range: item.range || null,
+              quantity: parseInt(item.quantity) || null,
+              delivered_quantity: parseInt(item.delivered_quantity) || null,
+              uom: item.uom || null,
+              components: item.components,
+            })),
+          };
+          const response = await apiClient.post(`/work-orders/${state.selectedWorkOrder.id}/initiate-delivery/`, payload);
+          toast.success(`Delivery initiated successfully as ${state.deliveryType} Delivery Note (${response.data.dn_number}).`);
         }
       }
 
-      toast.success('Delivery initiated successfully as ' + state.deliveryType + ' Delivery Note(s).');
       navigate('/job-execution/processing-work-orders/pending-deliveries');
     } catch (error) {
       console.error('Error initiating delivery:', error);
       toast.error('Failed to initiate delivery.');
       setState((prev) => ({ ...prev, isSubmitting: false }));
     }
+  };
+
+  // Helper function to get unit name from unit ID
+  const getUnitName = (unitId) => {
+    const unit = state.units.find((u) => u.id === unitId);
+    return unit ? unit.name : 'N/A';
   };
 
   const remainingItems = state.deliveryItems.filter((item) => !state.usedItemIds.includes(item.id));
@@ -549,6 +558,7 @@ const InitiateDelivery = () => {
                 checked={state.deliveryType === 'Single'}
                 onChange={handleDeliveryTypeChange}
                 className="mr-2"
+                disabled={!hasPermission('delivery', 'edit')}
               />
               Single DN
             </label>
@@ -559,6 +569,7 @@ const InitiateDelivery = () => {
                 checked={state.deliveryType === 'Multiple'}
                 onChange={handleDeliveryTypeChange}
                 className="mr-2"
+                disabled={!hasPermission('delivery', 'edit')}
               />
               Multiple DN
             </label>
@@ -573,6 +584,7 @@ const InitiateDelivery = () => {
               onChange={handleNumberOfSplitDNsChange}
               className="w-full"
               min="1"
+              disabled={!hasPermission('delivery', 'edit')}
             />
           </div>
         )}
@@ -602,17 +614,13 @@ const InitiateDelivery = () => {
                       <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
                     </>
                   )}
-                  {state.deliveryType === 'Single' && (
-                    <>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
-                    </>
-                  )}
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {remainingItems.map((item, index) => (
-                  <React.Fragment key={item.id}>
+                  <React.Fragment key={`item-${item.id}`}>
                     <tr className="border hover:bg-gray-50">
                       {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                         <td className="border p-2">
@@ -620,33 +628,65 @@ const InitiateDelivery = () => {
                             type="checkbox"
                             checked={state.selectedItemIds.includes(item.id)}
                             onChange={() => handleItemSelection(item.id)}
-                            disabled={state.usedItemIds.includes(item.id)}
+                            disabled={state.usedItemIds.includes(item.id) || !hasPermission('delivery', 'edit')}
                           />
                         </td>
                       )}
                       <td className="border p-2">{index + 1}</td>
-                      <td className="border p-2">{item.name}</td>
+                      <td className="border p-2">
+                        <select
+                          value={item.item}
+                          onChange={(e) => {
+                            const selectedItem = state.itemsList.find((i) => i.id === parseInt(e.target.value));
+                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                            handleItemChange(itemIndex, 'item', parseInt(e.target.value));
+                            handleItemChange(itemIndex, 'name', selectedItem?.name || 'N/A');
+                            handleItemChange(itemIndex, 'uom', selectedItem?.uom || ''); // Update uom when item changes
+                          }}
+                          className="w-full p-2 border rounded focus:outline-indigo-500"
+                          disabled={!hasPermission('delivery', 'edit')}
+                        >
+                          <option value="">Select Item</option>
+                          {state.itemsList.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="border p-2">
                         <InputField
                           value={item.range}
-                          onChange={(e) => handleItemChange(index, 'range', e.target.value)}
+                          onChange={(e) => {
+                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                            handleItemChange(itemIndex, 'range', e.target.value);
+                          }}
                           className="w-full"
+                          disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
                       <td className="border p-2">
                         <InputField
                           type="number"
                           value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          onChange={(e) => {
+                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                            handleItemChange(itemIndex, 'quantity', e.target.value);
+                          }}
                           className="w-full"
                           min="0"
+                          disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
                       <td className="border p-2">
                         <select
                           value={item.uom}
-                          onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                          onChange={(e) => {
+                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                            handleItemChange(itemIndex, 'uom', e.target.value);
+                          }}
                           className="w-full p-2 border rounded focus:outline-indigo-500"
+                          disabled={!hasPermission('delivery', 'edit')}
                         >
                           <option value="">Select Unit</option>
                           {state.units.map((unit) => (
@@ -660,9 +700,13 @@ const InitiateDelivery = () => {
                         <InputField
                           type="number"
                           value={item.delivered_quantity}
-                          onChange={(e) => handleItemChange(index, 'delivered_quantity', e.target.value)}
+                          onChange={(e) => {
+                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                            handleItemChange(itemIndex, 'delivered_quantity', e.target.value);
+                          }}
                           className="w-full"
                           min="0"
+                          disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
                       {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
@@ -676,36 +720,35 @@ const InitiateDelivery = () => {
                               className="w-full"
                               min="0"
                               max={item.remaining_quantity}
+                              disabled={!hasPermission('delivery', 'edit')}
                             />
                             {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
                           </td>
                         </>
                       )}
-                      {state.deliveryType === 'Single' && (
-                        <>
-                          <td className="border p-2">
-                            <button
-                              onClick={() => toggleAdditionalInfo(index)}
-                              className="text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
-                            </button>
-                          </td>
-                          <td className="border p-2">
-                            <button
-                              onClick={() => addNewItem(index)}
-                              className="text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              Add Item
-                            </button>
-                          </td>
-                        </>
-                      )}
+                      <td className="border p-2">
+                        <button
+                          onClick={() => toggleAdditionalInfo(item.id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          disabled={!hasPermission('delivery', 'edit')}
+                        >
+                          {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
+                        </button>
+                      </td>
+                      <td className="border p-2">
+                        <button
+                          onClick={() => addNewItem(index)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          disabled={!hasPermission('delivery', 'edit')}
+                        >
+                          Add Item
+                        </button>
+                      </td>
                     </tr>
-                    {state.deliveryType === 'Single' && item.showAdditionalInfo && (
-                      <tr>
+                    {item.showAdditionalInfo && (
+                      <tr key={`components-${item.id}`}>
                         <td
-                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 8 : 10}
+                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 10 : 8}
                           className="border p-2"
                         >
                           <h3 className="text-md font-semibold">Components for {item.name}</h3>
@@ -731,27 +774,35 @@ const InitiateDelivery = () => {
                                       <td className="border p-2">
                                         <InputField
                                           value={comp.component}
-                                          onChange={(e) =>
-                                            handleComponentChange(index, compIndex, 'component', e.target.value)
-                                          }
+                                          onChange={(e) => {
+                                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                                            handleComponentChange(itemIndex, compIndex, 'component', e.target.value);
+                                          }}
                                           placeholder="e.g., Make"
                                           className="w-full"
+                                          disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
                                       <td className="border p-2">
                                         <InputField
                                           value={comp.value}
-                                          onChange={(e) =>
-                                            handleComponentChange(index, compIndex, 'value', e.target.value)
-                                          }
+                                          onChange={(e) => {
+                                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                                            handleComponentChange(itemIndex, compIndex, 'value', e.target.value);
+                                          }}
                                           placeholder="e.g., BrandX"
                                           className="w-full"
+                                          disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
                                       <td className="border p-2">
                                         <button
-                                          onClick={() => removeComponent(index, compIndex)}
+                                          onClick={() => {
+                                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                                            removeComponent(itemIndex, compIndex);
+                                          }}
                                           className="text-red-600 hover:text-red-800 text-sm"
+                                          disabled={!hasPermission('delivery', 'edit')}
                                         >
                                           Remove
                                         </button>
@@ -765,8 +816,12 @@ const InitiateDelivery = () => {
                             <p className="text-gray-500">No components added yet.</p>
                           )}
                           <Button
-                            onClick={() => addComponent(index)}
+                            onClick={() => {
+                              const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
+                              addComponent(itemIndex);
+                            }}
                             className="mt-2 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                            disabled={!hasPermission('delivery', 'edit')}
                           >
                             + Add Component
                           </Button>
@@ -785,9 +840,9 @@ const InitiateDelivery = () => {
           <div className="mt-6">
             <Button
               onClick={handleGenerateSplitDN}
-              disabled={isGenerateDisabled()}
+              disabled={isGenerateDisabled() || !hasPermission('delivery', 'edit')}
               className={`px-3 py-1 rounded-md text-sm ${
-                isGenerateDisabled()
+                isGenerateDisabled() || !hasPermission('delivery', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
@@ -804,6 +859,7 @@ const InitiateDelivery = () => {
                       <button
                         onClick={() => deleteSplitDN(dnIndex)}
                         className="text-red-600 hover:text-red-800 text-sm"
+                        disabled={!hasPermission('delivery', 'edit')}
                       >
                         Delete
                       </button>
@@ -822,7 +878,7 @@ const InitiateDelivery = () => {
                         </thead>
                         <tbody>
                           {dn.items.map((item, itemIndex) => (
-                            <React.Fragment key={item.id}>
+                            <React.Fragment key={`split-item-${dnIndex}-${item.id}`}>
                               <tr className="border hover:bg-gray-50">
                                 <td className="border p-2">{item.name}</td>
                                 <td className="border p-2">
@@ -832,6 +888,7 @@ const InitiateDelivery = () => {
                                       handleSplitDNItemChange(dnIndex, item.id, 'range', e.target.value)
                                     }
                                     className="w-full"
+                                    disabled={!hasPermission('delivery', 'edit')}
                                   />
                                 </td>
                                 <td className="border p-2">
@@ -843,6 +900,7 @@ const InitiateDelivery = () => {
                                     }
                                     className="w-full"
                                     min="0"
+                                    disabled={!hasPermission('delivery', 'edit')}
                                   />
                                   {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
                                 </td>
@@ -853,6 +911,7 @@ const InitiateDelivery = () => {
                                       handleSplitDNItemChange(dnIndex, item.id, 'uom', e.target.value)
                                     }
                                     className="w-full p-2 border rounded focus:outline-indigo-500"
+                                    disabled={!hasPermission('delivery', 'edit')}
                                   >
                                     <option value="">Select Unit</option>
                                     {state.units.map((unit) => (
@@ -866,6 +925,7 @@ const InitiateDelivery = () => {
                                   <button
                                     onClick={() => toggleSplitDNAdditionalInfo(dnIndex, item.id)}
                                     className="text-blue-600 hover:text-blue-800 text-sm"
+                                    disabled={!hasPermission('delivery', 'edit')}
                                   >
                                     {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
                                   </button>
@@ -874,13 +934,14 @@ const InitiateDelivery = () => {
                                   <button
                                     onClick={() => addSplitDNComponent(dnIndex, item.id)}
                                     className="text-blue-600 hover:text-blue-800 text-sm"
+                                    disabled={!hasPermission('delivery', 'edit')}
                                   >
                                     Add Component
                                   </button>
                                 </td>
                               </tr>
                               {item.showAdditionalInfo && (
-                                <tr>
+                                <tr key={`split-components-${dnIndex}-${item.id}`}>
                                   <td colSpan="6" className="border p-2">
                                     <h3 className="text-md font-semibold">Components for {item.name}</h3>
                                     {item.components.length > 0 ? (
@@ -916,6 +977,7 @@ const InitiateDelivery = () => {
                                                     }
                                                     placeholder="e.g., Make"
                                                     className="w-full"
+                                                    disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
                                                 <td className="border p-2">
@@ -932,12 +994,14 @@ const InitiateDelivery = () => {
                                                     }
                                                     placeholder="e.g., BrandX"
                                                     className="w-full"
+                                                    disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
                                                 <td className="border p-2">
                                                   <button
                                                     onClick={() => removeSplitDNComponent(dnIndex, item.id, compIndex)}
                                                     className="text-red-600 hover:text-red-800 text-sm"
+                                                    disabled={!hasPermission('delivery', 'edit')}
                                                   >
                                                     Remove
                                                   </button>
@@ -953,6 +1017,7 @@ const InitiateDelivery = () => {
                                     <Button
                                       onClick={() => addSplitDNComponent(dnIndex, item.id)}
                                       className="mt-2 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                                      disabled={!hasPermission('delivery', 'edit')}
                                     >
                                       + Add Component
                                     </Button>
@@ -972,10 +1037,16 @@ const InitiateDelivery = () => {
         )}
         <div className="flex justify-end gap-2 mt-4">
           <Button
+            onClick={() => navigate('/job-execution/processing-work-orders/pending-deliveries')}
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+          >
+            Cancel
+          </Button>
+          <Button
             onClick={handleSubmitDelivery}
-            disabled={isSubmitDisabled() || state.isSubmitting}
+            disabled={isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')}
             className={`px-3 py-1 rounded-md text-sm ${
-              isSubmitDisabled() || state.isSubmitting
+              isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}

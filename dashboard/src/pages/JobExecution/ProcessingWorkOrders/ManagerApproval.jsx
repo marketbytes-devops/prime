@@ -98,7 +98,7 @@ const ManagerApproval = () => {
         const selectedWO = state.workOrders.find((wo) => wo.id === id);
         let deliveryNote = null;
         if (selectedWO.delivery_notes && Array.isArray(selectedWO.delivery_notes) && selectedWO.delivery_notes.length > 0) {
-          deliveryNote = selectedWO.delivery_notes[0]; 
+          deliveryNote = selectedWO.delivery_notes[0];
         }
         const payload = {
           delivery_note_type: state.deliveryNoteType,
@@ -108,7 +108,7 @@ const ManagerApproval = () => {
         const method = deliveryNote ? 'patch' : 'post';
 
         await apiClient[method](url, payload);
-        toast.success(`Work Order approved and ${state.deliveryNoteType} Delivery Note ${deliveryNote ? 'updated' : 'created'}.`);
+        toast.success(`Work Order approved and ${state.deliveryNoteType} Delivery Note ${deliveryNote ? 'updated' : 'created'} with temporary DN.`);
         await fetchData();
         navigate('/job-execution/processing-work-orders/delivery');
       } catch (error) {

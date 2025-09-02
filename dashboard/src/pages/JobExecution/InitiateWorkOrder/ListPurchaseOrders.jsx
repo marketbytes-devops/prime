@@ -569,12 +569,14 @@ const ListPurchaseOrders = () => {
             <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
           </div>
           <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Device Under Test Details</h2>
+            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Items</h2>
             <table border="1" style="width: 100%; border-collapse: collapse;">
               <tr style="background-color: #f2f2f2;">
                 <th style="padding: 8px; text-align: left;">Item</th>
                 <th style="padding: 8px; text-align: left;">Quantity</th>
                 <th style="padding: 8px; text-align: left;">Unit</th>
+                <th style="padding: 8px; text-align: left;">Unit Price</th>
+                <th style="padding: 8px; text-align: left;">Total Price</th>
                 <th style="padding: 8px; text-align: left;">Assigned To</th>
                 <th style="padding: 8px; text-align: left;">Certificate UUT Label</th>
                 <th style="padding: 8px; text-align: left;">Certificate Number</th>
@@ -596,6 +598,14 @@ const ListPurchaseOrders = () => {
                           <td style="padding: 8px; text-align: left;">${
                             state.units.find((u) => u.id === item.unit)?.name ||
                             "N/A"
+                          }</td>
+                          <td style="padding: 8px; text-align: right;">$${
+                            item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
+                          }</td>
+                          <td style="padding: 8px; text-align: right;">$${
+                            item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              : '0.00'
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
                             state.technicians.find(
@@ -638,7 +648,7 @@ const ListPurchaseOrders = () => {
                       .map(
                         (order, index) => `
                         <tr>
-                          <td colspan="11" style="padding: 8px; font-weight: bold;">Split Order ${
+                          <td colspan="12" style="padding: 8px; font-weight: bold;">Split Order ${
                             index + 1
                           }</td>
                         </tr>
@@ -655,6 +665,14 @@ const ListPurchaseOrders = () => {
                                 <td style="padding: 8px; text-align: left;">${
                                   state.units.find((u) => u.id === item.unit)
                                     ?.name || "N/A"
+                                }</td>
+                                <td style="padding: 8px; text-align: right;">$${
+                                  item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
+                                }</td>
+                                <td style="padding: 8px; text-align: right;">$${
+                                  item.quantity && item.unit_price
+                                    ? Number(item.quantity * item.unit_price).toFixed(2)
+                                    : '0.00'
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
                                   state.technicians.find(
@@ -865,7 +883,7 @@ const ListPurchaseOrders = () => {
               {currentPOs.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No purchase orders found.
@@ -1028,7 +1046,7 @@ const ListPurchaseOrders = () => {
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">
-                Device Under Test Details
+                Purchase Order Items
               </h3>
               {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1043,6 +1061,12 @@ const ListPurchaseOrders = () => {
                         </th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Unit
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Unit Price
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Total Price
                         </th>
                       </tr>
                     </thead>
@@ -1059,6 +1083,14 @@ const ListPurchaseOrders = () => {
                           <td className="border p-2 whitespace-nowrap">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              : '0.00'}
                           </td>
                         </tr>
                       ))}
@@ -1197,7 +1229,7 @@ const ListPurchaseOrders = () => {
           )}
           <div>
             <h3 className="text-lg font-medium text-black mb-2">
-              Device Under Test Details
+              Purchase Order Items
             </h3>
             {state.savedItems.length > 0 ? (
               <div className="overflow-x-auto">
@@ -1213,6 +1245,12 @@ const ListPurchaseOrders = () => {
                       <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                         Unit
                       </th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        Unit Price
+                      </th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        Total Price
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1227,6 +1265,14 @@ const ListPurchaseOrders = () => {
                         <td className="border p-2 whitespace-nowrap">
                           {state.units.find((u) => u.id === item.unit)?.name ||
                             "N/A"}
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
+                          ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
+                          ${item.quantity && item.unit_price
+                            ? Number(item.quantity * item.unit_price).toFixed(2)
+                            : '0.00'}
                         </td>
                       </tr>
                     ))}
@@ -1273,6 +1319,12 @@ const ListPurchaseOrders = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                           Unit
                         </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Unit Price
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Total Price
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1287,6 +1339,14 @@ const ListPurchaseOrders = () => {
                           <td className="border p-2 whitespace-nowrap">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              : '0.00'}
                           </td>
                         </tr>
                       ))}
@@ -1321,6 +1381,12 @@ const ListPurchaseOrders = () => {
                                   Unit
                                 </th>
                                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                                  Unit Price
+                                </th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                                  Total Price
+                                </th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                                   Assigned To
                                 </th>
                               </tr>
@@ -1337,6 +1403,14 @@ const ListPurchaseOrders = () => {
                                   <td className="border p-2 whitespace-nowrap">
                                     {state.units.find((u) => u.id === item.unit)
                                       ?.name || "N/A"}
+                                  </td>
+                                  <td className="border p-2 whitespace-nowrap">
+                                    ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                                  </td>
+                                  <td className="border p-2 whitespace-nowrap">
+                                    ${item.quantity && item.unit_price
+                                      ? Number(item.quantity * item.unit_price).toFixed(2)
+                                      : '0.00'}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
                                     {state.technicians.find(
@@ -1397,6 +1471,12 @@ const ListPurchaseOrders = () => {
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                               Unit
                             </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Unit Price
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Total Price
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1441,6 +1521,14 @@ const ListPurchaseOrders = () => {
                               <td className="border p-2 whitespace-nowrap">
                                 {state.units.find((u) => u.id === item.unit)
                                   ?.name || "N/A"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                ${item.quantity && item.unit_price
+                                  ? Number(item.quantity * item.unit_price).toFixed(2)
+                                  : '0.00'}
                               </td>
                             </tr>
                           ))}

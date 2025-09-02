@@ -51,20 +51,24 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
 
 class DeliveryNoteSerializer(serializers.ModelSerializer):
     work_order_id = serializers.PrimaryKeyRelatedField(source="work_order", read_only=True)
+    work_order_number = serializers.CharField(source="work_order.wo_number", read_only=True)
     items = DeliveryNoteItemSerializer(many=True, required=False)
     series = serializers.PrimaryKeyRelatedField(queryset=NumberSeries.objects.all(), allow_null=True, required=False)
 
     class Meta:
         model = DeliveryNote
-        fields = ["id", "dn_number", "work_order", "work_order_id", "signed_delivery_note", "delivery_status", "created_at", "items", "series"]
+        fields = [
+            "id", "dn_number", "work_order", "work_order_id", "work_order_number",
+            "signed_delivery_note", "delivery_status", "created_at", "items", "series"
+        ]
 
     def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", [])
         instance.dn_number = validated_data.get("dn_number", instance.dn_number)
         instance.signed_delivery_note = validated_data.get("signed_delivery_note", instance.signed_delivery_note)
         instance.delivery_status = validated_data.get("delivery_status", instance.delivery_status)
         instance.series = validated_data.get("series", instance.series)
         instance.save()
-        items_data = validated_data.get("items", [])
         if items_data:
             instance.items.all().delete()
             for item_data in items_data:

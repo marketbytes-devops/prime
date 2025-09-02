@@ -37,12 +37,11 @@ const PendingInvoices = () => {
     selectedDNForUpload: null,
     dnUpload: { signedDeliveryNote: null },
     dnUploadErrors: { signedDeliveryNote: '' },
-    isUploadInvoiceModalOpen: false, // Added for invoice upload modal
-    selectedWOForInvoiceUpload: null, // Added for invoice upload
-    invoiceUpload: { invoiceFile: null }, // Added for invoice file
-    invoiceUploadErrors: { invoiceFile: '' }, // Added for invoice upload errors
+    isUploadInvoiceModalOpen: false,
+    selectedWOForInvoiceUpload: null,
+    invoiceUpload: { invoiceFile: null },
+    invoiceUploadErrors: { invoiceFile: '' },
   });
-
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -88,19 +87,21 @@ const PendingInvoices = () => {
         apiClient.get('units/'),
         apiClient.get('quotations/'),
       ]);
-      const deliveryNotes = dnRes.data.map((dn) => ({
-        ...dn,
-        items: dn.items.map((item) => ({
-          ...item,
-          uom: item.uom ? Number(item.uom) : null,
-          components: item.components || [],
-        })),
-      }));
+      const deliveryNotes = dnRes.data
+        .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
+        .map((dn) => ({
+          ...dn,
+          items: dn.items.map((item) => ({
+            ...item,
+            uom: item.uom ? Number(item.uom) : null,
+            components: item.components || [],
+          })),
+        }));
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data.map(wo => ({
           ...wo,
-          invoice_status: wo.invoice_status || 'pending', // Ensure initial status is 'pending'
+          invoice_status: wo.invoice_status || 'pending',
         })) || [],
         purchaseOrders: poRes.data || [],
         deliveryNotes: deliveryNotes || [],
@@ -358,7 +359,7 @@ const PendingInvoices = () => {
         dueInDays: '',
         receivedDate: '',
       }));
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error('Error updating work order invoice status:', error);
       toast.error('Failed to update work order invoice status.');
@@ -392,9 +393,23 @@ const PendingInvoices = () => {
     return quotation?.assigned_sales_person_name || 'N/A';
   };
 
+  const getQuotationSeriesNumber = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    if (!po) return 'N/A';
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return quotation?.series_number || 'N/A';
+  };
+
+  const getDNSeriesNumber = (workOrder) => {
+    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
+    return dn?.dn_number || 'N/A';
+  };
+
   const filteredWorkOrders = state.workOrders
     .filter((workOrder) =>
-      (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+      (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getDNSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -437,7 +452,7 @@ const PendingInvoices = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
-              placeholder="Search by WO Number..."
+              placeholder="Search by WO Number, Quotation, or DN Number..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -458,29 +473,33 @@ const PendingInvoices = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">View Documents</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Invoice Status</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
               </tr>
             </thead>
             <tbody>
               {currentWorkOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                  <td colSpan="8" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
               ) : (
                 currentWorkOrders.map((workOrder, index) => (
                   <tr key={workOrder.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
-                    <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{getAssignedTechnicians(workOrder.items)}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(workOrder.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => (isPOEmpty(workOrder) ? handleUploadPO(workOrder) : handleViewDocument(workOrder, 'po'))}
@@ -520,7 +539,7 @@ const PendingInvoices = () => {
                         </Button>
                       </div>
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       <select
                         value={workOrder.invoice_status || 'pending'}
                         onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
@@ -582,6 +601,8 @@ const PendingInvoices = () => {
           </div>
         )}
       </div>
+
+      {/* Modals */}
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -592,20 +613,20 @@ const PendingInvoices = () => {
             <div>
               <h3 className="text-lg font-semibold mb-2">Work Order Details</h3>
               <div className="grid grid-cols-1 gap-2">
-                <p><strong className="text-sm font-medium text-gray-700">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
                 {state.selectedWO.manager_approval_status === 'Declined' && (
-                  <p><strong className="text-sm font-medium text-gray-700">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+                  <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
                 )}
-                <p><strong className="text-sm font-medium text-gray-700">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Invoice File:</strong> {state.selectedWO.invoice_file ? (
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.selectedWO.invoice_file ? (
                   <a
                     href={state.selectedWO.invoice_file}
                     target="_blank"
@@ -624,33 +645,33 @@ const PendingInvoices = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Range</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Certificate UUT Label</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Certificate Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Calibration Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Calibration Due Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">UUC Serial Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Certificate</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border hover:bg-gray-50">
-                          <td className="border p-2">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                          <td className="border p-2">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td className="border p-2">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
-                          <td className="border p-2">{item.range || 'N/A'}</td>
-                          <td className="border p-2">{item.certificate_uut_label || 'N/A'}</td>
-                          <td className="border p-2">{item.certificate_number || 'N/A'}</td>
-                          <td className="border p-2">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2">{item.uuc_serial_number || 'N/A'}</td>
-                          <td className="border p-2">
+                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
                               <a
                                 href={item.certificate_file}
@@ -678,6 +699,7 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No work order selected.</p>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
@@ -686,67 +708,56 @@ const PendingInvoices = () => {
         {state.selectedPO ? (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Purchase Order Details</h3>
-              <div className="grid grid-cols-1 gap-2">
-                <p><strong className="text-sm font-medium text-gray-700">PO Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Client PO Number:</strong> {state.selectedPO.client_po_number || 'Nil'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">PO File:</strong> {state.selectedPO.po_file ? (
-                  <a
-                    href={state.selectedPO.po_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    {state.selectedPO.po_file.split('/').pop() || 'View File'}
-                  </a>
-                ) : 'Nil'}</p>
-                <p><strong className="text-sm font-medium text-gray-700">Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
-              </div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">PO Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Client PO Number:</strong> {state.selectedPO.client_po_number || 'Nil'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">PO File:</strong> {state.selectedPO.po_file ? (
+                <a
+                  href={state.selectedPO.po_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  View File
+                </a>
+              ) : 'Nil'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold mb-2">Device Under Test Details</h3>
+              <h3 className="text-lg font-medium text-black">Purchase Order Items</h3>
               {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-100">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700">Components</th>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedPO.items.map((item) => (
-                        <tr key={item.id} className="border hover:bg-gray-50">
-                          <td className="border p-2">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                          <td className="border p-2">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td className="border p-2">
-                            {item.components && item.components.length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full border-collapse bg-gray-50">
-                                  <thead>
-                                    <tr className="bg-gray-100">
-                                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Component Name</th>
-                                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Component Value</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {item.components.map((comp, compIndex) => (
-                                      <tr key={compIndex} className="border hover:bg-gray-100">
-                                        <td className="border p-2">{comp.component || 'N/A'}</td>
-                                        <td className="border p-2">{comp.value || 'N/A'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              'None'
-                            )}
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.quantity || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === item.unit)?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              : '0.00'}
                           </td>
                         </tr>
                       ))}
@@ -762,6 +773,7 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No purchase order found.</p>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
@@ -771,11 +783,10 @@ const PendingInvoices = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold mb-2">Delivery Note Details</h3>
             <div className="grid grid-cols-1 gap-2">
-              <p><strong className="text-sm font-medium text-gray-700">DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700">Work Order Number:</strong> {state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)?.wo_number || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700">Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700">Created At:</strong> {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700">Signed Delivery Note:</strong> {state.selectedDN.signed_delivery_note ? (
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Signed Delivery Note:</strong> {state.selectedDN.signed_delivery_note ? (
                 <a
                   href={state.selectedDN.signed_delivery_note}
                   target="_blank"
@@ -792,44 +803,37 @@ const PendingInvoices = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Item</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Range</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivered Quantity</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Components</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.selectedDN.items.map((item) => (
                       <tr key={item.id} className="border hover:bg-gray-50">
-                        <td className="border p-2">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                        <td className="border p-2">{item.range || 'N/A'}</td>
-                        <td className="border p-2">{item.quantity || 'N/A'}</td>
-                        <td className="border p-2">{item.delivered_quantity || 'N/A'}</td>
-                        <td className="border p-2">{state.units.find((u) => u.id === item.uom)?.name || 'N/A'}</td>
-                        <td className="border p-2">
+                        <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.uom)?.name || 'N/A'}</td>
+                        <td className="border p-2 bg-gray-100">
                           {item.components && item.components.length > 0 ? (
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse bg-gray-50">
-                                <thead>
-                                  <tr className="bg-gray-100">
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">Component Name</th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">Component Value</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {item.components.map((comp, compIndex) => (
-                                    <tr key={compIndex} className="border hover:bg-gray-100">
-                                      <td className="border p-2">{comp.component || 'N/A'}</td>
-                                      <td className="border p-2">{comp.value || 'N/A'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                            <div className="space-y-2">
+                              {item.components.map((comp, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-2 p-2 border border-gray-300 rounded-md bg-white"
+                                >
+                                  <span className="font-medium text-gray-700">{comp.component || 'N/A'}: </span>
+                                  <span className="text-gray-600">{comp.value || 'N/A'}</span>
+                                </div>
+                              ))}
                             </div>
                           ) : (
-                            'None'
+                            'No components'
                           )}
                         </td>
                       </tr>
@@ -845,6 +849,7 @@ const PendingInvoices = () => {
           <p className="text-gray-500">No delivery note selected.</p>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isUploadPOModalOpen}
         onClose={() => setState((prev) => ({
@@ -914,6 +919,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadDNModalOpen}
         onClose={() => setState((prev) => ({
@@ -971,6 +977,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadInvoiceModalOpen}
         onClose={() => setState((prev) => ({
@@ -1028,6 +1035,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isStatusModalOpen}
         onClose={() => setState((prev) => ({

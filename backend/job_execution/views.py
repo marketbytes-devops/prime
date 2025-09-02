@@ -85,30 +85,28 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         if work_order.status != 'Manager Approval':
             logger.warning(f"WorkOrder {pk} not in Manager Approval status")
             return Response({'error': 'Work Order must be in Manager Approval status'}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             dn_series = NumberSeries.objects.get(series_name='Delivery Note')
         except NumberSeries.DoesNotExist:
             logger.error("Delivery Note series not found")
             return Response({'error': 'Delivery Note series not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         with transaction.atomic():
             delivery_note = work_order.delivery_notes.first()
             if delivery_note:
-                max_sequence = DeliveryNote.objects.filter(series=dn_series).aggregate(Max('dn_number'))['dn_number__max']
-                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                dn_number = f"{dn_series.prefix}-{sequence:06d}"
-                delivery_note.dn_number = dn_number
+                # Update existing delivery note with a temporary DN number
+                delivery_note.dn_number = f"TEMP-DN-{work_order.id:06d}"  # Temporary DN number
                 delivery_note.series = dn_series
                 delivery_note.delivery_status = 'Delivery Pending'
                 delivery_note.save()
-                logger.info(f"Updated existing Delivery Note {dn_number} for WorkOrder {pk}")
+                logger.info(f"Updated existing Delivery Note with temp DN for WorkOrder {pk}")
             else:
-                max_sequence = DeliveryNote.objects.filter(series=dn_series).aggregate(Max('dn_number'))['dn_number__max']
-                sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                # Create new delivery note with a temporary DN number
                 delivery_note = DeliveryNote.objects.create(
                     work_order=work_order,
                     series=dn_series,
-                    dn_number=dn_number,
+                    dn_number=f"TEMP-DN-{work_order.id:06d}",  # Temporary DN number
                     delivery_status='Delivery Pending'
                 )
                 for item in work_order.items.all():
@@ -118,13 +116,15 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         range=item.range,
                         quantity=item.quantity,
                         delivered_quantity=item.quantity,
-                        uom=item.unit  
+                        uom=item.unit
                     )
-                logger.info(f"Created new Delivery Note {dn_number} for WorkOrder {pk}")
+                logger.info(f"Created new Delivery Note with temp DN for WorkOrder {pk}")
+            
             work_order.manager_approval_status = 'Approved'
             work_order.status = 'Approved'
             work_order.save()
-        return Response({'status': 'Work Order approved and Delivery Note updated/created'})
+        
+        return Response({'status': 'Work Order approved and Delivery Note updated/created with temporary DN'})
 
     @action(detail=True, methods=['post'], url_path='decline')
     def decline(self, request, pk=None):
@@ -206,11 +206,41 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Delivery Note series not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         with transaction.atomic():
+            work_order_items = {item.id: item.quantity for item in work_order.items.all()}
+            existing_dns = work_order.delivery_notes.all()
+            assigned_quantities = {}
+
+            for item_data in items_data:
+                item_id = item_data.get('item').id if item_data.get('item') else None
+                if item_id:
+                    assigned_quantities[item_id] = assigned_quantities.get(item_id, 0) + (item_data.get('quantity') or 0)
+
+            for dn in existing_dns:
+                for dn_item in dn.items.all():
+                    item_id = dn_item.item.id if dn_item.item else None
+                    if item_id:
+                        assigned_quantities[item_id] = assigned_quantities.get(item_id, 0) + (dn_item.quantity or 0)
+
+            for item_id, total_quantity in work_order_items.items():
+                assigned = assigned_quantities.get(item_id, 0)
+                if assigned > total_quantity:
+                    return Response(
+                        {'error': f'Assigned quantity for item {item_id} exceeds work order quantity'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Generate the actual DN number
+            max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
+                Max('dn_number')
+            )['dn_number__max']
+            sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
+            dn_number = f"{dn_series.prefix}-{sequence:06d}"
+
             if delivery_type == 'Single':
-                # Check if a delivery note already exists
                 delivery_note = work_order.delivery_notes.first()
                 if delivery_note:
-                    # Update existing delivery note
+                    # Update existing delivery note with actual DN number
+                    delivery_note.dn_number = dn_number
                     delivery_note.items.all().delete()
                     for item_data in items_data:
                         components_data = item_data.pop('components', [])
@@ -228,13 +258,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                                 component=component_data.get('component'),
                                 value=component_data.get('value')
                             )
-                    logger.info(f"Updated Delivery Note {delivery_note.dn_number} for WorkOrder {pk}")
+                    delivery_note.save()
+                    logger.info(f"Updated Delivery Note {dn_number} for WorkOrder {pk}")
                 else:
-                    max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
-                        Max('dn_number')
-                    )['dn_number__max']
-                    sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                    dn_number = f"{dn_series.prefix}-{sequence:06d}"
+                    # Create new delivery note with actual DN number
                     delivery_note = DeliveryNote.objects.create(
                         work_order=work_order,
                         dn_number=dn_number,
@@ -259,69 +286,32 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             )
                     logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items_data)} items")
             else:  # Multiple
-                technician_items = {}
+                # Create new delivery note with actual DN number
+                delivery_note = DeliveryNote.objects.create(
+                    work_order=work_order,
+                    dn_number=dn_number,
+                    delivery_status='Delivery Pending',
+                    series=dn_series
+                )
                 for item_data in items_data:
-                    assigned_to = work_order.items.filter(item=item_data.get('item')).first().assigned_to
-                    technician_id = assigned_to.id if assigned_to else 'unassigned'
-                    if technician_id not in technician_items:
-                        technician_items[technician_id] = []
-                    technician_items[technician_id].append(item_data)
-
-                for technician_id, items in technician_items.items():
-                    existing_dn = work_order.delivery_notes.filter(
-                        items__item__in=[item.get('item') for item in items]
-                    ).first()
-                    if existing_dn:
-                        # Update existing delivery note
-                        existing_dn.items.all().delete()
-                        for item_data in items:
-                            components_data = item_data.pop('components', [])
-                            delivery_note_item = DeliveryNoteItem.objects.create(
-                                delivery_note=existing_dn,
-                                item=item_data.get('item'),
-                                range=item_data.get('range'),
-                                quantity=item_data.get('quantity'),
-                                delivered_quantity=item_data.get('delivered_quantity'),
-                                uom=item_data.get('uom')
-                            )
-                            for component_data in components_data:
-                                DeliveryNoteItemComponent.objects.create(
-                                    delivery_note_item=delivery_note_item,
-                                    component=component_data.get('component'),
-                                    value=component_data.get('value')
-                                )
-                        logger.info(f"Updated Delivery Note {existing_dn.dn_number} for WorkOrder {pk} for technician {technician_id}")
-                    else:
-                        max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
-                            Max('dn_number')
-                        )['dn_number__max']
-                        sequence = 1 if not max_sequence else int(max_sequence.split('-')[-1]) + 1
-                        dn_number = f"{dn_series.prefix}-{sequence:06d}"
-                        delivery_note = DeliveryNote.objects.create(
-                            work_order=work_order,
-                            dn_number=dn_number,
-                            delivery_status='Delivery Pending',
-                            series=dn_series
+                    components_data = item_data.pop('components', [])
+                    delivery_note_item = DeliveryNoteItem.objects.create(
+                        delivery_note=delivery_note,
+                        item=item_data.get('item'),
+                        range=item_data.get('range'),
+                        quantity=item_data.get('quantity'),
+                        delivered_quantity=item_data.get('delivered_quantity'),
+                        uom=item_data.get('uom')
+                    )
+                    for component_data in components_data:
+                        DeliveryNoteItemComponent.objects.create(
+                            delivery_note_item=delivery_note_item,
+                            component=component_data.get('component'),
+                            value=component_data.get('value')
                         )
-                        for item_data in items:
-                            components_data = item_data.pop('components', [])
-                            delivery_note_item = DeliveryNoteItem.objects.create(
-                                delivery_note=delivery_note,
-                                item=item_data.get('item'),
-                                range=item_data.get('range'),
-                                quantity=item_data.get('quantity'),
-                                delivered_quantity=item_data.get('delivered_quantity'),
-                                uom=item_data.get('uom')
-                            )
-                            for component_data in components_data:
-                                DeliveryNoteItemComponent.objects.create(
-                                    delivery_note_item=delivery_note_item,
-                                    component=component_data.get('component'),
-                                    value=component_data.get('value')
-                                )
-                        logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items)} items for technician {technician_id}")
-
-        return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type})
+                    logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items_data)} items")
+            
+        return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type, 'dn_number': dn_number})
 
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
