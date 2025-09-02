@@ -1,217 +1,136 @@
-import React from 'react';
+import logo from "../../../assets/images/img-logo.webp";
 
 const Template2 = ({ data }) => {
-  const calculateTotal = (items) => {
-    return items.reduce((acc, item) => acc + (item.quantity * item.unit_price || 0), 0).toFixed(2);
+  const { series_number, company_name, company_address, company_phone, company_email, channelName, point_of_contact_name, point_of_contact_email, point_of_contact_phone, assigned_sales_person, due_date_for_quotation, created_at, items, quotation_status, not_approved_reason_remark, next_followup_date, remarks, purchase_orders } = data;
+  const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price || 0), 0);
+
+  // Function to format date as "24 Aug 2025"
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).replace(/ /g, ' ');
   };
 
-  const grandTotal = calculateTotal(data.items || []);
-
   return (
-    <html>
-      <head>
-        <title>Work Order - {data.wo_number || 'N/A'}</title>
-        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-        <style>
-          {`
-            @page {
-              size: A4 portrait;
-              margin: 1.2cm 1.7cm 2.2cm 1.7cm;
-            }
-            body { font-size: 10pt; line-height: 1.2; }
-            .header { text-align: center; margin-bottom: 1rem; }
-            .arabic { font-family: 'Traditional Arabic', sans-serif; }
-            .table-details { width: 100%; border: 1px solid #000; border-collapse: collapse; font-size: 9pt; }
-            .table-details td { padding: 0.3rem; border-bottom: 1px solid #e5e7eb; }
-            .item-table { width: 100%; border: 1px solid #000; border-collapse: collapse; font-size: 9pt; }
-            .item-table th, .item-table td { padding: 0.3rem; border: 1px solid #000; }
-            .terms { margin-top: 1rem; font-size: 8pt; line-height: 1.1; }
-            .signature { text-align: right; margin-top: 1rem; font-size: 9pt; }
-            .footer-row { display: flex; justify-content: space-between; margin-top: 1rem; font-size: 8pt; }
-            .bank-details { line-height: 1.2; margin-bottom: 0.5rem; font-size: 8pt; }
-            .contact-details { display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 8pt; line-height: 1.1; }
-          `}
-        </style>
-      </head>
-      <body className="font-sans">
-        <div className="mb-4">
-          <div className="header">
-            <img src="path/to/your/logo.png" alt="Prime Innovation Logo" className="w-24 mx-auto mb-1" />
-            <div className="text-lg font-bold mb-1">Prime Innovation Contracting Co.</div>
-            <div className="text-base mb-2 arabic">شركة ابتكار الرئيسية للمقاوﻻت</div>
-          </div>
-
-          <div className="text-center text-base font-bold underline mb-3">WORK ORDER FOR CALIBRATION SERVICES</div>
-
-          <div className="text-center text-sm mb-2"><strong>Work Order Details</strong></div>
-
-          <table className="table-details mb-2">
-            <tbody>
-              <tr>
-                <td className="text-left w-1/2">WO Number:</td>
-                <td className="text-left w-1/2">{data.wo_number || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Status:</td>
-                <td className="text-left w-1/2">{data.status || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Manager Approval Status:</td>
-                <td className="text-left w-1/2">{data.manager_approval_status || 'N/A'}</td>
-              </tr>
-              {data.manager_approval_status === 'Declined' && (
-                <tr>
-                  <td className="text-left w-1/2">Decline Reason:</td>
-                  <td className="text-left w-1/2">{data.decline_reason || 'N/A'}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="text-left w-1/2">Created At:</td>
-                <td className="text-left w-1/2">{data.created_at ? new Date(data.created_at).toLocaleDateString() : 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Date Received:</td>
-                <td className="text-left w-1/2">{data.date_received ? new Date(data.date_received).toLocaleDateString() : 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Expected Completion:</td>
-                <td className="text-left w-1/2">{data.expected_completion_date ? new Date(data.expected_completion_date).toLocaleDateString() : 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Onsite/Lab:</td>
-                <td className="text-left w-1/2">{data.onsite_or_lab || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Range:</td>
-                <td className="text-left w-1/2">{data.range || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Serial Number:</td>
-                <td className="text-left w-1/2">{data.serial_number || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Site Location:</td>
-                <td className="text-left w-1/2">{data.site_location || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Remarks:</td>
-                <td className="text-left w-1/2">{data.remarks || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td className="text-left w-1/2">Assigned To:</td>
-                <td className="text-left w-1/2">{data.techniciansAssigned || 'N/A'}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="text-sm bank-details mb-2">
-            <strong>Our Bank Account Details are as follows:</strong><br />
-            Bank Name: Saudi National Bank<br />
-            Account Name: Prime Innovation Contracting Company<br />
-            Account Number: 95400006193408<br />
-            IBAN: SA3210000095400006193408<br />
-            Bank Address: The Saudi National Bank tower, King Fahd Road 3208, Al Aqeeq District Unit No: 778 Riyadh 13519-6676 Saudi Arabia<br />
-            Company Address: Bldg No. 2099, Al Fayha Dist. 7453, Ras Tannurah-32817 City: Rastanura<br />
-            <strong>Please ensure that all payments are made to the above-mentioned account details.</strong>
-          </div>
-
-          <div className="text-center text-base font-bold underline mb-3">CALIBRATION INSTRUMENT & EQUIPMENT</div>
-
-          <table className="item-table mb-2">
-            <thead>
-              <tr className="font-bold">
-                <th className="p-2 text-left">Sl. No.</th>
-                <th className="p-2 text-left">Description</th>
-                <th className="p-2 text-left">Unit</th>
-                <th className="p-2 text-left">Qty</th>
-                <th className="p-2 text-left">Unit Price (SAR)</th>
-                <th className="p-2 text-left">Total Price (SAR)</th>
-                <th className="p-2 text-left">Assigned To</th>
-                <th className="p-2 text-left">Certificate UUT Label</th>
-                <th className="p-2 text-left">Certificate Number</th>
-                <th className="p-2 text-left">Calibration Date</th>
-                <th className="p-2 text-left">Calibration Due Date</th>
-                <th className="p-2 text-left">UUC Serial Number</th>
-                <th className="p-2 text-left">Certificate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items && data.items.length > 0 ? (
-                data.items.map((item, index) => (
-                  <tr key={item.id}>
-                    <td className="p-2 text-left">{index + 1}</td>
-                    <td className="p-2 text-left">{item.name}</td>
-                    <td className="p-2 text-left">{item.unit}</td>
-                    <td className="p-2 text-left">{item.quantity}</td>
-                    <td className="p-2 text-left">{item.unit_price}</td>
-                    <td className="p-2 text-left">{item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
-                    <td className="p-2 text-left">{item.assigned_to}</td>
-                    <td className="p-2 text-left">{item.certificate_uut_label}</td>
-                    <td className="p-2 text-left">{item.certificate_number}</td>
-                    <td className="p-2 text-left">{item.calibration_date}</td>
-                    <td className="p-2 text-left">{item.calibration_due_date}</td>
-                    <td className="p-2 text-left">{item.uuc_serial_number}</td>
-                    <td className="p-2 text-left">
-                      {item.certificate_file ? (
-                        <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Certificate</a>
-                      ) : 'N/A'}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="13" className="p-2 text-center">No items available.</td>
-                </tr>
-              )}
-              <tr className="font-bold">
-                <td colSpan="5" className="p-2 text-left">Grand Total (SAR)</td>
-                <td colSpan="8" className="p-2 text-left">{grandTotal}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="terms">
-            <strong>Terms & Conditions</strong><br /><strong>
-            Calibration Service General Terms and Conditions</strong><br />
-            • Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo.<br />
-            • Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative.<br />
-            • If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services.<br />
-            • Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.<br />
-            • Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.<br />
-            • Customers purchase order or written approval is required to start calibration.<br />
-            • Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO.<br />
-            • If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.<br />
-            • Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required.<br />
-            • PAYMENT: Payment to be made after 30 days<br />
-            • VAT is excluded from our quotation and will be charged at 15% extra.
-          </div>
-
-          <div className="signature text-sm">
-            For Prime Innovation Contracting Co<br />
-            Hari Krishnan M<br />
-            Head - Engineering and QA/QC
-          </div>
-
-          <div className="contact-details">
-            <div>
-              Bldg No. 2099, Al Fayha Dist. 7453, Ras Tannurah-32817<br />
-              www.primearabiagroup.com<br />
-              CR No: 2050172178
-            </div>
-            <div>
-              Ph: +966 50 584 7698<br />
-              Info@primearabiagroup.com
-            </div>
-          </div>
-
-          <div className="footer-row">
-            <div>PRM-QAF-WO-00</div>
-            <div className="flex-1 text-center">ISSUE DATE 13-AUG-2025</div>
-            <div>REV NO: 00</div>
-          </div>
+    <div style={{ fontFamily: 'Arial, sans-serif', padding: '20px' }}>
+      <div style={{ display: 'flex', alignItems: "start", justifyContent: 'space-between' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img src={logo} alt="Prime Logo" style={{ position:"relative", left:"-10px" }} />
         </div>
-      </body>
-    </html>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Quote</h1>
+          <p style={{ fontSize: '14px' }}>#{series_number || 'N/A'}</p>
+        </div>
+      </div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Prime Innovation Contracting Company</h2>
+        <p>Prince Nayif Bin Abdul Aziz St.</p>
+        <p>Ras Tanura Ash Shariyah 32817</p>
+        <p>TRN: 1116993003</p>
+        <p>danny@primeareagroup.com</p>
+      </div>
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: "end", justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Bill To</h2>
+          <p>{company_name || 'N/A'}</p>
+          <p>{company_address || 'N/A'}</p>
+          <p>Phone: {company_phone || 'N/A'}</p>
+          <p>Email: {company_email || 'N/A'}</p>
+        </div>
+        <div>
+          <p><strong>Quote Date: {formatDate(created_at)}</strong></p>
+        </div>
+      </div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Subject:</h2>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>CALIBRATION INSTRUMENT & EQUIPMENT</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#403c3c' }}>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>#</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Item & Descriptio</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Qty</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Unit</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Amount</th>
+              <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Total Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items && items.length > 0 ? (
+              items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{index + 1}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.name}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.quantity}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.unit}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                  <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.quantity && item.unit_price ? (item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center', backgroundColor: '#ffffff', color: '#000000' }}>No items added.</td>
+              </tr>
+            )}
+            <tr>
+              <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Total</strong></td>
+              <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>${totalAmount.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: '20px' }}>
+        <p><strong>Notes</strong></p>
+        <p>Looking forward for your business.</p>
+        <p><strong>Terms & Conditions</strong></p>
+        <p><strong>Calibration Service General Terms and Conditions</strong></p>
+        <ul style={{ paddingLeft: '20px' }}>
+          <li style={{ marginBottom: '10px' }}>
+            Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to recalibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Customers purchase order or written approval is required to start calibration.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            PAYMENT: Payment to be made after 30 days.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.
+          </li>
+          <li style={{ marginBottom: '10px' }}>
+            VAT is excluded from our quotation and will be charged at 15% extra.
+          </li>
+        </ul>
+      </div>
+    </div>
   );
 };
 

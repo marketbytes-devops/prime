@@ -4,8 +4,7 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
-import ReactDOMServer from 'react-dom/server';
-import Template1 from '../../../components/Templates/RFQ/Template1';
+import Template1 from '../../../components/Templates/RFQ/Template2';
 import { toast } from 'react-toastify';
 
 const ViewRFQ = () => {
@@ -148,27 +147,6 @@ const ViewRFQ = () => {
       console.error('Error initiating quotation conversion:', error);
       toast.error('Failed to initiate quotation conversion.');
     }
-  };
-
-  const handlePrint = (rfq) => {
-    const channelName = state.channels.find(c => c.id === rfq.rfq_channel)?.channel_name || 'N/A';
-    const salesPersonName = state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A';
-
-    const itemsData = (rfq.items || []).map(item => ({
-      id: item.id,
-      name: typeof item.item === 'string' ? item.item : (state.itemsList.find(i => i.id === item.item)?.name || 'N/A'),
-      quantity: item.quantity || '',
-      unit: state.units.find(u => u.id === item.unit)?.name || 'N/A',
-      unit_price: item.unit_price || ''
-    }));
-
-    const data = { ...rfq, channelName, salesPersonName, items: itemsData };
-
-    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(htmlString);
-    printWindow.document.close();
-    printWindow.print();
   };
 
   const openModal = (rfq) => {
@@ -353,12 +331,6 @@ const ViewRFQ = () => {
                           }`}
                         >
                           Edit
-                        </Button>
-                        <Button
-                          onClick={() => handlePrint(rfq)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                        >
-                          Print
                         </Button>
                         <Button
                           onClick={() => handleDelete(rfq.id)}

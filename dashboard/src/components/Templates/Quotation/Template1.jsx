@@ -88,7 +88,6 @@ const Template1 = ({ data }) => {
         <p>Looking forward for your business.</p>
         <p><strong>Terms & Conditions</strong></p>
         <p><strong>Calibration Service General Terms and Conditions</strong></p>
-        <p><strong>SAR 350.00</strong></p>
         <ul style={{ paddingLeft: '20px' }}>
           <li style={{ marginBottom: '10px' }}>
             Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
