@@ -33,7 +33,7 @@ import DeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/Declin
 import PendingInvoices from "./pages/PostJobPhase/Pendinginvoices";
 import RaisedInvoices from "./pages/PostJobPhase/Raisedinvoices";
 import ProcessedInvoices from "./pages/PostJobPhase/ProcessedInvoices";
-import CompletedWO from "./pages/PostJobPhase/CompletedWO";
+// import CompletedWO from "./pages/PostJobPhase/CompletedWO";
 import Users from "./pages/UserRoles/Users";
 import Roles from "./pages/UserRoles/Roles";
 import Permissions from "./pages/UserRoles/Permissions";
@@ -269,14 +269,14 @@ function App() {
             </ProtectedRoute>
           ),
         },
-        {
-          path: "/post-job-phase/completed-wo",
-          element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="completed_work_orders" requiredAction="view">
-              <CompletedWO />
-            </ProtectedRoute>
-          ),
-        },
+        // {
+        //   path: "/post-job-phase/completed-wo",
+        //   element: (
+        //     <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="completed_work_orders" requiredAction="view">
+        //       <CompletedWO />
+        //     </ProtectedRoute>
+        //   ),
+        // },
         {
           path: "/profile",
           element: (

@@ -175,22 +175,6 @@ const Dashboard = () => {
             </div>
           </div>
         </Link>
-
-        <Link to="/post-job-phase/completed-wo" className="block">
-          <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
-            <div className="p-3 bg-red-100 rounded-full">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-700">Closed Work Orders</h3>
-              <p className="text-2xl font-bold text-red-600">
-                {loading ? 'Loading...' : counts.closedWorkOrders}
-              </p>
-            </div>
-          </div>
-        </Link>
       </div>
 
       {counts.overdueWorkOrders > 0 && (

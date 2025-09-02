@@ -248,13 +248,13 @@ const Sidebar = ({ toggleSidebar }) => {
             },
           ],
         },
-        {
-          to: "/post-job-phase/completed-wo",
-          label: "Completed WO",
-          icon: <CheckSquare className="w-5 h-5 mr-3" />,
-          page: "completed_work_orders",
-          action: "view",
-        },
+        // {
+        //   to: "/post-job-phase/completed-wo",
+        //   label: "Completed WO",
+        //   icon: <CheckSquare className="w-5 h-5 mr-3" />,
+        //   page: "completed_work_orders",
+        //   action: "view",
+        // },
       ],
     },
     {
