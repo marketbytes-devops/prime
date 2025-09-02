@@ -8,6 +8,8 @@ import Modal from '../../components/Modal';
 const RaisedInvoices = () => {
   const [state, setState] = useState({
     workOrders: [],
+    purchaseOrders: [], // Added to store purchase orders
+    quotations: [], // Added to store quotations
     technicians: [],
     itemsList: [],
     units: [],
@@ -58,8 +60,10 @@ const RaisedInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('work-orders/'),
+        apiClient.get('purchase-orders/'), // Added to fetch purchase orders
+        apiClient.get('quotations/'), // Added to fetch quotations
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -68,6 +72,8 @@ const RaisedInvoices = () => {
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
+        purchaseOrders: poRes.data || [], // Store purchase orders
+        quotations: quotationsRes.data || [], // Store quotations
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -137,7 +143,11 @@ const RaisedInvoices = () => {
   };
 
   const viewInvoice = (workOrder) => {
-    toast.info(`Viewing invoice for WO ${workOrder.wo_number} (placeholder action)`);
+    if (workOrder.invoice_file) {
+      window.open(workOrder.invoice_file, '_blank');
+    } else {
+      toast.error('No invoice file available.');
+    }
   };
 
   const getAssignedTechnicians = (items) => {
@@ -156,11 +166,19 @@ const RaisedInvoices = () => {
     return followUpDate.toLocaleDateString();
   };
 
+  const getCompanyName = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    if (!po) return 'N/A';
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return quotation?.company_name || 'N/A';
+  };
+
   const filteredWorkOrders = state.workOrders
     .filter(
       (workOrder) =>
         workOrder.invoice_status === 'Raised' &&
-        (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+        ((workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+         getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -204,7 +222,7 @@ const RaisedInvoices = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
-              placeholder="Search by WO Number..."
+              placeholder="Search by WO Number or Company Name..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -225,35 +243,37 @@ const RaisedInvoices = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Next Follow Up Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Next Follow Up Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWorkOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                  <td colSpan="7" className="border p-2 text-center text-gray-500">
                     No raised invoices found.
                   </td>
                 </tr>
               ) : (
                 currentWorkOrders.map((workOrder, index) => (
                   <tr key={workOrder.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{workOrder.wo_number || 'N/A'}</td>
-                    <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{getAssignedTechnicians(workOrder.items)}</td>
-                    <td className="border p-2">{calculateFollowUpDate(workOrder)}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{getCompanyName(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(workOrder.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">{calculateFollowUpDate(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => handlePaymentProcess(workOrder.id)}
                           disabled={!hasPermission('raised_invoices', 'edit')}
-                          className={`px-3 py-1 rounded-md text-sm ${
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             hasPermission('raised_invoices', 'edit')
                               ? 'bg-blue-600 text-white hover:bg-blue-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -263,7 +283,7 @@ const RaisedInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => viewInvoice(workOrder)}
-                          className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+                          className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm whitespace-nowrap"
                         >
                           View Invoice
                         </Button>
@@ -317,20 +337,31 @@ const RaisedInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'Raised'}</p>
-              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Company Name:</strong> {getCompanyName(state.selectedWO)}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.selectedWO.invoice_status || 'Raised'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
               {state.selectedWO.manager_approval_status === 'Declined' && (
-                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               )}
-              <p><strong>Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Next Follow Up Date:</strong> {calculateFollowUpDate(state.selectedWO)}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Next Follow Up Date:</strong> {calculateFollowUpDate(state.selectedWO)}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.selectedWO.invoice_file ? (
+                <a
+                  href={state.selectedWO.invoice_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  View Invoice
+                </a>
+              ) : 'Not Uploaded'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -338,7 +369,7 @@ const RaisedInvoices = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-200">
+                      <tr className="bg-gray-100">
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
@@ -354,7 +385,7 @@ const RaisedInvoices = () => {
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
-                        <tr key={item.id} className="border">
+                        <tr key={item.id} className="border hover:bg-gray-50">
                           <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
@@ -371,7 +402,7 @@ const RaisedInvoices = () => {
                                 href={item.certificate_file}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+                                className="text-blue-600 hover:text-blue-800"
                               >
                                 View Certificate
                               </a>

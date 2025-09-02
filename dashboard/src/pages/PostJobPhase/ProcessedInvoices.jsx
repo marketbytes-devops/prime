@@ -8,6 +8,8 @@ import Modal from '../../components/Modal';
 const ProcessedInvoices = () => {
   const [state, setState] = useState({
     workOrders: [],
+    purchaseOrders: [], // Added to store purchase orders
+    quotations: [], // Added to store quotations
     technicians: [],
     itemsList: [],
     units: [],
@@ -56,8 +58,10 @@ const ProcessedInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('work-orders/'),
+        apiClient.get('purchase-orders/'), // Added to fetch purchase orders
+        apiClient.get('quotations/'), // Added to fetch quotations
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -71,6 +75,8 @@ const ProcessedInvoices = () => {
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
+        purchaseOrders: poRes.data || [], // Store purchase orders
+        quotations: quotationsRes.data || [], // Store quotations
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -143,7 +149,6 @@ const ProcessedInvoices = () => {
         payment_reference_number: value,
       });
       toast.success(`Payment Reference Number updated for WO ${state.workOrders.find((wo) => wo.id === workOrderId)?.wo_number || 'N/A'}`);
-      // Update the workOrders state to reflect the change
       setState((prev) => ({
         ...prev,
         workOrders: prev.workOrders.map((wo) =>
@@ -157,7 +162,6 @@ const ProcessedInvoices = () => {
     } catch (error) {
       console.error('Error updating payment reference number:', error);
       toast.error('Failed to update payment reference number.');
-      // Revert input to original value on error
       const originalValue = state.workOrders.find((wo) => wo.id === workOrderId)?.payment_reference_number || '';
       setState((prev) => ({
         ...prev,
@@ -181,11 +185,19 @@ const ProcessedInvoices = () => {
     return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
   };
 
+  const getCompanyName = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    if (!po) return 'N/A';
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return quotation?.company_name || 'N/A';
+  };
+
   const filteredWorkOrders = state.workOrders
     .filter(
       (workOrder) =>
         workOrder.invoice_status === 'processed' &&
-        (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+        ((workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+         getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -229,7 +241,7 @@ const ProcessedInvoices = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
-              placeholder="Search by WO Number..."
+              placeholder="Search by WO Number or Company Name..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -250,27 +262,29 @@ const ProcessedInvoices = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Payment Reference Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Processed Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Payment Reference Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Processed Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentWorkOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="border p-2 text-center text-gray-500">
+                  <td colSpan="8" className="border p-2 text-center text-gray-500">
                     No processed invoices found.
                   </td>
                 </tr>
               ) : (
                 currentWorkOrders.map((workOrder, index) => (
                   <tr key={workOrder.id} className="border hover:bg-gray-50">
-                    <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{getCompanyName(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       <button
                         onClick={() => handleViewWO(workOrder)}
                         className="text-blue-600 hover:underline"
@@ -278,9 +292,9 @@ const ProcessedInvoices = () => {
                         {workOrder.wo_number || 'N/A'}
                       </button>
                     </td>
-                    <td className="border p-2">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{getAssignedTechnicians(workOrder.items)}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">{new Date(workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(workOrder.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">
                       <InputField
                         type="text"
                         value={state.paymentReferenceNumbers[workOrder.id] || ''}
@@ -301,10 +315,10 @@ const ProcessedInvoices = () => {
                         <p className="text-red-500 text-xs mt-1">{state.paymentRefErrors[workOrder.id]}</p>
                       )}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {workOrder.received_date ? new Date(workOrder.received_date).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       <Button
                         onClick={() => viewInvoice(workOrder)}
                         className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
@@ -361,26 +375,27 @@ const ProcessedInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'Processed'}</p>
-              <p><strong>Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Company Name:</strong> {getCompanyName(state.selectedWO)}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.selectedWO.invoice_status || 'Processed'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
               {state.selectedWO.manager_approval_status === 'Declined' && (
-                <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               )}
-              <p><strong>Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Received Date:</strong> {state.selectedWO.received_date ? new Date(state.selectedWO.received_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Payment Reference Number:</strong> {state.selectedWO.payment_reference_number || 'N/A'}</p>
-              <p><strong>Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Invoice File:</strong> {state.selectedWO.invoice_file ? (
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.selectedWO.received_date ? new Date(state.selectedWO.received_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Payment Reference Number:</strong> {state.selectedWO.payment_reference_number || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.selectedWO.invoice_file ? (
                 <a
                   href={state.selectedWO.invoice_file}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-blue-600 hover:text-blue-800"
                 >
                   View Invoice
                 </a>
@@ -392,7 +407,7 @@ const ProcessedInvoices = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-200">
+                      <tr className="bg-gray-100">
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
@@ -408,7 +423,7 @@ const ProcessedInvoices = () => {
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
-                        <tr key={item.id} className="border">
+                        <tr key={item.id} className="border hover:bg-gray-50">
                           <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
@@ -425,7 +440,7 @@ const ProcessedInvoices = () => {
                                 href={item.certificate_file}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+                                className="text-blue-600 hover:text-blue-800"
                               >
                                 View Certificate
                               </a>

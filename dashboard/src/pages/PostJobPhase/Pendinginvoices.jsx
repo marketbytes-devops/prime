@@ -400,6 +400,13 @@ const PendingInvoices = () => {
     return quotation?.series_number || 'N/A';
   };
 
+  const getCompanyName = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    if (!po) return 'N/A';
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return quotation?.company_name || 'N/A';
+  };
+
   const getDNSeriesNumber = (workOrder) => {
     const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
     return dn?.dn_number || 'N/A';
@@ -409,7 +416,8 @@ const PendingInvoices = () => {
     .filter((workOrder) =>
       (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getDNSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
+      getDNSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -452,7 +460,7 @@ const PendingInvoices = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
-              placeholder="Search by WO Number, Quotation, or DN Number..."
+              placeholder="Search by WO Number, Quotation, DN Number, or Company Name..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -474,6 +482,7 @@ const PendingInvoices = () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
@@ -486,7 +495,7 @@ const PendingInvoices = () => {
             <tbody>
               {currentWorkOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="border p-2 text-center text-gray-500">
+                  <td colSpan="9" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
@@ -494,6 +503,7 @@ const PendingInvoices = () => {
                 currentWorkOrders.map((workOrder, index) => (
                   <tr key={workOrder.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{getCompanyName(workOrder)}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(workOrder)}</td>
                     <td className="border p-2 whitespace-nowrap">{workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(workOrder)}</td>
