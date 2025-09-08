@@ -50,7 +50,7 @@ const Template2 = ({ data }) => {
         <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>CALIBRATION INSTRUMENT & EQUIPMENT</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
           <thead>
-            <tr style={{ backgroundColor: '#403c3c' }}>
+            <tr style={{ }}>
               <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>#</th>
               <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Item & Descriptio</th>
               <th style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'left', color: '#ffffff' }}>Qty</th>
