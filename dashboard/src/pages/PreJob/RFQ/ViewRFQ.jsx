@@ -4,7 +4,6 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
-import Template1 from '../../../components/Templates/RFQ/Template2';
 import { toast } from 'react-toastify';
 
 const ViewRFQ = () => {

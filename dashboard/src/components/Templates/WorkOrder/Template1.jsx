@@ -2,211 +2,317 @@ import React from 'react';
 import logo from '../../../assets/images/img-logo.webp';
 
 const Template1 = ({ data }) => {
-  const { wo_number, wo_type, date_received, expected_completion_date, onsite_or_lab, site_location, remarks, items } = data;
+  const {
+    wo_number,
+    date_received,
+    expected_completion_date,
+    onsite_or_lab,
+    site_location,
+    remarks,
+    items = [],
+    rfqDetails = {},
+  } = data;
+
+  // Extract company details from RFQ with comprehensive fallbacks
+  const company_name = rfqDetails?.company_name || 'Company Name Not Available';
+  const company_address = rfqDetails?.company_address || 'Address Not Available';
+  const company_phone = rfqDetails?.company_phone || 'Phone Not Available';
+  const company_email = rfqDetails?.company_email || 'Email Not Available';
+  
+  // Use company name for both DN/Invoice and Certificate (as requested)
+  const company_name_dn = company_name;
+  const company_name_certificate = company_name;
+  
+  // Contact details from RFQ point of contact
+  const contact_person = rfqDetails?.point_of_contact_name || 'Contact Person Not Available';
+  const contact_number = rfqDetails?.point_of_contact_phone || 'Contact Phone Not Available';
+  const contact_email = rfqDetails?.point_of_contact_email || 'Contact Email Not Available';
+  
+  // Sales person from RFQ
+  const sales_person = rfqDetails?.assigned_sales_person_name || 'Sales Person Not Available';
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Not Provided';
-    return new Date(dateStr).toLocaleDateString('en-GB', {
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? 'Not Provided' : date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-    }).replace(/ /g, ' ');
+    });
+  };
+
+  const formatDateSimple = (dateStr) => {
+    if (!dateStr) return 'Not Provided';
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? 'Not Provided' : date.toLocaleDateString('en-GB');
   };
 
   return (
-    <div
-      className="relative"
-      style={{ fontFamily: 'Arial, sans-serif', padding: '20px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
-    >
-      {/* Print-Specific Styles and Background Image */}
-      <style jsx>{`
-        .background-container::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-image: url(${logo});
-          background-position: center;
-          background-repeat: no-repeat;
-          background-size: contain;
-          opacity: 0.2;
-          z-index: 0;
-        }
-        .content {
-          position: relative;
-          z-index: 1;
-          flex-grow: 1;
-        }
-        .footer {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 10px;
-          padding: 10px 20px;
-          border-top: 1px solid #000;
-          margin-top: 20px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-        }
-        th, td {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        th {
-          background-color: #403c3c;
-          color: #ffffff;
-          font-weight: bold;
-        }
-        tr:nth-child(even) {
-          background-color: #f8f8f8;
-        }
-        a {
-          color: #0066cc;
-          text-decoration: underline;
-        }
-        a:hover {
-          color: #0033cc;
-        }
-        .table-container {
-          overflow-x: auto;
-        }
-        @media print {
-          @page {
-            margin: 1cm;
-          }
-          .background-container::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url(${logo});
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: contain;
-            opacity: 0.2;
-            z-index: 0;
-          }
-          .content {
-            padding-bottom: 100px;
-          }
-          .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 80px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 10px;
-            padding: 10px 20px;
-            border-top: 1px solid #000;
-          }
-          .table-container {
-            overflow-x: visible;
-          }
-        }
-      `}</style>
-
-      {/* Content Wrapper */}
-      <div className="content background-container">
-        <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <img src={logo} alt="Company Logo" style={{ maxWidth: '150px' }} />
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Work Order</h1>
-            <p style={{ fontSize: '14px' }}>#{wo_number || 'Not Provided'}</p>
-          </div>
-        </div>
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>Work Order Details</h2>
-          <p><strong>Work Order Number:</strong> {wo_number || 'Not Provided'}</p>
-          <p><strong>Work Order Type:</strong> {wo_type || 'Not Provided'}</p>
-          <p><strong>Date Received:</strong> {formatDate(date_received)}</p>
-          <p><strong>Expected Completion Date:</strong> {formatDate(expected_completion_date)}</p>
-          <p><strong>Onsite or Lab:</strong> {onsite_or_lab || 'Not Provided'}</p>
-          <p><strong>Site Location:</strong> {site_location || 'Not Provided'}</p>
-          <p><strong>Remarks:</strong> {remarks || 'Not Provided'}</p>
-        </div>
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>Device Under Test Details</h2>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Quantity</th>
-                  <th>Unit</th>
-                  <th>Range</th>
-                  <th>Assigned To</th>
-                  <th>Certificate UUT Label</th>
-                  <th>Certificate Number</th>
-                  <th>Calibration Date</th>
-                  <th>Calibration Due Date</th>
-                  <th>UUC Serial Number</th>
-                  <th>Certificate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items && items.length > 0 ? (
-                  items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.name || 'Not Provided'}</td>
-                      <td style={{ textAlign: 'center' }}>{item.quantity || 'Not Provided'}</td>
-                      <td>{item.unit || 'Not Provided'}</td>
-                      <td>{item.range || 'Not Provided'}</td>
-                      <td>{item.assigned_to_name || 'Not Provided'}</td>
-                      <td>{item.certificate_uut_label || 'Not Provided'}</td>
-                      <td>{item.certificate_number || 'Not Provided'}</td>
-                      <td>{formatDate(item.calibration_date)}</td>
-                      <td>{formatDate(item.calibration_due_date)}</td>
-                      <td>{item.uuc_serial_number || 'Not Provided'}</td>
-                      <td>
-                        {item.certificate_file ? (
-                          <a href={item.certificate_file} target="_blank" rel="noopener noreferrer">
-                            View Certificate
-                          </a>
-                        ) : 'Not Provided'}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="11" style={{ textAlign: 'center' }}>No items available.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+    <div style={{ fontFamily: 'Arial, sans-serif', padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+      {/* Header Section */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <img
+          src={logo}
+          alt="Company Logo"
+          style={{ width: '100px', marginBottom: '10px' }}
+        />
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: '5px 0' }}>
+          Prime Innovation Contracting Co.
+        </h2>
+        <div style={{ borderBottom: '2px solid #000', margin: '10px 0' }}></div>
+        <p style={{ fontSize: '14px', margin: '5px 0' }}>شركة ابكار الرئية للمقاولات</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', margin: '10px 0' }}>
+          <span>📞 {company_phone}</span>
+          <span>📧 info@primearabiagroup.com</span>
         </div>
       </div>
 
-      {/* Spacer to Push Footer to Bottom */}
-      <div style={{ flexGrow: 1 }}></div>
+      {/* Work Order Details Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', border: '1px solid #000' }}>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', width: '50%', fontWeight: 'bold' }}>
+              WORK ORDER#
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', width: '50%', fontWeight: 'bold' }}>
+              SALES PERSON
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {wo_number || 'Not Provided'}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {sales_person}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              DATE RECEIVED
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              EXP. DATE OF COMPLETION
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {formatDate(date_received)}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {formatDate(expected_completion_date)}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              SITE LOCATION
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              ONSITE/LAB
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {site_location || 'Not Provided'}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {onsite_or_lab || 'Not Provided'}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              COMPANY NAME IN DN AND INVOICE
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              COMPANY NAME IN CERTIFICATE
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {company_name_dn}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {company_name_certificate}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }} colSpan="2">
+              COMPANY ADDRESS
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }} colSpan="2">
+              {company_address}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              CONTACT PERSON
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              CONTACT NUMBER
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {contact_person}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {contact_number}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              VALIDITY OF THE CERTIFICATE
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              1 Year
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }} colSpan="2">
+              REMARKS
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }} colSpan="2">
+              {remarks || 'Not Provided'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-      {/* Footer Section */}
-      <footer className="footer">
-        <div>
-          <p>Ph: +966 50 584 7698</p>
-          <p>Bldg No. 2099, Al Fayha Dist.7453, Ras Tanura-32817</p>
-          <p>CR No: 2050172178</p>
-        </div>
-        <div>
-          <p>info@primearabbagroup.com</p>
-          <p>www.primearabbagroup.com</p>
-        </div>
-      </footer>
+      {/* Device Under Test Details */}
+      <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+        DEVICE UNDER TEST DETAILS:
+      </h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', border: '1px solid #000' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f2f2f2' }}>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>SL #</th>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>DESCRIPTION</th>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>QTY</th>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>RANGE</th>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>CERT NO.</th>
+            <th style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>COMPLETED BY</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items && items.length > 0 ? (
+            items.map((item, index) => (
+              <tr key={item.id || index}>
+                <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', fontSize: '12px' }}>
+                  {index + 1}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>
+                  {item.name || 'Not Provided'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', fontSize: '12px' }}>
+                  {item.quantity || 'N/A'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>
+                  {item.range || 'Not Provided'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>
+                  {item.certificate_number || 'Not Provided'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>
+                  {item.assigned_to_name || 'Not Provided'}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', fontSize: '12px' }} colSpan="6">
+                No items available.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* Approval Checklist */}
+      <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+        APPROVAL CHECKLIST:
+      </h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', border: '1px solid #000' }}>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold', backgroundColor: '#f2f2f2' }}>
+              CERTIFICATE & UUT LABEL
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold', backgroundColor: '#f2f2f2' }}>
+              COMPLETED
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold', backgroundColor: '#f2f2f2' }}>
+              MANAGER APPROVAL
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>CERTIFICATE NUMBER</td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {items && items.length > 0 && items[0].certificate_number ? 'ISSUED' : 'PENDING'}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              WORK ORDER COMPLETE: YES ☐ NO ☐
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              CALIBRATION DATE
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {items && items.length > 0 && items[0].calibration_date 
+                ? formatDateSimple(items[0].calibration_date) 
+                : formatDateSimple(new Date())}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              DELIVERY NOTE #
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              CALIBRATION DUE DATE
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {items && items.length > 0 && items[0].calibration_due_date 
+                ? formatDateSimple(items[0].calibration_due_date)
+                : formatDateSimple(new Date(new Date().setFullYear(new Date().getFullYear() + 1)))}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              MANAGER SIGNATURE
+            </td>
+          </tr>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '8px', fontWeight: 'bold' }}>
+              UUC SERIAL NUMBER
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {items && items.length > 0 && items[0].uuc_serial_number 
+                ? items[0].uuc_serial_number 
+                : 'Not Provided'}
+            </td>
+            <td style={{ border: '1px solid #000', padding: '8px' }}>
+              {/* Signature area */}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Footer */}
+      <div style={{ 
+        textAlign: 'center', 
+        fontSize: '12px', 
+        marginTop: '30px',
+        borderTop: '1px solid #000',
+        paddingTop: '10px'
+      }}>
+        <p>
+          <strong>Prime Innovation Contracting Co.</strong> | 
+          Phone: {company_phone} | 
+          Email: info@primearabiagroup.com
+        </p>
+        <p>Page 1 of 1</p>
+      </div>
     </div>
   );
 };
