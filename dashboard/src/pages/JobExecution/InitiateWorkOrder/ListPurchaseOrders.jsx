@@ -43,6 +43,7 @@ const ListPurchaseOrders = () => {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [seriesError, setSeriesError] = useState(""); // New state for series error message
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -151,8 +152,9 @@ const ListPurchaseOrders = () => {
       createdSplitOrders: [],
       usedItemIds: [],
       splitOrderAssignedTo: "",
-      singleOrderAssignedTo: "", 
+      singleOrderAssignedTo: "",
     }));
+    setSeriesError(""); // Clear any previous series error when opening the modal
   };
 
   const handleViewPO = (po) => {
@@ -239,7 +241,7 @@ const ListPurchaseOrders = () => {
       singleOrderAssignedTo: value,
       savedItems: prev.savedItems.map((item) => ({
         ...item,
-        assigned_to: value, 
+        assigned_to: value,
       })),
     }));
   };
@@ -291,10 +293,12 @@ const ListPurchaseOrders = () => {
   const isSubmitDisabled = () => {
     if (!state.woType) return true;
     if (state.woType === "Single") {
-      return !state.singleOrderAssignedTo ||
+      return (
+        !state.singleOrderAssignedTo ||
         !state.technicians.some(
           (t) => t.id === parseInt(state.singleOrderAssignedTo)
-        );
+        )
+      );
     }
     if (state.woType === "Split") {
       if (state.createdSplitOrders.length !== state.numberOfSplitOrders)
@@ -362,10 +366,12 @@ const ListPurchaseOrders = () => {
       (s) => s.series_name === "Work Order"
     );
     if (!workOrderSeries) {
-      toast.error("Work Order series not found.");
+      setSeriesError("The 'Work Order' series is not configured. Please add it in the Additional Settings section to convert this purchase order into a work order.");
       setState((prev) => ({ ...prev, isSubmitting: false }));
+      toast.warn("The 'Work Order' series is missing. Configure it in Additional Settings.");
       return;
     }
+    setSeriesError(""); // Clear error if series is found
     try {
       const basePayload = {
         purchase_order: state.selectedPO.id,
@@ -396,7 +402,7 @@ const ListPurchaseOrders = () => {
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unit_price,
-          assigned_to: parseInt(state.singleOrderAssignedTo), 
+          assigned_to: parseInt(state.singleOrderAssignedTo),
         }));
         const response = await apiClient.post("work-orders/", basePayload);
         responses.push(response.data);
@@ -488,7 +494,7 @@ const ListPurchaseOrders = () => {
           "Work Order creation succeeded, but range details are required. Please update them in the Edit Work Order section."
         );
         const updatedWorkOrderStatusMap = { ...state.workOrderStatusMap };
-        const responses = [{ id: Date.now() }]; 
+        const responses = [{ id: Date.now() }];
         responses.forEach((response) => {
           updatedWorkOrderStatusMap[state.selectedPO.id] = [
             ...(updatedWorkOrderStatusMap[state.selectedPO.id] || []),
@@ -600,12 +606,12 @@ const ListPurchaseOrders = () => {
                             "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: right;">$${
-                            item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
+                            item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: right;">$${
                             item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(2)
-                              : '0.00'
+                              : "0.00"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
                             state.technicians.find(
@@ -667,12 +673,12 @@ const ListPurchaseOrders = () => {
                                     ?.name || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: right;">$${
-                                  item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'
+                                  item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: right;">$${
                                   item.quantity && item.unit_price
                                     ? Number(item.quantity * item.unit_price).toFixed(2)
-                                    : '0.00'
+                                    : "0.00"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
                                   state.technicians.find(
@@ -1085,12 +1091,12 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             ${item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(2)
-                              : '0.00'}
+                              : "0.00"}
                           </td>
                         </tr>
                       ))}
@@ -1117,6 +1123,11 @@ const ListPurchaseOrders = () => {
         title="Create Work Order"
       >
         <div className="space-y-4">
+          {seriesError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{seriesError}</span>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Work Order Type
@@ -1130,7 +1141,7 @@ const ListPurchaseOrders = () => {
                   singleOrderAssignedTo: "",
                   savedItems: prev.savedItems.map((item) => ({
                     ...item,
-                    assigned_to: "", 
+                    assigned_to: "",
                   })),
                 }))
               }
@@ -1267,12 +1278,12 @@ const ListPurchaseOrders = () => {
                             "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
                           ${item.quantity && item.unit_price
                             ? Number(item.quantity * item.unit_price).toFixed(2)
-                            : '0.00'}
+                            : "0.00"}
                         </td>
                       </tr>
                     ))}
@@ -1341,12 +1352,12 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             ${item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(2)
-                              : '0.00'}
+                              : "0.00"}
                           </td>
                         </tr>
                       ))}
@@ -1405,12 +1416,12 @@ const ListPurchaseOrders = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                                    ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
                                     ${item.quantity && item.unit_price
                                       ? Number(item.quantity * item.unit_price).toFixed(2)
-                                      : '0.00'}
+                                      : "0.00"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
                                     {state.technicians.find(
@@ -1523,12 +1534,12 @@ const ListPurchaseOrders = () => {
                                   ?.name || "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
                                 ${item.quantity && item.unit_price
                                   ? Number(item.quantity * item.unit_price).toFixed(2)
-                                  : '0.00'}
+                                  : "0.00"}
                               </td>
                             </tr>
                           ))}
