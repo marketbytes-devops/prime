@@ -6,7 +6,7 @@ import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 import Template1 from "../../../components/Templates/WorkOrder/Template1";
-import ReactDOMServer from 'react-dom/server';
+import ReactDOMServer from "react-dom/server";
 
 const ListProcessingWorkOrders = () => {
   const navigate = useNavigate();
@@ -130,7 +130,9 @@ const ListProcessingWorkOrders = () => {
       return;
     }
     if (!isDUTComplete(wo)) {
-      navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`);
+      navigate(
+        `/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`
+      );
     } else {
       handleMoveToApproval(woId);
     }
@@ -138,55 +140,146 @@ const ListProcessingWorkOrders = () => {
 
   const handleMoveToApproval = async (woId) => {
     try {
-      const response = await apiClient.post(`/work-orders/${woId}/move-to-approval/`);
+      const response = await apiClient.post(
+        `/work-orders/${woId}/move-to-approval/`
+      );
       toast.success(response.data.status);
       await fetchData();
     } catch (error) {
       console.error("Error moving work order to approval:", error);
-      toast.error(error.response?.data?.error || "Failed to move work order to approval.");
+      toast.error(
+        error.response?.data?.error || "Failed to move work order to approval."
+      );
     }
   };
 
-  const handlePrint = (wo) => {
-    const itemsData = wo.items.map(item => ({
-      id: item.id,
-      name: state.itemsList.find(i => i.id === item.item)?.name || 'Not Provided',
-      quantity: item.quantity || 'Not Provided',
-      unit: state.units.find(u => u.id === item.unit)?.name || 'Not Provided',
-      range: item.range || 'Not Provided',
-      assigned_to_name: state.technicians.find(t => t.id === item.assigned_to)?.name || 'Not Provided',
-      certificate_uut_label: item.certificate_uut_label || 'Not Provided',
-      certificate_number: item.certificate_number || 'Not Provided',
-      calibration_date: item.calibration_date,
-      calibration_due_date: item.calibration_due_date,
-      uuc_serial_number: item.uuc_serial_number || 'Not Provided',
-      certificate_file: item.certificate_file,
-    }));
+  const handlePrint = async (wo) => {
+    try {
+      console.log("Work Order Object:", wo);
 
-    const data = {
-      ...wo,
-      items: itemsData,
-    };
+      let rfqDetails = null;
+      let teamMembers = [];
 
-    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head><title>Work Order ${wo.wo_number}</title></head>
-        <body>${htmlString}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+      // Try multiple approaches to get RFQ details
+      try {
+        // First, try to get RFQ directly from work order
+        if (wo.rfq) {
+          const rfqRes = await apiClient.get(`/rfqs/${wo.rfq}/`);
+          rfqDetails = rfqRes.data;
+        } else if (wo.quotation?.rfq) {
+          const rfqRes = await apiClient.get(`/rfqs/${wo.quotation.rfq}/`);
+          rfqDetails = rfqRes.data;
+        } else if (wo.quotation) {
+          // Try to get quotation details first, then RFQ
+          const quotationRes = await apiClient.get(`/quotations/${wo.quotation}/`);
+          const quotationData = quotationRes.data;
+          if (quotationData.rfq) {
+            const rfqRes = await apiClient.get(`/rfqs/${quotationData.rfq}/`);
+            rfqDetails = rfqRes.data;
+          }
+        }
+
+        // Get team members for sales person name mapping
+        const teamsRes = await apiClient.get("teams/");
+        teamMembers = teamsRes.data || [];
+      } catch (error) {
+        console.warn("Error fetching RFQ details:", error);
+        // Continue with fallback data
+      }
+
+      // Set up RFQ details with fallbacks
+      if (!rfqDetails) {
+        rfqDetails = {
+          company_name: "Company Name Not Available",
+          company_address: "Address Not Available",
+          company_phone: "Phone Not Available",
+          company_email: "Email Not Available",
+          point_of_contact_name: "Contact Not Available",
+          point_of_contact_phone: "Contact Phone Not Available",
+          point_of_contact_email: "Contact Email Not Available",
+          assigned_sales_person: null,
+        };
+      }
+
+      // Map assigned sales person ID to name
+      let assignedSalesPersonName = "Sales Person Not Available";
+      if (rfqDetails.assigned_sales_person && teamMembers.length > 0) {
+        const salesPerson = teamMembers.find(
+          (member) => member.id === rfqDetails.assigned_sales_person
+        );
+        if (salesPerson) {
+          assignedSalesPersonName = salesPerson.name;
+        }
+      }
+
+      // Add sales person name to rfqDetails
+      rfqDetails.assigned_sales_person_name = assignedSalesPersonName;
+
+      // Map work order items with proper names
+      const itemsData = wo.items.map((item) => ({
+        id: item.id,
+        name:
+          state.itemsList.find((i) => i.id === item.item)?.name ||
+          "Item Name Not Available",
+        quantity: item.quantity || "Not Provided",
+        unit:
+          state.units.find((u) => u.id === item.unit)?.name || "Not Provided",
+        range: item.range || "Not Provided",
+        assigned_to_name:
+          state.technicians.find((t) => t.id === item.assigned_to)?.name ||
+          "Not Provided",
+        certificate_uut_label: item.certificate_uut_label || "Not Provided",
+        certificate_number: item.certificate_number || "Not Provided",
+        calibration_date: item.calibration_date,
+        calibration_due_date: item.calibration_due_date,
+        uuc_serial_number: item.uuc_serial_number || "Not Provided",
+        certificate_file: item.certificate_file,
+      }));
+
+      const printData = {
+        ...wo,
+        items: itemsData,
+        rfqDetails: rfqDetails,
+      };
+
+      console.log("Print data being sent to template:", printData);
+
+      const htmlString = ReactDOMServer.renderToStaticMarkup(
+        <Template1 data={printData} />
+      );
+
+      const printWindow = window.open("", "_blank");
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Work Order ${wo.wo_number}</title>
+            <style>
+              body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+              @media print {
+                body { margin: 0; }
+                @page { margin: 0.5in; }
+              }
+            </style>
+          </head>
+          <body>${htmlString}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error("Error generating print:", error);
+      toast.error(
+        "Failed to generate print. Please try again or contact support."
+      );
+    }
   };
 
   const filteredWOs = state.workOrders
-    .filter(
-      (wo) =>
-        (wo.wo_number || "")
-          .toLowerCase()
-          .includes(state.searchTerm.toLowerCase())
+    .filter((wo) =>
+      (wo.wo_number || "")
+        .toLowerCase()
+        .includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === "created_at") {
@@ -314,10 +407,13 @@ const ListProcessingWorkOrders = () => {
                       {wo.items
                         .map(
                           (item) =>
-                            state.technicians.find((t) => t.id === item.assigned_to)
-                              ?.name || "Not Provided"
+                            state.technicians.find(
+                              (t) => t.id === item.assigned_to
+                            )?.name || "Not Provided"
                         )
-                        .filter((name, index, self) => self.indexOf(name) === index)
+                        .filter(
+                          (name, index, self) => self.indexOf(name) === index
+                        )
                         .join(", ")}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -359,12 +455,16 @@ const ListProcessingWorkOrders = () => {
                           className={`px-3 py-1 rounded-md text-sm ${
                             !hasPermission("work_orders", "edit")
                               ? "bg-gray-300 cursor-not-allowed"
-                              : isDUTComplete(state.workOrders.find((w) => w.id === wo.id))
+                              : isDUTComplete(
+                                  state.workOrders.find((w) => w.id === wo.id)
+                                )
                               ? "bg-indigo-600 text-white hover:bg-indigo-700"
                               : "bg-yellow-600 text-white hover:bg-yellow-700"
                           }`}
                         >
-                          {isDUTComplete(state.workOrders.find((w) => w.id === wo.id))
+                          {isDUTComplete(
+                            state.workOrders.find((w) => w.id === wo.id)
+                          )
                             ? "Move to Manager Approval"
                             : "Update Device Test Details"}
                         </Button>
@@ -423,7 +523,9 @@ const ListProcessingWorkOrders = () => {
             selectedWO: null,
           }))
         }
-        title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"}`}
+        title={`Work Order Details - ${
+          state.selectedWO?.wo_number || "Not Provided"
+        }`}
       >
         {state.selectedWO && (
           <div className="space-y-4">
@@ -442,7 +544,9 @@ const ListProcessingWorkOrders = () => {
               <p>
                 <strong>Date Received:</strong>{" "}
                 {state.selectedWO.date_received
-                  ? new Date(state.selectedWO.date_received).toLocaleDateString()
+                  ? new Date(
+                      state.selectedWO.date_received
+                    ).toLocaleDateString()
                   : "Not Provided"}
               </p>
               <p>
@@ -462,7 +566,8 @@ const ListProcessingWorkOrders = () => {
                 {state.selectedWO.site_location || "Not Provided"}
               </p>
               <p>
-                <strong>Remarks:</strong> {state.selectedWO.remarks || "Not Provided"}
+                <strong>Remarks:</strong>{" "}
+                {state.selectedWO.remarks || "Not Provided"}
               </p>
             </div>
             <div>
@@ -520,15 +625,16 @@ const ListProcessingWorkOrders = () => {
                             {item.quantity || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)?.name ||
-                              "Not Provided"}
+                            {state.units.find((u) => u.id === item.unit)
+                              ?.name || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.range || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.technicians.find((t) => t.id === item.assigned_to)
-                              ?.name || "Not Provided"}
+                            {state.technicians.find(
+                              (t) => t.id === item.assigned_to
+                            )?.name || "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_uut_label || "Not Provided"}
@@ -538,7 +644,9 @@ const ListProcessingWorkOrders = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_date
-                              ? new Date(item.calibration_date).toLocaleDateString()
+                              ? new Date(
+                                  item.calibration_date
+                                ).toLocaleDateString()
                               : "Not Provided"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
