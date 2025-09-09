@@ -100,7 +100,7 @@ const ListProcessingWorkOrders = () => {
       try {
         await apiClient.delete(`/work-orders/${woId}/`);
         toast.success("Work order deleted successfully.");
-        navigate("/purchase-orders");
+        navigate("/job-execution/initiate-work-order/list-all-purchase-orders");
         await fetchData();
       } catch (error) {
         console.error("Error deleting work order:", error);

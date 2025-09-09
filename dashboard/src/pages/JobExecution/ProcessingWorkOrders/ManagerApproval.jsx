@@ -27,6 +27,8 @@ const ManagerApproval = () => {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [seriesList, setSeriesList] = useState([]);
+  const [seriesError, setSeriesError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,11 +63,12 @@ const ManagerApproval = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
+      const [woRes, itemsRes, unitsRes, techRes, seriesRes] = await Promise.all([
         apiClient.get('work-orders/', { params: { status: 'Manager Approval' } }),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('technicians/'),
+        apiClient.get('series/'),
       ]);
       setState((prev) => ({
         ...prev,
@@ -74,6 +77,7 @@ const ManagerApproval = () => {
         units: unitsRes.data || [],
         technicians: techRes.data || [],
       }));
+      setSeriesList(seriesRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load work orders.');
@@ -93,7 +97,15 @@ const ManagerApproval = () => {
   };
 
   const handleApprove = async (id) => {
-    if (window.confirm("Are you sure you want to move this work order to Delivery?")) {
+    const deliveryNoteSeries = seriesList.find((s) => s.series_name === 'Delivery Note');
+    if (!deliveryNoteSeries) {
+      setSeriesError('The "Delivery Note" series is not configured. Please add it in the Additional Settings section to approve this work order.');
+      toast.warn('The "Delivery Note" series is missing. Configure it in Additional Settings.');
+      return;
+    }
+    setSeriesError('');
+
+    if (window.confirm('Are you sure you want to move this work order to Delivery?')) {
       try {
         const selectedWO = state.workOrders.find((wo) => wo.id === id);
         let deliveryNote = null;
@@ -106,7 +118,6 @@ const ManagerApproval = () => {
         };
         const url = deliveryNote ? `delivery-notes/${deliveryNote.id}/` : `work-orders/${id}/approve/`;
         const method = deliveryNote ? 'patch' : 'post';
-
         await apiClient[method](url, payload);
         toast.success(`Work Order approved and ${state.deliveryNoteType} Delivery Note ${deliveryNote ? 'updated' : 'created'} with temporary DN.`);
         await fetchData();
@@ -163,7 +174,6 @@ const ManagerApproval = () => {
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
   const currentWOs = filteredWOs.slice(startIndex, startIndex + state.itemsPerPage);
-
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
@@ -197,6 +207,11 @@ const ManagerApproval = () => {
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Manager Approval</h1>
+      {seriesError && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+          {seriesError}
+        </div>
+      )}
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
