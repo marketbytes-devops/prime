@@ -173,18 +173,18 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "processing_work_orders",
               action: "view",
             },
+             {
+              to: "/job-execution/processing-work-orders/manager-approval",
+              label: "Manager Approval",
+              icon: <CheckCircle className="w-5 h-5 mr-3" />,
+              page: "manager_approval",
+              action: "view",
+            },
             {
               to: "/job-execution/processing-work-orders/declined-work-orders",
               label: "Declined Work Orders",
               icon: <FileCheck className="w-5 h-5 mr-3" />,
               page: "declined_work_orders",
-              action: "view",
-            },
-            {
-              to: "/job-execution/processing-work-orders/manager-approval",
-              label: "Manager Approval",
-              icon: <CheckCircle className="w-5 h-5 mr-3" />,
-              page: "manager_approval",
               action: "view",
             },
             {
