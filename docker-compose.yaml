@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_primedb
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: prime_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - prime_network
+
+  backend:
+    build: ./backend
+    container_name: prime_backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DJANGO_SETTINGS_MODULE: backend.settings
+    depends_on:
+      - mysql
+    ports:
+      - "6370:8000" # Django Gunicorn exposed at 6700
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+    networks:
+      - prime_network
+
+  cms:
+    build: ./dashboard
+    container_name: prime_frontend
+    restart: always
+    ports:
+      - "6371:80" # Frontend served via Nginx at 6701
+    networks:
+      - prime_network
+
+networks:
+  prime_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  media_data:
