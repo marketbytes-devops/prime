@@ -2,6 +2,7 @@ import { Menu, X, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import apiClient from '../../helpers/apiClient';
+import placeholderImage from '../../assets/images/placeholder-profile.webp';
 
 const Topbar = ({ toggleSidebar, isSidebarOpen, isAuthenticated, setIsAuthenticated, user }) => {
   const [profileImage, setProfileImage] = useState(null);
@@ -50,7 +51,11 @@ const Topbar = ({ toggleSidebar, isSidebarOpen, isAuthenticated, setIsAuthentica
             onError={() => setProfileImage(null)}
           />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-gray-300 opacity-80"></div>
+          <img
+            src={placeholderImage}
+            alt="Placeholder Profile"
+            className="w-8 h-8 rounded-full object-cover opacity-80"
+          />
         )}
         {isAuthenticated && (
           <button
