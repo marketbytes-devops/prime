@@ -164,6 +164,15 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
+# CSRF Trusted Origins - using same domains as CORS
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if os.getenv("CSRF_TRUSTED_ORIGINS") else [
+    "http://localhost:6370",
+    "http://localhost:6371",
+    "http://localhost:3000",
+    "https://backend.primearabiagroup.com",
+    "https://crm.primearabiagroup.com",
+]
+
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = os.getenv("EMAIL_PORT", 587)
