@@ -29,9 +29,7 @@ const Permissions = () => {
     delivery: { apiName: "delivery", displayName: "Delivery" },
     close_work_orders: { apiName: "close_work_orders", displayName: "Close Work Orders" },
     pending_invoices: { apiName: "pending_invoices", displayName: "Pending Invoices" },
-    raised_invoices: { apiName: "raised_invoices", displayName: "Raised Invoices" },
-    processed_invoices: { apiName: "processed_invoices", displayName: "Processed Invoices" },
-    // completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
+    completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
     series: { apiName: "series", displayName: "Series" },
     rfq_channel: { apiName: "rfq_channel", displayName: "RFQ Channel" },
     item: { apiName: "item", displayName: "Item" },
@@ -40,9 +38,6 @@ const Permissions = () => {
     users: { apiName: "users", displayName: "Users" },
     roles: { apiName: "roles", displayName: "Roles" },
     permissions: { apiName: "permissions", displayName: "Permissions" },
-    job_execution: { apiName: "job_execution", displayName: "Job Execution" },
-    post_job_phase: { apiName: "post_job_phase", displayName: "Post Job Phase" },
-    additional_settings: { apiName: "additional_settings", displayName: "Additional Settings" },
   };
 
   useEffect(() => {

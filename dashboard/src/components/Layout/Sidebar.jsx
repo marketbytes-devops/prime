@@ -40,11 +40,12 @@ import apiClient from "../../helpers/apiClient";
 
 const Sidebar = ({ toggleSidebar }) => {
   const location = useLocation();
-  const [activeOuterMenu, setActiveOuterMenu] = useState(null);
+  const [activeOuterMenu, setActiveOuterMenu] = useState(null); // Tracks the active outer menu
   const [isRFQOpen, setIsRFQOpen] = useState(false);
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isForDeliveryPendingOpen, setIsForDeliveryPendingOpen] = useState(false);
+  const [isInvoicesOpen, setIsInvoicesOpen] = useState(false); // New state for Invoices submenu
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,14 +80,17 @@ const Sidebar = ({ toggleSidebar }) => {
     return perm && perm[`can_${action}`];
   };
 
+  // Toggle function for outer menus
   const toggleOuterMenu = (menuLabel) => {
     setActiveOuterMenu((prev) => (prev === menuLabel ? null : menuLabel));
   };
 
+  // Inner menu toggle functions
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
   const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
   const toggleForDeliveryPending = () => setIsForDeliveryPendingOpen(!isForDeliveryPendingOpen);
+  const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen); // New toggle for Invoices submenu
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -169,7 +173,7 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "processing_work_orders",
               action: "view",
             },
-            {
+             {
               to: "/job-execution/processing-work-orders/manager-approval",
               label: "Manager Approval",
               icon: <CheckCircle className="w-5 h-5 mr-3" />,
@@ -216,25 +220,33 @@ const Sidebar = ({ toggleSidebar }) => {
       action: "view",
       subItems: [
         {
-          to: "/post-job-phase/pending-invoices",
-          label: "Pending Invoices",
-          icon: <Clock className="w-5 h-5 mr-3" />,
-          page: "pending_invoices",
+          label: "Invoices",
+          icon: <FileCheck className="w-5 h-5 mr-3" />,
+          page: "invoices",
           action: "view",
-        },
-        {
-          to: "/post-job-phase/raised-invoices",
-          label: "Raised Invoices",
-          icon: <FileUp className="w-5 h-5 mr-3" />,
-          page: "raised_invoices",
-          action: "view",
-        },
-        {
-          to: "/post-job-phase/processed-invoices",
-          label: "Processed Invoices",
-          icon: <CheckSquare className="w-5 h-5 mr-3" />,
-          page: "processed_invoices",
-          action: "view",
+          subItems: [
+            {
+              to: "/post-job-phase/pending-invoices",
+              label: "Pending Invoices",
+              icon: <Clock className="w-5 h-5 mr-3" />,
+              page: "pending_invoices",
+              action: "view",
+            },
+            {
+              to: "/post-job-phase/raised-invoices",
+              label: "Raised Invoices",
+              icon: <FileUp className="w-5 h-5 mr-3" />,
+              page: "raised_invoices",
+              action: "view",
+            },
+            {
+              to: "/post-job-phase/processed-invoices",
+              label: "Processed Invoices",
+              icon: <CheckSquare className="w-5 h-5 mr-3" />,
+              page: "processed_invoices",
+              action: "view",
+            },
+          ],
         },
         // {
         //   to: "/post-job-phase/completed-wo",
@@ -363,7 +375,8 @@ const Sidebar = ({ toggleSidebar }) => {
         (item.label === "RFQ" && isRFQOpen) ||
         (item.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
         (item.label === "Processing Work Orders" && isProcessingWorkOrdersOpen) ||
-        (item.label === "Delivery" && isForDeliveryPendingOpen);
+        (item.label === "Delivery" && isForDeliveryPendingOpen) ||
+        (item.label === "Invoices" && isInvoicesOpen);
 
       return (
         <>
@@ -378,6 +391,7 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Initiate Work Order") toggleInitiateWorkOrder();
               else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
               else if (item.label === "Delivery") toggleForDeliveryPending();
+              else if (item.label === "Invoices") toggleInvoices();
             }}
             className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
               isMenuOpen || isActiveSubmenu(item.subItems)
@@ -397,7 +411,8 @@ const Sidebar = ({ toggleSidebar }) => {
               (item.label === "RFQ" && (isRFQOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
               (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
               (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Delivery" && (isForDeliveryPendingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
+              (item.label === "Delivery" && (isForDeliveryPendingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Invoices" && (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
           </button>
           <AnimatePresence>
             {(item.label === "Pre-Job" ? activeOuterMenu === "Pre-Job" :
@@ -408,7 +423,8 @@ const Sidebar = ({ toggleSidebar }) => {
               item.label === "RFQ" ? isRFQOpen :
               item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
               item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
-              item.label === "Delivery" ? isForDeliveryPendingOpen : false) && (
+              item.label === "Delivery" ? isForDeliveryPendingOpen :
+              item.label === "Invoices" ? isInvoicesOpen : false) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}

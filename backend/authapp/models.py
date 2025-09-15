@@ -218,7 +218,7 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_delete": False,
             },
             {
-                "page": "job_execution",
+                "page": "delivery",
                 "can_view": True,
                 "can_add": False,
                 "can_edit": False,
