@@ -45,7 +45,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isForDeliveryPendingOpen, setIsForDeliveryPendingOpen] = useState(false);
-  const [isInvoicesOpen, setIsInvoicesOpen] = useState(false); // New state for Invoices submenu
+  const [isInvoicesOpen, setIsInvoicesOpen] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,7 +90,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
   const toggleForDeliveryPending = () => setIsForDeliveryPendingOpen(!isForDeliveryPendingOpen);
-  const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen); // New toggle for Invoices submenu
+  const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -173,7 +173,7 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "processing_work_orders",
               action: "view",
             },
-             {
+            {
               to: "/job-execution/processing-work-orders/manager-approval",
               label: "Manager Approval",
               icon: <CheckCircle className="w-5 h-5 mr-3" />,
@@ -248,13 +248,6 @@ const Sidebar = ({ toggleSidebar }) => {
             },
           ],
         },
-        // {
-        //   to: "/post-job-phase/completed-wo",
-        //   label: "Completed WO",
-        //   icon: <CheckSquare className="w-5 h-5 mr-3" />,
-        //   page: "completed_work_orders",
-        //   action: "view",
-        // },
       ],
     },
     {
@@ -349,6 +342,7 @@ const Sidebar = ({ toggleSidebar }) => {
     }
 
     if (item.subItems) {
+      // Filter sub-items based on permissions
       const filteredSubItems = item.subItems.filter((subItem) => {
         if (subItem.subItems) {
           return subItem.subItems.some((nestedItem) =>
@@ -358,7 +352,10 @@ const Sidebar = ({ toggleSidebar }) => {
         return hasPermission(subItem.page, subItem.action);
       });
 
-      if (filteredSubItems.length === 0) return null;
+      // Only render the parent menu if it has permission AND at least one sub-item is accessible
+      if (!hasPermission(item.page, item.action) || filteredSubItems.length === 0) {
+        return null;
+      }
 
       const isActiveSubmenu = (subItems) => {
         return subItems.some((subItem) => {
@@ -371,7 +368,8 @@ const Sidebar = ({ toggleSidebar }) => {
         });
       };
 
-      const isMenuOpen = activeOuterMenu === item.label ||
+      const isMenuOpen =
+        activeOuterMenu === item.label ||
         (item.label === "RFQ" && isRFQOpen) ||
         (item.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
         (item.label === "Processing Work Orders" && isProcessingWorkOrdersOpen) ||
@@ -403,28 +401,80 @@ const Sidebar = ({ toggleSidebar }) => {
               {item.icon}
               {item.label}
             </span>
-            {(item.label === "Pre-Job" && (activeOuterMenu === "Pre-Job" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Job Execution" && (activeOuterMenu === "Job Execution" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Post Job Phase" && (activeOuterMenu === "Post Job Phase" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Additional Settings" && (activeOuterMenu === "Additional Settings" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "User Roles" && (activeOuterMenu === "User Roles" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+            {(item.label === "Pre-Job" &&
+              (activeOuterMenu === "Pre-Job" ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              ))) ||
+              (item.label === "Job Execution" &&
+                (activeOuterMenu === "Job Execution" ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Post Job Phase" &&
+                (activeOuterMenu === "Post Job Phase" ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Additional Settings" &&
+                (activeOuterMenu === "Additional Settings" ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "User Roles" &&
+                (activeOuterMenu === "User Roles" ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
               (item.label === "RFQ" && (isRFQOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Delivery" && (isForDeliveryPendingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Invoices" && (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
+              (item.label === "Initiate Work Order" &&
+                (isInitiateWorkOrderOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Processing Work Orders" &&
+                (isProcessingWorkOrdersOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Delivery" &&
+                (isForDeliveryPendingOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                ))) ||
+              (item.label === "Invoices" &&
+                (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
           </button>
           <AnimatePresence>
-            {(item.label === "Pre-Job" ? activeOuterMenu === "Pre-Job" :
-              item.label === "Job Execution" ? activeOuterMenu === "Job Execution" :
-              item.label === "Post Job Phase" ? activeOuterMenu === "Post Job Phase" :
-              item.label === "Additional Settings" ? activeOuterMenu === "Additional Settings" :
-              item.label === "User Roles" ? activeOuterMenu === "User Roles" :
-              item.label === "RFQ" ? isRFQOpen :
-              item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
-              item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
-              item.label === "Delivery" ? isForDeliveryPendingOpen :
-              item.label === "Invoices" ? isInvoicesOpen : false) && (
+            {(item.label === "Pre-Job"
+              ? activeOuterMenu === "Pre-Job"
+              : item.label === "Job Execution"
+              ? activeOuterMenu === "Job Execution"
+              : item.label === "Post Job Phase"
+              ? activeOuterMenu === "Post Job Phase"
+              : item.label === "Additional Settings"
+              ? activeOuterMenu === "Additional Settings"
+              : item.label === "User Roles"
+              ? activeOuterMenu === "User Roles"
+              : item.label === "RFQ"
+              ? isRFQOpen
+              : item.label === "Initiate Work Order"
+              ? isInitiateWorkOrderOpen
+              : item.label === "Processing Work Orders"
+              ? isProcessingWorkOrdersOpen
+              : item.label === "Delivery"
+              ? isForDeliveryPendingOpen
+              : item.label === "Invoices"
+              ? isInvoicesOpen
+              : false) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}
