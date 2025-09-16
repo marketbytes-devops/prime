@@ -263,7 +263,6 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('certificate_file', state.woUpload.certificateFile);
-      // Assuming the work order items need to be updated with certificate details
       await apiClient.patch(`/work-orders/${state.selectedWOForUpload.id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -614,17 +613,15 @@ const PendingInvoices = () => {
                           {isSubmitting ? 'Submitting...' : isPOEmpty(workOrder) ? 'Upload PO' : 'View PO'}
                         </Button>
                         <Button
-                          onClick={() => (!isDUTComplete(workOrder) ? handleUploadWO(workOrder) : handleViewDocument(workOrder, 'wo'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+                          onClick={() => handleViewDocument(workOrder, 'wo')}
+                          disabled={isSubmitting}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit')
+                            isSubmitting
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : !isDUTComplete(workOrder)
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-green-600 text-white hover:bg-green-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : !isDUTComplete(workOrder) ? 'Upload WO' : 'View WO'}
+                          {isSubmitting ? 'Submitting...' : 'View WO'}
                         </Button>
                         <Button
                           onClick={() => (isDNEmpty(workOrder) ? handleUploadDN(workOrder) : handleViewDocument(workOrder, 'dn'))}
@@ -717,7 +714,6 @@ const PendingInvoices = () => {
           </div>
         )}
       </div>
-      {/* Modals */}
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
