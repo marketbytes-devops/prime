@@ -40,12 +40,12 @@ import apiClient from "../../helpers/apiClient";
 
 const Sidebar = ({ toggleSidebar }) => {
   const location = useLocation();
-  const [activeOuterMenu, setActiveOuterMenu] = useState(null);
+  const [activeOuterMenu, setActiveOuterMenu] = useState(null); // Tracks the active outer menu
   const [isRFQOpen, setIsRFQOpen] = useState(false);
   const [isInitiateWorkOrderOpen, setIsInitiateWorkOrderOpen] = useState(false);
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isForDeliveryPendingOpen, setIsForDeliveryPendingOpen] = useState(false);
-  const [isInvoicesOpen, setIsInvoicesOpen] = useState(false);
+  const [isInvoicesOpen, setIsInvoicesOpen] = useState(false); // New state for Invoices submenu
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,15 +80,17 @@ const Sidebar = ({ toggleSidebar }) => {
     return perm && perm[`can_${action}`];
   };
 
+  // Toggle function for outer menus
   const toggleOuterMenu = (menuLabel) => {
     setActiveOuterMenu((prev) => (prev === menuLabel ? null : menuLabel));
   };
 
+  // Inner menu toggle functions
   const toggleRFQ = () => setIsRFQOpen(!isRFQOpen);
   const toggleInitiateWorkOrder = () => setIsInitiateWorkOrderOpen(!isInitiateWorkOrderOpen);
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
   const toggleForDeliveryPending = () => setIsForDeliveryPendingOpen(!isForDeliveryPendingOpen);
-  const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen);
+  const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen); // New toggle for Invoices submenu
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -171,7 +173,7 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "processing_work_orders",
               action: "view",
             },
-            {
+             {
               to: "/job-execution/processing-work-orders/manager-approval",
               label: "Manager Approval",
               icon: <CheckCircle className="w-5 h-5 mr-3" />,
@@ -185,36 +187,31 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "declined_work_orders",
               action: "view",
             },
-          ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
-        },
-        {
-          label: "Delivery",
-          icon: <MailQuestionMark className="w-5 h-5 mr-3" />,
-          page: "delivery",
-          action: "view",
-          subItems: [
             {
-              to: "/job-execution/processing-work-orders/delivery",
-              label: "For Delivery",
-              icon: <MailCheck className="w-5 h-5 mr-3" />,
+              label: "Delivery",
+              icon: <MailQuestionMark className="w-5 h-5 mr-3" />,
               page: "delivery",
               action: "view",
+              subItems: [
+                {
+                  to: "/job-execution/processing-work-orders/delivery",
+                  label: "For Delivery",
+                  icon: <MailCheck className="w-5 h-5 mr-3" />,
+                  page: "delivery",
+                  action: "view",
+                },
+                {
+                  to: "/job-execution/processing-work-orders/pending-deliveries",
+                  label: "Pending Delivery",
+                  icon: <MailWarning className="w-5 h-5 mr-3" />,
+                  page: "pending_deliveries",
+                  action: "view",
+                },
+              ],
             },
-            {
-              to: "/job-execution/processing-work-orders/pending-deliveries",
-              label: "Pending Delivery",
-              icon: <MailWarning className="w-5 h-5 mr-3" />,
-              page: "pending_deliveries",
-              action: "view",
-            },
-          ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
+          ],
         },
-      ].filter((subItem) => {
-        if (subItem.subItems) {
-          return subItem.subItems.length > 0;
-        }
-        return hasPermission(subItem.page, subItem.action);
-      }),
+      ],
     },
     {
       label: "Post Job Phase",
@@ -251,14 +248,14 @@ const Sidebar = ({ toggleSidebar }) => {
             },
           ],
         },
-      ].filter((subItem) => {
-        if (subItem.subItems) {
-          return subItem.subItems.some((nestedItem) =>
-            hasPermission(nestedItem.page, nestedItem.action)
-          );
-        }
-        return hasPermission(subItem.page, subItem.action);
-      }),
+        // {
+        //   to: "/post-job-phase/completed-wo",
+        //   label: "Completed WO",
+        //   icon: <CheckSquare className="w-5 h-5 mr-3" />,
+        //   page: "completed_work_orders",
+        //   action: "view",
+        // },
+      ],
     },
     {
       label: "Additional Settings",
@@ -301,7 +298,7 @@ const Sidebar = ({ toggleSidebar }) => {
           page: "team",
           action: "view",
         },
-      ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
+      ],
     },
     {
       label: "User Roles",
@@ -330,7 +327,7 @@ const Sidebar = ({ toggleSidebar }) => {
           page: "permissions",
           action: "view",
         },
-      ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
+      ],
     },
     {
       to: "/profile",
@@ -339,12 +336,7 @@ const Sidebar = ({ toggleSidebar }) => {
       page: "Profile",
       action: "view",
     },
-  ].filter((item) => {
-    if (item.subItems) {
-      return item.subItems.length > 0;
-    }
-    return hasPermission(item.page, item.action);
-  });
+  ];
 
   const renderMenuItem = (item) => {
     if (isLoading) {
@@ -359,7 +351,9 @@ const Sidebar = ({ toggleSidebar }) => {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter((subItem) => {
         if (subItem.subItems) {
-          return subItem.subItems.length > 0;
+          return subItem.subItems.some((nestedItem) =>
+            hasPermission(nestedItem.page, nestedItem.action)
+          );
         }
         return hasPermission(subItem.page, subItem.action);
       });
