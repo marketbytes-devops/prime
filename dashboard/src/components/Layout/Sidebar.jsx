@@ -126,7 +126,7 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "rfq",
               action: "view",
             },
-          ],
+          ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
         },
         {
           to: "/view-quotation",
@@ -135,7 +135,12 @@ const Sidebar = ({ toggleSidebar }) => {
           page: "quotation",
           action: "view",
         },
-      ],
+      ].filter((subItem) => {
+        if (subItem.subItems) {
+          return subItem.subItems.length > 0;
+        }
+        return hasPermission(subItem.page, subItem.action);
+      }),
     },
     {
       label: "Job Execution",
@@ -156,7 +161,7 @@ const Sidebar = ({ toggleSidebar }) => {
               page: "purchase_orders",
               action: "view",
             },
-          ],
+          ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
         },
         {
           label: "Processing Work Orders",
@@ -357,7 +362,7 @@ const Sidebar = ({ toggleSidebar }) => {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter((subItem) => {
         if (subItem.subItems) {
-          return subItem.subItems.length > 0 && hasPermission(subItem.page, subItem.action);
+          return subItem.subItems.length > 0;
         }
         return hasPermission(subItem.page, subItem.action);
       });
@@ -375,34 +380,29 @@ const Sidebar = ({ toggleSidebar }) => {
         });
       };
 
-      const toggleFunction = {
-        "Pre-Job": () => toggleOuterMenu("Pre-Job"),
-        "Job Execution": () => toggleOuterMenu("Job Execution"),
-        "Post Job Phase": () => toggleOuterMenu("Post Job Phase"),
-        "Additional Settings": () => toggleOuterMenu("Additional Settings"),
-        "User Roles": () => toggleOuterMenu("User Roles"),
-        "RFQ": toggleRFQ,
-        "Initiate Work Order": toggleInitiateWorkOrder,
-        "Processing Work Orders": toggleProcessingWorkOrders,
-        "Delivery": toggleForDeliveryPending,
-        "Invoices": toggleInvoices,
-      }[item.label];
-
-      const isMenuOpen = item.label === "Pre-Job" ? activeOuterMenu === "Pre-Job" :
-        item.label === "Job Execution" ? activeOuterMenu === "Job Execution" :
-        item.label === "Post Job Phase" ? activeOuterMenu === "Post Job Phase" :
-        item.label === "Additional Settings" ? activeOuterMenu === "Additional Settings" :
-        item.label === "User Roles" ? activeOuterMenu === "User Roles" :
-        item.label === "RFQ" ? isRFQOpen :
-        item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
-        item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
-        item.label === "Delivery" ? isForDeliveryPendingOpen :
-        item.label === "Invoices" ? isInvoicesOpen : false;
+      const isMenuOpen =
+        activeOuterMenu === item.label ||
+        (item.label === "RFQ" && isRFQOpen) ||
+        (item.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
+        (item.label === "Processing Work Orders" && isProcessingWorkOrdersOpen) ||
+        (item.label === "Delivery" && isForDeliveryPendingOpen) ||
+        (item.label === "Invoices" && isInvoicesOpen);
 
       return (
         <>
           <button
-            onClick={toggleFunction}
+            onClick={() => {
+              if (item.label === "Pre-Job") toggleOuterMenu("Pre-Job");
+              else if (item.label === "Job Execution") toggleOuterMenu("Job Execution");
+              else if (item.label === "Post Job Phase") toggleOuterMenu("Post Job Phase");
+              else if (item.label === "Additional Settings") toggleOuterMenu("Additional Settings");
+              else if (item.label === "User Roles") toggleOuterMenu("User Roles");
+              else if (item.label === "RFQ") toggleRFQ();
+              else if (item.label === "Initiate Work Order") toggleInitiateWorkOrder();
+              else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
+              else if (item.label === "Delivery") toggleForDeliveryPending();
+              else if (item.label === "Invoices") toggleInvoices();
+            }}
             className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
               isMenuOpen || isActiveSubmenu(item.subItems)
                 ? "bg-indigo-100 text-indigo-600"
@@ -413,10 +413,28 @@ const Sidebar = ({ toggleSidebar }) => {
               {item.icon}
               {item.label}
             </span>
-            {isMenuOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {(item.label === "Pre-Job" && (activeOuterMenu === "Pre-Job" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Job Execution" && (activeOuterMenu === "Job Execution" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Post Job Phase" && (activeOuterMenu === "Post Job Phase" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Additional Settings" && (activeOuterMenu === "Additional Settings" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "User Roles" && (activeOuterMenu === "User Roles" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "RFQ" && (isRFQOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Delivery" && (isForDeliveryPendingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Invoices" && (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
           </button>
           <AnimatePresence>
-            {isMenuOpen && (
+            {(item.label === "Pre-Job" ? activeOuterMenu === "Pre-Job" :
+              item.label === "Job Execution" ? activeOuterMenu === "Job Execution" :
+              item.label === "Post Job Phase" ? activeOuterMenu === "Post Job Phase" :
+              item.label === "Additional Settings" ? activeOuterMenu === "Additional Settings" :
+              item.label === "User Roles" ? activeOuterMenu === "User Roles" :
+              item.label === "RFQ" ? isRFQOpen :
+              item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
+              item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
+              item.label === "Delivery" ? isForDeliveryPendingOpen :
+              item.label === "Invoices" ? isInvoicesOpen : false) && (
               <motion.ul
                 className="ml-4 mt-1 space-y-1"
                 initial={{ height: 0, opacity: 0 }}
