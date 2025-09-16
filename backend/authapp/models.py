@@ -155,6 +155,20 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_edit": False,
                 "can_delete": False,
             },
+            {
+                "page": "raised_invoices",
+                "can_view": True,
+                "can_add": False,
+                "can_edit": False,
+                "can_delete": False,
+            },
+             {
+                "page": "processed_invoices",
+                "can_view": True,
+                "can_add": False,
+                "can_edit": False,
+                "can_delete": False,
+            },
             # {
             #     "page": "completed_work_orders",
             #     "can_view": True,
