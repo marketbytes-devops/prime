@@ -30,6 +30,7 @@ const PendingDeliveries = () => {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -127,15 +128,13 @@ const PendingDeliveries = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const formData = new FormData();
       formData.append('signed_delivery_note', signedDeliveryNote);
+      formData.append('invoice_status', 'Raised');
+      formData.append('due_in_days', parseInt(dueInDays));
       await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      await apiClient.post(`work-orders/${selectedDNForComplete.work_order.id}/update-invoice-status/`, {
-        invoice_status: 'Raised',
-        due_in_days: parseInt(dueInDays),
       });
 
       toast.success('Delivery completed and work order moved to Pending Invoices.');
@@ -150,6 +149,8 @@ const PendingDeliveries = () => {
     } catch (error) {
       console.error('Error completing delivery:', error);
       toast.error('Failed to complete delivery.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -157,7 +158,7 @@ const PendingDeliveries = () => {
     if (templateRef.current) {
       setState((prev) => ({
         ...prev,
-        selectedDN: dn, // Temporarily set selectedDN for rendering Template1
+        selectedDN: dn,
       }));
       setTimeout(() => {
         const printContent = templateRef.current;
@@ -191,7 +192,7 @@ const PendingDeliveries = () => {
         printWindow.focus();
         printWindow.print();
         printWindow.close();
-      }, 0); // Use setTimeout to ensure templateRef is updated
+      }, 0);
     }
   };
 
@@ -306,13 +307,14 @@ const PendingDeliveries = () => {
                           </Button>
                           <Button
                             onClick={() => handleOpenCompleteModal(dn)}
-                            disabled={!hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'}
-                            className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${hasPermission('delivery', 'edit') && dn.delivery_status !== 'Delivered'
-                                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
+                            disabled={isSubmitting || !hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'}
+                            className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                              isSubmitting || !hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            }`}
                           >
-                            Complete Delivery
+                            {isSubmitting ? 'Completing...' : 'Complete'}
                           </Button>
                           <Button
                             onClick={() => handlePrint(dn)}
@@ -333,27 +335,33 @@ const PendingDeliveries = () => {
           <div className="flex justify-center items-center gap-2 mt-4 w-fit">
             <Button
               onClick={handlePrev}
-              disabled={state.currentPage === 1}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              disabled={state.currentPage === 1 || isSubmitting}
+              className={`px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit`}
             >
-              Prev
+              {isSubmitting ? 'Submitting...' : 'Prev'}
             </Button>
             {pageNumbers.map((page) => (
               <Button
                 key={page}
                 onClick={() => handlePageChange(page)}
-                className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                disabled={isSubmitting}
+                className={`px-3 py-1 rounded-md min-w-fit ${
+                  isSubmitting
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : state.currentPage === page
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                {page}
+                {isSubmitting ? 'Submitting...' : page}
               </Button>
             ))}
             <Button
               onClick={handleNext}
-              disabled={state.currentPage === totalPages}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              disabled={state.currentPage === totalPages || isSubmitting}
+              className={`px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit`}
             >
-              Next
+              {isSubmitting ? 'Submitting...' : 'Next'}
             </Button>
           </div>
         )}
@@ -491,15 +499,23 @@ const PendingDeliveries = () => {
                     dueInDays: '',
                   }))
                 }
-                className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+                disabled={isSubmitting}
+                className={`px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm ${
+                  isSubmitting ? 'cursor-not-allowed' : ''
+                }`}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCompleteDelivery}
-                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                disabled={isSubmitting || !hasPermission('delivery', 'edit')}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  isSubmitting || !hasPermission('delivery', 'edit')
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                Complete
+                {isSubmitting ? 'Completing...' : 'Complete'}
               </Button>
             </div>
           </div>
