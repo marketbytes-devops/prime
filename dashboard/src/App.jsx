@@ -23,7 +23,7 @@ import Unit from "./pages/AdditionalSettings/Unit";
 import PartialOrderSelection from "./pages/PreJob/Quotation/PartialOrderSelection";
 import ExistingClient from "./components/ExistingClient";
 import ListPurchaseOrders from "./pages/JobExecution/InitiateWorkOrder/ListPurchaseOrders";
-import AddWOWithoutPO from "./pages/JobExecution/InitiateWorkOrder/AddWOWithoutPO";
+// import AddWOWithoutPO from "./pages/JobExecution/InitiateWorkOrder/AddWOWithoutPO";
 import ListProcessingWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/ListProcessingWorkOrders";
 import ManagerApproval from "./pages/JobExecution/ProcessingWorkOrders/ManagerApproval";
 import Delivery from "./pages/JobExecution/ProcessingWorkOrders/Delivery";
@@ -181,14 +181,14 @@ function App() {
             </ProtectedRoute>
           ),
         },
-        {
-          path: "/job-execution/initiate-work-order/add-wo-without-po",
-          element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="work_orders" requiredAction="add">
-              <AddWOWithoutPO />
-            </ProtectedRoute>
-          ),
-        },
+        // {
+        //   path: "/job-execution/initiate-work-order/add-wo-without-po",
+        //   element: (
+        //     <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="work_orders" requiredAction="add">
+        //       <AddWOWithoutPO />
+        //     </ProtectedRoute>
+        //   ),
+        // },
         {
           path: "/job-execution/processing-work-orders/list-all-processing-work-orders",
           element: (
