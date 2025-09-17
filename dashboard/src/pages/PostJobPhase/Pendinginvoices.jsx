@@ -456,15 +456,30 @@ const PendingInvoices = () => {
     );
   };
 
+  const isPOComplete = (workOrder) => {
+    const poId = workOrder.purchase_order;
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+    return purchaseOrder && purchaseOrder.client_po_number && purchaseOrder.po_file;
+  };
+
   const isPOEmpty = (workOrder) => {
     const poId = workOrder.purchase_order;
     const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
     return !purchaseOrder || (!purchaseOrder.client_po_number && !purchaseOrder.po_file);
   };
 
-  const isDNEmpty = (workOrder) => {
+  const isDNReadyForUpload = (workOrder) => {
     const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-    return !dn || !dn.signed_delivery_note;
+    return dn && !dn.signed_delivery_note;
+  };
+
+  const isDNComplete = (workOrder) => {
+    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
+    return dn && dn.signed_delivery_note;
+  };
+
+  const canUploadInvoice = (workOrder) => {
+    return isPOComplete(workOrder) && isDUTComplete(workOrder) && isDNComplete(workOrder);
   };
 
   const getAssignedTechnicians = (items) => {
@@ -601,9 +616,9 @@ const PendingInvoices = () => {
                       <div className="flex items-center gap-2">
                         <Button
                           onClick={() => (isPOEmpty(workOrder) ? handleUploadPO(workOrder) : handleViewDocument(workOrder, 'po'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(workOrder) && !isPOComplete(workOrder))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit')
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(workOrder) && !isPOComplete(workOrder))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : isPOEmpty(workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
@@ -614,9 +629,9 @@ const PendingInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(workOrder, 'wo')}
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || !isDUTComplete(workOrder)}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting
+                            isSubmitting || !isDUTComplete(workOrder)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-green-600 text-white hover:bg-green-700'
                           }`}
@@ -624,23 +639,23 @@ const PendingInvoices = () => {
                           {isSubmitting ? 'Submitting...' : 'View WO'}
                         </Button>
                         <Button
-                          onClick={() => (isDNEmpty(workOrder) ? handleUploadDN(workOrder) : handleViewDocument(workOrder, 'dn'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+                          onClick={() => (isDNReadyForUpload(workOrder) ? handleUploadDN(workOrder) : handleViewDocument(workOrder, 'dn'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(workOrder) && !isDNComplete(workOrder))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit')
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(workOrder) && !isDNComplete(workOrder))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isDNEmpty(workOrder)
+                              : isDNReadyForUpload(workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-purple-600 text-white hover:bg-purple-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : isDNEmpty(workOrder) ? 'Upload DN' : 'View DN'}
+                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(workOrder) ? 'Upload DN' : 'View DN'}
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(workOrder, 'invoice')}
-                          disabled={isSubmitting || !workOrder.invoice_file}
+                          disabled={isSubmitting || !workOrder.invoice_file || !canUploadInvoice(workOrder)}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !workOrder.invoice_file
+                            isSubmitting || !workOrder.invoice_file || !canUploadInvoice(workOrder)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
@@ -653,9 +668,9 @@ const PendingInvoices = () => {
                       <select
                         value={workOrder.invoice_status || 'pending'}
                         onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
-                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(workOrder)}
                         className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
-                          isSubmitting || !hasPermission('pending_invoices', 'edit')
+                          isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(workOrder)
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : ''
                         }`}
