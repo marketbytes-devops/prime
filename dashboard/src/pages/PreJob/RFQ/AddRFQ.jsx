@@ -378,7 +378,7 @@ const AddRFQ = () => {
             Company Phone
           </label>
           <InputField
-            type="text"
+            type="number"
             placeholder="Enter company phone"
             value={state.company_phone}
             onChange={(e) =>
@@ -463,7 +463,7 @@ const AddRFQ = () => {
             Contact Phone
           </label>
           <InputField
-            type="text"
+            type="number"
             placeholder="Enter contact phone"
             value={state.point_of_contact_phone}
             onChange={(e) =>
@@ -638,30 +638,46 @@ const AddRFQ = () => {
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
-          <div className="flex justify-between space-x-4 mt-6">
-            {step > 1 && (
-              <Button
-                onClick={handlePrev}
-                className="bg-gray-500 text-white rounded-md hover:bg-gray-600"
-              >
-                Previous
-              </Button>
-            )}
-            {step < 3 ? (
-              <Button
-                onClick={handleNext}
-                className="bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ml-auto"
-              >
-                Next
-              </Button>
+          <div className="mt-6">
+            {step === 1 ? (
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleNext}
+                  className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                >
+                  Next
+                </Button>
+              </div>
             ) : (
-              <Button
-                type="submit"
-                disabled={!isStepValid() || loading}
-                className={`bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ml-auto ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {loading ? "Submitting..." : "Submit RFQ"}
-              </Button>
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  {step > 1 && (
+                    <Button
+                      onClick={handlePrev}
+                      className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                      Previous
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleNext}
+                    className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                  >
+                    Next
+                  </Button>
+                </div>
+                {step === 3 && (
+                  <div className="flex justify-end mt-4">
+                    <Button
+                      type="submit"
+                      disabled={!isStepValid() || loading}
+                      className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {loading ? "Submitting..." : "Submit RFQ"}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </form>

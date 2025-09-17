@@ -167,10 +167,23 @@ const ListPurchaseOrders = () => {
 
   const handleNumberOfSplitOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
+    const totalQuantity = state.savedItems.reduce(
+      (total, item) => total + (item.quantity || 0),
+      0
+    );
+
+    if (value && value > totalQuantity) {
+      toast.error(
+        `Number of split orders cannot exceed the total quantity (${totalQuantity}).`
+      );
+      return;
+    }
+
     if (value && value < 1) {
       toast.error("Number of split orders must be at least 1.");
       return;
     }
+
     setState((prev) => ({
       ...prev,
       numberOfSplitOrders: value,
@@ -184,6 +197,12 @@ const ListPurchaseOrders = () => {
       })),
       splitOrderAssignedTo: "",
     }));
+  };
+  const calculateTotalQuantity = () => {
+    return state.savedItems.reduce(
+      (total, item) => total + (item.quantity || 0),
+      0
+    );
   };
 
   const handleItemSelection = (itemId) => {
@@ -366,9 +385,13 @@ const ListPurchaseOrders = () => {
       (s) => s.series_name === "Work Order"
     );
     if (!workOrderSeries) {
-      setSeriesError("The 'Work Order' series is not configured. Please add it in the Additional Settings section to convert this purchase order into a work order.");
+      setSeriesError(
+        "The 'Work Order' series is not configured. Please add it in the Additional Settings section to convert this purchase order into a work order."
+      );
       setState((prev) => ({ ...prev, isSubmitting: false }));
-      toast.warn("The 'Work Order' series is missing. Configure it in Additional Settings.");
+      toast.warn(
+        "The 'Work Order' series is missing. Configure it in Additional Settings."
+      );
       return;
     }
     setSeriesError(""); // Clear error if series is found
@@ -606,11 +629,15 @@ const ListPurchaseOrders = () => {
                             "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: right;">$${
-                            item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"
+                            item.unit_price
+                              ? Number(item.unit_price).toFixed(2)
+                              : "N/A"
                           }</td>
                           <td style="padding: 8px; text-align: right;">$${
                             item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              ? Number(item.quantity * item.unit_price).toFixed(
+                                  2
+                                )
                               : "0.00"
                           }</td>
                           <td style="padding: 8px; text-align: left;">${
@@ -673,11 +700,15 @@ const ListPurchaseOrders = () => {
                                     ?.name || "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: right;">$${
-                                  item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"
+                                  item.unit_price
+                                    ? Number(item.unit_price).toFixed(2)
+                                    : "N/A"
                                 }</td>
                                 <td style="padding: 8px; text-align: right;">$${
                                   item.quantity && item.unit_price
-                                    ? Number(item.quantity * item.unit_price).toFixed(2)
+                                    ? Number(
+                                        item.quantity * item.unit_price
+                                      ).toFixed(2)
                                     : "0.00"
                                 }</td>
                                 <td style="padding: 8px; text-align: left;">${
@@ -1091,11 +1122,17 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
+                            $
+                            {item.unit_price
+                              ? Number(item.unit_price).toFixed(2)
+                              : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                            $
+                            {item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(
+                                  2
+                                )
                               : "0.00"}
                           </td>
                         </tr>
@@ -1124,7 +1161,10 @@ const ListPurchaseOrders = () => {
       >
         <div className="space-y-4">
           {seriesError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <div
+              className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+              role="alert"
+            >
               <span className="block sm:inline">{seriesError}</span>
             </div>
           )}
@@ -1278,10 +1318,14 @@ const ListPurchaseOrders = () => {
                             "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
+                          $
+                          {item.unit_price
+                            ? Number(item.unit_price).toFixed(2)
+                            : "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          ${item.quantity && item.unit_price
+                          $
+                          {item.quantity && item.unit_price
                             ? Number(item.quantity * item.unit_price).toFixed(2)
                             : "0.00"}
                         </td>
@@ -1352,11 +1396,17 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
+                            $
+                            {item.unit_price
+                              ? Number(item.unit_price).toFixed(2)
+                              : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            ${item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                            $
+                            {item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(
+                                  2
+                                )
                               : "0.00"}
                           </td>
                         </tr>
@@ -1416,11 +1466,17 @@ const ListPurchaseOrders = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
+                                    $
+                                    {item.unit_price
+                                      ? Number(item.unit_price).toFixed(2)
+                                      : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    ${item.quantity && item.unit_price
-                                      ? Number(item.quantity * item.unit_price).toFixed(2)
+                                    $
+                                    {item.quantity && item.unit_price
+                                      ? Number(
+                                          item.quantity * item.unit_price
+                                        ).toFixed(2)
                                       : "0.00"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
@@ -1534,11 +1590,17 @@ const ListPurchaseOrders = () => {
                                   ?.name || "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
+                                $
+                                {item.unit_price
+                                  ? Number(item.unit_price).toFixed(2)
+                                  : "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                ${item.quantity && item.unit_price
-                                  ? Number(item.quantity * item.unit_price).toFixed(2)
+                                $
+                                {item.quantity && item.unit_price
+                                  ? Number(
+                                      item.quantity * item.unit_price
+                                    ).toFixed(2)
                                   : "0.00"}
                               </td>
                             </tr>

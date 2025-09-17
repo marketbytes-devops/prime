@@ -201,7 +201,7 @@ const ManagerApproval = () => {
   };
 
   const getApplicationStatus = (wo) => {
-    return wo.decline_reason ? 'Declined' : 'New';
+    return wo.decline_reason ? 'Resubmitted' : 'New';
   };
 
   return (

@@ -89,12 +89,16 @@ const DeclinedWorkOrders = () => {
     }));
   };
 
+  const handleUpdate = (woId) => {
+    navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}`);
+  };
+
   const handleDecline = async () => {
     try {
       await apiClient.post(`work-orders/${state.selectedWO.id}/decline/`, {
         decline_reason: state.declineReason,
       });
-      toast.success('Work Order declined and updated.');
+      toast.success('Work Order decline reason updated.');
       setState((prev) => ({
         ...prev,
         isDeclineModalOpen: false,
@@ -104,7 +108,7 @@ const DeclinedWorkOrders = () => {
       fetchData();
     } catch (error) {
       console.error('Error declining work order:', error);
-      toast.error(error.response?.data?.error || 'Failed to decline Work Order.');
+      toast.error(error.response?.data?.error || 'Failed to update decline reason.');
     }
   };
 
@@ -238,6 +242,17 @@ const DeclinedWorkOrders = () => {
                           View WO & Certificates
                         </Button>
                         <Button
+                          onClick={() => handleUpdate(wo.id)}
+                          disabled={!hasPermission('declined_work_orders', 'edit')}
+                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                            hasPermission('declined_work_orders', 'edit')
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Update
+                        </Button>
+                        <Button
                           onClick={() => handleResubmit(wo.id)}
                           disabled={!hasPermission('declined_work_orders', 'edit')}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
@@ -364,7 +379,7 @@ const DeclinedWorkOrders = () => {
       <Modal
         isOpen={state.isDeclineModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDeclineModalOpen: false, selectedWO: null, declineReason: '' }))}
-        title="Decline Work Order"
+        title="Update Decline Reason"
       >
         <div className="space-y-4">
           <div>

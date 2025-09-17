@@ -39,7 +39,7 @@ class WorkOrder(models.Model):
     created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
     invoice_status = models.CharField(
         max_length=20,
-        choices=[('pending', 'pending'), ('Raised', 'Raised'), ('processed', 'processed')],
+        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
         default='pending',
         null=True,
         blank=True

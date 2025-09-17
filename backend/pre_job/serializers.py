@@ -11,6 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import date, timedelta
 import json
+from authapp.models import CustomUser, Role 
 
 class RFQItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
@@ -284,6 +285,114 @@ class RFQSerializer(serializers.ModelSerializer):
 
         return email_sent
 
+    def send_creation_email(self, rfq):
+        email_sent = False
+        # Collect recipient emails
+        recipient_list = []
+        if rfq.company_email:
+            recipient_list.append(rfq.company_email)
+        if rfq.point_of_contact_email:
+            recipient_list.append(rfq.point_of_contact_email)
+        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
+            recipient_list.append(rfq.assigned_sales_person.email)
+        # Add Superadmin emails
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
+            recipient_list.extend(superadmin_emails)
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f'New RFQ Created: #{rfq.series_number}'
+            message = (
+                f'Dear Recipient,\n\n'
+                f'A new Request for Quotation (RFQ) has been created in PrimeCRM:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 RFQ Number: {rfq.series_number}\n'
+                f'🔹 Project: {rfq.company_name or "Not specified"}\n'
+                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
+                f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
+                f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
+                f'🔹 Company: {rfq.company_name or "Not specified"}\n'
+                f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
+                f'------------------------------------------------------------\n'
+                f'Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=recipient_list,
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"RFQ creation email sent successfully to {', '.join(recipient_list)} for RFQ #{rfq.series_number}")
+            except Exception as e:
+                print(f"Failed to send RFQ creation email to {', '.join(recipient_list)} for RFQ #{rfq.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
+    def send_update_email(self, rfq):
+        email_sent = False
+        # Collect recipient emails
+        recipient_list = []
+        if rfq.company_email:
+            recipient_list.append(rfq.company_email)
+        if rfq.point_of_contact_email:
+            recipient_list.append(rfq.point_of_contact_email)
+        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
+            recipient_list.append(rfq.assigned_sales_person.email)
+        # Add Superadmin emails
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
+            recipient_list.extend(superadmin_emails)
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f'RFQ Updated: #{rfq.series_number}'
+            message = (
+                f'Dear Recipient,\n\n'
+                f'The following Request for Quotation (RFQ) has been updated in PrimeCRM:\n'
+                f'------------------------------------------------------------\n'
+                f'🔹 RFQ Number: {rfq.series_number}\n'
+                f'🔹 Project: {rfq.company_name or "Not specified"}\n'
+                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
+                f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
+                f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
+                f'🔹 Company: {rfq.company_name or "Not specified"}\n'
+                f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
+                f'------------------------------------------------------------\n'
+                f'Please log in to your PrimeCRM dashboard to review the updated details and take any necessary actions.\n\n'
+                f'Best regards,\n'
+                f'PrimeCRM Team\n'
+                f'---\n'
+                f'This is an automated message. Please do not reply to this email.'
+            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=recipient_list,
+                    fail_silently=True,
+                )
+                email_sent = True
+                print(f"RFQ update email sent successfully to {', '.join(recipient_list)} for RFQ #{rfq.series_number}")
+            except Exception as e:
+                print(f"Failed to send RFQ update email to {', '.join(recipient_list)} for RFQ #{rfq.series_number}: {str(e)}")
+                email_sent = False
+
+        return email_sent
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         assigned_sales_person = validated_data.pop('assigned_sales_person', None)
@@ -306,6 +415,10 @@ class RFQSerializer(serializers.ModelSerializer):
             email_sent = self.send_assignment_email(rfq, assigned_sales_person)
             rfq.email_sent = email_sent
             rfq.save()
+        # Send creation email to company_email, point_of_contact_email, assigned_sales_person, and Superadmins
+        creation_email_sent = self.send_creation_email(rfq)
+        rfq.email_sent = rfq.email_sent or creation_email_sent  # Update email_sent if either email was sent
+        rfq.save()
         return rfq
 
     def update(self, instance, validated_data):
@@ -322,6 +435,10 @@ class RFQSerializer(serializers.ModelSerializer):
             email_sent = self.send_assignment_email(instance, assigned_sales_person)
             instance.email_sent = email_sent
             instance.save()
+        # Send update email to company_email, point_of_contact_email, assigned_sales_person, and Superadmins
+        update_email_sent = self.send_update_email(instance)
+        instance.email_sent = instance.email_sent or update_email_sent  # Update email_sent if either email was sent
+        instance.save()
         return instance
 
     def to_representation(self, instance):

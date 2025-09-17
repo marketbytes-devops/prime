@@ -31,6 +31,7 @@ const PendingInvoices = () => {
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
+    originalInvoiceStatus: '',
     isUploadPOModalOpen: false,
     selectedPOForUpload: null,
     poUpload: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
@@ -43,6 +44,7 @@ const PendingInvoices = () => {
     selectedWOForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
+    invoiceUploadType: '',
     isUploadWOModalOpen: false,
     selectedWOForUpload: null,
     woUpload: { certificateFile: null },
@@ -109,7 +111,7 @@ const PendingInvoices = () => {
         ...prev,
         workOrders: woRes.data.map(wo => ({
           ...wo,
-          invoice_status: wo.invoice_status || 'pending',
+          invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
         })) || [],
         purchaseOrders: poRes.data || [],
         deliveryNotes: deliveryNotes || [],
@@ -337,13 +339,14 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (workOrder) => {
+  const handleUploadInvoice = (workOrder, status) => {
     setState((prev) => ({
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: workOrder,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
+      invoiceUploadType: status === 'raised' ? 'Proforma' : 'Final',
     }));
   };
 
@@ -351,7 +354,7 @@ const PendingInvoices = () => {
     let isValid = true;
     const errors = { invoiceFile: '' };
     if (!state.invoiceUpload.invoiceFile) {
-      errors.invoiceFile = 'Invoice File is required';
+      errors.invoiceFile = `${state.invoiceUploadType} Invoice File is required`;
       isValid = false;
     }
     setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
@@ -364,29 +367,64 @@ const PendingInvoices = () => {
     }
     try {
       setIsSubmitting(true);
+      // Step 1: Update invoice status
+      const payload = { invoice_status: state.newStatus };
+      if (state.newStatus === 'raised' && state.dueInDays) {
+        payload.due_in_days = parseInt(state.dueInDays);
+      } else if (state.newStatus === 'processed' && state.receivedDate) {
+        payload.received_date = state.receivedDate;
+      }
+      await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
+
+      // Step 2: Upload invoice file
       const formData = new FormData();
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
       await apiClient.patch(`/work-orders/${state.selectedWOForInvoiceUpload.id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      toast.success('Invoice file uploaded successfully.');
+
+      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUploadType: '',
+        isStatusModalOpen: false,
+        selectedWorkOrderId: null,
+        newStatus: '',
+        dueInDays: '',
+        receivedDate: '',
+        originalInvoiceStatus: '',
       }));
       await fetchData();
     } catch (error) {
-      console.error('Error uploading invoice file:', error);
-      toast.error('Failed to upload invoice file.');
+      console.error(`Error updating status or uploading ${state.invoiceUploadType.toLowerCase()} invoice file:`, error);
+      toast.error(`Failed to update status or upload ${state.invoiceUploadType.toLowerCase()} invoice file.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleUpdateStatus = (workOrderId, newStatus) => {
+    const workOrder = state.workOrders.find((wo) => wo.id === workOrderId);
+    // Check if the current status is 'raised' and the new status is also 'raised'
+    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.warn(
+        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
     setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
@@ -394,24 +432,65 @@ const PendingInvoices = () => {
       newStatus,
       dueInDays: '',
       receivedDate: '',
+      originalInvoiceStatus: workOrder?.invoice_status || 'pending',
+      invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
     }));
+  };
+
+  const handleStatusModalSubmit = () => {
+    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate } = state;
+    const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+    // Additional validation in the modal to prevent re-submission of 'raised'
+    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.error(
+        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
+    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+      toast.error('Please enter a valid number of days.');
+      return;
+    }
+    if (newStatus === 'processed' && !receivedDate) {
+      toast.error('Please select a received date.');
+      return;
+    }
+    // Open invoice upload modal for Raised or Processed without API call
+    if (newStatus === 'raised' || newStatus === 'processed') {
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        isUploadInvoiceModalOpen: true,
+        selectedWOForInvoiceUpload: workOrder,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
+      }));
+    } else {
+      // For other statuses (e.g., pending), update immediately
+      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate);
+    }
   };
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate) => {
     try {
       setIsSubmitting(true);
       const payload = { invoice_status: newStatus };
-      if (newStatus === 'Raised' && dueInDays) {
+      if (newStatus === 'raised' && dueInDays) {
         payload.due_in_days = parseInt(dueInDays);
       } else if (newStatus === 'processed' && receivedDate) {
         payload.received_date = receivedDate;
       }
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
-      if (newStatus === 'Raised' || newStatus === 'processed') {
-        const workOrder = state.workOrders.find((wo) => wo.id === workOrderId);
-        handleUploadInvoice(workOrder);
-      }
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
@@ -419,6 +498,8 @@ const PendingInvoices = () => {
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
+        originalInvoiceStatus: '',
+        invoiceUploadType: '',
       }));
       await fetchData();
     } catch (error) {
@@ -427,19 +508,6 @@ const PendingInvoices = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate } = state;
-    if (newStatus === 'Raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-      toast.error('Please enter a valid number of days.');
-      return;
-    }
-    if (newStatus === 'processed' && !receivedDate) {
-      toast.error('Please select a received date.');
-      return;
-    }
-    confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate);
   };
 
   const isDUTComplete = (wo) => {
@@ -676,7 +744,7 @@ const PendingInvoices = () => {
                         }`}
                       >
                         <option value="pending">Pending</option>
-                        <option value="Raised">Raised</option>
+                        <option value="raised">Raised</option>
                         <option value="processed">Processed</option>
                       </select>
                     </td>
@@ -975,7 +1043,7 @@ const PendingInvoices = () => {
               />
               PO Available
             </label>
-            <label className="flex items-center ml-4">
+            <label className="flex items-center mt-2">
               <input
                 type="checkbox"
                 checked={state.poUpload.poStatus === 'not_available'}
@@ -1198,12 +1266,24 @@ const PendingInvoices = () => {
           selectedWOForInvoiceUpload: null,
           invoiceUpload: { invoiceFile: null },
           invoiceUploadErrors: { invoiceFile: '' },
+          invoiceUploadType: '',
+          isStatusModalOpen: false,
+          selectedWorkOrderId: null,
+          newStatus: '',
+          dueInDays: '',
+          receivedDate: '',
+          originalInvoiceStatus: '',
         }))}
-        title={`Upload Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'}`}
       >
         <div className="space-y-4">
+          {state.invoiceUploadType === 'Proforma' && state.selectedWOForInvoiceUpload?.invoice_status === 'raised' && (
+            <p className="text-red-500 text-sm">
+              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
+            </p>
+          )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Invoice File</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{state.invoiceUploadType} Invoice File</label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -1228,6 +1308,13 @@ const PendingInvoices = () => {
                 selectedWOForInvoiceUpload: null,
                 invoiceUpload: { invoiceFile: null },
                 invoiceUploadErrors: { invoiceFile: '' },
+                invoiceUploadType: '',
+                isStatusModalOpen: false,
+                selectedWorkOrderId: null,
+                newStatus: '',
+                dueInDays: '',
+                receivedDate: '',
+                originalInvoiceStatus: '',
               }))}
               disabled={isSubmitting}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -1261,11 +1348,18 @@ const PendingInvoices = () => {
           newStatus: '',
           dueInDays: '',
           receivedDate: '',
+          originalInvoiceStatus: '',
+          invoiceUploadType: '',
         }))}
-        title={`Update Invoice Status${state.newStatus ? ` to ${state.newStatus}` : ''}`}
+        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
       >
         <div className="space-y-4">
-          {state.newStatus === 'Raised' && (
+          {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
+            <p className="text-red-500 text-sm">
+              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
+            </p>
+          )}
+          {state.newStatus === 'raised' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
               <InputField
@@ -1298,6 +1392,8 @@ const PendingInvoices = () => {
                 newStatus: '',
                 dueInDays: '',
                 receivedDate: '',
+                originalInvoiceStatus: '',
+                invoiceUploadType: '',
               }))}
               disabled={isSubmitting}
               className={`px-3 py-1 rounded-md text-sm ${

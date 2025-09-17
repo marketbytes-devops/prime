@@ -14,7 +14,8 @@ const PartialOrderSelection = () => {
     createdPartialOrders: [],
     usedItemIds: [],
     units: [],
-    itemsList: [], // Added to store items list
+    itemsList: [],
+    isAllPartialsCreated: false, // New state to track completion
   });
 
   useEffect(() => {
@@ -40,7 +41,7 @@ const PartialOrderSelection = () => {
           ...prev,
           savedItems: initialSavedItems,
           units: unitsRes.data || [],
-          itemsList: itemsRes.data || [], // Store items list
+          itemsList: itemsRes.data || [],
         }));
       } catch (error) {
         console.error("Error fetching units or items:", error);
@@ -63,6 +64,7 @@ const PartialOrderSelection = () => {
       selectedItemIds: [],
       createdPartialOrders: [],
       usedItemIds: [],
+      isAllPartialsCreated: false, // Reset completion state
     }));
   };
 
@@ -125,30 +127,38 @@ const PartialOrderSelection = () => {
       )
     );
 
-    const response = await apiClient.post("/purchase-orders/", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    try {
+      const response = await apiClient.post("/purchase-orders/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-    setState(prev => ({
-      ...prev,
-      createdPartialOrders: [
-        ...prev.createdPartialOrders,
-        { 
-          ...response.data, 
-          items: response.data.items.map(item => ({
-            ...item,
-            total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
-          })),
-          itemIds: [...prev.selectedItemIds] // Store the item IDs for this order
-        }
-      ],
-      usedItemIds: [...prev.usedItemIds, ...state.selectedItemIds],
-      selectedItemIds: [],
-    }));
-    toast.success(`Partial purchase order ${state.createdPartialOrders.length + 1} created successfully!`);
-
-    if (state.createdPartialOrders.length + 1 === state.numberOfPartialOrders && state.usedItemIds.length === state.savedItems.length) {
-      navigate("/view-quotation", { state: { quotationId: quotationData.id, partialOrders: state.createdPartialOrders } });
+      setState(prev => {
+        const newCreatedPartialOrders = [
+          ...prev.createdPartialOrders,
+          { 
+            ...response.data, 
+            items: response.data.items.map(item => ({
+              ...item,
+              total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
+            })),
+            itemIds: [...prev.selectedItemIds]
+          }
+        ];
+        const newUsedItemIds = [...prev.usedItemIds, ...prev.selectedItemIds];
+        const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders && 
+                                    newUsedItemIds.length === prev.savedItems.length;
+        return {
+          ...prev,
+          createdPartialOrders: newCreatedPartialOrders,
+          usedItemIds: newUsedItemIds,
+          selectedItemIds: [],
+          isAllPartialsCreated, // Update completion state
+        };
+      });
+      toast.success(`Partial purchase order ${state.createdPartialOrders.length + 1} created successfully!`);
+    } catch (error) {
+      console.error("Error creating partial order:", error);
+      toast.error("Failed to create partial order.");
     }
   };
 
@@ -157,16 +167,18 @@ const PartialOrderSelection = () => {
     if (!orderToCancel) return;
 
     try {
-      // Delete the partial order from the backend
       await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`);
       
       setState(prev => {
         const newCreatedPartialOrders = prev.createdPartialOrders.filter((_, i) => i !== index);
         const newUsedItemIds = prev.usedItemIds.filter(id => !orderToCancel.itemIds.includes(id));
+        const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders && 
+                                    newUsedItemIds.length === prev.savedItems.length;
         return {
           ...prev,
           createdPartialOrders: newCreatedPartialOrders,
           usedItemIds: newUsedItemIds,
+          isAllPartialsCreated, // Update completion state
         };
       });
       toast.success(`Partial order ${index + 1} canceled successfully.`);
@@ -182,6 +194,7 @@ const PartialOrderSelection = () => {
       createdPartialOrders: [],
       usedItemIds: [],
       selectedItemIds: [],
+      isAllPartialsCreated: false, // Reset completion state
     }));
     toast.info("All created partial orders have been reset.");
   };
@@ -324,7 +337,11 @@ const PartialOrderSelection = () => {
           </button>
           <button
             onClick={handleFinish}
-            className="bg-gray-200 text-black px-3 py-2 rounded hover:bg-gray-300"
+            className={`px-3 py-2 rounded transition-colors duration-200 ${
+              state.isAllPartialsCreated
+                ? "bg-green-500 text-white hover:bg-green-600"
+                : "bg-grey-200 text-black hover:bg-gray-300"
+            }`}
           >
             Finish
           </button>
