@@ -145,9 +145,8 @@ SIMPLE_JWT = {
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if os.getenv("CORS_ALLOWED_ORIGINS") else [
-    "http://localhost:3000",
     "http://localhost:5173",
-    "http://localhost:6371",
+    "http://localhost:5178",
 ]
 
 # Add CORS headers for all responses
@@ -166,9 +165,7 @@ CORS_ALLOW_HEADERS = [
 
 # CSRF Trusted Origins - using same domains as CORS
 CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if os.getenv("CSRF_TRUSTED_ORIGINS") else [
-    "http://localhost:6370",
-    "http://localhost:6371",
-    "http://localhost:3000",
+    "http://localhost:5178",
     "https://backend.primearabiagroup.com",
     "https://crm.primearabiagroup.com",
 ]
