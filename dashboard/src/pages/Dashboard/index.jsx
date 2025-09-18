@@ -12,6 +12,7 @@ const Dashboard = () => {
     quotations: 0,
     purchaseOrders: 0,
     workOrders: 0,
+    deliveryNotes: 0,
     openedWorkOrders: 0,
     closedWorkOrders: 0,
     overdueWorkOrders: 0,
@@ -20,7 +21,7 @@ const Dashboard = () => {
   const chartRef = useRef(null);
 
   const chartData = {
-    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders'],
+    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes'],
     datasets: [
       {
         label: 'Counts',
@@ -29,18 +30,21 @@ const Dashboard = () => {
           counts.quotations,
           counts.purchaseOrders,
           counts.workOrders,
+          counts.deliveryNotes,
         ],
         backgroundColor: [
-          'rgba(79, 70, 229, 0.2)',
-          'rgba(16, 185, 129, 0.2)',
-          'rgba(59, 130, 246, 0.2)',
-          'rgba(147, 51, 234, 0.2)',
+          'rgba(79, 70, 229, 0.2)', // RFQ
+          'rgba(16, 185, 129, 0.2)', // Quotation
+          'rgba(59, 130, 246, 0.2)', // PO
+          'rgba(147, 51, 234, 0.2)', // WO
+          'rgba(245, 158, 11, 0.2)', // NEW: Delivery Notes
         ],
         borderColor: [
-          'rgba(79, 70, 229, 1)',
-          'rgba(16, 185, 129, 1)',
-          'rgba(59, 130, 246, 1)',
-          'rgba(147, 51, 234, 1)',
+          'rgba(79, 70, 229, 1)', // RFQ
+          'rgba(16, 185, 129, 1)', // Quotation
+          'rgba(59, 130, 246, 1)', // PO
+          'rgba(147, 51, 234, 1)', // WO
+          'rgba(245, 158, 11, 1)', // NEW: Delivery Notes
         ],
         borderWidth: 1,
       },
@@ -51,20 +55,29 @@ const Dashboard = () => {
     const fetchCounts = async () => {
       try {
         setLoading(true);
-        const [rfqsRes, quotationsRes, poRes, woRes, openedWoRes, closedWoRes] =
-          await Promise.all([
-            apiClient.get('/rfqs/'),
-            apiClient.get('/quotations/'),
-            apiClient.get('/purchase-orders/'),
-            apiClient.get('/work-orders/'),
-            apiClient.get('/work-orders/?status=Submitted'),
-            apiClient.get('/work-orders/?status=Completed'),
-          ]);
+        const [
+          rfqsRes,
+          quotationsRes,
+          poRes,
+          woRes,
+          dnRes, // CHANGED: Properly capture delivery notes response
+          openedWoRes,
+          closedWoRes,
+        ] = await Promise.all([
+          apiClient.get('/rfqs/'),
+          apiClient.get('/quotations/'),
+          apiClient.get('/purchase-orders/'),
+          apiClient.get('/work-orders/'),
+          apiClient.get('/delivery-notes/'), // Already correct in Promise.all
+          apiClient.get('/work-orders/?status=Submitted'),
+          apiClient.get('/work-orders/?status=Completed'),
+        ]);
         setCounts({
           rfqs: rfqsRes.data?.length || 0,
           quotations: quotationsRes.data?.length || 0,
           purchaseOrders: poRes.data?.length || 0,
           workOrders: woRes.data?.length || 0,
+          deliveryNotes: dnRes.data?.length || 0, // CHANGED: Use dnRes
           openedWorkOrders: openedWoRes.data?.length || 0,
           closedWorkOrders: closedWoRes.data?.length || 0,
           overdueWorkOrders: woRes.data?.filter(wo => wo.isOverdue)?.length || 0,
@@ -87,12 +100,12 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="p-6">
+    <div className="p-4">
       <h2 className="text-2xl font-semibold mb-2 text-black">
         Welcome back!
       </h2>
       <p className="text-gray-600 mb-6">
-        Monitor your RFQs, Quotations, Purchase Orders, and Work Orders below.
+        Monitor your RFQs, Quotations, Purchase Orders, Work Orders, and Delivery Notes below.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -171,6 +184,22 @@ const Dashboard = () => {
               <h3 className="text-lg font-medium text-gray-700">Opened Work Orders</h3>
               <p className="text-2xl font-bold text-yellow-600">
                 {loading ? 'Loading...' : counts.openedWorkOrders}
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link to="/job-execution/processing-work-orders/delivery" className="block">
+          <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
+            <div className="p-3 bg-purple-100 rounded-full">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-700">Total Delivery Notes</h3>
+              <p className="text-2xl font-bold text-purple-600">
+                {loading ? 'Loading...' : counts.deliveryNotes}
               </p>
             </div>
           </div>
