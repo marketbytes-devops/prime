@@ -102,6 +102,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             f'Your account has been created successfully. Here are your login credentials:\n'
             f'Email: {user.email}\n'
             f'Password: {random_password}\n\n'
+            f'You can log in here: https://crm.primearabiagroup.com/login\n\n'
             f'Please log in and change your password after your first login.\n\n'
             f'Regards,\nYour Team'
         )
