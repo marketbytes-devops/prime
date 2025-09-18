@@ -47,7 +47,7 @@ const InitiateDelivery = () => {
           range: item.range || '',
           quantity: item.quantity || '',
           delivered_quantity: item.quantity || '',
-          uom: item.unit || '', // Changed from itemsRes.data.find to use item.unit directly
+          uom: item.unit || '',
           remaining_quantity: item.quantity || 0,
           assigned_quantity: '',
           components: [],
@@ -127,10 +127,17 @@ const InitiateDelivery = () => {
 
   const handleNumberOfSplitDNsChange = (e) => {
     const value = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+    const totalQuantity = state.deliveryItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+
     if (value && value < 1) {
       toast.error('Number of split delivery notes must be at least 1.');
       return;
     }
+    if (value && value > totalQuantity) {
+      toast.error(`Number of split delivery notes cannot exceed total item quantity (${totalQuantity}).`);
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
       numberOfSplitDNs: value,
@@ -311,7 +318,6 @@ const InitiateDelivery = () => {
     });
   };
 
-  // Fixed toggle function - using item.id instead of index for better consistency
   const toggleAdditionalInfo = (itemId) => {
     setState((prev) => ({
       ...prev,
@@ -343,7 +349,7 @@ const InitiateDelivery = () => {
       deliveryItems: [
         ...prev.deliveryItems.slice(0, index + 1),
         {
-          id: Date.now() + Math.random(), // More unique ID generation
+          id: Date.now() + Math.random(),
           item: prev.itemsList[0]?.id || '',
           name: prev.itemsList[0]?.name || 'N/A',
           range: '',
@@ -530,13 +536,13 @@ const InitiateDelivery = () => {
     }
   };
 
-  // Helper function to get unit name from unit ID
   const getUnitName = (unitId) => {
     const unit = state.units.find((u) => u.id === unitId);
     return unit ? unit.name : 'N/A';
   };
 
   const remainingItems = state.deliveryItems.filter((item) => !state.usedItemIds.includes(item.id));
+  const totalQuantity = state.deliveryItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
 
   if (state.isLoading || isLoadingPermissions) {
     return <div className="text-center p-4">Loading...</div>;
@@ -584,8 +590,10 @@ const InitiateDelivery = () => {
               onChange={handleNumberOfSplitDNsChange}
               className="w-full"
               min="1"
+              max={totalQuantity}
               disabled={!hasPermission('delivery', 'edit')}
             />
+            <p className="text-sm text-gray-500 mt-1">Total item quantity: {totalQuantity}</p>
           </div>
         )}
         {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
@@ -641,7 +649,7 @@ const InitiateDelivery = () => {
                             const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
                             handleItemChange(itemIndex, 'item', parseInt(e.target.value));
                             handleItemChange(itemIndex, 'name', selectedItem?.name || 'N/A');
-                            handleItemChange(itemIndex, 'uom', selectedItem?.uom || ''); // Update uom when item changes
+                            handleItemChange(itemIndex, 'uom', selectedItem?.uom || '');
                           }}
                           className="w-full p-2 border rounded focus:outline-indigo-500"
                           disabled={!hasPermission('delivery', 'edit')}
