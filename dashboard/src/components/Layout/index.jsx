@@ -83,7 +83,7 @@ const Layout = ({ isAuthenticated, setIsAuthenticated }) => {
           />
         </div>
         <main
-          className={`bg-gradient-to-b from-blue-50 via-gray-50 to-indigo-50 flex-1 pt-20 p-6 ${isSidebarOpen ? "md:ml-72" : "ml-0"
+          className={`bg-gradient-to-b from-blue-50 via-gray-50 to-indigo-50 flex-1 pt-18 px-1 sm:px-2 pb-2 ${isSidebarOpen ? "md:ml-72" : "ml-0"
             } overflow-auto`}
         >
           {loading ? <div className="flex justify-center items-center min-h-screen"><Loading/></div> : <Outlet />}

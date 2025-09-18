@@ -118,8 +118,8 @@ const Template1 = ({ data }) => {
                     <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.name}</td>
                     <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.quantity}</td>
                     <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.unit}</td>
-                    <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                    <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>${item.quantity && item.unit_price ? (item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                    <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                    <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#ffffff', color: '#000000' }}>{item.quantity && item.unit_price ? (item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                   </tr>
                 ))
               ) : (
@@ -129,7 +129,7 @@ const Template1 = ({ data }) => {
               )}
               <tr>
                 <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Total</strong></td>
-                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>${totalAmount.toFixed(2)}</td>
+                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {totalAmount.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
