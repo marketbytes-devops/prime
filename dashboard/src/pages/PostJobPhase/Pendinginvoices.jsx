@@ -28,6 +28,7 @@ const PendingInvoices = () => {
     selectedDN: null,
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
+    selectedDNId: null, // Add this for split DN handling
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
@@ -49,6 +50,8 @@ const PendingInvoices = () => {
     selectedWOForUpload: null,
     woUpload: { certificateFile: null },
     woUploadErrors: { certificateFile: '' },
+    // New state for handling split delivery notes
+    workOrderDeliveryPairs: [],
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -97,6 +100,7 @@ const PendingInvoices = () => {
         apiClient.get('units/'),
         apiClient.get('quotations/'),
       ]);
+
       const deliveryNotes = dnRes.data
         .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
         .map((dn) => ({
@@ -107,18 +111,51 @@ const PendingInvoices = () => {
             components: item.components || [],
           })),
         }));
+
+      const workOrders = woRes.data.map(wo => ({
+        ...wo,
+        invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
+      })) || [];
+
+      // Create work order-delivery note pairs for display
+      const workOrderDeliveryPairs = [];
+      
+      workOrders.forEach(workOrder => {
+        const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
+        
+        if (relatedDNs.length > 0) {
+          // If there are delivery notes, create one pair per delivery note
+          relatedDNs.forEach(dn => {
+            workOrderDeliveryPairs.push({
+              id: `${workOrder.id}-${dn.id}`, // Unique identifier
+              workOrder: workOrder,
+              deliveryNote: dn,
+              workOrderId: workOrder.id,
+              deliveryNoteId: dn.id,
+            });
+          });
+        } else {
+          // If no delivery notes, create a single pair with null delivery note
+          workOrderDeliveryPairs.push({
+            id: `${workOrder.id}-no-dn`,
+            workOrder: workOrder,
+            deliveryNote: null,
+            workOrderId: workOrder.id,
+            deliveryNoteId: null,
+          });
+        }
+      });
+
       setState((prev) => ({
         ...prev,
-        workOrders: woRes.data.map(wo => ({
-          ...wo,
-          invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
-        })) || [],
+        workOrders: workOrders,
         purchaseOrders: poRes.data || [],
-        deliveryNotes: deliveryNotes || [],
+        deliveryNotes: deliveryNotes,
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
+        workOrderDeliveryPairs: workOrderDeliveryPairs,
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -130,7 +167,9 @@ const PendingInvoices = () => {
     fetchData();
   }, []);
 
-  const handleViewDocument = (workOrder, type) => {
+  const handleViewDocument = (pair, type) => {
+    const workOrder = pair.workOrder;
+    
     if (type === 'wo') {
       setState((prev) => ({
         ...prev,
@@ -149,15 +188,14 @@ const PendingInvoices = () => {
         toast.error('Purchase order not found.');
       }
     } else if (type === 'dn') {
-      const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-      if (!dn) {
+      if (!pair.deliveryNote) {
         toast.error('Delivery note not found.');
         return;
       }
       setState((prev) => ({
         ...prev,
         isDNModalOpen: true,
-        selectedDN: dn,
+        selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
       if (workOrder.invoice_file) {
@@ -166,7 +204,8 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadPO = (workOrder) => {
+  const handleUploadPO = (pair) => {
+    const workOrder = pair.workOrder;
     const poId = workOrder.purchase_order;
     const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
     if (!purchaseOrder) {
@@ -236,7 +275,8 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadWO = (workOrder) => {
+  const handleUploadWO = (pair) => {
+    const workOrder = pair.workOrder;
     setState((prev) => ({
       ...prev,
       isUploadWOModalOpen: true,
@@ -285,16 +325,15 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadDN = (workOrder) => {
-    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-    if (!dn) {
+  const handleUploadDN = (pair) => {
+    if (!pair.deliveryNote) {
       toast.error('Delivery note not found.');
       return;
     }
     setState((prev) => ({
       ...prev,
       isUploadDNModalOpen: true,
-      selectedDNForUpload: dn,
+      selectedDNForUpload: pair.deliveryNote,
       dnUpload: { signedDeliveryNote: null },
       dnUploadErrors: { signedDeliveryNote: '' },
     }));
@@ -339,11 +378,13 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (workOrder, status) => {
+  const handleUploadInvoice = (pair, status) => {
+    const workOrder = pair.workOrder;
     setState((prev) => ({
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: workOrder,
+      selectedDNId: pair.deliveryNoteId,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
       invoiceUploadType: status === 'raised' ? 'Proforma' : 'Final',
@@ -374,6 +415,12 @@ const PendingInvoices = () => {
       } else if (state.newStatus === 'processed' && state.receivedDate) {
         payload.received_date = state.receivedDate;
       }
+      
+      // Add delivery note ID to payload if available
+      if (state.selectedDNId) {
+        payload.delivery_note_id = state.selectedDNId;
+      }
+
       await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
 
       // Step 2: Upload invoice file
@@ -388,6 +435,7 @@ const PendingInvoices = () => {
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
+        selectedDNId: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: '',
@@ -407,8 +455,8 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (workOrderId, newStatus) => {
-    const workOrder = state.workOrders.find((wo) => wo.id === workOrderId);
+  const handleUpdateStatus = (pair, newStatus) => {
+    const workOrder = pair.workOrder;
     // Check if the current status is 'raised' and the new status is also 'raised'
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.warn(
@@ -428,7 +476,8 @@ const PendingInvoices = () => {
     setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
-      selectedWorkOrderId: workOrderId,
+      selectedWorkOrderId: workOrder.id,
+      selectedDNId: pair.deliveryNoteId,
       newStatus,
       dueInDays: '',
       receivedDate: '',
@@ -438,8 +487,10 @@ const PendingInvoices = () => {
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate } = state;
+    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
     const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
+    
     // Additional validation in the modal to prevent re-submission of 'raised'
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
@@ -476,11 +527,11 @@ const PendingInvoices = () => {
       }));
     } else {
       // For other statuses (e.g., pending), update immediately
-      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate);
+      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
     }
   };
 
-  const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate) => {
+  const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate, deliveryNoteId) => {
     try {
       setIsSubmitting(true);
       const payload = { invoice_status: newStatus };
@@ -489,12 +540,19 @@ const PendingInvoices = () => {
       } else if (newStatus === 'processed' && receivedDate) {
         payload.received_date = receivedDate;
       }
+      
+      // Add delivery note ID to payload if available
+      if (deliveryNoteId) {
+        payload.delivery_note_id = deliveryNoteId;
+      }
+
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
+        selectedDNId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
@@ -536,18 +594,16 @@ const PendingInvoices = () => {
     return !purchaseOrder || (!purchaseOrder.client_po_number && !purchaseOrder.po_file);
   };
 
-  const isDNReadyForUpload = (workOrder) => {
-    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-    return dn && !dn.signed_delivery_note;
+  const isDNReadyForUpload = (deliveryNote) => {
+    return deliveryNote && !deliveryNote.signed_delivery_note;
   };
 
-  const isDNComplete = (workOrder) => {
-    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-    return dn && dn.signed_delivery_note;
+  const isDNComplete = (deliveryNote) => {
+    return deliveryNote && deliveryNote.signed_delivery_note;
   };
 
-  const canUploadInvoice = (workOrder) => {
-    return isPOComplete(workOrder) && isDUTComplete(workOrder) && isDNComplete(workOrder);
+  const canUploadInvoice = (pair) => {
+    return isPOComplete(pair.workOrder) && isDUTComplete(pair.workOrder) && isDNComplete(pair.deliveryNote);
   };
 
   const getAssignedTechnicians = (items) => {
@@ -578,28 +634,27 @@ const PendingInvoices = () => {
     return quotation?.company_name || 'N/A';
   };
 
-  const getDNSeriesNumber = (workOrder) => {
-    const dn = state.deliveryNotes.find((dn) => dn.work_order_id === workOrder.id);
-    return dn?.dn_number || 'N/A';
+  const getDNSeriesNumber = (deliveryNote) => {
+    return deliveryNote?.dn_number || 'N/A';
   };
 
-  const filteredWorkOrders = state.workOrders
-    .filter((workOrder) =>
-      (workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getDNSeriesNumber(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
+  const filteredPairs = state.workOrderDeliveryPairs
+    .filter((pair) =>
+      (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationSeriesNumber(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getCompanyName(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
-        return new Date(b.created_at) - new Date(a.created_at);
+        return new Date(b.workOrder.created_at) - new Date(a.workOrder.created_at);
       }
       return 0;
     });
 
-  const totalPages = Math.ceil(filteredWorkOrders.length / state.itemsPerPage);
+  const totalPages = Math.ceil(filteredPairs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
-  const currentWorkOrders = filteredWorkOrders.slice(startIndex, startIndex + state.itemsPerPage);
+  const currentPairs = filteredPairs.slice(startIndex, startIndex + state.itemsPerPage);
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
@@ -664,42 +719,42 @@ const PendingInvoices = () => {
               </tr>
             </thead>
             <tbody>
-              {currentWorkOrders.length === 0 ? (
+              {currentPairs.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
               ) : (
-                currentWorkOrders.map((workOrder, index) => (
-                  <tr key={workOrder.id} className="border hover:bg-gray-50">
+                currentPairs.map((pair, index) => (
+                  <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{getCompanyName(workOrder)}</td>
-                    <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(workOrder)}</td>
-                    <td className="border p-2 whitespace-nowrap">{workOrder.wo_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(workOrder)}</td>
-                    <td className="border p-2 whitespace-nowrap">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(workOrder.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getCompanyName(pair.workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(pair.workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
-                          onClick={() => (isPOEmpty(workOrder) ? handleUploadPO(workOrder) : handleViewDocument(workOrder, 'po'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(workOrder) && !isPOComplete(workOrder))}
+                          onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(workOrder) && !isPOComplete(workOrder))
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isPOEmpty(workOrder)
+                              : isPOEmpty(pair.workOrder)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : isPOEmpty(workOrder) ? 'Upload PO' : 'View PO'}
+                          {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
                         </Button>
                         <Button
-                          onClick={() => handleViewDocument(workOrder, 'wo')}
-                          disabled={isSubmitting || !isDUTComplete(workOrder)}
+                          onClick={() => handleViewDocument(pair, 'wo')}
+                          disabled={isSubmitting || !isDUTComplete(pair.workOrder)}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !isDUTComplete(workOrder)
+                            isSubmitting || !isDUTComplete(pair.workOrder)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-green-600 text-white hover:bg-green-700'
                           }`}
@@ -707,38 +762,38 @@ const PendingInvoices = () => {
                           {isSubmitting ? 'Submitting...' : 'View WO'}
                         </Button>
                         <Button
-                          onClick={() => (isDNReadyForUpload(workOrder) ? handleUploadDN(workOrder) : handleViewDocument(workOrder, 'dn'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(workOrder) && !isDNComplete(workOrder))}
+                          onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(workOrder) && !isDNComplete(workOrder))
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isDNReadyForUpload(workOrder)
+                              : isDNReadyForUpload(pair.deliveryNote)
                               ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                               : 'bg-purple-600 text-white hover:bg-purple-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(workOrder) ? 'Upload DN' : 'View DN'}
+                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
                         </Button>
                         <Button
-                          onClick={() => handleViewDocument(workOrder, 'invoice')}
-                          disabled={isSubmitting || !workOrder.invoice_file || !canUploadInvoice(workOrder)}
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={isSubmitting || !pair.workOrder.invoice_file || !canUploadInvoice(pair)}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !workOrder.invoice_file || !canUploadInvoice(workOrder)
+                            isSubmitting || !pair.workOrder.invoice_file || !canUploadInvoice(pair)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : workOrder.invoice_file ? 'View Invoice' : 'No Invoice'}
+                          {isSubmitting ? 'Submitting...' : pair.workOrder.invoice_file ? 'View Invoice' : 'No Invoice'}
                         </Button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <select
-                        value={workOrder.invoice_status || 'pending'}
-                        onChange={(e) => handleUpdateStatus(workOrder.id, e.target.value)}
-                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(workOrder)}
+                        value={pair.workOrder.invoice_status || 'pending'}
+                        onChange={(e) => handleUpdateStatus(pair, e.target.value)}
+                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
                         className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
-                          isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(workOrder)
+                          isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : ''
                         }`}
@@ -797,6 +852,8 @@ const PendingInvoices = () => {
           </div>
         )}
       </div>
+
+      {/* All the existing modals remain the same */}
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -876,6 +933,8 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
+      {/* Rest of the modals remain exactly the same as in your original code */}
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
@@ -936,6 +995,8 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
+      {/* Continue with all other modals from your original code... */}
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}

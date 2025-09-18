@@ -12,6 +12,9 @@ const PendingDeliveries = () => {
   const templateRef = useRef(null);
   const [state, setState] = useState({
     deliveryNotes: [],
+    workOrders: [], // Add work orders to state
+    purchaseOrders: [], // Add purchase orders to state
+    quotations: [], // Add quotations to state
     technicians: [],
     itemsList: [],
     units: [],
@@ -64,10 +67,13 @@ const PendingDeliveries = () => {
 
   const fetchData = async () => {
     try {
-      const [dnRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [dnRes, woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('delivery-notes/', {
           params: { delivery_status: 'Delivery Pending' },
         }),
+        apiClient.get('work-orders/'), // Fetch work orders
+        apiClient.get('purchase-orders/'), // Fetch purchase orders  
+        apiClient.get('quotations/'), // Fetch quotations
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -80,6 +86,9 @@ const PendingDeliveries = () => {
       setState((prev) => ({
         ...prev,
         deliveryNotes: filteredDeliveryNotes,
+        workOrders: woRes.data || [],
+        purchaseOrders: poRes.data || [],
+        quotations: quotationsRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -93,6 +102,40 @@ const PendingDeliveries = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Helper functions to get related data
+  const getWorkOrderByDN = (dn) => {
+    return state.workOrders.find(wo => wo.id === dn.work_order_id);
+  };
+
+  const getPurchaseOrderByWO = (workOrder) => {
+    if (!workOrder) return null;
+    return state.purchaseOrders.find(po => po.id === workOrder.purchase_order);
+  };
+
+  const getQuotationByPO = (purchaseOrder) => {
+    if (!purchaseOrder) return null;
+    return state.quotations.find(q => q.id === purchaseOrder.quotation);
+  };
+
+  const getCompanyNameByDN = (dn) => {
+    const workOrder = getWorkOrderByDN(dn);
+    const purchaseOrder = getPurchaseOrderByWO(workOrder);
+    const quotation = getQuotationByPO(purchaseOrder);
+    return quotation?.company_name || 'N/A';
+  };
+
+  const getQuotationNumberByDN = (dn) => {
+    const workOrder = getWorkOrderByDN(dn);
+    const purchaseOrder = getPurchaseOrderByWO(workOrder);
+    const quotation = getQuotationByPO(purchaseOrder);
+    return quotation?.series_number || 'N/A';
+  };
+
+  const getWONumberByDN = (dn) => {
+    const workOrder = getWorkOrderByDN(dn);
+    return workOrder?.wo_number || 'N/A';
+  };
 
   const handleViewDN = (dn) => {
     setState((prev) => ({
@@ -199,13 +242,18 @@ const PendingDeliveries = () => {
   const filteredDNs = state.deliveryNotes
     .filter(
       (dn) =>
-        (dn.dn_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
+        (dn.dn_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        getCompanyNameByDN(dn).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        getQuotationNumberByDN(dn).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        getWONumberByDN(dn).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
         return new Date(b.created_at) - new Date(a.created_at);
       } else if (state.sortBy === 'dn_number') {
         return (a.dn_number || '').localeCompare(b.dn_number || '');
+      } else if (state.sortBy === 'company_name') {
+        return getCompanyNameByDN(a).localeCompare(getCompanyNameByDN(b));
       }
       return 0;
     });
@@ -254,7 +302,7 @@ const PendingDeliveries = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Search Delivery Notes</label>
               <InputField
                 type="text"
-                placeholder="Search by DN Number..."
+                placeholder="Search by DN Number, Company Name, Quotation Number, or WO Number..."
                 value={state.searchTerm}
                 onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
                 className="w-full"
@@ -269,6 +317,7 @@ const PendingDeliveries = () => {
               >
                 <option value="created_at">Creation Date</option>
                 <option value="dn_number">DN Number</option>
+                <option value="company_name">Company Name</option>
               </select>
             </div>
           </div>
@@ -277,6 +326,9 @@ const PendingDeliveries = () => {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Company Name</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Quotation Number</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
@@ -286,7 +338,7 @@ const PendingDeliveries = () => {
               <tbody>
                 {currentDNs.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="border p-2 text-center text-gray-500">
+                    <td colSpan="8" className="border p-2 text-center text-gray-500">
                       No delivery notes available.
                     </td>
                   </tr>
@@ -294,6 +346,9 @@ const PendingDeliveries = () => {
                   currentDNs.map((dn, index) => (
                     <tr key={dn.id} className="border hover:bg-gray-50">
                       <td className="border p-2">{startIndex + index + 1}</td>
+                      <td className="border p-2">{getCompanyNameByDN(dn)}</td>
+                      <td className="border p-2">{getQuotationNumberByDN(dn)}</td>
+                      <td className="border p-2">{getWONumberByDN(dn)}</td>
                       <td className="border p-2">{dn.dn_number || 'N/A'}</td>
                       <td className="border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
                       <td className="border p-2">{dn.delivery_status || 'N/A'}</td>
@@ -375,6 +430,9 @@ const PendingDeliveries = () => {
               <div>
                 <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
                 <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
+                <p><strong>Company Name:</strong> {getCompanyNameByDN(state.selectedDN)}</p>
+                <p><strong>Quotation Number:</strong> {getQuotationNumberByDN(state.selectedDN)}</p>
+                <p><strong>WO Number:</strong> {getWONumberByDN(state.selectedDN)}</p>
                 <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
                 <p>
                   <strong>Created At:</strong>{' '}
