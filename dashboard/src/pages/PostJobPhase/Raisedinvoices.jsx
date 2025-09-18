@@ -8,8 +8,8 @@ import Modal from '../../components/Modal';
 const RaisedInvoices = () => {
   const [state, setState] = useState({
     workOrders: [],
-    purchaseOrders: [], // Added to store purchase orders
-    quotations: [], // Added to store quotations
+    purchaseOrders: [],
+    quotations: [],
     technicians: [],
     itemsList: [],
     units: [],
@@ -62,8 +62,8 @@ const RaisedInvoices = () => {
     try {
       const [woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('work-orders/'),
-        apiClient.get('purchase-orders/'), // Added to fetch purchase orders
-        apiClient.get('quotations/'), // Added to fetch quotations
+        apiClient.get('purchase-orders/'),
+        apiClient.get('quotations/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -72,8 +72,8 @@ const RaisedInvoices = () => {
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
-        purchaseOrders: poRes.data || [], // Store purchase orders
-        quotations: quotationsRes.data || [], // Store quotations
+        purchaseOrders: poRes.data || [],
+        quotations: quotationsRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -176,7 +176,7 @@ const RaisedInvoices = () => {
   const filteredWorkOrders = state.workOrders
     .filter(
       (workOrder) =>
-        workOrder.invoice_status === 'Raised' &&
+        workOrder.invoice_status === 'raised' && // Changed from 'Raised' to 'raised'
         ((workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
          getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()))
     )
