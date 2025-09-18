@@ -12,9 +12,9 @@ const PendingDeliveries = () => {
   const templateRef = useRef(null);
   const [state, setState] = useState({
     deliveryNotes: [],
-    workOrders: [], // Add work orders to state
-    purchaseOrders: [], // Add purchase orders to state
-    quotations: [], // Add quotations to state
+    workOrders: [],
+    purchaseOrders: [],
+    quotations: [],
     technicians: [],
     itemsList: [],
     units: [],
@@ -71,9 +71,9 @@ const PendingDeliveries = () => {
         apiClient.get('delivery-notes/', {
           params: { delivery_status: 'Delivery Pending' },
         }),
-        apiClient.get('work-orders/'), // Fetch work orders
-        apiClient.get('purchase-orders/'), // Fetch purchase orders  
-        apiClient.get('quotations/'), // Fetch quotations
+        apiClient.get('work-orders/'),
+        apiClient.get('purchase-orders/'),
+        apiClient.get('quotations/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -325,14 +325,14 @@ const PendingDeliveries = () => {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Company Name</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Quotation Number</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Company Name</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Quotation Number</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
+                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,26 +345,31 @@ const PendingDeliveries = () => {
                 ) : (
                   currentDNs.map((dn, index) => (
                     <tr key={dn.id} className="border hover:bg-gray-50">
-                      <td className="border p-2">{startIndex + index + 1}</td>
-                      <td className="border p-2">{getCompanyNameByDN(dn)}</td>
-                      <td className="border p-2">{getQuotationNumberByDN(dn)}</td>
-                      <td className="border p-2">{getWONumberByDN(dn)}</td>
-                      <td className="border p-2">{dn.dn_number || 'N/A'}</td>
-                      <td className="border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
-                      <td className="border p-2">{dn.delivery_status || 'N/A'}</td>
-                      <td className="border p-2">
+                      <td className="whitespace-nowrap border p-2">{startIndex + index + 1}</td>
+                      <td className="whitespace-nowrap border p-2">{getCompanyNameByDN(dn)}</td>
+                      <td className="whitespace-nowrap border p-2">{getQuotationNumberByDN(dn)}</td>
+                      <td className="whitespace-nowrap border p-2">{getWONumberByDN(dn)}</td>
+                      <td className="whitespace-nowrap border p-2">{dn.dn_number || 'N/A'}</td>
+                      <td className="whitespace-nowrap border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
+                      <td className="whitespace-nowrap border p-2">{dn.delivery_status || 'N/A'}</td>
+                      <td className="whitespace-nowrap border p-2">
                         <div className="flex items-center gap-2">
                           <Button
                             onClick={() => handleViewDN(dn)}
-                            className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                            disabled={isSubmitting || !hasPermission('pending_deliveries', 'view')}
+                            className={`whitespace-nowrap px-3 py-1 text-sm rounded-md ${
+                              isSubmitting || !hasPermission('pending_deliveries', 'view')
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
                           >
                             View DN
                           </Button>
                           <Button
                             onClick={() => handleOpenCompleteModal(dn)}
-                            disabled={isSubmitting || !hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'}
+                            disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit') || dn.delivery_status === 'Delivered'}
                             className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                              isSubmitting || !hasPermission('delivery', 'edit') || dn.delivery_status === 'Delivered'
+                              isSubmitting || !hasPermission('pending_deliveries', 'edit') || dn.delivery_status === 'Delivered'
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-indigo-600 text-white hover:bg-indigo-700'
                             }`}
@@ -373,7 +378,12 @@ const PendingDeliveries = () => {
                           </Button>
                           <Button
                             onClick={() => handlePrint(dn)}
-                            className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                            disabled={isSubmitting || !hasPermission('pending_deliveries', 'view')}
+                            className={`whitespace-nowrap px-3 py-1 text-sm rounded-md ${
+                              isSubmitting || !hasPermission('pending_deliveries', 'view')
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
                           >
                             Print DN
                           </Button>
@@ -400,7 +410,7 @@ const PendingDeliveries = () => {
                 key={page}
                 onClick={() => handlePageChange(page)}
                 disabled={isSubmitting}
-                className={`px-3 py-1 rounded-md min-w-fit ${
+                className={`whitespace-nowrap px-3 py-1 rounded-md min-w-fit ${
                   isSubmitting
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
@@ -414,7 +424,7 @@ const PendingDeliveries = () => {
             <Button
               onClick={handleNext}
               disabled={state.currentPage === totalPages || isSubmitting}
-              className={`px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit`}
+              className={`whitespace-nowrap px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit`}
             >
               {isSubmitting ? 'Submitting...' : 'Next'}
             </Button>
@@ -534,6 +544,7 @@ const PendingDeliveries = () => {
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setState((prev) => ({ ...prev, signedDeliveryNote: e.target.files[0] }))}
                 className="w-full p-2 border rounded focus:outline-indigo-500"
+                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
             <div className="mb-4">
@@ -544,6 +555,7 @@ const PendingDeliveries = () => {
                 onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
                 className="w-full p-2 border rounded focus:outline-indigo-500"
                 min="1"
+                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -558,7 +570,7 @@ const PendingDeliveries = () => {
                   }))
                 }
                 disabled={isSubmitting}
-                className={`px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm ${
+                className={`whitespace-nowrap px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm ${
                   isSubmitting ? 'cursor-not-allowed' : ''
                 }`}
               >
@@ -566,9 +578,9 @@ const PendingDeliveries = () => {
               </Button>
               <Button
                 onClick={handleCompleteDelivery}
-                disabled={isSubmitting || !hasPermission('delivery', 'edit')}
-                className={`px-3 py-1 rounded-md text-sm ${
-                  isSubmitting || !hasPermission('delivery', 'edit')
+                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
+                className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                  isSubmitting || !hasPermission('pending_deliveries', 'edit')
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
