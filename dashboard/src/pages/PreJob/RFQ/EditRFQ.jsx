@@ -38,7 +38,7 @@ const EditRFQ = () => {
     units: [],
     loading: true,
     lastSaved: null,
-    submitting: false, // New state for submission loading
+    submitting: false, 
   });
 
   useEffect(() => {
@@ -567,10 +567,10 @@ const EditRFQ = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-semibold mb-4">
+      <h1 className="text-2xl text-center sm:text-left font-semibold mb-4">
         {isQuotation ? 'Convert to Quotation' : 'Edit RFQ'}
       </h1>
-      <div className="text-sm text-gray-600 mb-4">
+      <div className="text-sm text-center sm:text-left text-gray-600 mb-4">
         Last saved:{' '}
         {state.lastSaved ? state.lastSaved.toLocaleTimeString() : 'Not saved yet'}
       </div>

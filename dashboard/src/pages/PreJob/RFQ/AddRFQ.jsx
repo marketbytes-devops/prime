@@ -539,7 +539,7 @@ const AddRFQ = () => {
         {state.items.map((item, index) => (
           <div key={index} className="border p-4 rounded bg-gray-50">
             <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
-            <div className="flex items-center justify-between gap-4">
+            <div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
               <div className="w-full">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item
@@ -603,20 +603,20 @@ const AddRFQ = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Add RFQ</h1>
-      <div className="flex justify-between mb-6">
+      <h1 className="text-2xl text-center sm:text-left font-bold mb-4">Add RFQ</h1>
+      <div className="grid space-y-2 sm:flex justify-center sm:justify-between mb-6">
         <div
-          className={`flex-1 text-start ${step === 1 ? "font-bold text-indigo-600" : "text-gray-500"}`}
+          className={`flex-1 text-center sm:text-start ${step === 1 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 1: Company & Contact
         </div>
         <div
-          className={`flex-1 text-center ${step === 2 ? "font-bold text-indigo-600" : "text-gray-500"}`}
+          className={`flex-1 text-center sm:text-center ${step === 2 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 2: Assignment & Dates
         </div>
         <div
-          className={`flex-1 text-end ${step === 3 ? "font-bold text-indigo-600" : "text-gray-500"}`}
+          className={`flex-1 text-center sm:text-end ${step === 3 ? "font-bold text-indigo-600" : "text-gray-500"}`}
         >
           Step 3: Items
         </div>
@@ -676,7 +676,7 @@ const AddRFQ = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <Button
                     type="button"
                     onClick={handlePrev}
@@ -684,7 +684,6 @@ const AddRFQ = () => {
                   >
                     Previous
                   </Button>
-                  <div></div> {/* Empty div to maintain grid layout */}
                 </div>
                 <div className="flex justify-end">
                   <Button

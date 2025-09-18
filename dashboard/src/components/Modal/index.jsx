@@ -14,7 +14,7 @@ const Modal = ({ isOpen, onClose, title, children, className }) => {
           transition={{ duration: 0.3 }}
         >
           <motion.div
-            className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+            className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 m-4"
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.7, opacity: 0 }}
