@@ -270,16 +270,22 @@ const AddRFQ = () => {
     return false;
   };
 
-  const handleNext = () => {
+  const handleNext = (e) => {
+    e.preventDefault(); // Prevent form submission
     if (isStepValid()) {
-      setStep((prev) => prev + 1);
+      if (step < 3) {
+        setStep((prev) => prev + 1);
+      }
     } else {
       toast.error("Please fill all required fields.");
     }
   };
 
-  const handlePrev = () => {
-    setStep((prev) => prev - 1);
+  const handlePrev = (e) => {
+    e.preventDefault(); // Prevent form submission
+    if (step > 1) {
+      setStep((prev) => prev - 1);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -574,6 +580,7 @@ const AddRFQ = () => {
               </div>
               {state.items.length > 1 && (
                 <Button
+                  type="button"
                   onClick={() => removeItem(index)}
                   className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
                 >
@@ -584,6 +591,7 @@ const AddRFQ = () => {
           </div>
         ))}
         <Button
+          type="button"
           onClick={addItem}
           className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
         >
@@ -642,42 +650,52 @@ const AddRFQ = () => {
             {step === 1 ? (
               <div className="flex justify-end">
                 <Button
+                  type="button"
                   onClick={handleNext}
                   className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
                 >
                   Next
                 </Button>
               </div>
+            ) : step === 2 ? (
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  onClick={handlePrev}
+                  className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                >
+                  Next
+                </Button>
+              </div>
             ) : (
-              <>
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  {step > 1 && (
-                    <Button
-                      onClick={handlePrev}
-                      className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                    >
-                      Previous
-                    </Button>
-                  )}
                   <Button
-                    onClick={handleNext}
-                    className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                    type="button"
+                    onClick={handlePrev}
+                    className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
                   >
-                    Next
+                    Previous
+                  </Button>
+                  <div></div> {/* Empty div to maintain grid layout */}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={!isStepValid() || loading}
+                    className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {loading ? "Submitting..." : "Submit RFQ"}
                   </Button>
                 </div>
-                {step === 3 && (
-                  <div className="flex justify-end mt-4">
-                    <Button
-                      type="submit"
-                      disabled={!isStepValid() || loading}
-                      className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      {loading ? "Submitting..." : "Submit RFQ"}
-                    </Button>
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </div>
         </form>

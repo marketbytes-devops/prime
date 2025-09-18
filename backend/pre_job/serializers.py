@@ -70,7 +70,7 @@ class RFQSerializer(serializers.ModelSerializer):
             'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
             'series_number', 'created_at', 'items', 'rfq_status',
-            'assigned_sales_person_name', 'assigned_sales_person_email'
+            'assigned_sales_person_name', 'assigned_sales_person_email', 'email_sent',
         ]
 
     def validate_assigned_sales_person(self, value):
