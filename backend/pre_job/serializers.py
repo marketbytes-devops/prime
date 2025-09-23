@@ -62,6 +62,7 @@ class RFQSerializer(serializers.ModelSerializer):
     rfq_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')], allow_null=True, required=False)
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
+    email_sent = serializers.BooleanField(read_only=True, default=False) 
 
     class Meta:
         model = RFQ
@@ -93,27 +94,23 @@ class RFQSerializer(serializers.ModelSerializer):
         if superadmin_role:
             superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
             recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))
+        recipient_list = list(set([email for email in recipient_list if email]))  # Remove duplicates
 
         if recipient_list:
             for email in recipient_list:
-                # Determine salutation based on recipient
+                salutation = "Dear Recipient"
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
                 else:
                     user = CustomUser.objects.filter(email=email).first()
                     if user and user.role and user.role.name == "Superadmin":
-                        salutation = "Dear Admin"
-                    else:
-                        # For company or POC email, use point_of_contact_name if available
-                        name = rfq.point_of_contact_name if email == rfq.point_of_contact_email and rfq.point_of_contact_name else None
-                        # For assigned sales person, use their name
-                        if email == (rfq.assigned_sales_person.email if rfq.assigned_sales_person else None):
-                            name = rfq.assigned_sales_person.name if rfq.assigned_sales_person else None
-                        # If user exists in CustomUser, use their name
-                        if not name and user:
-                            name = user.get_full_name() or user.username
-                        salutation = f"Dear {name}" if name else "Dear Recipient"
+                        salutation = f"Dear {user.name or user.username}"
+                    elif email == rfq.point_of_contact_email and rfq.point_of_contact_name:
+                        salutation = f"Dear {rfq.point_of_contact_name}"
+                    elif email == (rfq.assigned_sales_person.email if rfq.assigned_sales_person else None):
+                        salutation = f"Dear {rfq.assigned_sales_person.name}"
+                    elif email == rfq.company_email and rfq.point_of_contact_name:
+                        salutation = f"Dear {rfq.point_of_contact_name}"
 
                 subject = f'New RFQ Created: #{rfq.series_number}'
                 message = (
@@ -184,7 +181,7 @@ class RFQSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['email_sent'] = getattr(instance, 'email_sent', False)
+        representation['email_sent'] = instance.email_sent  
         return representation
 
 class QuotationSerializer(serializers.ModelSerializer):
@@ -198,6 +195,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
     not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    email_sent = serializers.BooleanField(read_only=True, default=False) 
 
     class Meta:
         model = Quotation
@@ -207,7 +205,8 @@ class QuotationSerializer(serializers.ModelSerializer):
             'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
             'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
             'series_number', 'created_at', 'items', 'purchase_orders',
-            'assigned_sales_person_name', 'assigned_sales_person_email', 'not_approved_reason_remark'
+            'assigned_sales_person_name', 'assigned_sales_person_email', 'not_approved_reason_remark',
+            'email_sent'
         ]
 
     def get_purchase_orders(self, obj):
@@ -229,27 +228,23 @@ class QuotationSerializer(serializers.ModelSerializer):
         if superadmin_role:
             superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
             recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))
+        recipient_list = list(set([email for email in recipient_list if email])) 
 
         if recipient_list:
             for email in recipient_list:
-                # Determine salutation based on recipient
+                salutation = "Dear Recipient"
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
                 else:
                     user = CustomUser.objects.filter(email=email).first()
                     if user and user.role and user.role.name == "Superadmin":
-                        salutation = "Dear Admin"
-                    else:
-                        # For company or POC email, use point_of_contact_name if available
-                        name = quotation.point_of_contact_name if email == quotation.point_of_contact_email and quotation.point_of_contact_name else None
-                        # For assigned sales person, use their name
-                        if email == (quotation.assigned_sales_person.email if quotation.assigned_sales_person else None):
-                            name = quotation.assigned_sales_person.name if quotation.assigned_sales_person else None
-                        # If user exists in CustomUser, use their name
-                        if not name and user:
-                            name = user.get_full_name() or user.username
-                        salutation = f"Dear {name}" if name else "Dear Recipient"
+                        salutation = f"Dear {user.name or user.username}"
+                    elif email == quotation.point_of_contact_email and quotation.point_of_contact_name:
+                        salutation = f"Dear {quotation.point_of_contact_name}"
+                    elif email == (quotation.assigned_sales_person.email if quotation.assigned_sales_person else None):
+                        salutation = f"Dear {quotation.assigned_sales_person.name}"
+                    elif email == quotation.company_email and quotation.point_of_contact_name:
+                        salutation = f"Dear {quotation.point_of_contact_name}"
 
                 subject = f'New Quotation Submitted: #{quotation.series_number}'
                 message = (
@@ -335,7 +330,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['email_sent'] = getattr(instance, 'email_sent', False)
+        representation['email_sent'] = instance.email_sent  
         return representation
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
