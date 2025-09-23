@@ -64,7 +64,8 @@ class Quotation(models.Model):
     remarks = models.TextField(null=True, blank=True)
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    email_sent = models.BooleanField(default=False, blank=True, null=True)
+    
     def __str__(self):
         return f"Quotation {self.id} - {self.company_name or 'Unnamed'}"
 
