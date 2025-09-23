@@ -313,6 +313,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
+        assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
         not_approved_reason_remark = validated_data.get('not_approved_reason_remark', instance.not_approved_reason_remark)
         if validated_data.get('quotation_status') == 'Not Approved' and not not_approved_reason_remark:
             raise serializers.ValidationError("A reason must be provided when setting status to 'Not Approved'.")
