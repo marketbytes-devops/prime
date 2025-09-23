@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import date, timedelta
 import json
-from authapp.models import CustomUser, Role 
+from authapp.models import CustomUser, Role
 
 class RFQItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
@@ -78,216 +78,8 @@ class RFQSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Selected team member must have a valid email address.")
         return value
 
-    def send_assignment_email(self, rfq, assigned_sales_person):
-        email_sent = False
-        if assigned_sales_person and assigned_sales_person.email:
-            subject = f'You Have Been Assigned to RFQ #{rfq.series_number}'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'You have been assigned to the following Request for Quotation (RFQ):\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to view the details and take the necessary actions.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Email sent successfully to {assigned_sales_person.email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send email to {assigned_sales_person.email} for RFQ #{rfq.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'RFQ Assignment Notification – #{rfq.series_number}'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following RFQ has been assigned:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Email sent successfully to {admin_email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send email to {admin_email} for RFQ #{rfq.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_due_date_reminder(self, rfq, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                rfq.due_date_for_quotation == date.today() and
-                rfq.rfq_status != 'Completed'):
-            # Email to assigned person
-            subject = f'Reminder: RFQ #{rfq.series_number} Due Today'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'Your due date for the following Request for Quotation (RFQ) is ending today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please ensure all necessary actions are completed promptly. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Reminder email sent successfully to {assigned_sales_person.email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send reminder email to {assigned_sales_person.email} for RFQ #{rfq.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'RFQ #{rfq.series_number} Due Today Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following RFQ is due today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Reminder email sent successfully to {admin_email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send reminder email to {admin_email} for RFQ #{rfq.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_past_due_alert(self, rfq, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                rfq.due_date_for_quotation and
-                rfq.due_date_for_quotation < date.today() and
-                rfq.rfq_status != 'Completed'):
-            # Email to assigned person
-            subject = f'Alert: RFQ #{rfq.series_number} Past Due'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'The due date for the following Request for Quotation (RFQ) has passed:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take immediate action to address this. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Past due alert email sent successfully to {assigned_sales_person.email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send past due alert email to {assigned_sales_person.email} for RFQ #{rfq.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'RFQ #{rfq.series_number} Past Due Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following RFQ is past due:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {rfq.company_name or ""}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation}\n'
-                f'🔹 Status: {rfq.rfq_status or "Processing"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Past due alert email sent successfully to {admin_email} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send past due alert email to {admin_email} for RFQ #{rfq.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
     def send_creation_email(self, rfq):
         email_sent = False
-        # Collect recipient emails
         recipient_list = []
         if rfq.company_email:
             recipient_list.append(rfq.company_email)
@@ -295,14 +87,11 @@ class RFQSerializer(serializers.ModelSerializer):
             recipient_list.append(rfq.point_of_contact_email)
         if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
             recipient_list.append(rfq.assigned_sales_person.email)
-        # Add Superadmin emails
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
             superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
             recipient_list.extend(superadmin_emails)
-        # Remove duplicates and None values
         recipient_list = list(set([email for email in recipient_list if email]))
-
         if recipient_list:
             subject = f'New RFQ Created: #{rfq.series_number}'
             message = (
@@ -335,62 +124,6 @@ class RFQSerializer(serializers.ModelSerializer):
                 print(f"RFQ creation email sent successfully to {', '.join(recipient_list)} for RFQ #{rfq.series_number}")
             except Exception as e:
                 print(f"Failed to send RFQ creation email to {', '.join(recipient_list)} for RFQ #{rfq.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_update_email(self, rfq):
-        email_sent = False
-        # Collect recipient emails
-        recipient_list = []
-        if rfq.company_email:
-            recipient_list.append(rfq.company_email)
-        if rfq.point_of_contact_email:
-            recipient_list.append(rfq.point_of_contact_email)
-        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
-            recipient_list.append(rfq.assigned_sales_person.email)
-        # Add Superadmin emails
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        # Remove duplicates and None values
-        recipient_list = list(set([email for email in recipient_list if email]))
-
-        if recipient_list:
-            subject = f'RFQ Updated: #{rfq.series_number}'
-            message = (
-                f'Dear Recipient,\n\n'
-                f'The following Request for Quotation (RFQ) has been updated in PrimeCRM:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Project: {rfq.company_name or "Not specified"}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
-                f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
-                f'🔹 Company: {rfq.company_name or "Not specified"}\n'
-                f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
-                f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to review the updated details and take any necessary actions.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=recipient_list,
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"RFQ update email sent successfully to {', '.join(recipient_list)} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send RFQ update email to {', '.join(recipient_list)} for RFQ #{rfq.series_number}: {str(e)}")
-                email_sent = False
-
         return email_sent
 
     def create(self, validated_data):
@@ -407,17 +140,11 @@ class RFQSerializer(serializers.ModelSerializer):
         if max_sequence:
             sequence = int(max_sequence.split('-')[-1]) + 1
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
-
         rfq = RFQ.objects.create(series_number=series_number, assigned_sales_person=assigned_sales_person, **validated_data)
         for item_data in items_data:
             RFQItem.objects.create(rfq=rfq, **item_data)
-        if assigned_sales_person:
-            email_sent = self.send_assignment_email(rfq, assigned_sales_person)
-            rfq.email_sent = email_sent
-            rfq.save()
-        # Send creation email to company_email, point_of_contact_email, assigned_sales_person, and Superadmins
         creation_email_sent = self.send_creation_email(rfq)
-        rfq.email_sent = rfq.email_sent or creation_email_sent  # Update email_sent if either email was sent
+        rfq.email_sent = creation_email_sent
         rfq.save()
         return rfq
 
@@ -431,14 +158,6 @@ class RFQSerializer(serializers.ModelSerializer):
             instance.items.all().delete()
             for item_data in items_data:
                 RFQItem.objects.create(rfq=instance, **item_data)
-        if assigned_sales_person and (not instance.assigned_sales_person or instance.assigned_sales_person.id != assigned_sales_person.id):
-            email_sent = self.send_assignment_email(instance, assigned_sales_person)
-            instance.email_sent = email_sent
-            instance.save()
-        # Send update email to company_email, point_of_contact_email, assigned_sales_person, and Superadmins
-        update_email_sent = self.send_update_email(instance)
-        instance.email_sent = instance.email_sent or update_email_sent  # Update email_sent if either email was sent
-        instance.save()
         return instance
 
     def to_representation(self, instance):
@@ -473,20 +192,35 @@ class QuotationSerializer(serializers.ModelSerializer):
         pos = PurchaseOrder.objects.filter(quotation=obj)
         return PurchaseOrderSerializer(pos, many=True).data
 
-    def send_assignment_email(self, quotation, assigned_sales_person):
+    def send_submission_email(self, quotation):
         email_sent = False
-        if assigned_sales_person and assigned_sales_person.email:
-            subject = f'You Have Been Assigned to Quotation #{quotation.series_number}'
+        recipient_list = []
+        if quotation.company_email:
+            recipient_list.append(quotation.company_email)
+        if quotation.point_of_contact_email:
+            recipient_list.append(quotation.point_of_contact_email)
+        if quotation.assigned_sales_person and quotation.assigned_sales_person.email:
+            recipient_list.append(quotation.assigned_sales_person.email)
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
+            recipient_list.extend(superadmin_emails)
+        recipient_list = list(set([email for email in recipient_list if email]))
+        if recipient_list:
+            subject = f'New Quotation Submitted: #{quotation.series_number}'
             message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'You have been assigned to the following Quotation:\n'
+                f'Dear Recipient,\n\n'
+                f'A new Quotation has been submitted in PrimeCRM:\n'
                 f'------------------------------------------------------------\n'
                 f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
+                f'🔹 Project: {quotation.company_name or "Not specified"}\n'
                 f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
                 f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
+                f'🔹 Assigned To: {quotation.assigned_sales_person.name if quotation.assigned_sales_person else "Not assigned"}\n'
+                f'🔹 Company: {quotation.company_name or "Not specified"}\n'
+                f'🔹 Contact: {quotation.point_of_contact_name or "Not specified"} ({quotation.point_of_contact_email or "Not specified"})\n'
                 f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to view the details and take the necessary actions.\n\n'
+                f'Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n'
                 f'Best regards,\n'
                 f'PrimeCRM Team\n'
                 f'---\n'
@@ -496,375 +230,14 @@ class QuotationSerializer(serializers.ModelSerializer):
                 send_mail(
                     subject=subject,
                     message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=recipient_list,
                     fail_silently=True,
                 )
                 email_sent = True
-                print(f"Email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
+                print(f"Quotation submission email sent successfully to {', '.join(recipient_list)} for Quotation #{quotation.series_number}")
             except Exception as e:
-                print(f"Failed to send email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Quotation Assignment Notification – #{quotation.series_number}'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following Quotation has been assigned:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_followup_reminder(self, quotation, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                quotation.next_followup_date == date.today() and
-                quotation.quotation_status != 'PO Created'):
-            # Email to assigned person
-            subject = f'Reminder: Quotation #{quotation.series_number} Follow-up Due Today'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'Your follow-up for the following Quotation is due today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please ensure all necessary actions are completed promptly. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Follow-up reminder email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send follow-up reminder email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Quotation #{quotation.series_number} Follow-up Due Today Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following Quotation has a follow-up due today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Follow-up reminder email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send follow-up reminder email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
-            # Update next_followup_date if frequency is 'every_7th_day'
-            if quotation.followup_frequency == 'every_7th_day':
-                quotation.next_followup_date = date.today() + timedelta(days=7)
-                quotation.save()
-
-        return email_sent
-
-    def send_past_due_alert(self, quotation, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                quotation.next_followup_date and
-                quotation.next_followup_date < date.today() and
-                quotation.quotation_status != 'PO Created'):
-            # Email to assigned person
-            subject = f'Alert: Quotation #{quotation.series_number} Follow-up Past Due'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'The follow-up date for the following Quotation has passed:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take immediate action to address this. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Past due alert email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send past due alert email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Quotation #{quotation.series_number} Follow-up Past Due Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following Quotation is past due for follow-up:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Past due alert email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send past due alert email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_po_followup_reminder(self, quotation, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                quotation.quotation_status == 'Approved' and
-                not quotation.purchase_orders.exists() and
-                quotation.next_followup_date == date.today()):
-            # Email to assigned person
-            subject = f'Reminder: Follow-up on Purchase Order for Quotation #{quotation.series_number}'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'The following Quotation has been approved but no Purchase Order has been received yet:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status}\n'
-                f'------------------------------------------------------------\n'
-                f'Please follow up with the client to obtain the Purchase Order. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"PO follow-up reminder email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send PO follow-up reminder email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Quotation #{quotation.series_number} PO Follow-up Due Today Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'We would like to inform you that the following Quotation has a PO follow-up due today:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"PO follow-up reminder email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send PO follow-up reminder email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_po_past_due_alert(self, quotation, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                quotation.quotation_status == 'Approved' and
-                not quotation.purchase_orders.exists() and
-                quotation.next_followup_date and
-                quotation.next_followup_date < date.today()):
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Alert: No Purchase Order Received for Quotation #{quotation.series_number}'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'The following Quotation has been approved but no Purchase Order has been received, and the follow-up date has passed:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Next Follow-up Date: {quotation.next_followup_date}\n'
-                f'🔹 Status: {quotation.quotation_status}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"PO past due alert email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send PO past due alert email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
-        return email_sent
-
-    def send_not_approved_notification(self, quotation, assigned_sales_person):
-        email_sent = False
-        if (assigned_sales_person and assigned_sales_person.email and
-                quotation.quotation_status == 'Not Approved'):
-            # Email to assigned person
-            subject = f'Quotation #{quotation.series_number} Not Approved'
-            message = (
-                f'Dear {assigned_sales_person.name},\n\n'
-                f'The following Quotation has been marked as Not Approved:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Status: {quotation.quotation_status}\n'
-                f'🔹 Reason for Non-Approval: {quotation.not_approved_reason_remark or "Not specified"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please review the details and take any necessary actions. '
-                f'Log in to your PrimeCRM dashboard for details.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=None,
-                    recipient_list=[assigned_sales_person.email],
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Not approved notification email sent successfully to {assigned_sales_person.email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send not approved notification email to {assigned_sales_person.email} for Quotation #{quotation.series_number}: {str(e)}")
-
-            # Email to admin
-            admin_email = settings.ADMIN_EMAIL
-            admin_subject = f'Quotation #{quotation.series_number} Not Approved Notification'
-            admin_message = (
-                f'Dear Admin,\n\n'
-                f'The following Quotation has been marked as Not Approved:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Assigned To: {assigned_sales_person.name} ({assigned_sales_person.email})\n'
-                f'🔹 Project: {quotation.company_name or ""}\n'
-                f'🔹 Status: {quotation.quotation_status}\n'
-                f'🔹 Reason for Non-Approval: {quotation.not_approved_reason_remark or "Not specified"}\n'
-                f'------------------------------------------------------------\n'
-                f'Please take any necessary actions or follow up as required.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=admin_subject,
-                    message=admin_message,
-                    from_email=None,
-                    recipient_list=[admin_email],
-                    fail_silently=True,
-                )
-                print(f"Not approved notification email sent successfully to {admin_email} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send not approved notification email to {admin_email} for Quotation #{quotation.series_number}: {str(e)}")
-                email_sent = False
-
+                print(f"Failed to send quotation submission email to {', '.join(recipient_list)} for Quotation #{quotation.series_number}: {str(e)}")
         return email_sent
 
     def create(self, validated_data):
@@ -881,43 +254,24 @@ class QuotationSerializer(serializers.ModelSerializer):
         if max_sequence:
             sequence = int(max_sequence.split('-')[-1]) + 1
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
-
-        # Set default followup_frequency to '24_hours' if not provided
         if 'followup_frequency' not in validated_data:
             validated_data['followup_frequency'] = '24_hours'
-
         quotation = Quotation.objects.create(series_number=series_number, assigned_sales_person=assigned_sales_person, **validated_data)
         for item_data in items_data:
             QuotationItem.objects.create(quotation=quotation, **item_data)
-        
-        if assigned_sales_person:
-            email_sent = self.send_assignment_email(quotation, assigned_sales_person)
-            quotation.email_sent = email_sent
-            quotation.save()
-        
-        # Send initial follow-up reminder if applicable
-        if quotation.next_followup_date == date.today() and quotation.quotation_status != 'PO Created':
-            self.send_followup_reminder(quotation, assigned_sales_person)
-        
-        # Send PO follow-up reminder if quotation is approved and no PO exists
-        if quotation.quotation_status == 'Approved' and not quotation.purchase_orders.exists():
-            self.send_po_followup_reminder(quotation, assigned_sales_person)
-        
+        email_sent = self.send_submission_email(quotation)
+        quotation.email_sent = email_sent
+        quotation.save()
         return quotation
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
         assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
         not_approved_reason_remark = validated_data.get('not_approved_reason_remark', instance.not_approved_reason_remark)
-        
-        # Validate not_approved_reason_remark when status is 'Not Approved'
         if validated_data.get('quotation_status') == 'Not Approved' and not not_approved_reason_remark:
             raise serializers.ValidationError("A reason must be provided when setting status to 'Not Approved'.")
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
-        # Update next_followup_date based on followup_frequency
         if validated_data.get('followup_frequency') and instance.followup_frequency != validated_data['followup_frequency']:
             today = timezone.now().date()
             if validated_data['followup_frequency'] == '24_hours':
@@ -928,38 +282,11 @@ class QuotationSerializer(serializers.ModelSerializer):
                 instance.next_followup_date = today + timedelta(days=7)
             elif validated_data['followup_frequency'] == 'every_7th_day':
                 instance.next_followup_date = today + timedelta(days=7)
-        
         instance.save()
-        
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
-        
-        # Send assignment email if sales person changed
-        if assigned_sales_person and (not instance.assigned_sales_person or instance.assigned_sales_person.id != assigned_sales_person.id):
-            email_sent = self.send_assignment_email(instance, assigned_sales_person)
-            instance.email_sent = email_sent
-            instance.save()
-        
-        # Send follow-up reminders and alerts
-        if instance.next_followup_date == date.today() and instance.quotation_status != 'PO Created':
-            self.send_followup_reminder(instance, assigned_sales_person)
-        
-        if instance.next_followup_date and instance.next_followup_date < date.today() and instance.quotation_status != 'PO Created':
-            self.send_past_due_alert(instance, assigned_sales_person)
-        
-        # Send PO follow-up reminder and past due alert
-        if instance.quotation_status == 'Approved' and not instance.purchase_orders.exists():
-            if instance.next_followup_date == date.today():
-                self.send_po_followup_reminder(instance, assigned_sales_person)
-            if instance.next_followup_date and instance.next_followup_date < date.today():
-                self.send_po_past_due_alert(instance, assigned_sales_person)
-        
-        # Send not approved notification if status is 'Not Approved'
-        if instance.quotation_status == 'Not Approved' and (not hasattr(instance, '_original_status') or instance._original_status != 'Not Approved'):
-            self.send_not_approved_notification(instance, assigned_sales_person)
-        
         return instance
 
     def to_representation(self, instance):
@@ -994,10 +321,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                 items_data = json.loads(self.context['request'].POST.get('items', '[]'))
             except json.JSONDecodeError:
                 raise serializers.ValidationError("Invalid JSON format for items.")
-
         quotation = validated_data['quotation']
         purchase_order = PurchaseOrder.objects.create(**validated_data)
-
         if validated_data['order_type'] == 'full':
             for item in quotation.items.all():
                 PurchaseOrderItem.objects.create(
@@ -1011,14 +336,12 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             for item_data in items_data:
                 item_instance = None
                 unit_instance = None
-                # Handle item field
                 item_id = item_data.get('item')
                 if item_id is not None:
                     try:
                         item_instance = Item.objects.get(id=item_id)
                     except Item.DoesNotExist:
                         raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
-                # Handle unit field
                 unit_id = item_data.get('unit')
                 if unit_id is not None:
                     try:
@@ -1032,7 +355,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                     unit=unit_instance,
                     unit_price=item_data.get('unit_price')
                 )
-
         quotation_items = set(quotation.items.values_list('id', flat=True))
         po_items = set(
             PurchaseOrderItem.objects.filter(
@@ -1042,7 +364,6 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if quotation_items.issubset(po_items):
             quotation.quotation_status = 'PO Created'
             quotation.save()
-
         return purchase_order
 
     def update(self, instance, validated_data):
@@ -1053,20 +374,17 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if 'po_file' in validated_data:
             instance.po_file = validated_data.get('po_file')
         instance.save()
-
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 item_instance = None
                 unit_instance = None
-                # Handle item field
                 item_id = item_data.get('item')
                 if item_id is not None:
                     try:
                         item_instance = Item.objects.get(id=item_id)
                     except Item.DoesNotExist:
                         raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
-                # Handle unit field
                 unit_id = item_data.get('unit')
                 if unit_id is not None:
                     try:
@@ -1080,5 +398,4 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                     unit=unit_instance,
                     unit_price=item_data.get('unit_price')
                 )
-
         return instance
