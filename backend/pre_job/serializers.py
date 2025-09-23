@@ -62,7 +62,6 @@ class RFQSerializer(serializers.ModelSerializer):
     rfq_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')], allow_null=True, required=False)
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
-    email_sent = serializers.BooleanField(read_only=True, default=False) 
 
     class Meta:
         model = RFQ
@@ -82,35 +81,40 @@ class RFQSerializer(serializers.ModelSerializer):
     def send_creation_email(self, rfq):
         email_sent = False
         recipient_list = []
+        
+        # Collect recipient emails
         if rfq.company_email:
-            recipient_list.append(rfq.company_email)
+            recipient_list.append((rfq.company_email, None))  # No specific name for company email
         if rfq.point_of_contact_email:
-            recipient_list.append(rfq.point_of_contact_email)
+            recipient_list.append((rfq.point_of_contact_email, rfq.point_of_contact_name))
         if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
-            recipient_list.append(rfq.assigned_sales_person.email)
+            recipient_list.append((rfq.assigned_sales_person.email, rfq.assigned_sales_person.name))
         if settings.ADMIN_EMAIL:
-            recipient_list.append(settings.ADMIN_EMAIL)
+            recipient_list.append((settings.ADMIN_EMAIL, None))  # Admin email with no specific name
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))  # Remove duplicates
+            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
+            for user in superadmin_users:
+                if user.email:
+                    recipient_list.append((user.email, user.name or user.username))
+
+        # Remove duplicates while preserving names
+        recipient_dict = {email: name for email, name in recipient_list}
+        recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
         if recipient_list:
-            for email in recipient_list:
-                salutation = "Dear Recipient"
+            for email, name in recipient_list:
+                # Determine salutation
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
+                elif superadmin_role and CustomUser.objects.filter(email=email, role=superadmin_role).exists():
+                    salutation = f"Dear {name}" if name else "Dear Superadmin"
+                elif email == rfq.point_of_contact_email and name:
+                    salutation = f"Dear {name}"
+                elif email == (rfq.assigned_sales_person.email if rfq.assigned_sales_person else None) and name:
+                    salutation = f"Dear {name}"
                 else:
-                    user = CustomUser.objects.filter(email=email).first()
-                    if user and user.role and user.role.name == "Superadmin":
-                        salutation = f"Dear {user.name or user.username}"
-                    elif email == rfq.point_of_contact_email and rfq.point_of_contact_name:
-                        salutation = f"Dear {rfq.point_of_contact_name}"
-                    elif email == (rfq.assigned_sales_person.email if rfq.assigned_sales_person else None):
-                        salutation = f"Dear {rfq.assigned_sales_person.name}"
-                    elif email == rfq.company_email and rfq.point_of_contact_name:
-                        salutation = f"Dear {rfq.point_of_contact_name}"
+                    salutation = "Dear Recipient"
 
                 subject = f'New RFQ Created: #{rfq.series_number}'
                 message = (
@@ -181,7 +185,7 @@ class RFQSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['email_sent'] = instance.email_sent  
+        representation['email_sent'] = getattr(instance, 'email_sent', False)
         return representation
 
 class QuotationSerializer(serializers.ModelSerializer):
@@ -195,7 +199,6 @@ class QuotationSerializer(serializers.ModelSerializer):
     assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
     assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
     not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    email_sent = serializers.BooleanField(read_only=True, default=False) 
 
     class Meta:
         model = Quotation
@@ -206,7 +209,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
             'series_number', 'created_at', 'items', 'purchase_orders',
             'assigned_sales_person_name', 'assigned_sales_person_email', 'not_approved_reason_remark',
-            'email_sent'
+            'email_sent',
         ]
 
     def get_purchase_orders(self, obj):
@@ -216,35 +219,40 @@ class QuotationSerializer(serializers.ModelSerializer):
     def send_submission_email(self, quotation):
         email_sent = False
         recipient_list = []
+        
+        # Collect recipient emails
         if quotation.company_email:
-            recipient_list.append(quotation.company_email)
+            recipient_list.append((quotation.company_email, None))  # No specific name for company email
         if quotation.point_of_contact_email:
-            recipient_list.append(quotation.point_of_contact_email)
+            recipient_list.append((quotation.point_of_contact_email, quotation.point_of_contact_name))
         if quotation.assigned_sales_person and quotation.assigned_sales_person.email:
-            recipient_list.append(quotation.assigned_sales_person.email)
+            recipient_list.append((quotation.assigned_sales_person.email, quotation.assigned_sales_person.name))
         if settings.ADMIN_EMAIL:
-            recipient_list.append(settings.ADMIN_EMAIL)
+            recipient_list.append((settings.ADMIN_EMAIL, None))  # Admin email with no specific name
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email])) 
+            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
+            for user in superadmin_users:
+                if user.email:
+                    recipient_list.append((user.email, user.name or user.username))
+
+        # Remove duplicates while preserving names
+        recipient_dict = {email: name for email, name in recipient_list}
+        recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
         if recipient_list:
-            for email in recipient_list:
-                salutation = "Dear Recipient"
+            for email, name in recipient_list:
+                # Determine salutation
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
+                elif superadmin_role and CustomUser.objects.filter(email=email, role=superadmin_role).exists():
+                    salutation = f"Dear {name}" if name else "Dear Superadmin"
+                elif email == quotation.point_of_contact_email and name:
+                    salutation = f"Dear {name}"
+                elif email == (quotation.assigned_sales_person.email if quotation.assigned_sales_person else None) and name:
+                    salutation = f"Dear {name}"
                 else:
-                    user = CustomUser.objects.filter(email=email).first()
-                    if user and user.role and user.role.name == "Superadmin":
-                        salutation = f"Dear {user.name or user.username}"
-                    elif email == quotation.point_of_contact_email and quotation.point_of_contact_name:
-                        salutation = f"Dear {quotation.point_of_contact_name}"
-                    elif email == (quotation.assigned_sales_person.email if quotation.assigned_sales_person else None):
-                        salutation = f"Dear {quotation.assigned_sales_person.name}"
-                    elif email == quotation.company_email and quotation.point_of_contact_name:
-                        salutation = f"Dear {quotation.point_of_contact_name}"
+                    salutation = "Dear Recipient"
 
                 subject = f'New Quotation Submitted: #{quotation.series_number}'
                 message = (
@@ -305,7 +313,6 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
-        assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
         not_approved_reason_remark = validated_data.get('not_approved_reason_remark', instance.not_approved_reason_remark)
         if validated_data.get('quotation_status') == 'Not Approved' and not not_approved_reason_remark:
             raise serializers.ValidationError("A reason must be provided when setting status to 'Not Approved'.")
@@ -330,7 +337,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['email_sent'] = instance.email_sent  
+        representation['email_sent'] = getattr(instance, 'email_sent', False)
         return representation
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
