@@ -9,7 +9,6 @@ from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from datetime import date, timedelta
 import logging
 from authapp.models import CustomUser, Role
 
@@ -74,6 +73,7 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         instance.delivery_status = validated_data.get("delivery_status", instance.delivery_status)
         instance.series = validated_data.get("series", instance.series)
         instance.save()
+
         if items_data:
             instance.items.all().delete()
             for item_data in items_data:
@@ -171,44 +171,132 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "invoice_file", "payment_reference_number",
         ]
 
-    def send_invoice_status_change_email(self, work_order, new_status):
-        admin_email = settings.ADMIN_EMAIL
-        subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
-        message = (
-            f"Dear Admin,\n\n"
-            f"The invoice status for the following Work Order has been updated:\n"
-            f"------------------------------------------------------------\n"
-            f"🔹 Work Order Number: {work_order.wo_number}\n"
-            f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
-            f"🔹 New Invoice Status: {new_status}\n"
-            f'🔹 Due in Days: {work_order.due_in_days or "Not specified"}\n'
-            f'🔹 Received Date: {work_order.received_date or "Not specified"}\n'
-            f"------------------------------------------------------------\n"
-            f"Please take any necessary actions or follow up as required.\n\n"
-            f"Best regards,\n"
-            f"PrimeCRM Team\n"
-            f"---\n"
-            f"This is an automated message. Please do not reply to this email."
-        )
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=None,
-                recipient_list=[admin_email],
-                fail_silently=True,
-            )
-            logger.info(f"Invoice status change email sent to {admin_email} for WO #{work_order.wo_number}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send invoice status change email to {admin_email} for WO #{work_order.wo_number}: {str(e)}")
-            return False
+    def send_invoice_status_change_email(self, work_order, new_status, user):
+        email_sent = False
+        recipient_list = []
+
+        # Collect recipient emails
+        if work_order.quotation:
+            if work_order.quotation.company_email:
+                recipient_list.append(work_order.quotation.company_email)
+            if work_order.quotation.point_of_contact_email:
+                recipient_list.append(work_order.quotation.point_of_contact_email)
+        if work_order.created_by and work_order.created_by.email:
+            recipient_list.append(work_order.created_by.email)
+
+        # Add Admin and Superadmin emails
+        admin_role = Role.objects.filter(name__in=["Admin", "Superadmin"]).first()
+        if admin_role:
+            admin_emails = CustomUser.objects.filter(role=admin_role).values_list('email', flat=True)
+            recipient_list.extend(admin_emails)
+
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
+            for recipient_email in recipient_list:
+                try:
+                    recipient_user = CustomUser.objects.filter(email=recipient_email).first()
+                    greeting_name = "Admin" if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"] else (recipient_user.username if recipient_user else "Recipient")
+                    message = (
+                        f"Dear {greeting_name},\n\n"
+                        f"The invoice status for the following Work Order has been updated:\n"
+                        f"------------------------------------------------------------\n"
+                        f"🔹 Work Order Number: {work_order.wo_number}\n"
+                        f'🔹 Project: {work_order.quotation.company_name if work_order.quotation else "Unnamed"}\n'
+                        f"🔹 New Invoice Status: {new_status}\n"
+                        f'🔹 Due in Days: {work_order.due_in_days or "Not specified"}\n'
+                        f'🔹 Received Date: {work_order.received_date or "Not specified"}\n'
+                        f"------------------------------------------------------------\n"
+                        f"Please take any necessary actions or follow up as required.\n\n"
+                        f"Best regards,\n"
+                        f"PrimeCRM Team\n"
+                        f"---\n"
+                        f"This is an automated message. Please do not reply to this email."
+                    )
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[recipient_email],
+                        fail_silently=True,
+                    )
+                    # Set email_sent to True only for Admin or Superadmin
+                    if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"]:
+                        email_sent = True
+                    logger.info(f"Invoice status change email sent to {recipient_email} for WO #{work_order.wo_number}")
+                except Exception as e:
+                    logger.error(f"Failed to send invoice status change email to {recipient_email} for WO #{work_order.wo_number}: {str(e)}")
+        return email_sent
+
+    def send_creation_email(self, work_order, user):
+        email_sent = False
+        recipient_list = []
+
+        # Collect recipient emails
+        if work_order.quotation:
+            if work_order.quotation.company_email:
+                recipient_list.append(work_order.quotation.company_email)
+            if work_order.quotation.point_of_contact_email:
+                recipient_list.append(work_order.quotation.point_of_contact_email)
+        if work_order.created_by and work_order.created_by.email:
+            recipient_list.append(work_order.created_by.email)
+
+        # Add Admin and Superadmin emails
+        admin_role = Role.objects.filter(name__in=["Admin", "Superadmin"]).first()
+        if admin_role:
+            admin_emails = CustomUser.objects.filter(role=admin_role).values_list('email', flat=True)
+            recipient_list.extend(admin_emails)
+
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f'New Work Order Created: #{work_order.wo_number}'
+            for recipient_email in recipient_list:
+                try:
+                    recipient_user = CustomUser.objects.filter(email=recipient_email).first()
+                    greeting_name = "Admin" if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"] else (recipient_user.username if recipient_user else "Recipient")
+                    message = (
+                        f'Dear {greeting_name},\n\n'
+                        f'A new Work Order has been created in PrimeCRM:\n'
+                        f'------------------------------------------------------------\n'
+                        f'🔹 Work Order Number: {work_order.wo_number}\n'
+                        f'🔹 Project: {work_order.quotation.company_name if work_order.quotation else "Not specified"}\n'
+                        f'🔹 Status: {work_order.status or "Collection Pending"}\n'
+                        f'🔹 Expected Completion Date: {work_order.expected_completion_date or "Not specified"}\n'
+                        f'🔹 Created By: {work_order.created_by.name if work_order.created_by else "Not specified"}\n'
+                        f'🔹 Onsite or Lab: {work_order.onsite_or_lab or "Not specified"}\n'
+                        f'🔹 Site Location: {work_order.site_location or "Not specified"}\n'
+                        f'------------------------------------------------------------\n'
+                        f'Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n'
+                        f'Best regards,\n'
+                        f'PrimeCRM Team\n'
+                        f'---\n'
+                        f'This is an automated message. Please do not reply to this email.'
+                    )
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[recipient_email],
+                        fail_silently=True,
+                    )
+                    # Set email_sent to True only for Admin or Superadmin
+                    if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"]:
+                        email_sent = True
+                    logger.info(f"Work Order creation email sent to {recipient_email} for WO #{work_order.wo_number}")
+                except Exception as e:
+                    logger.error(f"Failed to send Work Order creation email to {recipient_email} for WO #{work_order.wo_number}: {str(e)}")
+        return email_sent
 
     def validate(self, data):
         instance = getattr(self, "instance", None)
         new_invoice_status = data.get("invoice_status")
         due_in_days = data.get("due_in_days")
         received_date = data.get("received_date")
+
         if new_invoice_status:
             if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
                 raise serializers.ValidationError("Due in days is required and must be a positive integer for 'raised' status.")
@@ -221,6 +309,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     def parse_formdata_items(self, request_data):
         items_data = []
         item_indices = set()
+
         for key in request_data.keys():
             if key.startswith("items[") and "]" in key:
                 try:
@@ -228,6 +317,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     item_indices.add(index)
                 except (ValueError, IndexError):
                     continue
+
         for index in sorted(item_indices):
             item_data = {}
             prefix = f"items[{index}]"
@@ -246,6 +336,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 f"{prefix}assigned_to": "assigned_to",
                 f"{prefix}certificate_file": "certificate_file",
             }
+
             for form_key, item_key in field_mappings.items():
                 if form_key in request_data:
                     value = request_data[form_key]
@@ -283,17 +374,21 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if hasattr(request, "data") and any(key.startswith("items[") for key in request.data.keys()):
             items_data = self.parse_formdata_items(request.data)
+
         if request and hasattr(request.user, "technician"):
             validated_data["created_by"] = request.user.technician
         else:
             validated_data["created_by"] = None
+
         try:
             wo_series = NumberSeries.objects.get(series_name="Work Order")
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Work Order series not found.")
+
         max_sequence = WorkOrder.objects.filter(wo_number__startswith=wo_series.prefix).aggregate(Max("wo_number"))["wo_number__max"]
         sequence = 1 if not max_sequence else int(max_sequence.split("-")[-1]) + 1
         wo_number = f"{wo_series.prefix}-{sequence:06d}"
+
         work_order = WorkOrder.objects.create(
             wo_number=wo_number,
             purchase_order=validated_data.get("purchase_order"),
@@ -311,29 +406,50 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             wo_type=validated_data.get("wo_type"),
             application_status=validated_data.get("application_status"),
         )
+
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
+
         for item_data in items_data:
             item_data.setdefault("range", None)
             logger.info(f"Creating item with data: {dict(item_data)}")
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
+
+        # Send creation email
+        creation_email_sent = self.send_creation_email(work_order, self.context.get('request').user if self.context.get('request') else None)
+        logger.info(f"Work Order creation email sent successfully for WO #{work_order.wo_number}" if creation_email_sent else f"Work Order creation email failed for WO #{work_order.wo_number}")
+
+        # Send invoice status change email if applicable
         if work_order.invoice_status in ["raised", "processed"]:
-            self.send_invoice_status_change_email(work_order, work_order.invoice_status)
+            email_sent = self.send_invoice_status_change_email(work_order, work_order.invoice_status, self.context.get('request').user if self.context.get('request') else None)
+            if email_sent:
+                work_order.email_sent = email_sent
+                work_order.save()
+                logger.info(f"Invoice status change email sent successfully for WO #{work_order.wo_number}")
+
         return work_order
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
         previous_invoice_status = instance.invoice_status
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         logger.info(f"Updated WorkOrder {instance.id}")
+
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 logger.info(f"Creating item with data: {dict(item_data)}")
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
                 logger.info(f"Updated items for WorkOrder {instance.id}")
+
+        # Send invoice status change email if status changed to 'raised' or 'processed'
         if "invoice_status" in validated_data and validated_data["invoice_status"] != previous_invoice_status and validated_data["invoice_status"] in ["raised", "processed"]:
-            self.send_invoice_status_change_email(instance, validated_data["invoice_status"])
+            email_sent = self.send_invoice_status_change_email(instance, validated_data["invoice_status"], self.context.get('request').user if self.context.get('request') else None)
+            instance.email_sent = email_sent
+            instance.save()
+            logger.info(f"Invoice status change email sent successfully for WO #{instance.wo_number}" if email_sent else f"Invoice status change email failed for WO #{instance.wo_number}")
+
         return instance

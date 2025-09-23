@@ -1,401 +1,455 @@
 from rest_framework import serializers
-from .models import RFQ, RFQItem, Quotation, QuotationItem, PurchaseOrder, PurchaseOrderItem
+from .models import WorkOrder, WorkOrderItem, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
+from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
 from unit.models import Unit
-from channels.models import RFQChannel
-from team.models import TeamMember
 from series.models import NumberSeries
+from team.models import Technician
 from django.db.models import Max
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from datetime import date, timedelta
-import json
+import logging
 from authapp.models import CustomUser, Role
 
-class RFQItemSerializer(serializers.ModelSerializer):
+logger = logging.getLogger(__name__)
+
+class DeliveryNoteItemComponentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryNoteItemComponent
+        fields = ['id', 'component', 'value']
+
+class DeliveryNoteItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
-    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
-    total_price = serializers.SerializerMethodField()
+    uom = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
+    components = DeliveryNoteItemComponentSerializer(many=True, required=False)
 
     class Meta:
-        model = RFQItem
-        fields = ['id', 'item', 'quantity', 'unit', 'unit_price', 'total_price']
+        model = DeliveryNoteItem
+        fields = ["id", "item", "range", "quantity", "delivered_quantity", "uom", "components"]
 
-    def get_total_price(self, obj):
-        if obj.quantity and obj.unit_price:
-            return obj.quantity * obj.unit_price
-        return 0
+    def validate(self, data):
+        if data.get("quantity") != data.get("delivered_quantity"):
+            raise serializers.ValidationError({"delivered_quantity": "Delivered quantity must equal quantity."})
+        return data
 
-class QuotationItemSerializer(serializers.ModelSerializer):
-    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
-    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
-    total_price = serializers.SerializerMethodField()
+    def create(self, validated_data):
+        components_data = validated_data.pop('components', [])
+        delivery_note_item = DeliveryNoteItem.objects.create(**validated_data)
+        for component_data in components_data:
+            DeliveryNoteItemComponent.objects.create(delivery_note_item=delivery_note_item, **component_data)
+        return delivery_note_item
 
-    class Meta:
-        model = QuotationItem
-        fields = ['id', 'item', 'quantity', 'unit', 'unit_price', 'total_price']
+    def update(self, instance, validated_data):
+        components_data = validated_data.pop('components', [])
+        instance.item = validated_data.get('item', instance.item)
+        instance.range = validated_data.get('range', instance.range)
+        instance.quantity = validated_data.get('quantity', instance.quantity)
+        instance.delivered_quantity = validated_data.get('delivered_quantity', instance.delivered_quantity)
+        instance.uom = validated_data.get('uom', instance.uom)
+        instance.save()
+        instance.components.all().delete()
+        for component_data in components_data:
+            DeliveryNoteItemComponent.objects.create(delivery_note_item=instance, **component_data)
+        return instance
 
-    def get_total_price(self, obj):
-        if obj.quantity and obj.unit_price:
-            return obj.quantity * obj.unit_price
-        return 0
-
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
-    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
-    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
-    total_price = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PurchaseOrderItem
-        fields = ['id', 'item', 'quantity', 'unit', 'unit_price', 'total_price']
-
-    def get_total_price(self, obj):
-        if obj.quantity and obj.unit_price:
-            return obj.quantity * obj.unit_price
-        return 0
-
-class RFQSerializer(serializers.ModelSerializer):
-    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
-    items = RFQItemSerializer(many=True, required=False)
-    rfq_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')], allow_null=True, required=False)
-    assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
-    assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
+class DeliveryNoteSerializer(serializers.ModelSerializer):
+    work_order_id = serializers.PrimaryKeyRelatedField(source="work_order", read_only=True)
+    work_order_number = serializers.CharField(source="work_order.wo_number", read_only=True)
+    items = DeliveryNoteItemSerializer(many=True, required=False)
+    series = serializers.PrimaryKeyRelatedField(queryset=NumberSeries.objects.all(), allow_null=True, required=False)
 
     class Meta:
-        model = RFQ
+        model = DeliveryNote
         fields = [
-            'id', 'company_name', 'company_address', 'company_phone', 'company_email',
-            'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
-            'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
-            'series_number', 'created_at', 'items', 'rfq_status',
-            'assigned_sales_person_name', 'assigned_sales_person_email', 'email_sent',
+            "id", "dn_number", "work_order", "work_order_id", "work_order_number",
+            "signed_delivery_note", "delivery_status", "created_at", "items", "series"
         ]
 
-    def validate_assigned_sales_person(self, value):
-        if value and not value.email:
-            raise serializers.ValidationError("Selected team member must have a valid email address.")
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", [])
+        instance.dn_number = validated_data.get("dn_number", instance.dn_number)
+        instance.signed_delivery_note = validated_data.get("signed_delivery_note", instance.signed_delivery_note)
+        instance.delivery_status = validated_data.get("delivery_status", instance.delivery_status)
+        instance.series = validated_data.get("series", instance.series)
+        instance.save()
+
+        if items_data:
+            instance.items.all().delete()
+            for item_data in items_data:
+                components_data = item_data.pop("components", [])
+                delivery_note_item = DeliveryNoteItem.objects.create(
+                    delivery_note=instance,
+                    item=item_data.get("item"),
+                    range=item_data.get("range"),
+                    quantity=item_data.get("quantity"),
+                    delivered_quantity=item_data.get("delivered_quantity"),
+                    uom=item_data.get("uom"),
+                )
+                for component_data in components_data:
+                    DeliveryNoteItemComponent.objects.create(
+                        delivery_note_item=delivery_note_item,
+                        component=component_data.get("component"),
+                        value=component_data.get("value"),
+                    )
+        return instance
+
+class InitiateDeliverySerializer(serializers.Serializer):
+    delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])
+    items = DeliveryNoteItemSerializer(many=True)
+
+    def validate(self, data):
+        if not data.get("items"):
+            raise serializers.ValidationError({"items": "At least one item is required."})
+        return data
+
+class WorkOrderItemSerializer(serializers.ModelSerializer):
+    item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all(), allow_null=True)
+    unit = serializers.PrimaryKeyRelatedField(queryset=Unit.objects.all(), allow_null=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(queryset=Technician.objects.all(), allow_null=True, required=False)
+    total_price = serializers.SerializerMethodField()
+    calibration_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    calibration_due_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+
+    class Meta:
+        model = WorkOrderItem
+        fields = [
+            "id", "item", "quantity", "unit", "unit_price", "range", "certificate_uut_label",
+            "certificate_number", "calibration_date", "calibration_due_date", "uuc_serial_number",
+            "certificate_file", "assigned_to", "total_price",
+        ]
+
+    def get_total_price(self, obj):
+        if obj.quantity and obj.unit_price:
+            return obj.quantity * obj.unit_price
+        return 0
+
+    def validate_assigned_to(self, value):
+        if value is not None and not Technician.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Selected technician does not exist.")
         return value
 
-    def send_creation_email(self, rfq):
-        email_sent = False
-        recipient_list = []
-        if rfq.company_email:
-            recipient_list.append(rfq.company_email)
-        if rfq.point_of_contact_email:
-            recipient_list.append(rfq.point_of_contact_email)
-        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
-            recipient_list.append(rfq.assigned_sales_person.email)
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))
-        if recipient_list:
-            subject = f'New RFQ Created: #{rfq.series_number}'
-            message = (
-                f'Dear Recipient,\n\n'
-                f'A new Request for Quotation (RFQ) has been created in PrimeCRM:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 RFQ Number: {rfq.series_number}\n'
-                f'🔹 Project: {rfq.company_name or "Not specified"}\n'
-                f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
-                f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
-                f'🔹 Company: {rfq.company_name or "Not specified"}\n'
-                f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
-                f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=recipient_list,
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"RFQ creation email sent successfully to {', '.join(recipient_list)} for RFQ #{rfq.series_number}")
-            except Exception as e:
-                print(f"Failed to send RFQ creation email to {', '.join(recipient_list)} for RFQ #{rfq.series_number}: {str(e)}")
-        return email_sent
+    def validate(self, data):
+        instance = getattr(self, "instance", None)
+        is_update = instance is not None
+        if is_update and instance.range is not None and "range" not in data:
+            raise serializers.ValidationError({"range": "Range is required for each item during update if previously set."})
+        return data
 
-    def create(self, validated_data):
-        items_data = validated_data.pop('items', [])
-        assigned_sales_person = validated_data.pop('assigned_sales_person', None)
-        try:
-            quotation_series = NumberSeries.objects.get(series_name='Quotation')
-        except NumberSeries.DoesNotExist:
-            raise serializers.ValidationError("Quotation series not found.")
-        max_sequence = RFQ.objects.filter(series_number__startswith=quotation_series.prefix).aggregate(
-            Max('series_number')
-        )['series_number__max']
-        sequence = 1
-        if max_sequence:
-            sequence = int(max_sequence.split('-')[-1]) + 1
-        series_number = f"{quotation_series.prefix}-{sequence:06d}"
-        rfq = RFQ.objects.create(series_number=series_number, assigned_sales_person=assigned_sales_person, **validated_data)
-        for item_data in items_data:
-            RFQItem.objects.create(rfq=rfq, **item_data)
-        creation_email_sent = self.send_creation_email(rfq)
-        rfq.email_sent = creation_email_sent
-        rfq.save()
-        return rfq
-
-    def update(self, instance, validated_data):
-        items_data = validated_data.pop('items', None)
-        assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if items_data is not None:
-            instance.items.all().delete()
-            for item_data in items_data:
-                RFQItem.objects.create(rfq=instance, **item_data)
-        return instance
-
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation['email_sent'] = getattr(instance, 'email_sent', False)
-        return representation
-
-class QuotationSerializer(serializers.ModelSerializer):
-    rfq = serializers.PrimaryKeyRelatedField(queryset=RFQ.objects.all())
-    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
-    items = QuotationItemSerializer(many=True, required=True)
-    quotation_status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created'), ('Not Approved', 'Not Approved')], required=False)
-    followup_frequency = serializers.ChoiceField(choices=[('24_hours', '24 Hours'), ('3_days', '3 Days'), ('7_days', '7 Days'), ('every_7th_day', 'Every 7th Day')], required=False)
-    purchase_orders = serializers.SerializerMethodField()
-    assigned_sales_person_name = serializers.CharField(source='assigned_sales_person.name', read_only=True)
-    assigned_sales_person_email = serializers.CharField(source='assigned_sales_person.email', read_only=True)
-    not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-
-    class Meta:
-        model = Quotation
-        fields = [
-            'id', 'rfq', 'company_name', 'company_address', 'company_phone', 'company_email',
-            'rfq_channel', 'point_of_contact_name', 'point_of_contact_email',
-            'point_of_contact_phone', 'assigned_sales_person', 'due_date_for_quotation',
-            'quotation_status', 'next_followup_date', 'followup_frequency', 'remarks',
-            'series_number', 'created_at', 'items', 'purchase_orders',
-            'assigned_sales_person_name', 'assigned_sales_person_email', 'not_approved_reason_remark'
-        ]
-
-    def get_purchase_orders(self, obj):
-        pos = PurchaseOrder.objects.filter(quotation=obj)
-        return PurchaseOrderSerializer(pos, many=True).data
-
-    def send_submission_email(self, quotation):
-        email_sent = False
-        recipient_list = []
-        if quotation.company_email:
-            recipient_list.append(quotation.company_email)
-        if quotation.point_of_contact_email:
-            recipient_list.append(quotation.point_of_contact_email)
-        if quotation.assigned_sales_person and quotation.assigned_sales_person.email:
-            recipient_list.append(quotation.assigned_sales_person.email)
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))
-        if recipient_list:
-            subject = f'New Quotation Submitted: #{quotation.series_number}'
-            message = (
-                f'Dear Recipient,\n\n'
-                f'A new Quotation has been submitted in PrimeCRM:\n'
-                f'------------------------------------------------------------\n'
-                f'🔹 Quotation Number: {quotation.series_number}\n'
-                f'🔹 Project: {quotation.company_name or "Not specified"}\n'
-                f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
-                f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                f'🔹 Assigned To: {quotation.assigned_sales_person.name if quotation.assigned_sales_person else "Not assigned"}\n'
-                f'🔹 Company: {quotation.company_name or "Not specified"}\n'
-                f'🔹 Contact: {quotation.point_of_contact_name or "Not specified"} ({quotation.point_of_contact_email or "Not specified"})\n'
-                f'------------------------------------------------------------\n'
-                f'Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n'
-                f'Best regards,\n'
-                f'PrimeCRM Team\n'
-                f'---\n'
-                f'This is an automated message. Please do not reply to this email.'
-            )
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=recipient_list,
-                    fail_silently=True,
-                )
-                email_sent = True
-                print(f"Quotation submission email sent successfully to {', '.join(recipient_list)} for Quotation #{quotation.series_number}")
-            except Exception as e:
-                print(f"Failed to send quotation submission email to {', '.join(recipient_list)} for Quotation #{quotation.series_number}: {str(e)}")
-        return email_sent
-
-    def create(self, validated_data):
-        items_data = validated_data.pop('items', [])
-        assigned_sales_person = validated_data.pop('assigned_sales_person', None)
-        try:
-            quotation_series = NumberSeries.objects.get(series_name='Quotation')
-        except NumberSeries.DoesNotExist:
-            raise serializers.ValidationError("Quotation series not found.")
-        max_sequence = Quotation.objects.filter(series_number__startswith=quotation_series.prefix).aggregate(
-            Max('series_number')
-        )['series_number__max']
-        sequence = 1
-        if max_sequence:
-            sequence = int(max_sequence.split('-')[-1]) + 1
-        series_number = f"{quotation_series.prefix}-{sequence:06d}"
-        if 'followup_frequency' not in validated_data:
-            validated_data['followup_frequency'] = '24_hours'
-        quotation = Quotation.objects.create(series_number=series_number, assigned_sales_person=assigned_sales_person, **validated_data)
-        for item_data in items_data:
-            QuotationItem.objects.create(quotation=quotation, **item_data)
-        email_sent = self.send_submission_email(quotation)
-        quotation.email_sent = email_sent
-        quotation.save()
-        return quotation
-
-    def update(self, instance, validated_data):
-        items_data = validated_data.pop('items', None)
-        assigned_sales_person = validated_data.get('assigned_sales_person', instance.assigned_sales_person)
-        not_approved_reason_remark = validated_data.get('not_approved_reason_remark', instance.not_approved_reason_remark)
-        if validated_data.get('quotation_status') == 'Not Approved' and not not_approved_reason_remark:
-            raise serializers.ValidationError("A reason must be provided when setting status to 'Not Approved'.")
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        if validated_data.get('followup_frequency') and instance.followup_frequency != validated_data['followup_frequency']:
-            today = timezone.now().date()
-            if validated_data['followup_frequency'] == '24_hours':
-                instance.next_followup_date = today + timedelta(days=1)
-            elif validated_data['followup_frequency'] == '3_days':
-                instance.next_followup_date = today + timedelta(days=3)
-            elif validated_data['followup_frequency'] == '7_days':
-                instance.next_followup_date = today + timedelta(days=7)
-            elif validated_data['followup_frequency'] == 'every_7th_day':
-                instance.next_followup_date = today + timedelta(days=7)
-        instance.save()
-        if items_data is not None:
-            instance.items.all().delete()
-            for item_data in items_data:
-                QuotationItem.objects.create(quotation=instance, **item_data)
-        return instance
-
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation['email_sent'] = getattr(instance, 'email_sent', False)
-        return representation
-
-class PurchaseOrderSerializer(serializers.ModelSerializer):
-    quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all())
-    items = PurchaseOrderItemSerializer(many=True, required=False)
-    order_type = serializers.ChoiceField(choices=[('full', 'Full'), ('partial', 'Partial')], default='full')
-    client_po_number = serializers.CharField(max_length=100, allow_blank=True, required=False)
-    po_file = serializers.FileField(required=False, allow_null=True)
-    series_number = serializers.CharField(max_length=50, read_only=True)
-    status = serializers.ChoiceField(
-        choices=[('Pending', 'Pending'), ('Collected', 'Collected'), ('Completed', 'Completed')],
-        default='Pending',
-        required=False
+class WorkOrderSerializer(serializers.ModelSerializer):
+    purchase_order = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrder.objects.all(), allow_null=True)
+    quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all(), allow_null=True)
+    created_by = serializers.PrimaryKeyRelatedField(queryset=Technician.objects.all(), allow_null=True, required=False)
+    items = WorkOrderItemSerializer(many=True, required=False)
+    delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)
+    created_by_name = serializers.CharField(source="created_by.name", read_only=True)
+    purchase_order_file = serializers.FileField(required=False)
+    work_order_file = serializers.FileField(required=False)
+    signed_delivery_note_file = serializers.FileField(required=False)
+    invoice_file = serializers.FileField(required=False)
+    invoice_status = serializers.ChoiceField(
+        choices=[("pending", "Pending"), ("raised", "Raised"), ("processed", "Processed")],
+        required=False,
     )
+    due_in_days = serializers.IntegerField(required=False, allow_null=True)
+    received_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    wo_type = serializers.CharField(required=False, allow_null=True)
+    application_status = serializers.CharField(max_length=20, allow_null=True, required=False)
+    date_received = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    expected_completion_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
+    payment_reference_number = serializers.CharField(max_length=100, required=False, allow_null=True)
 
     class Meta:
-        model = PurchaseOrder
+        model = WorkOrder
         fields = [
-            'id', 'quotation', 'order_type', 'client_po_number', 'po_file',
-            'created_at', 'items', 'series_number', 'status'
+            "id", "purchase_order", "quotation", "wo_number", "status", "date_received",
+            "expected_completion_date", "onsite_or_lab", "site_location", "remarks",
+            "created_at", "created_by", "manager_approval_status", "decline_reason",
+            "items", "delivery_notes", "created_by_name", "purchase_order_file",
+            "work_order_file", "signed_delivery_note_file", "invoice_status",
+            "due_in_days", "received_date", "wo_type", "application_status",
+            "invoice_file", "payment_reference_number",
         ]
 
+    def send_invoice_status_change_email(self, work_order, new_status, user):
+        email_sent = False
+        recipient_list = []
+
+        # Collect recipient emails
+        if work_order.quotation:
+            if work_order.quotation.company_email:
+                recipient_list.append(work_order.quotation.company_email)
+            if work_order.quotation.point_of_contact_email:
+                recipient_list.append(work_order.quotation.point_of_contact_email)
+        if work_order.created_by and work_order.created_by.email:
+            recipient_list.append(work_order.created_by.email)
+
+        # Add Admin and Superadmin emails
+        admin_role = Role.objects.filter(name__in=["Admin", "Superadmin"]).first()
+        if admin_role:
+            admin_emails = CustomUser.objects.filter(role=admin_role).values_list('email', flat=True)
+            recipient_list.extend(admin_emails)
+
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
+            for recipient_email in recipient_list:
+                try:
+                    recipient_user = CustomUser.objects.filter(email=recipient_email).first()
+                    greeting_name = "Admin" if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"] else (recipient_user.username if recipient_user else "Recipient")
+                    message = (
+                        f"Dear {greeting_name},\n\n"
+                        f"The invoice status for the following Work Order has been updated:\n"
+                        f"------------------------------------------------------------\n"
+                        f"🔹 Work Order Number: {work_order.wo_number}\n"
+                        f'🔹 Project: {work_order.quotation.company_name if work_order.quotation else "Unnamed"}\n'
+                        f"🔹 New Invoice Status: {new_status}\n"
+                        f'🔹 Due in Days: {work_order.due_in_days or "Not specified"}\n'
+                        f'🔹 Received Date: {work_order.received_date or "Not specified"}\n'
+                        f"------------------------------------------------------------\n"
+                        f"Please take any necessary actions or follow up as required.\n\n"
+                        f"Best regards,\n"
+                        f"PrimeCRM Team\n"
+                        f"---\n"
+                        f"This is an automated message. Please do not reply to this email."
+                    )
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[recipient_email],
+                        fail_silently=True,
+                    )
+                    # Set email_sent to True only for Admin or Superadmin
+                    if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"]:
+                        email_sent = True
+                    logger.info(f"Invoice status change email sent to {recipient_email} for WO #{work_order.wo_number}")
+                except Exception as e:
+                    logger.error(f"Failed to send invoice status change email to {recipient_email} for WO #{work_order.wo_number}: {str(e)}")
+        return email_sent
+
+    def send_creation_email(self, work_order, user):
+        email_sent = False
+        recipient_list = []
+
+        # Collect recipient emails
+        if work_order.quotation:
+            if work_order.quotation.company_email:
+                recipient_list.append(work_order.quotation.company_email)
+            if work_order.quotation.point_of_contact_email:
+                recipient_list.append(work_order.quotation.point_of_contact_email)
+        if work_order.created_by and work_order.created_by.email:
+            recipient_list.append(work_order.created_by.email)
+
+        # Add Admin and Superadmin emails
+        admin_role = Role.objects.filter(name__in=["Admin", "Superadmin"]).first()
+        if admin_role:
+            admin_emails = CustomUser.objects.filter(role=admin_role).values_list('email', flat=True)
+            recipient_list.extend(admin_emails)
+
+        # Remove duplicates and None values
+        recipient_list = list(set([email for email in recipient_list if email]))
+
+        if recipient_list:
+            subject = f'New Work Order Created: #{work_order.wo_number}'
+            for recipient_email in recipient_list:
+                try:
+                    recipient_user = CustomUser.objects.filter(email=recipient_email).first()
+                    greeting_name = "Admin" if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"] else (recipient_user.username if recipient_user else "Recipient")
+                    message = (
+                        f'Dear {greeting_name},\n\n'
+                        f'A new Work Order has been created in PrimeCRM:\n'
+                        f'------------------------------------------------------------\n'
+                        f'🔹 Work Order Number: {work_order.wo_number}\n'
+                        f'🔹 Project: {work_order.quotation.company_name if work_order.quotation else "Not specified"}\n'
+                        f'🔹 Status: {work_order.status or "Collection Pending"}\n'
+                        f'🔹 Expected Completion Date: {work_order.expected_completion_date or "Not specified"}\n'
+                        f'🔹 Created By: {work_order.created_by.name if work_order.created_by else "Not specified"}\n'
+                        f'🔹 Onsite or Lab: {work_order.onsite_or_lab or "Not specified"}\n'
+                        f'🔹 Site Location: {work_order.site_location or "Not specified"}\n'
+                        f'------------------------------------------------------------\n'
+                        f'Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n'
+                        f'Best regards,\n'
+                        f'PrimeCRM Team\n'
+                        f'---\n'
+                        f'This is an automated message. Please do not reply to this email.'
+                    )
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[recipient_email],
+                        fail_silently=True,
+                    )
+                    # Set email_sent to True only for Admin or Superadmin
+                    if recipient_user and recipient_user.role.name in ["Admin", "Superadmin"]:
+                        email_sent = True
+                    logger.info(f"Work Order creation email sent to {recipient_email} for WO #{work_order.wo_number}")
+                except Exception as e:
+                    logger.error(f"Failed to send Work Order creation email to {recipient_email} for WO #{work_order.wo_number}: {str(e)}")
+        return email_sent
+
+    def validate(self, data):
+        instance = getattr(self, "instance", None)
+        new_invoice_status = data.get("invoice_status")
+        due_in_days = data.get("due_in_days")
+        received_date = data.get("received_date")
+
+        if new_invoice_status:
+            if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
+                raise serializers.ValidationError("Due in days is required and must be a positive integer for 'raised' status.")
+            if new_invoice_status == "processed" and not received_date:
+                raise serializers.ValidationError("Received date is required for 'processed' status.")
+            if instance and instance.invoice_status == "processed" and new_invoice_status != "processed":
+                raise serializers.ValidationError("Cannot change invoice status from 'processed' to another status.")
+        return data
+
+    def parse_formdata_items(self, request_data):
+        items_data = []
+        item_indices = set()
+
+        for key in request_data.keys():
+            if key.startswith("items[") and "]" in key:
+                try:
+                    index = int(key.split("[")[1].split("]")[0])
+                    item_indices.add(index)
+                except (ValueError, IndexError):
+                    continue
+
+        for index in sorted(item_indices):
+            item_data = {}
+            prefix = f"items[{index}]"
+            field_mappings = {
+                f"{prefix}id": "id",
+                f"{prefix}item": "item",
+                f"{prefix}quantity": "quantity",
+                f"{prefix}unit": "unit",
+                f"{prefix}unit_price": "unit_price",
+                f"{prefix}range": "range",
+                f"{prefix}certificate_uut_label": "certificate_uut_label",
+                f"{prefix}certificate_number": "certificate_number",
+                f"{prefix}calibration_date": "calibration_date",
+                f"{prefix}calibration_due_date": "calibration_due_date",
+                f"{prefix}uuc_serial_number": "uuc_serial_number",
+                f"{prefix}assigned_to": "assigned_to",
+                f"{prefix}certificate_file": "certificate_file",
+            }
+
+            for form_key, item_key in field_mappings.items():
+                if form_key in request_data:
+                    value = request_data[form_key]
+                    if value == "" or value == "null":
+                        value = None
+                    elif item_key in ["item", "unit", "assigned_to"] and value:
+                        try:
+                            value = int(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    elif item_key == "quantity" and value:
+                        try:
+                            value = int(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    elif item_key == "range" and value:
+                        try:
+                            value = int(value)
+                        except (ValueError, TypeError):
+                            raise serializers.ValidationError({"range": f"Invalid range value for item {index}: must be an integer."})
+                    elif item_key == "unit_price" and value:
+                        try:
+                            value = float(value)
+                        except (ValueError, TypeError):
+                            value = None
+                    elif item_key in ["calibration_date", "calibration_due_date", "date_received", "expected_completion_date"] and value:
+                        logger.info(f"Received date for {item_key}: {value}")
+                    item_data[item_key] = value
+            if item_data:
+                items_data.append(item_data)
+        return items_data
+
     def create(self, validated_data):
-        items_data = validated_data.pop('items', [])
-        if not items_data and 'items' in self.context['request'].POST:
-            try:
-                items_data = json.loads(self.context['request'].POST.get('items', '[]'))
-            except json.JSONDecodeError:
-                raise serializers.ValidationError("Invalid JSON format for items.")
-        quotation = validated_data['quotation']
-        purchase_order = PurchaseOrder.objects.create(**validated_data)
-        if validated_data['order_type'] == 'full':
-            for item in quotation.items.all():
-                PurchaseOrderItem.objects.create(
-                    purchase_order=purchase_order,
-                    item=item.item,
-                    quantity=item.quantity,
-                    unit=item.unit,
-                    unit_price=item.unit_price
-                )
-        else:  # partial order
-            for item_data in items_data:
-                item_instance = None
-                unit_instance = None
-                item_id = item_data.get('item')
-                if item_id is not None:
-                    try:
-                        item_instance = Item.objects.get(id=item_id)
-                    except Item.DoesNotExist:
-                        raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
-                unit_id = item_data.get('unit')
-                if unit_id is not None:
-                    try:
-                        unit_instance = Unit.objects.get(id=unit_id)
-                    except Unit.DoesNotExist:
-                        raise serializers.ValidationError(f"Unit with ID {unit_id} does not exist.")
-                PurchaseOrderItem.objects.create(
-                    purchase_order=purchase_order,
-                    item=item_instance,
-                    quantity=item_data.get('quantity'),
-                    unit=unit_instance,
-                    unit_price=item_data.get('unit_price')
-                )
-        quotation_items = set(quotation.items.values_list('id', flat=True))
-        po_items = set(
-            PurchaseOrderItem.objects.filter(
-                purchase_order__quotation=quotation
-            ).values_list('item_id', flat=True)
+        items_data = validated_data.pop("items", [])
+        request = self.context.get("request")
+        if hasattr(request, "data") and any(key.startswith("items[") for key in request.data.keys()):
+            items_data = self.parse_formdata_items(request.data)
+
+        if request and hasattr(request.user, "technician"):
+            validated_data["created_by"] = request.user.technician
+        else:
+            validated_data["created_by"] = None
+
+        try:
+            wo_series = NumberSeries.objects.get(series_name="Work Order")
+        except NumberSeries.DoesNotExist:
+            raise serializers.ValidationError("Work Order series not found.")
+
+        max_sequence = WorkOrder.objects.filter(wo_number__startswith=wo_series.prefix).aggregate(Max("wo_number"))["wo_number__max"]
+        sequence = 1 if not max_sequence else int(max_sequence.split("-")[-1]) + 1
+        wo_number = f"{wo_series.prefix}-{sequence:06d}"
+
+        work_order = WorkOrder.objects.create(
+            wo_number=wo_number,
+            purchase_order=validated_data.get("purchase_order"),
+            quotation=validated_data.get("quotation"),
+            created_by=validated_data.get("created_by"),
+            status=validated_data.get("status", "Collection Pending"),
+            date_received=validated_data.get("date_received"),
+            expected_completion_date=validated_data.get("expected_completion_date"),
+            onsite_or_lab=validated_data.get("onsite_or_lab"),
+            site_location=validated_data.get("site_location"),
+            remarks=validated_data.get("remarks"),
+            invoice_status=validated_data.get("invoice_status", "pending"),
+            due_in_days=validated_data.get("due_in_days"),
+            received_date=validated_data.get("received_date"),
+            wo_type=validated_data.get("wo_type"),
+            application_status=validated_data.get("application_status"),
         )
-        if quotation_items.issubset(po_items):
-            quotation.quotation_status = 'PO Created'
-            quotation.save()
-        return purchase_order
+
+        logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
+
+        for item_data in items_data:
+            item_data.setdefault("range", None)
+            logger.info(f"Creating item with data: {dict(item_data)}")
+            WorkOrderItem.objects.create(work_order=work_order, **item_data)
+            logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
+
+        # Send creation email
+        creation_email_sent = self.send_creation_email(work_order, self.context.get('request').user if self.context.get('request') else None)
+        logger.info(f"Work Order creation email sent successfully for WO #{work_order.wo_number}" if creation_email_sent else f"Work Order creation email failed for WO #{work_order.wo_number}")
+
+        # Send invoice status change email if applicable
+        if work_order.invoice_status in ["raised", "processed"]:
+            email_sent = self.send_invoice_status_change_email(work_order, work_order.invoice_status, self.context.get('request').user if self.context.get('request') else None)
+            if email_sent:
+                work_order.email_sent = email_sent
+                work_order.save()
+                logger.info(f"Invoice status change email sent successfully for WO #{work_order.wo_number}")
+
+        return work_order
 
     def update(self, instance, validated_data):
-        items_data = validated_data.pop('items', None)
-        instance.order_type = validated_data.get('order_type', instance.order_type)
-        instance.client_po_number = validated_data.get('client_po_number', instance.client_po_number)
-        instance.status = validated_data.get('status', instance.status)
-        if 'po_file' in validated_data:
-            instance.po_file = validated_data.get('po_file')
+        items_data = validated_data.pop("items", None)
+        previous_invoice_status = instance.invoice_status
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         instance.save()
+        logger.info(f"Updated WorkOrder {instance.id}")
+
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
-                item_instance = None
-                unit_instance = None
-                item_id = item_data.get('item')
-                if item_id is not None:
-                    try:
-                        item_instance = Item.objects.get(id=item_id)
-                    except Item.DoesNotExist:
-                        raise serializers.ValidationError(f"Item with ID {item_id} does not exist.")
-                unit_id = item_data.get('unit')
-                if unit_id is not None:
-                    try:
-                        unit_instance = Unit.objects.get(id=unit_id)
-                    except Unit.DoesNotExist:
-                        raise serializers.ValidationError(f"Unit with ID {unit_id} does not exist.")
-                PurchaseOrderItem.objects.create(
-                    purchase_order=instance,
-                    item=item_instance,
-                    quantity=item_data.get('quantity'),
-                    unit=unit_instance,
-                    unit_price=item_data.get('unit_price')
-                )
+                logger.info(f"Creating item with data: {dict(item_data)}")
+                WorkOrderItem.objects.create(work_order=instance, **item_data)
+                logger.info(f"Updated items for WorkOrder {instance.id}")
+
+        # Send invoice status change email if status changed to 'raised' or 'processed'
+        if "invoice_status" in validated_data and validated_data["invoice_status"] != previous_invoice_status and validated_data["invoice_status"] in ["raised", "processed"]:
+            email_sent = self.send_invoice_status_change_email(instance, validated_data["invoice_status"], self.context.get('request').user if self.context.get('request') else None)
+            instance.email_sent = email_sent
+            instance.save()
+            logger.info(f"Invoice status change email sent successfully for WO #{instance.wo_number}" if email_sent else f"Invoice status change email failed for WO #{instance.wo_number}")
+
         return instance
