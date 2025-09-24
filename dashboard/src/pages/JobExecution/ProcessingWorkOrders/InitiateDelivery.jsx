@@ -583,7 +583,7 @@ const InitiateDelivery = () => {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  {state.deliveryType === 'Multiple' && (
+                  {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                     <th className="border p-2 text-left text-sm font-medium text-gray-700">Select</th>
                   )}
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">SL</th>
@@ -592,7 +592,7 @@ const InitiateDelivery = () => {
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivered Quantity</th>
-                  {state.deliveryType === 'Multiple' && (
+                  {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                     <>
                       <th className="border p-2 text-left text-sm font-medium text-gray-700">Remaining Quantity</th>
                       <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
@@ -605,7 +605,7 @@ const InitiateDelivery = () => {
                 {remainingItems.map((item, index) => (
                   <React.Fragment key={`item-${item.id}`}>
                     <tr className="border hover:bg-gray-50">
-                      {state.deliveryType === 'Multiple' && (
+                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                         <td className="border p-2">
                           <input
                             type="checkbox"
@@ -692,7 +692,7 @@ const InitiateDelivery = () => {
                           disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
-                      {state.deliveryType === 'Multiple' && (
+                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
                         <>
                           <td className="border p-2">{item.remaining_quantity}</td>
                           <td className="border p-2">
@@ -722,7 +722,7 @@ const InitiateDelivery = () => {
                     {item.showAdditionalInfo && (
                       <tr key={`components-${item.id}`}>
                         <td
-                          colSpan={state.deliveryType === 'Multiple' ? 10 : 7}
+                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 9 : 7}
                           className="border p-2"
                         >
                           <h3 className="text-md font-semibold">Components for {item.name}</h3>
@@ -731,13 +731,13 @@ const InitiateDelivery = () => {
                               <table className="w-full border-collapse bg-gray-50 mt-2">
                                 <thead>
                                   <tr className="bg-gray-100">
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                       Component Name
                                     </th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                       Component Value
                                     </th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                       Actions
                                     </th>
                                   </tr>
@@ -745,7 +745,7 @@ const InitiateDelivery = () => {
                                 <tbody>
                                   {item.components.map((comp, compIndex) => (
                                     <tr key={compIndex} className="border hover:bg-gray-100">
-                                      <td className="border p-2 w-1/3">
+                                      <td className="border p-2">
                                         <InputField
                                           value={comp.component}
                                           onChange={(e) => {
@@ -757,7 +757,7 @@ const InitiateDelivery = () => {
                                           disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
-                                      <td className="border p-2 w-1/3">
+                                      <td className="border p-2">
                                         <InputField
                                           value={comp.value}
                                           onChange={(e) => {
@@ -769,7 +769,7 @@ const InitiateDelivery = () => {
                                           disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
-                                      <td className="border p-2 w-1/3">
+                                      <td className="border p-2">
                                         <button
                                           onClick={() => {
                                             const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
@@ -847,7 +847,6 @@ const InitiateDelivery = () => {
                             <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -904,32 +903,23 @@ const InitiateDelivery = () => {
                                     {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
                                   </button>
                                 </td>
-                                <td className="border p-2">
-                                  <button
-                                    onClick={() => addSplitDNComponent(dnIndex, item.id)}
-                                    className="text-blue-600 hover:text-blue-800 text-sm"
-                                    disabled={!hasPermission('delivery', 'edit')}
-                                  >
-                                    Add Component
-                                  </button>
-                                </td>
                               </tr>
                               {item.showAdditionalInfo && (
                                 <tr key={`split-components-${dnIndex}-${item.id}`}>
-                                  <td colSpan="6" className="border p-2">
+                                  <td colSpan="5" className="border p-2">
                                     <h3 className="text-md font-semibold">Components for {item.name}</h3>
                                     {item.components.length > 0 ? (
                                       <div className="overflow-x-auto">
                                         <table className="w-full border-collapse bg-gray-50 mt-2">
                                           <thead>
                                             <tr className="bg-gray-100">
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                                 Component Name
                                               </th>
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                                 Component Value
                                               </th>
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                                 Actions
                                               </th>
                                             </tr>
@@ -937,7 +927,7 @@ const InitiateDelivery = () => {
                                           <tbody>
                                             {item.components.map((comp, compIndex) => (
                                               <tr key={compIndex} className="border hover:bg-gray-100">
-                                                <td className="border p-2 w-1/3">
+                                                <td className="border p-2">
                                                   <InputField
                                                     value={comp.component}
                                                     onChange={(e) =>
@@ -954,7 +944,7 @@ const InitiateDelivery = () => {
                                                     disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
-                                                <td className="border p-2 w-1/3">
+                                                <td className="border p-2">
                                                   <InputField
                                                     value={comp.value}
                                                     onChange={(e) =>
@@ -971,7 +961,7 @@ const InitiateDelivery = () => {
                                                     disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
-                                                <td className="border p-2 w-1/3">
+                                                <td className="border p-2">
                                                   <button
                                                     onClick={() => removeSplitDNComponent(dnIndex, item.id, compIndex)}
                                                     className="text-red-600 hover:text-red-800 text-sm"
