@@ -583,7 +583,7 @@ const InitiateDelivery = () => {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
+                  {state.deliveryType === 'Multiple' && (
                     <th className="border p-2 text-left text-sm font-medium text-gray-700">Select</th>
                   )}
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">SL</th>
@@ -592,8 +592,12 @@ const InitiateDelivery = () => {
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivered Quantity</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Remaining Quantity</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
+                  {state.deliveryType === 'Multiple' && (
+                    <>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Remaining Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
+                    </>
+                  )}
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
                 </tr>
               </thead>
@@ -601,7 +605,7 @@ const InitiateDelivery = () => {
                 {remainingItems.map((item, index) => (
                   <React.Fragment key={`item-${item.id}`}>
                     <tr className="border hover:bg-gray-50">
-                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
+                      {state.deliveryType === 'Multiple' && (
                         <td className="border p-2">
                           <input
                             type="checkbox"
@@ -688,19 +692,23 @@ const InitiateDelivery = () => {
                           disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
-                      <td className="border p-2">{item.remaining_quantity}</td>
-                      <td className="border p-2">
-                        <InputField
-                          type="number"
-                          value={item.assigned_quantity}
-                          onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
-                          className="w-full"
-                          min="0"
-                          max={item.remaining_quantity}
-                          disabled={state.deliveryType !== 'Multiple' || !hasPermission('delivery', 'edit')}
-                        />
-                        {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
-                      </td>
+                      {state.deliveryType === 'Multiple' && (
+                        <>
+                          <td className="border p-2">{item.remaining_quantity}</td>
+                          <td className="border p-2">
+                            <InputField
+                              type="number"
+                              value={item.assigned_quantity}
+                              onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
+                              className="w-full"
+                              min="0"
+                              max={item.remaining_quantity}
+                              disabled={!hasPermission('delivery', 'edit')}
+                            />
+                            {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
+                          </td>
+                        </>
+                      )}
                       <td className="border p-2">
                         <button
                           onClick={() => toggleAdditionalInfo(item.id)}
@@ -714,7 +722,7 @@ const InitiateDelivery = () => {
                     {item.showAdditionalInfo && (
                       <tr key={`components-${item.id}`}>
                         <td
-                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 10 : 9}
+                          colSpan={state.deliveryType === 'Multiple' ? 10 : 7}
                           className="border p-2"
                         >
                           <h3 className="text-md font-semibold">Components for {item.name}</h3>
