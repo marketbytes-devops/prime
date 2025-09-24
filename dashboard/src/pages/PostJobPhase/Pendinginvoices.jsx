@@ -16,6 +16,7 @@ const PendingInvoices = () => {
     itemsList: [],
     units: [],
     quotations: [],
+    channels: [], // Added channels to state
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -28,7 +29,7 @@ const PendingInvoices = () => {
     selectedDN: null,
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
-    selectedDNId: null, // Add this for split DN handling
+    selectedDNId: null,
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
@@ -50,7 +51,6 @@ const PendingInvoices = () => {
     selectedWOForUpload: null,
     woUpload: { certificateFile: null },
     woUploadErrors: { certificateFile: '' },
-    // New state for handling split delivery notes
     workOrderDeliveryPairs: [],
   });
 
@@ -91,7 +91,7 @@ const PendingInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes] = await Promise.all([
+      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('delivery-notes/'),
@@ -99,6 +99,7 @@ const PendingInvoices = () => {
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('quotations/'),
+        apiClient.get('channels/'), // Added fetch for channels
       ]);
 
       const deliveryNotes = dnRes.data
@@ -124,10 +125,9 @@ const PendingInvoices = () => {
         const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
         
         if (relatedDNs.length > 0) {
-          // If there are delivery notes, create one pair per delivery note
           relatedDNs.forEach(dn => {
             workOrderDeliveryPairs.push({
-              id: `${workOrder.id}-${dn.id}`, // Unique identifier
+              id: `${workOrder.id}-${dn.id}`,
               workOrder: workOrder,
               deliveryNote: dn,
               workOrderId: workOrder.id,
@@ -135,7 +135,6 @@ const PendingInvoices = () => {
             });
           });
         } else {
-          // If no delivery notes, create a single pair with null delivery note
           workOrderDeliveryPairs.push({
             id: `${workOrder.id}-no-dn`,
             workOrder: workOrder,
@@ -155,6 +154,7 @@ const PendingInvoices = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
         workOrderDeliveryPairs: workOrderDeliveryPairs,
       }));
     } catch (error) {
@@ -166,6 +166,65 @@ const PendingInvoices = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Helper functions to get related data
+  const getWorkOrderByDN = (dn) => {
+    return state.workOrders.find(wo => wo.id === dn.work_order_id);
+  };
+
+  const getPurchaseOrderByWO = (workOrder) => {
+    if (!workOrder) return null;
+    return state.purchaseOrders.find(po => po.id === workOrder.purchase_order);
+  };
+
+  const getQuotationByPO = (purchaseOrder) => {
+    if (!purchaseOrder) return null;
+    return state.quotations.find(q => q.id === purchaseOrder.quotation);
+  };
+
+  const getQuotationDetails = (workOrder, deliveryNote) => {
+    const purchaseOrder = getPurchaseOrderByWO(workOrder);
+    const quotation = getQuotationByPO(purchaseOrder);
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: purchaseOrder?.series_number || 'N/A',
+      client_po_number: purchaseOrder?.client_po_number || 'N/A',
+      order_type: purchaseOrder?.order_type || 'N/A',
+      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      po_file: purchaseOrder?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
+      wo_number: workOrder?.wo_number || 'N/A',
+      dn_number: deliveryNote?.dn_number || 'N/A',
+    };
+  };
+
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
+  };
+
+  const getCompanyName = (workOrder) => {
+    return getQuotationDetails(workOrder, null).company_name;
+  };
+
+  const getQuotationSeriesNumber = (workOrder) => {
+    return getQuotationDetails(workOrder, null).series_number;
+  };
+
+  const getDNSeriesNumber = (deliveryNote) => {
+    return getQuotationDetails(null, deliveryNote).dn_number;
+  };
 
   const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
@@ -408,7 +467,6 @@ const PendingInvoices = () => {
     }
     try {
       setIsSubmitting(true);
-      // Step 1: Update invoice status
       const payload = { invoice_status: state.newStatus };
       if (state.newStatus === 'raised' && state.dueInDays) {
         payload.due_in_days = parseInt(state.dueInDays);
@@ -416,14 +474,12 @@ const PendingInvoices = () => {
         payload.received_date = state.receivedDate;
       }
       
-      // Add delivery note ID to payload if available
       if (state.selectedDNId) {
         payload.delivery_note_id = state.selectedDNId;
       }
 
       await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
 
-      // Step 2: Upload invoice file
       const formData = new FormData();
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
       await apiClient.patch(`/work-orders/${state.selectedWOForInvoiceUpload.id}/`, formData, {
@@ -457,7 +513,6 @@ const PendingInvoices = () => {
 
   const handleUpdateStatus = (pair, newStatus) => {
     const workOrder = pair.workOrder;
-    // Check if the current status is 'raised' and the new status is also 'raised'
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.warn(
         'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
@@ -489,9 +544,7 @@ const PendingInvoices = () => {
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
     const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
     
-    // Additional validation in the modal to prevent re-submission of 'raised'
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
         'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
@@ -515,7 +568,6 @@ const PendingInvoices = () => {
       toast.error('Please select a received date.');
       return;
     }
-    // Open invoice upload modal for Raised or Processed without API call
     if (newStatus === 'raised' || newStatus === 'processed') {
       setState((prev) => ({
         ...prev,
@@ -526,7 +578,6 @@ const PendingInvoices = () => {
         invoiceUploadErrors: { invoiceFile: '' },
       }));
     } else {
-      // For other statuses (e.g., pending), update immediately
       confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
     }
   };
@@ -541,7 +592,6 @@ const PendingInvoices = () => {
         payload.received_date = receivedDate;
       }
       
-      // Add delivery note ID to payload if available
       if (deliveryNoteId) {
         payload.delivery_note_id = deliveryNoteId;
       }
@@ -604,38 +654,6 @@ const PendingInvoices = () => {
 
   const canUploadInvoice = (pair) => {
     return isPOComplete(pair.workOrder) && isDUTComplete(pair.workOrder) && isDNComplete(pair.deliveryNote);
-  };
-
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
-  };
-
-  const getAssignedSalesPersonName = (po) => {
-    if (!po) return 'N/A';
-    const quotation = state.quotations.find((q) => q.id === po.quotation);
-    return quotation?.assigned_sales_person_name || 'N/A';
-  };
-
-  const getQuotationSeriesNumber = (workOrder) => {
-    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
-    if (!po) return 'N/A';
-    const quotation = state.quotations.find((q) => q.id === po.quotation);
-    return quotation?.series_number || 'N/A';
-  };
-
-  const getCompanyName = (workOrder) => {
-    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
-    if (!po) return 'N/A';
-    const quotation = state.quotations.find((q) => q.id === po.quotation);
-    return quotation?.company_name || 'N/A';
-  };
-
-  const getDNSeriesNumber = (deliveryNote) => {
-    return deliveryNote?.dn_number || 'N/A';
   };
 
   const filteredPairs = state.workOrderDeliveryPairs
@@ -829,7 +847,7 @@ const PendingInvoices = () => {
                 disabled={isSubmitting}
                 className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
                   isSubmitting
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -853,7 +871,6 @@ const PendingInvoices = () => {
         )}
       </div>
 
-      {/* All the existing modals remain the same */}
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -861,9 +878,66 @@ const PendingInvoices = () => {
       >
         {state.selectedWO && (
           <div className="space-y-4">
-            <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-            <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-            <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO, null).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO, null).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO, null).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO, null).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO, null).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO, null).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO, null).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO, null).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO, null).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO, null).po_series_number}</p>
+              <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO, null).client_po_number}</p>
+              <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO, null).order_type}</p>
+              <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO, null).created_at}</p>
+              <p>
+                <strong>PO File:</strong>{' '}
+                {getQuotationDetails(state.selectedWO, null).po_file ? (
+                  <a
+                    href={getQuotationDetails(state.selectedWO, null).po_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO, null).assigned_sales_person}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
+              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'N/A'}</p>
+              <p>
+                <strong>Invoice File:</strong>{' '}
+                {state.selectedWO.invoice_file ? (
+                  <a
+                    href={state.selectedWO.invoice_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    View Invoice
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+            </div>
             <div>
               <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
               {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
@@ -934,7 +1008,6 @@ const PendingInvoices = () => {
         )}
       </Modal>
 
-      {/* Rest of the modals remain exactly the same as in your original code */}
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
@@ -942,17 +1015,39 @@ const PendingInvoices = () => {
       >
         {state.selectedPO && (
           <div className="space-y-4">
-            <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
-            <p>
-              <strong>PO File:</strong>{' '}
-              {state.selectedPO.po_file ? (
-                <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                  View File
-                </a>
-              ) : (
-                'N/A'
-              )}
-            </p>
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(null, null).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(null, null).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(null, null).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(null, null).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(null, null).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(null, null).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(null, null).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(null, null).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(null, null).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
+              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p>
+                <strong>PO File:</strong>{' '}
+                {state.selectedPO.po_file ? (
+                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(null, null).assigned_sales_person}</p>
+            </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
@@ -996,7 +1091,6 @@ const PendingInvoices = () => {
         )}
       </Modal>
 
-      {/* Continue with all other modals from your original code... */}
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
@@ -1004,17 +1098,69 @@ const PendingInvoices = () => {
       >
         {state.selectedDN && (
           <div className="space-y-4">
-            <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
-            <p>
-              <strong>Signed Delivery Note:</strong>{' '}
-              {state.selectedDN.signed_delivery_note ? (
-                <a href={state.selectedDN.signed_delivery_note} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                  View File
-                </a>
-              ) : (
-                'N/A'
-              )}
-            </p>
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_series_number}</p>
+              <p><strong>Client PO Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).client_po_number}</p>
+              <p><strong>Order Type:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).order_type}</p>
+              <p><strong>Created:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).created_at}</p>
+              <p>
+                <strong>PO File:</strong>{' '}
+                {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_file ? (
+                  <a
+                    href={getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).assigned_sales_person}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
+              <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
+              <p><strong>WO Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).wo_number}</p>
+              <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
+              <p>
+                <strong>Created At:</strong>{' '}
+                {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}
+              </p>
+              <p>
+                <strong>Signed Delivery Note:</strong>{' '}
+                {state.selectedDN.signed_delivery_note ? (
+                  <a
+                    href={state.selectedDN.signed_delivery_note}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+            </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedDN.items && state.selectedDN.items.length > 0 ? (
@@ -1071,6 +1217,7 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isUploadPOModalOpen}
         onClose={() => setState((prev) => ({
@@ -1195,6 +1342,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadWOModalOpen}
         onClose={() => setState((prev) => ({
@@ -1257,6 +1405,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadDNModalOpen}
         onClose={() => setState((prev) => ({
@@ -1319,6 +1468,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadInvoiceModalOpen}
         onClose={() => setState((prev) => ({
@@ -1400,6 +1550,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isStatusModalOpen}
         onClose={() => setState((prev) => ({
