@@ -9,10 +9,13 @@ import Modal from '../../../components/Modal';
 const Delivery = () => {
   const navigate = useNavigate();
   const [state, setState] = useState({
-    workOrders: [], // Changed from deliveryNotes to workOrders
+    workOrders: [],
     technicians: [],
     itemsList: [],
     units: [],
+    quotations: [], // Added quotations to state
+    purchaseOrders: [], // Added purchaseOrders to state
+    channels: [], // Added channels to state
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -57,11 +60,14 @@ const Delivery = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, techRes, itemsRes, unitsRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Approved' } }), // Fetch only Approved work orders
+      const [woRes, techRes, itemsRes, unitsRes, quotationsRes, poRes, channelsRes] = await Promise.all([
+        apiClient.get('work-orders/', { params: { status: 'Approved' } }),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
+        apiClient.get('quotations/'), // Added fetch for quotations
+        apiClient.get('purchase-orders/'), // Added fetch for purchase orders
+        apiClient.get('channels/'), // Added fetch for channels
       ]);
 
       setState((prev) => ({
@@ -70,6 +76,9 @@ const Delivery = () => {
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        quotations: quotationsRes.data || [], // Store quotations in state
+        purchaseOrders: poRes.data || [], // Store purchase orders in state
+        channels: channelsRes.data || [], // Store channels in state
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -80,6 +89,28 @@ const Delivery = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const getQuotationDetails = (wo) => {
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order);
+    const quotation = state.quotations.find((q) => q.id === wo.quotation);
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: purchaseOrder?.series_number || 'N/A',
+      client_po_number: purchaseOrder?.client_po_number || 'N/A',
+      order_type: purchaseOrder?.order_type || 'N/A',
+      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      po_file: purchaseOrder?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
+    };
+  };
 
   const handleViewWO = (wo) => {
     setState((prev) => ({
@@ -110,6 +141,8 @@ const Delivery = () => {
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
         return new Date(b.created_at) - new Date(a.created_at);
+      } else if (state.sortBy === 'company_name') {
+        return (a.quotation?.company_name || '').localeCompare(b.quotation?.company_name || '');
       }
       return 0;
     });
@@ -260,32 +293,61 @@ const Delivery = () => {
         {state.selectedWO ? (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).po_series_number}</p>
+              <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO).client_po_number}</p>
+              <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO).order_type}</p>
+              <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO).created_at}</p>
               <p>
-                <strong>Created At:</strong>{' '}
-                {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}
+                <strong>PO File:</strong>{' '}
+                {getQuotationDetails(state.selectedWO).po_file ? (
+                  <a
+                    href={getQuotationDetails(state.selectedWO).po_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline"
+                  >
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
               </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>Work Order Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Work Order Type:</strong> {state.selectedWO.wo_type || 'N/A'}</p>
               <p>
                 <strong>Date Received:</strong>{' '}
                 {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}
               </p>
               <p>
-                <strong>Expected Completion:</strong>{' '}
+                <strong>Expected Completion Date:</strong>{' '}
                 {state.selectedWO.expected_completion_date
                   ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString()
                   : 'N/A'}
               </p>
-              <p>
-                <strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}
-              </p>
-              <p>
-                <strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}
-              </p>
-              <p>
-                <strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}
-              </p>
+              <p><strong>Onsite or Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -317,7 +379,9 @@ const Delivery = () => {
                           <td className="border p-2 whitespace-nowrap">
                             {state.units.find((u) => u.id === Number(item.unit))?.name || 'N/A'}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
                           <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
@@ -334,7 +398,7 @@ const Delivery = () => {
                                 href={item.certificate_file}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+                                className="text-indigo-600 hover:underline"
                               >
                                 View Certificate
                               </a>
