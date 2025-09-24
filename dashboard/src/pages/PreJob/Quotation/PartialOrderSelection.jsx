@@ -442,13 +442,13 @@ const PartialOrderSelection = () => {
 
   return (
     <div className="container mx-auto p-4 bg-transparent min-h-screen">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-start items-center mb-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
         <button
           onClick={handlePrevious}
           className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
         >
-          Previous
+          Go Back
         </button>
       </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
