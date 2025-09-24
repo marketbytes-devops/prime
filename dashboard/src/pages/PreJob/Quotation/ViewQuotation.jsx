@@ -36,8 +36,8 @@ const ViewQuotation = () => {
     isNotApprovedModalOpen: false,
     notApprovedReason: "",
     selectedQuotationId: null,
-    editingRemarks: {}, 
-    tempRemarks: {}, 
+    remarkInputs: {}, // Track remark input values per quotation
+    remarkEditing: {}, // Track editing state per quotation
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -109,12 +109,18 @@ const ViewQuotation = () => {
         teamMembers: teamsRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
-        editingRemarks: quotationsWithPOs.reduce(
-          (acc, q) => ({ ...acc, [q.id]: false }),
+        remarkInputs: quotationsWithPOs.reduce(
+          (acc, q) => ({
+            ...acc,
+            [q.id]: q.remarks || "",
+          }),
           {}
         ),
-        tempRemarks: quotationsWithPOs.reduce(
-          (acc, q) => ({ ...acc, [q.id]: q.remarks || "" }),
+        remarkEditing: quotationsWithPOs.reduce(
+          (acc, q) => ({
+            ...acc,
+            [q.id]: false,
+          }),
           {}
         ),
       }));
@@ -480,29 +486,44 @@ const ViewQuotation = () => {
   const handleRemarkChange = (id, value) => {
     setState((prev) => ({
       ...prev,
-      tempRemarks: { ...prev.tempRemarks, [id]: value },
+      remarkInputs: {
+        ...prev.remarkInputs,
+        [id]: value,
+      },
+      remarkEditing: {
+        ...prev.remarkEditing,
+        [id]: true,
+      },
     }));
+  };
+
+  const handleRemarkUpdate = async (id) => {
+    try {
+      const value = state.remarkInputs[id] || "";
+      await apiClient.patch(`/quotations/${id}/`, { remarks: value || null });
+      setState((prev) => ({
+        ...prev,
+        remarkEditing: {
+          ...prev.remarkEditing,
+          [id]: false,
+        },
+      }));
+      await fetchQuotations();
+      toast.success("Remark is Saved");
+    } catch (error) {
+      console.error("Error updating remark:", error);
+      toast.error("Failed to update remark.");
+    }
   };
 
   const handleRemarkEdit = (id) => {
     setState((prev) => ({
       ...prev,
-      editingRemarks: { ...prev.editingRemarks, [id]: true },
+      remarkEditing: {
+        ...prev.remarkEditing,
+        [id]: true,
+      },
     }));
-  };
-
-  const handleRemarkUpdate = async (id) => {
-    const value = state.tempRemarks[id] || "";
-    try {
-      await handleUpdateField(id, "remarks", value);
-      setState((prev) => ({
-        ...prev,
-        editingRemarks: { ...prev.editingRemarks, [id]: false },
-      }));
-    } catch (error) {
-      console.error("Error updating remarks:", error);
-      toast.error("Failed to update remarks.");
-    }
   };
 
   const isPoComplete = (quotation) => {
@@ -652,7 +673,7 @@ const ViewQuotation = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[350px]">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -664,7 +685,7 @@ const ViewQuotation = () => {
               {currentQuotations.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="9"
+                    colSpan="10"
                     className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No quotations found.
@@ -711,36 +732,37 @@ const ViewQuotation = () => {
                           ).toLocaleDateString()
                         : "N/A"}
                     </td>
-                    <td className="border p-2 whitespace-nowrap min-w-[350px]">
+                    <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <InputField
                           type="text"
-                          value={
-                            state.editingRemarks[quotation.id]
-                              ? state.tempRemarks[quotation.id] || ""
-                              : quotation.remarks || ""
-                          }
+                          value={state.remarkInputs[quotation.id] || ""}
                           onChange={(e) =>
                             handleRemarkChange(quotation.id, e.target.value)
                           }
-                          disabled={!state.editingRemarks[quotation.id]}
+                          disabled={!state.remarkEditing[quotation.id]}
                           className="w-full p-1"
                         />
                         <Button
                           onClick={() =>
-                            state.editingRemarks[quotation.id]
+                            state.remarkEditing[quotation.id]
                               ? handleRemarkUpdate(quotation.id)
                               : handleRemarkEdit(quotation.id)
                           }
+                          disabled={
+                            state.remarkEditing[quotation.id] &&
+                            state.remarkInputs[quotation.id] ===
+                              (quotation.remarks || "")
+                          }
                           className={`px-2 py-1 rounded-md text-sm ${
-                            state.editingRemarks[quotation.id]
-                              ? "bg-green-600 text-white hover:bg-green-700"
-                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                            state.remarkEditing[quotation.id] &&
+                            state.remarkInputs[quotation.id] ===
+                              (quotation.remarks || "")
+                              ? "bg-green-600 text-white hover:bg-green-700 cursor-not-allowed"
+                              : "bg-blue-600 text-white hover:bg-blue-700"
                           }`}
                         >
-                          {state.editingRemarks[quotation.id]
-                            ? "Update Remark"
-                            : "Edit Remark"}
+                          {state.remarkEditing[quotation.id] ? "Update" : "Edit"}
                         </Button>
                       </div>
                     </td>
@@ -781,7 +803,9 @@ const ViewQuotation = () => {
                           Print
                         </Button>
                         {hasBothOrderTypes(quotation) ||
-                        isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
+                        isPoComplete(
+                          quotation
+                        ) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
                           <Button
@@ -808,9 +832,9 @@ const ViewQuotation = () => {
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
                             }`}
-                        >
-                          Convert to PO
-                        </Button>
+                          >
+                            Convert to PO
+                          </Button>
                         )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
@@ -1103,14 +1127,12 @@ const ViewQuotation = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    $
-                                    {item.unit_price
+                                    SAR {item.unit_price
                                       ? Number(item.unit_price).toFixed(2)
                                       : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    $
-                                    {item.quantity && item.unit_price
+                                    SAR {item.quantity && item.unit_price
                                       ? Number(
                                           item.quantity * item.unit_price
                                         ).toFixed(2)

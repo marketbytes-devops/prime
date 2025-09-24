@@ -442,8 +442,8 @@ const ViewRFQ = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
+                          <td className="border p-2 whitespace-nowrap">SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                         </tr>
                       ))}
                     </tbody>
