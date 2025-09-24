@@ -43,7 +43,7 @@ const ListPurchaseOrders = () => {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
-  const [seriesError, setSeriesError] = useState(""); // New state for series error message
+  const [seriesError, setSeriesError] = useState("");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -154,7 +154,7 @@ const ListPurchaseOrders = () => {
       splitOrderAssignedTo: "",
       singleOrderAssignedTo: "",
     }));
-    setSeriesError(""); // Clear any previous series error when opening the modal
+    setSeriesError("");
   };
 
   const handleViewPO = (po) => {
@@ -198,6 +198,7 @@ const ListPurchaseOrders = () => {
       splitOrderAssignedTo: "",
     }));
   };
+
   const calculateTotalQuantity = () => {
     return state.savedItems.reduce(
       (total, item) => total + (item.quantity || 0),
@@ -394,7 +395,7 @@ const ListPurchaseOrders = () => {
       );
       return;
     }
-    setSeriesError(""); // Clear error if series is found
+    setSeriesError("");
     try {
       const basePayload = {
         purchase_order: state.selectedPO.id,
@@ -628,12 +629,12 @@ const ListPurchaseOrders = () => {
                             state.units.find((u) => u.id === item.unit)?.name ||
                             "N/A"
                           }</td>
-                          <td style="padding: 8px; text-align: right;">$${
+                          <td style="padding: 8px; text-align: right;">SAR ${
                             item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"
                           }</td>
-                          <td style="padding: 8px; text-align: right;">$${
+                          <td style="padding: 8px; text-align: right;">SAR ${
                             item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
@@ -699,12 +700,12 @@ const ListPurchaseOrders = () => {
                                   state.units.find((u) => u.id === item.unit)
                                     ?.name || "N/A"
                                 }</td>
-                                <td style="padding: 8px; text-align: right;">$${
+                                <td style="padding: 8px; text-align: right;">SAR ${
                                   item.unit_price
                                     ? Number(item.unit_price).toFixed(2)
                                     : "N/A"
                                 }</td>
-                                <td style="padding: 8px; text-align: right;">$${
+                                <td style="padding: 8px; text-align: right;">SAR ${
                                   item.quantity && item.unit_price
                                     ? Number(
                                         item.quantity * item.unit_price
@@ -1122,14 +1123,12 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
-                            {item.unit_price
+                            SAR {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
-                            {item.quantity && item.unit_price
+                            SAR {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
                                 )
@@ -1318,14 +1317,12 @@ const ListPurchaseOrders = () => {
                             "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          $
-                          {item.unit_price
+                          SAR {item.unit_price
                             ? Number(item.unit_price).toFixed(2)
                             : "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          $
-                          {item.quantity && item.unit_price
+                          SAR {item.quantity && item.unit_price
                             ? Number(item.quantity * item.unit_price).toFixed(2)
                             : "0.00"}
                         </td>
@@ -1396,14 +1393,12 @@ const ListPurchaseOrders = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
-                            {item.unit_price
+                            SAR {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
-                            {item.quantity && item.unit_price
+                            SAR {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
                                 )
@@ -1466,14 +1461,12 @@ const ListPurchaseOrders = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    $
-                                    {item.unit_price
+                                    SAR {item.unit_price
                                       ? Number(item.unit_price).toFixed(2)
                                       : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    $
-                                    {item.quantity && item.unit_price
+                                    SAR {item.quantity && item.unit_price
                                       ? Number(
                                           item.quantity * item.unit_price
                                         ).toFixed(2)
@@ -1590,14 +1583,12 @@ const ListPurchaseOrders = () => {
                                   ?.name || "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                $
-                                {item.unit_price
+                                SAR {item.unit_price
                                   ? Number(item.unit_price).toFixed(2)
                                   : "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                $
-                                {item.quantity && item.unit_price
+                                SAR {item.quantity && item.unit_price
                                   ? Number(
                                       item.quantity * item.unit_price
                                     ).toFixed(2)

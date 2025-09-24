@@ -36,8 +36,8 @@ const ViewQuotation = () => {
     isNotApprovedModalOpen: false,
     notApprovedReason: "",
     selectedQuotationId: null,
-    tempRemarks: {}, // Track temporary remarks for each quotation
-    isEditingRemark: {}, // Track editing state for each quotation's remark
+    tempRemarks: {},
+    isEditingRemark: {},
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
