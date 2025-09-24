@@ -118,7 +118,6 @@ const PendingInvoices = () => {
         invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
       })) || [];
 
-      // Create work order-delivery note pairs for display
       const workOrderDeliveryPairs = [];
       
       workOrders.forEach(workOrder => {
@@ -167,24 +166,9 @@ const PendingInvoices = () => {
     fetchData();
   }, []);
 
-  // Helper functions to get related data
-  const getWorkOrderByDN = (dn) => {
-    return state.workOrders.find(wo => wo.id === dn.work_order_id);
-  };
-
-  const getPurchaseOrderByWO = (workOrder) => {
-    if (!workOrder) return null;
-    return state.purchaseOrders.find(po => po.id === workOrder.purchase_order);
-  };
-
-  const getQuotationByPO = (purchaseOrder) => {
-    if (!purchaseOrder) return null;
-    return state.quotations.find(q => q.id === purchaseOrder.quotation);
-  };
-
-  const getQuotationDetails = (workOrder, deliveryNote) => {
-    const purchaseOrder = getPurchaseOrderByWO(workOrder);
-    const quotation = getQuotationByPO(purchaseOrder);
+  const getQuotationDetails = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    const quotation = po ? state.quotations.find((q) => q.id === po.quotation) : null;
     return {
       series_number: quotation?.series_number || 'N/A',
       company_name: quotation?.company_name || 'N/A',
@@ -195,35 +179,13 @@ const PendingInvoices = () => {
       contact_name: quotation?.point_of_contact_name || 'N/A',
       contact_email: quotation?.point_of_contact_email || 'N/A',
       contact_phone: quotation?.point_of_contact_phone || 'N/A',
-      po_series_number: purchaseOrder?.series_number || 'N/A',
-      client_po_number: purchaseOrder?.client_po_number || 'N/A',
-      order_type: purchaseOrder?.order_type || 'N/A',
-      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
-      po_file: purchaseOrder?.po_file || null,
+      po_series_number: po?.series_number || 'N/A',
+      client_po_number: po?.client_po_number || 'N/A',
+      order_type: po?.order_type || 'N/A',
+      created_at: po?.created_at ? new Date(po.created_at).toLocaleDateString() : 'N/A',
+      po_file: po?.po_file || null,
       assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
-      wo_number: workOrder?.wo_number || 'N/A',
-      dn_number: deliveryNote?.dn_number || 'N/A',
     };
-  };
-
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
-  };
-
-  const getCompanyName = (workOrder) => {
-    return getQuotationDetails(workOrder, null).company_name;
-  };
-
-  const getQuotationSeriesNumber = (workOrder) => {
-    return getQuotationDetails(workOrder, null).series_number;
-  };
-
-  const getDNSeriesNumber = (deliveryNote) => {
-    return getQuotationDetails(null, deliveryNote).dn_number;
   };
 
   const handleViewDocument = (pair, type) => {
@@ -544,6 +506,7 @@ const PendingInvoices = () => {
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
     const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
     
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
@@ -656,12 +619,29 @@ const PendingInvoices = () => {
     return isPOComplete(pair.workOrder) && isDUTComplete(pair.workOrder) && isDNComplete(pair.deliveryNote);
   };
 
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
+  };
+
+  const getWONumberByDN = (dn) => {
+    const workOrder = state.workOrders.find(wo => wo.id === dn.work_order_id);
+    return workOrder?.wo_number || 'N/A';
+  };
+
+  const getDNSeriesNumber = (deliveryNote) => {
+    return deliveryNote?.dn_number || 'N/A';
+  };
+
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationSeriesNumber(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getCompanyName(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
+      getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -747,8 +727,8 @@ const PendingInvoices = () => {
                 currentPairs.map((pair, index) => (
                   <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{getCompanyName(pair.workOrder)}</td>
-                    <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(pair.workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
@@ -847,7 +827,7 @@ const PendingInvoices = () => {
                 disabled={isSubmitting}
                 className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
                   isSubmitting
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -872,6 +852,89 @@ const PendingInvoices = () => {
       </div>
 
       <Modal
+        isOpen={state.isPOModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
+        title={`Purchase Order Details - ${state.selectedPO?.series_number || 'N/A'}`}
+      >
+        {state.selectedPO && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
+              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p>
+                <strong>PO File:</strong>{' '}
+                {state.selectedPO.po_file ? (
+                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).assigned_sales_person}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Items</h3>
+              {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedPO.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.itemsList.find((i) => i.id === item.item)?.name || item.item_name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === item.unit)?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
@@ -880,58 +943,30 @@ const PendingInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO, null).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO, null).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO, null).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO, null).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO, null).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO, null).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO, null).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO, null).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO, null).contact_phone}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO, null).po_series_number}</p>
-              <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO, null).client_po_number}</p>
-              <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO, null).order_type}</p>
-              <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO, null).created_at}</p>
-              <p>
-                <strong>PO File:</strong>{' '}
-                {getQuotationDetails(state.selectedWO, null).po_file ? (
-                  <a
-                    href={getQuotationDetails(state.selectedWO, null).po_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:underline"
-                  >
-                    View File
-                  </a>
-                ) : (
-                  'N/A'
-                )}
-              </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO, null).assigned_sales_person}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
               <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
-              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'N/A'}</p>
+              <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
               <p>
                 <strong>Invoice File:</strong>{' '}
                 {state.selectedWO.invoice_file ? (
-                  <a
-                    href={state.selectedWO.invoice_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:underline"
-                  >
-                    View Invoice
+                  <a href={state.selectedWO.invoice_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
                   </a>
                 ) : (
                   'N/A'
@@ -1009,89 +1044,6 @@ const PendingInvoices = () => {
       </Modal>
 
       <Modal
-        isOpen={state.isPOModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
-        title={`Purchase Order Details - ${state.selectedPO?.series_number || 'N/A'}`}
-      >
-        {state.selectedPO && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(null, null).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(null, null).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(null, null).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(null, null).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(null, null).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(null, null).channel}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(null, null).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(null, null).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(null, null).contact_phone}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
-              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
-              <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
-              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p>
-                <strong>PO File:</strong>{' '}
-                {state.selectedPO.po_file ? (
-                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                    View File
-                  </a>
-                ) : (
-                  'N/A'
-                )}
-              </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(null, null).assigned_sales_person}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Items</h3>
-              {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {state.selectedPO.items.map((item) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)?.name || item.item_name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            ${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-gray-500">No items available.</p>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
         title={`Delivery Note Details - ${state.selectedDN?.dn_number || 'N/A'}`}
@@ -1100,46 +1052,23 @@ const PendingInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).contact_phone}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_series_number}</p>
-              <p><strong>Client PO Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).client_po_number}</p>
-              <p><strong>Order Type:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).order_type}</p>
-              <p><strong>Created:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).created_at}</p>
-              <p>
-                <strong>PO File:</strong>{' '}
-                {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_file ? (
-                  <a
-                    href={getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).po_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:underline"
-                  >
-                    View File
-                  </a>
-                ) : (
-                  'N/A'
-                )}
-              </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).assigned_sales_person}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
               <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
-              <p><strong>WO Number:</strong> {getQuotationDetails(getWorkOrderByDN(state.selectedDN), state.selectedDN).wo_number}</p>
+              <p><strong>WO Number:</strong> {getWONumberByDN(state.selectedDN)}</p>
               <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
               <p>
                 <strong>Created At:</strong>{' '}
@@ -1148,12 +1077,7 @@ const PendingInvoices = () => {
               <p>
                 <strong>Signed Delivery Note:</strong>{' '}
                 {state.selectedDN.signed_delivery_note ? (
-                  <a
-                    href={state.selectedDN.signed_delivery_note}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:underline"
-                  >
+                  <a href={state.selectedDN.signed_delivery_note} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
                     View File
                   </a>
                 ) : (
