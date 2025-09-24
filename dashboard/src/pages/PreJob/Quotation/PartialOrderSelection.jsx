@@ -448,7 +448,7 @@ const PartialOrderSelection = () => {
       >
         Go Back
       </button>
-      <div className="flex justify-center items-center mb-4">
+      <div className="flex justify-start items-center mb-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
       </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
@@ -552,7 +552,7 @@ const PartialOrderSelection = () => {
                         {state.units.find(u => u.id === item.unit)?.name || "N/A"}
                       </td>
                       <td className="px-4 py-3 text-sm text-black">
-                        ${item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
+                        SAR {item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
                       </td>
                     </tr>
                   ))}
@@ -597,10 +597,10 @@ const PartialOrderSelection = () => {
                             {state.units.find(u => u.id === item.unit)?.name || "N/A"}
                           </td>
                           <td className="px-4 py-3 text-sm text-black">
-                            ${item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
+                            SAR {item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
                           </td>
                           <td className="px-4 py-3 text-sm text-black">
-                            ${item.total_price != null ? Number(item.total_price).toFixed(2) : "0.00"}
+                            SAR {item.total_price != null ? Number(item.total_price).toFixed(2) : "0.00"}
                           </td>
                         </tr>
                       ))}
