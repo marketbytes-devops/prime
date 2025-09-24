@@ -343,30 +343,6 @@ const InitiateDelivery = () => {
     }));
   };
 
-  const addNewItem = (index) => {
-    setState((prev) => ({
-      ...prev,
-      deliveryItems: [
-        ...prev.deliveryItems.slice(0, index + 1),
-        {
-          id: Date.now() + Math.random(),
-          item: prev.itemsList[0]?.id || '',
-          name: prev.itemsList[0]?.name || 'N/A',
-          range: '',
-          quantity: '',
-          delivered_quantity: '',
-          uom: prev.units[0]?.id || '',
-          remaining_quantity: 0,
-          assigned_quantity: '',
-          components: [],
-          showAdditionalInfo: false,
-          error: '',
-        },
-        ...prev.deliveryItems.slice(index + 1),
-      ],
-    }));
-  };
-
   const deleteSplitDN = (index) => {
     setState((prev) => {
       const deletedDN = prev.createdSplitDNs[index];
@@ -623,7 +599,6 @@ const InitiateDelivery = () => {
                     </>
                   )}
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
-                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -743,20 +718,11 @@ const InitiateDelivery = () => {
                           {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
                         </button>
                       </td>
-                      <td className="border p-2">
-                        <button
-                          onClick={() => addNewItem(index)}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                          disabled={!hasPermission('delivery', 'edit')}
-                        >
-                          Add Item
-                        </button>
-                      </td>
                     </tr>
                     {item.showAdditionalInfo && (
                       <tr key={`components-${item.id}`}>
                         <td
-                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 10 : 8}
+                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 9 : 7}
                           className="border p-2"
                         >
                           <h3 className="text-md font-semibold">Components for {item.name}</h3>
