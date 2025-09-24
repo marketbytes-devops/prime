@@ -136,15 +136,7 @@ class RFQSerializer(serializers.ModelSerializer):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails
-        if rfq.company_email:
-            recipient_list.append(
-                (rfq.company_email, None)
-            )  # No specific name for company email
-        if rfq.point_of_contact_email:
-            recipient_list.append(
-                (rfq.point_of_contact_email, rfq.point_of_contact_name)
-            )
+        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
         if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
             recipient_list.append(
                 (rfq.assigned_sales_person.email, rfq.assigned_sales_person.name)
@@ -176,8 +168,6 @@ class RFQSerializer(serializers.ModelSerializer):
                     ).exists()
                 ):
                     salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif email == rfq.point_of_contact_email and name:
-                    salutation = f"Dear {name}"
                 elif (
                     email
                     == (
@@ -349,15 +339,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails
-        if quotation.company_email:
-            recipient_list.append(
-                (quotation.company_email, None)
-            )  # No specific name for company email
-        if quotation.point_of_contact_email:
-            recipient_list.append(
-                (quotation.point_of_contact_email, quotation.point_of_contact_name)
-            )
+        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
         if quotation.assigned_sales_person and quotation.assigned_sales_person.email:
             recipient_list.append(
                 (
@@ -392,8 +374,6 @@ class QuotationSerializer(serializers.ModelSerializer):
                     ).exists()
                 ):
                     salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif email == quotation.point_of_contact_email and name:
-                    salutation = f"Dear {name}"
                 elif (
                     email
                     == (

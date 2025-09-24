@@ -21,12 +21,10 @@ from authapp.models import CustomUser, Role
 
 logger = logging.getLogger(__name__)
 
-
 class DeliveryNoteItemComponentSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryNoteItemComponent
         fields = ["id", "component", "value"]
-
 
 class DeliveryNoteItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
@@ -81,7 +79,6 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
                 delivery_note_item=instance, **component_data
             )
         return instance
-
 
 class DeliveryNoteSerializer(serializers.ModelSerializer):
     work_order_id = serializers.PrimaryKeyRelatedField(
@@ -141,7 +138,6 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
                     )
         return instance
 
-
 class InitiateDeliverySerializer(serializers.Serializer):
     delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])
     items = DeliveryNoteItemSerializer(many=True)
@@ -152,7 +148,6 @@ class InitiateDeliverySerializer(serializers.Serializer):
                 {"items": "At least one item is required."}
             )
         return data
-
 
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
@@ -211,7 +206,6 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
                 }
             )
         return data
-
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
@@ -294,14 +288,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails
-        if work_order.quotation and work_order.quotation.company_email:
-            recipient_list.append(
-                (
-                    work_order.quotation.company_email,
-                    work_order.quotation.point_of_contact_name,
-                )
-            )
+        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
         if (
             work_order.quotation
             and work_order.quotation.assigned_sales_person
@@ -338,12 +325,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     ).exists()
                 ):
                     salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif (
-                    work_order.quotation
-                    and email == work_order.quotation.company_email
-                    and name
-                ):
-                    salutation = f"Dear {name}"
                 elif (
                     work_order.quotation
                     and email
