@@ -158,6 +158,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     date_received = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
     expected_completion_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', '%d-%m-%Y'])
     payment_reference_number = serializers.CharField(max_length=100, required=False, allow_null=True)
+    email_sent = serializers.BooleanField(read_only=True)  
 
     class Meta:
         model = WorkOrder
@@ -168,33 +169,44 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "items", "delivery_notes", "created_by_name", "purchase_order_file",
             "work_order_file", "signed_delivery_note_file", "invoice_status",
             "due_in_days", "received_date", "wo_type", "application_status",
-            "invoice_file", "payment_reference_number",
+            "invoice_file", "payment_reference_number", "email_sent",
         ]
 
     def send_invoice_status_change_email(self, work_order, new_status):
         email_sent = False
         recipient_list = []
+
+        # Collect recipient emails
+        if work_order.quotation and work_order.quotation.company_email:
+            recipient_list.append((work_order.quotation.company_email, work_order.quotation.point_of_contact_name))
+        if work_order.quotation and work_order.quotation.assigned_sales_person and work_order.quotation.assigned_sales_person.email:
+            recipient_list.append((work_order.quotation.assigned_sales_person.email, work_order.quotation.assigned_sales_person.name))
         if settings.ADMIN_EMAIL:
-            recipient_list.append(settings.ADMIN_EMAIL)
+            recipient_list.append((settings.ADMIN_EMAIL, None))  
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
-            superadmin_emails = CustomUser.objects.filter(role=superadmin_role).values_list('email', flat=True)
-            recipient_list.extend(superadmin_emails)
-        recipient_list = list(set([email for email in recipient_list if email]))
+            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
+            for user in superadmin_users:
+                if user.email:
+                    recipient_list.append((user.email, user.name or user.username))
+
+        # Remove duplicates while preserving names
+        recipient_dict = {email: name for email, name in recipient_list}
+        recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
         if recipient_list:
-            for email in recipient_list:
-                # Determine salutation based on recipient
+            for email, name in recipient_list:
+                # Determine salutation
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
+                elif superadmin_role and CustomUser.objects.filter(email=email, role=superadmin_role).exists():
+                    salutation = f"Dear {name}" if name else "Dear Superadmin"
+                elif work_order.quotation and email == work_order.quotation.company_email and name:
+                    salutation = f"Dear {name}"
+                elif work_order.quotation and email == (work_order.quotation.assigned_sales_person.email if work_order.quotation.assigned_sales_person else None) and name:
+                    salutation = f"Dear {name}"
                 else:
-                    user = CustomUser.objects.filter(email=email).first()
-                    if user and user.role and user.role.name == "Superadmin":
-                        salutation = "Dear Admin"
-                    else:
-                        # Use user name if available in CustomUser
-                        name = user.get_full_name() or user.username if user else None
-                        salutation = f"Dear {name}" if name else "Dear Recipient"
+                    salutation = "Dear Recipient"
 
                 subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
                 message = (
@@ -202,12 +214,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     f"The invoice status for the following Work Order has been updated:\n"
                     f"------------------------------------------------------------\n"
                     f"🔹 Work Order Number: {work_order.wo_number}\n"
-                    f'🔹 Project: {work_order.quotation.company_name or "Unnamed"}\n'
+                    f"🔹 Project: {work_order.quotation.company_name or 'Unnamed'}\n"
                     f"🔹 New Invoice Status: {new_status}\n"
-                    f'🔹 Due in Days: {work_order.due_in_days or "Not specified"}\n'
-                    f'🔹 Received Date: {work_order.received_date or "Not specified"}\n'
+                    f"🔹 Due in Days: {work_order.due_in_days or 'Not specified'}\n"
+                    f"🔹 Received Date: {work_order.received_date or 'Not specified'}\n"
                     f"------------------------------------------------------------\n"
-                    f"Please take any necessary actions or follow up as required.\n\n"
+                    f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
                     f"Best regards,\n"
                     f"PrimeCRM Team\n"
                     f"---\n"
@@ -341,7 +353,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
         if work_order.invoice_status in ["raised", "processed"]:
-            self.send_invoice_status_change_email(work_order, work_order.invoice_status)
+            email_sent = self.send_invoice_status_change_email(work_order, work_order.invoice_status)
+            work_order.email_sent = email_sent
+            work_order.save()
         return work_order
 
     def update(self, instance, validated_data):
@@ -358,5 +372,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
                 logger.info(f"Updated items for WorkOrder {instance.id}")
         if "invoice_status" in validated_data and validated_data["invoice_status"] != previous_invoice_status and validated_data["invoice_status"] in ["raised", "processed"]:
-            self.send_invoice_status_change_email(instance, validated_data["invoice_status"])
+            email_sent = self.send_invoice_status_change_email(instance, validated_data["invoice_status"])
+            instance.email_sent = email_sent
+            instance.save()
         return instance
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['email_sent'] = getattr(instance, 'email_sent', False)
+        return representation
