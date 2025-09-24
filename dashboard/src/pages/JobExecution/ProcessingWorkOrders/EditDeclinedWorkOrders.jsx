@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import apiClient from "../../helpers/apiClient";
-import InputField from "../../components/InputField";
-import Button from "../../components/Button";
-import Loading from "../../components/Loading";
+import apiClient from "../../../helpers/apiClient";
+import InputField from "../../../components/InputField";
+import Button from "../../../components/Button";
+import Loading from "../../../components/Loading";
 import { format } from 'date-fns';
 
 const EditDeclinedWorkOrders = () => {
