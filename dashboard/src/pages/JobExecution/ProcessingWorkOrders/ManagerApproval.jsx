@@ -12,6 +12,8 @@ const ManagerApproval = () => {
     itemsList: [],
     units: [],
     technicians: [],
+    quotations: [],
+    purchaseOrders: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -63,11 +65,13 @@ const ManagerApproval = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, itemsRes, unitsRes, techRes, seriesRes] = await Promise.all([
+      const [woRes, itemsRes, unitsRes, techRes, quotationsRes, poRes, seriesRes] = await Promise.all([
         apiClient.get('work-orders/', { params: { status: 'Manager Approval' } }),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('technicians/'),
+        apiClient.get('quotations/'),
+        apiClient.get('purchase-orders/'),
         apiClient.get('series/'),
       ]);
       setState((prev) => ({
@@ -76,6 +80,8 @@ const ManagerApproval = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         technicians: techRes.data || [],
+        quotations: quotationsRes.data || [],
+        purchaseOrders: poRes.data || [],
       }));
       setSeriesList(seriesRes.data || []);
     } catch (error) {
@@ -87,6 +93,28 @@ const ManagerApproval = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const getQuotationDetails = (wo) => {
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order);
+    const quotation = state.quotations.find((q) => q.id === wo.quotation);
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: quotation?.rfq_channel?.name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: purchaseOrder?.series_number || 'N/A',
+      client_po_number: purchaseOrder?.client_po_number || 'N/A',
+      order_type: purchaseOrder?.order_type || 'N/A',
+      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      po_file: purchaseOrder?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person?.name || 'N/A',
+    };
+  };
 
   const handleViewWO = (wo) => {
     setState((prev) => ({
@@ -337,37 +365,35 @@ const ManagerApproval = () => {
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         {state.selectedWO && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black mb-2">Company Details</h3>
-              <p><strong>Series Number:</strong> {state.selectedWO.quotation?.series_number || 'N/A'}</p>
-              <p><strong>Company Name:</strong> {state.selectedWO.quotation?.company_name || 'N/A'}</p>
-              <p><strong>Company Address:</strong> {state.selectedWO.quotation?.company_address || 'N/A'}</p>
-              <p><strong>Company Phone:</strong> {state.selectedWO.quotation?.company_phone || 'N/A'}</p>
-              <p><strong>Company Email:</strong> {state.selectedWO.quotation?.company_email || 'N/A'}</p>
-              <p><strong>Channel:</strong> {state.selectedWO.quotation?.rfq_channel?.name || 'N/A'}</p>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black mb-2">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {state.selectedWO.quotation?.point_of_contact_name || 'N/A'}</p>
-              <p><strong>Contact Email:</strong> {state.selectedWO.quotation?.point_of_contact_email || 'N/A'}</p>
-              <p><strong>Contact Phone:</strong> {state.selectedWO.quotation?.point_of_contact_phone || 'N/A'}</p>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black mb-2">Purchase Order Details</h3>
-              <p><strong>Series Number:</strong> {state.selectedWO.purchase_order?.series_number || 'N/A'}</p>
-              <p><strong>Client PO Number:</strong> {state.selectedWO.purchase_order?.client_po_number || 'N/A'}</p>
-              <p><strong>Order Type:</strong> {state.selectedWO.purchase_order?.order_type || 'N/A'}</p>
-              <p><strong>Created:</strong> {state.selectedWO.purchase_order?.created_at ? new Date(state.selectedWO.purchase_order.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>PO File:</strong> {state.selectedWO.purchase_order?.po_file ? (
-                <a href={state.selectedWO.purchase_order.po_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                  View PO File
-                </a>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).po_series_number}</p>
+              <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO).client_po_number}</p>
+              <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO).order_type}</p>
+              <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO).created_at}</p>
+              <p><strong>PO File:</strong> {getQuotationDetails(state.selectedWO).po_file ? (
+                <a href={getQuotationDetails(state.selectedWO).po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">View File</a>
               ) : 'N/A'}</p>
-              <p><strong>Assigned Sales Person:</strong> {state.selectedWO.quotation?.assigned_sales_person?.name || 'N/A'}</p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black mb-2">Work Order Details</h3>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>Work Order Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
               <p><strong>Work Order Type:</strong> {state.selectedWO.wo_type || 'N/A'}</p>
               <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
@@ -378,7 +404,7 @@ const ManagerApproval = () => {
               <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black mb-2">Items</h3>
+              <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
@@ -414,7 +440,7 @@ const ManagerApproval = () => {
                           <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
-                              <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              <a href={item.certificate_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
                                 View Certificate
                               </a>
                             ) : (
