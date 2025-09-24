@@ -306,7 +306,6 @@ const ViewRFQ = () => {
                           value={rfq.rfq_status || 'Pending'}
                           onChange={e => handleStatusChange(rfq.id, e.target.value)}
                           className="p-1 border rounded focus:outline-indigo-500 w-full"
-                          disabled={rfq.hasQuotation}
                         >
                           <option value="Pending">Pending</option>
                           <option value="Processing">Processing</option>
