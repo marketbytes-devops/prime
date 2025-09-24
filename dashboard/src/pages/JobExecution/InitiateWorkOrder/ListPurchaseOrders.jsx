@@ -851,6 +851,21 @@ const ListPurchaseOrders = () => {
     return po ? po.status : "Collection Pending";
   };
 
+  const getQuotationDetails = (po) => {
+    const quotation = state.quotations.find((q) => q.id === po.quotation);
+    return {
+      series_number: quotation?.series_number || "N/A",
+      company_name: quotation?.company_name || "N/A",
+      company_address: quotation?.company_address || "N/A",
+      company_phone: quotation?.company_phone || "N/A",
+      company_email: quotation?.company_email || "N/A",
+      channel: state.channels?.find((c) => c.id === quotation?.rfq_channel)?.channel_name || "N/A",
+      contact_name: quotation?.point_of_contact_name || "N/A",
+      contact_email: quotation?.point_of_contact_email || "N/A",
+      contact_phone: quotation?.point_of_contact_phone || "N/A",
+    };
+  };
+
   const remainingItems = state.savedItems.filter(
     (item) => !state.usedItemIds.includes(item.id)
   );
@@ -1044,95 +1059,64 @@ const ListPurchaseOrders = () => {
         {state.selectedPO && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Purchase Order Details
-              </h3>
-              <p>
-                <strong>Series Number:</strong>{" "}
-                {state.selectedPO.series_number || "N/A"}
-              </p>
-              <p>
-                <strong>Client PO Number:</strong>{" "}
-                {state.selectedPO.client_po_number || "Nil"}
-              </p>
-              <p>
-                <strong>Order Type:</strong> {state.selectedPO.order_type}
-              </p>
-              <p>
-                <strong>Created:</strong>{" "}
-                {new Date(state.selectedPO.created_at).toLocaleDateString()}
-              </p>
-              <p>
-                <strong>PO File:</strong>{" "}
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedPO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedPO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedPO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedPO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedPO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedPO).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedPO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedPO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedPO).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedPO.series_number || "N/A"}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || "Nil"}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type}</p>
+              <p><strong>Created:</strong> {new Date(state.selectedPO.created_at).toLocaleDateString()}</p>
+              <p><strong>PO File:</strong>{" "}
                 {state.selectedPO.po_file ? (
-                  <a
-                    href={state.selectedPO.po_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:underline"
-                  >
-                    View File
-                  </a>
+                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">View File</a>
                 ) : (
                   "Nil"
                 )}
               </p>
-              <p>
-                <strong>Assigned Sales Person:</strong>{" "}
-                {getAssignedSalesPersonName(state.selectedPO)}
-              </p>
+              <p><strong>Assigned Sales Person:</strong> {getAssignedSalesPersonName(state.selectedPO)}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Purchase Order Items
-              </h3>
+              <h3 className="text-lg font-medium text-black">Purchase Order Items</h3>
               {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Item
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Quantity
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit Price
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Total Price
-                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedPO.items.map((item) => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)
-                              ?.name || "N/A"}
+                            {state.itemsList.find((i) => i.id === item.item)?.name || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === item.unit)?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.quantity || "N/A"}
+                            SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            SAR {item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            SAR {item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"}
+                            SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
                           </td>
                         </tr>
                       ))}
@@ -1286,45 +1270,26 @@ const ListPurchaseOrders = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-200">
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Item
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Remaining Quantity
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Unit
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Unit Price
-                      </th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Total Price
-                      </th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining Quantity</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                      <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.savedItems.map((item) => (
                       <tr key={item.id} className="border">
+                        <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                        <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || "0"}</td>
                         <td className="border p-2 whitespace-nowrap">
-                          {item.name || "N/A"}
+                          {state.units.find((u) => u.id === item.unit)?.name || "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          {item.remaining_quantity || "0"}
+                          SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          {state.units.find((u) => u.id === item.unit)?.name ||
-                            "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          SAR {item.unit_price
-                            ? Number(item.unit_price).toFixed(2)
-                            : "N/A"}
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          SAR {item.quantity && item.unit_price
-                            ? Number(item.quantity * item.unit_price).toFixed(2)
-                            : "0.00"}
+                          SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
                         </td>
                       </tr>
                     ))}
@@ -1336,18 +1301,12 @@ const ListPurchaseOrders = () => {
             )}
             {state.woType === "Single" && (
               <div className="mt-4">
-                <h4 className="text-md font-medium mb-2">
-                  Assign Technician to All Items
-                </h4>
+                <h4 className="text-md font-medium mb-2">Assign Technician to All Items</h4>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assigned To
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
                   <select
                     value={state.singleOrderAssignedTo}
-                    onChange={(e) =>
-                      handleSingleOrderAssignedToChange(e.target.value)
-                    }
+                    onChange={(e) => handleSingleOrderAssignedToChange(e.target.value)}
                     className="p-2 border rounded w-full"
                   >
                     <option value="">Select Technician</option>
@@ -1362,47 +1321,26 @@ const ListPurchaseOrders = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Item
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Quantity
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Unit Price
-                        </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                          Total Price
-                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.savedItems.map((item) => (
                         <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.name || "N/A"}
+                            {state.units.find((u) => u.id === item.unit)?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.quantity || "N/A"}
+                            SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)
-                              ?.name || "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            SAR {item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            SAR {item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"}
+                            SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
                           </td>
                         </tr>
                       ))}
@@ -1415,67 +1353,38 @@ const ListPurchaseOrders = () => {
               <div className="mt-4">
                 {state.createdSplitOrders.length > 0 && (
                   <div>
-                    <h3 className="text-md font-semibold mb-2 text-black">
-                      Created Split Orders
-                    </h3>
+                    <h3 className="text-md font-semibold mb-2 text-black">Created Split Orders</h3>
                     {state.createdSplitOrders.map((order, index) => (
                       <div key={index} className="mb-4 p-2 border rounded">
-                        <h4 className="text-md font-medium">
-                          Split Order {index + 1}
-                        </h4>
+                        <h4 className="text-md font-medium">Split Order {index + 1}</h4>
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-gray-200">
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Item
-                                </th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Quantity
-                                </th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Unit
-                                </th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Unit Price
-                                </th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Total Price
-                                </th>
-                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                                  Assigned To
-                                </th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                               </tr>
                             </thead>
                             <tbody>
                               {order.items.map((item) => (
                                 <tr key={item.id} className="border">
+                                  <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                                  <td className="border p-2 whitespace-nowrap">{item.quantity || "N/A"}</td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    {item.name || "N/A"}
+                                    {state.units.find((u) => u.id === item.unit)?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    {item.quantity || "N/A"}
+                                    SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    {state.units.find((u) => u.id === item.unit)
-                                      ?.name || "N/A"}
+                                    SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.unit_price
-                                      ? Number(item.unit_price).toFixed(2)
-                                      : "N/A"}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.quantity && item.unit_price
-                                      ? Number(
-                                          item.quantity * item.unit_price
-                                        ).toFixed(2)
-                                      : "0.00"}
-                                  </td>
-                                  <td className="border p-2 whitespace-nowrap">
-                                    {state.technicians.find(
-                                      (t) => t.id === parseInt(item.assigned_to)
-                                    )?.name || "N/A"}
+                                    {state.technicians.find((t) => t.id === parseInt(item.assigned_to))?.name || "N/A"}
                                   </td>
                                 </tr>
                               ))}
@@ -1486,22 +1395,14 @@ const ListPurchaseOrders = () => {
                     ))}
                   </div>
                 )}
-                {state.createdSplitOrders.length <
-                  state.numberOfSplitOrders && (
+                {state.createdSplitOrders.length < state.numberOfSplitOrders && (
                   <div>
-                    <h4 className="text-md font-medium mb-2">
-                      Select Items for Split Order{" "}
-                      {state.createdSplitOrders.length + 1}
-                    </h4>
+                    <h4 className="text-md font-medium mb-2">Select Items for Split Order {state.createdSplitOrders.length + 1}</h4>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Assigned To
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
                       <select
                         value={state.splitOrderAssignedTo}
-                        onChange={(e) =>
-                          handleSplitOrderAssignedToChange(e.target.value)
-                        }
+                        onChange={(e) => handleSplitOrderAssignedToChange(e.target.value)}
                         className="p-2 border rounded w-full mb-4"
                       >
                         <option value="">Select Technician</option>
@@ -1516,27 +1417,13 @@ const ListPurchaseOrders = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Select
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Item
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Remaining Quantity
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Assigned Quantity
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Unit
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Unit Price
-                            </th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
-                              Total Price
-                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Select</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remaining Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Quantity</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1545,54 +1432,33 @@ const ListPurchaseOrders = () => {
                               <td className="border p-2 whitespace-nowrap">
                                 <input
                                   type="checkbox"
-                                  checked={state.selectedItemIds.includes(
-                                    item.id
-                                  )}
+                                  checked={state.selectedItemIds.includes(item.id)}
                                   onChange={() => handleItemSelection(item.id)}
                                   disabled={item.remaining_quantity === 0}
                                 />
                               </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.name || "N/A"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.remaining_quantity || "0"}
-                              </td>
+                              <td className="border p-2 whitespace-nowrap">{item.name || "N/A"}</td>
+                              <td className="border p-2 whitespace-nowrap">{item.remaining_quantity || "0"}</td>
                               <td className="border p-2 whitespace-nowrap">
                                 <InputField
                                   type="number"
                                   value={item.assigned_quantity}
-                                  onChange={(e) =>
-                                    handleAssignedQuantityChange(
-                                      item.id,
-                                      e.target.value
-                                    )
-                                  }
+                                  onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
                                   className="w-full"
                                   min="0"
                                   max={item.remaining_quantity}
-                                  disabled={
-                                    !state.selectedItemIds.includes(item.id) ||
-                                    item.remaining_quantity === 0
-                                  }
+                                  disabled={!state.selectedItemIds.includes(item.id) || item.remaining_quantity === 0}
                                   placeholder="Enter quantity"
                                 />
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                {state.units.find((u) => u.id === item.unit)
-                                  ?.name || "N/A"}
+                                {state.units.find((u) => u.id === item.unit)?.name || "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                SAR {item.unit_price
-                                  ? Number(item.unit_price).toFixed(2)
-                                  : "N/A"}
+                                SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "N/A"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                SAR {item.quantity && item.unit_price
-                                  ? Number(
-                                      item.quantity * item.unit_price
-                                    ).toFixed(2)
-                                  : "0.00"}
+                                SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
                               </td>
                             </tr>
                           ))}
