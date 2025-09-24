@@ -9,13 +9,17 @@ const PartialOrderSelection = () => {
   const { quotationData } = location.state || {};
   const [state, setState] = useState({
     numberOfPartialOrders: "",
+    splitMode: "items", 
     selectedItemIds: [],
     savedItems: [],
     createdPartialOrders: [],
     usedItemIds: [],
     units: [],
     itemsList: [],
-    isAllPartialsCreated: false, // New state to track completion
+    isAllPartialsCreated: false,
+    quantityAssignments: {}, // { itemId: { remainingQuantity: number, assignments: [{ quantity: number, partialOrderIndex: number }] } }
+    currentPartialIndex: 0,
+    isWorkflowCompleted: false,
   });
 
   useEffect(() => {
@@ -25,7 +29,6 @@ const PartialOrderSelection = () => {
       navigate("/view-quotation");
       return;
     }
-
     const fetchData = async () => {
       try {
         const [unitsRes, itemsRes] = await Promise.all([apiClient.get("/units/"), apiClient.get("/items/")]);
@@ -37,38 +40,78 @@ const PartialOrderSelection = () => {
           unit: item.unit || null,
           unit_price: item.unit_price || 0,
         }));
+        const initialQuantityAssignments = {};
+        initialSavedItems.forEach(item => {
+          initialQuantityAssignments[item.id] = {
+            remainingQuantity: item.quantity || 0,
+            assignments: []
+          };
+        });
         setState(prev => ({
           ...prev,
           savedItems: initialSavedItems,
           units: unitsRes.data || [],
           itemsList: itemsRes.data || [],
+          quantityAssignments: initialQuantityAssignments,
         }));
       } catch (error) {
         console.error("Error fetching units or items:", error);
         toast.error("Failed to load units or items.");
       }
     };
-
     fetchData();
   }, [quotationData, navigate]);
 
   const handleNumberOfPartialOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
-    if (value && (value < 1 || value > state.savedItems.length)) {
-      toast.error(`Number of partial orders must be between 1 and ${state.savedItems.length}.`);
+    if (value && value < 1) {
+      toast.error("Number of partial orders must be at least 1.");
       return;
     }
+    const initialQuantityAssignments = {};
+    state.savedItems.forEach(item => {
+      initialQuantityAssignments[item.id] = {
+        remainingQuantity: item.quantity || 0,
+        assignments: []
+      };
+    });
     setState(prev => ({
       ...prev,
       numberOfPartialOrders: value,
       selectedItemIds: [],
       createdPartialOrders: [],
       usedItemIds: [],
-      isAllPartialsCreated: false, // Reset completion state
+      isAllPartialsCreated: false,
+      quantityAssignments: initialQuantityAssignments,
+      currentPartialIndex: 0,
+      isWorkflowCompleted: false,
+    }));
+  };
+
+  const handleSplitModeChange = (mode) => {
+    const initialQuantityAssignments = {};
+    state.savedItems.forEach(item => {
+      initialQuantityAssignments[item.id] = {
+        remainingQuantity: item.quantity || 0,
+        assignments: []
+      };
+    });
+    setState(prev => ({
+      ...prev,
+      splitMode: mode,
+      selectedItemIds: [],
+      createdPartialOrders: [],
+      usedItemIds: [],
+      isAllPartialsCreated: false,
+      quantityAssignments: initialQuantityAssignments,
+      currentPartialIndex: 0,
+      isWorkflowCompleted: false,
     }));
   };
 
   const handleItemSelection = (itemId) => {
+    if (state.splitMode !== "items") return;
+
     setState(prev => {
       const { selectedItemIds, createdPartialOrders, numberOfPartialOrders, usedItemIds } = prev;
       if (selectedItemIds.includes(itemId)) {
@@ -87,29 +130,97 @@ const PartialOrderSelection = () => {
     });
   };
 
+  const handleQuantityAssignment = (itemId, quantity) => {
+    const assignedQuantity = quantity === "" ? 0 : parseInt(quantity, 10);
+    const item = state.savedItems.find(item => item.id === itemId);
+    const currentAssignment = state.quantityAssignments[itemId];
+
+    if (assignedQuantity < 0) {
+      toast.error("Quantity cannot be negative.");
+      return;
+    }
+
+    if (assignedQuantity > currentAssignment.remainingQuantity) {
+      toast.error(`Cannot assign more than ${currentAssignment.remainingQuantity} remaining quantity.`);
+      return;
+    }
+    setState(prev => {
+      const newQuantityAssignments = { ...prev.quantityAssignments };
+
+      const existingAssignmentIndex = newQuantityAssignments[itemId].assignments
+        .findIndex(a => a.partialOrderIndex === prev.currentPartialIndex);
+
+      if (existingAssignmentIndex !== -1) {
+        const existingQuantity = newQuantityAssignments[itemId].assignments[existingAssignmentIndex].quantity;
+        newQuantityAssignments[itemId].remainingQuantity += existingQuantity;
+        newQuantityAssignments[itemId].assignments.splice(existingAssignmentIndex, 1);
+      }
+
+      if (assignedQuantity > 0) {
+        newQuantityAssignments[itemId].remainingQuantity -= assignedQuantity;
+        newQuantityAssignments[itemId].assignments.push({
+          quantity: assignedQuantity,
+          partialOrderIndex: prev.currentPartialIndex
+        });
+      }
+
+      return {
+        ...prev,
+        quantityAssignments: newQuantityAssignments
+      };
+    });
+  };
+
+  const getCurrentPartialAssignment = (itemId) => {
+    const assignment = state.quantityAssignments[itemId]?.assignments
+      .find(a => a.partialOrderIndex === state.currentPartialIndex);
+    return assignment?.quantity || "";
+  };
+
   const isGenerateDisabled = () => {
-    const { numberOfPartialOrders, createdPartialOrders, selectedItemIds, usedItemIds } = state;
+    const { numberOfPartialOrders, createdPartialOrders, selectedItemIds, usedItemIds, splitMode } = state;
     if (!numberOfPartialOrders) return true;
     if (createdPartialOrders.length >= numberOfPartialOrders) return true;
-    if (selectedItemIds.length === 0) return true;
-    const remainingItemsCount = state.savedItems.length - usedItemIds.length;
-    const remainingPartialOrders = numberOfPartialOrders - createdPartialOrders.length;
-    const maxItemsPerOrder = remainingPartialOrders > 1
-      ? remainingItemsCount - (remainingPartialOrders - 1)
-      : remainingItemsCount;
-    if (remainingPartialOrders > 1 && selectedItemIds.length > maxItemsPerOrder) return true;
-    if (remainingPartialOrders === 1 && selectedItemIds.length !== remainingItemsCount) return true;
-    if (selectedItemIds.some(id => usedItemIds.includes(id))) return true;
+    if (splitMode === "items") {
+      if (selectedItemIds.length === 0) return true;
+      const remainingItemsCount = state.savedItems.length - usedItemIds.length;
+      const remainingPartialOrders = numberOfPartialOrders - createdPartialOrders.length;
+      const maxItemsPerOrder = remainingPartialOrders > 1
+        ? remainingItemsCount - (remainingPartialOrders - 1)
+        : remainingItemsCount;
+      if (remainingPartialOrders > 1 && selectedItemIds.length > maxItemsPerOrder) return true;
+      if (remainingPartialOrders === 1 && selectedItemIds.length !== remainingItemsCount) return true;
+      if (selectedItemIds.some(id => usedItemIds.includes(id))) return true;
+    } else if (splitMode === "quantity") {
+      const hasAssignments = Object.values(state.quantityAssignments).some(assignment =>
+        assignment.assignments.some(a => a.partialOrderIndex === state.currentPartialIndex)
+      );
+      if (!hasAssignments) return true;
+    }
     return false;
   };
 
   const handleGeneratePartialOrder = async () => {
-    const selectedItems = state.savedItems.filter(item => state.selectedItemIds.includes(item.id));
+    let selectedItems = [];
+    if (state.splitMode === "items") {
+      selectedItems = state.savedItems.filter(item => state.selectedItemIds.includes(item.id));
+    } else if (state.splitMode === "quantity") {
+      selectedItems = [];
+      Object.entries(state.quantityAssignments).forEach(([itemId, assignment]) => {
+        const partialAssignment = assignment.assignments.find(a => a.partialOrderIndex === state.currentPartialIndex);
+        if (partialAssignment && partialAssignment.quantity > 0) {
+          const originalItem = state.savedItems.find(item => item.id === parseInt(itemId));
+          selectedItems.push({
+            ...originalItem,
+            quantity: partialAssignment.quantity
+          });
+        }
+      });
+    }
     if (!selectedItems.length) {
       toast.error("No valid items selected.");
       return;
     }
-
     const formData = new FormData();
     formData.append("quotation", quotationData.id);
     formData.append("order_type", "partial");
@@ -126,35 +237,48 @@ const PartialOrderSelection = () => {
         }))
       )
     );
-
     try {
       const response = await apiClient.post("/purchase-orders/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
       setState(prev => {
         const newCreatedPartialOrders = [
           ...prev.createdPartialOrders,
-          { 
-            ...response.data, 
+          {
+            ...response.data,
             items: response.data.items.map(item => ({
               ...item,
               total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
             })),
-            itemIds: [...prev.selectedItemIds]
+            itemIds: prev.splitMode === "items" ? [...prev.selectedItemIds] : []
           }
         ];
-        const newUsedItemIds = [...prev.usedItemIds, ...prev.selectedItemIds];
-        const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders && 
-                                    newUsedItemIds.length === prev.savedItems.length;
+
+        let newUsedItemIds = prev.usedItemIds;
+        if (prev.splitMode === "items") {
+          newUsedItemIds = [...prev.usedItemIds, ...prev.selectedItemIds];
+        }
+
+        let isAllPartialsCreated = false;
+        if (prev.splitMode === "items") {
+          isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
+                                newUsedItemIds.length === prev.savedItems.length;
+        } else if (prev.splitMode === "quantity") {
+          isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
+                                Object.values(prev.quantityAssignments).every(assignment => assignment.remainingQuantity === 0);
+        }
+
         return {
           ...prev,
           createdPartialOrders: newCreatedPartialOrders,
           usedItemIds: newUsedItemIds,
           selectedItemIds: [],
-          isAllPartialsCreated, // Update completion state
+          currentPartialIndex: prev.currentPartialIndex + 1,
+          isAllPartialsCreated,
+          isWorkflowCompleted: false,
         };
       });
+
       toast.success(`Partial purchase order ${state.createdPartialOrders.length + 1} created successfully!`);
     } catch (error) {
       console.error("Error creating partial order:", error);
@@ -165,22 +289,51 @@ const PartialOrderSelection = () => {
   const handleCancelPartial = async (index) => {
     const orderToCancel = state.createdPartialOrders[index];
     if (!orderToCancel) return;
-
     try {
       await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`);
-      
+
       setState(prev => {
         const newCreatedPartialOrders = prev.createdPartialOrders.filter((_, i) => i !== index);
-        const newUsedItemIds = prev.usedItemIds.filter(id => !orderToCancel.itemIds.includes(id));
-        const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders && 
-                                    newUsedItemIds.length === prev.savedItems.length;
+        let newUsedItemIds = prev.usedItemIds;
+
+        if (prev.splitMode === "items") {
+          newUsedItemIds = prev.usedItemIds.filter(id => !orderToCancel.itemIds.includes(id));
+        } else if (prev.splitMode === "quantity") {
+          const newQuantityAssignments = { ...prev.quantityAssignments };
+          Object.entries(newQuantityAssignments).forEach(([itemId, assignment]) => {
+            const cancelledAssignment = assignment.assignments.find(a => a.partialOrderIndex === index);
+            if (cancelledAssignment) {
+              newQuantityAssignments[itemId].remainingQuantity += cancelledAssignment.quantity;
+              newQuantityAssignments[itemId].assignments = assignment.assignments.filter(a => a.partialOrderIndex !== index);
+              newQuantityAssignments[itemId].assignments = assignment.assignments.map(a =>
+                a.partialOrderIndex > index ? { ...a, partialOrderIndex: a.partialOrderIndex - 1 } : a
+              );
+            }
+          });
+
+          return {
+            ...prev,
+            createdPartialOrders: newCreatedPartialOrders,
+            quantityAssignments: newQuantityAssignments,
+            currentPartialIndex: Math.max(0, prev.currentPartialIndex - 1),
+            isAllPartialsCreated: false,
+            isWorkflowCompleted: false,
+          };
+        }
+
+        const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
+          newUsedItemIds.length === prev.savedItems.length;
+
         return {
           ...prev,
           createdPartialOrders: newCreatedPartialOrders,
           usedItemIds: newUsedItemIds,
-          isAllPartialsCreated, // Update completion state
+          currentPartialIndex: Math.max(0, prev.currentPartialIndex - 1),
+          isAllPartialsCreated,
+          isWorkflowCompleted: false,
         };
       });
+
       toast.success(`Partial order ${index + 1} canceled successfully.`);
     } catch (error) {
       console.error("Error canceling partial order:", error);
@@ -188,30 +341,116 @@ const PartialOrderSelection = () => {
     }
   };
 
-  const handleCancel = () => {
-    setState(prev => ({
-      ...prev,
-      createdPartialOrders: [],
-      usedItemIds: [],
-      selectedItemIds: [],
-      isAllPartialsCreated: false, // Reset completion state
-    }));
-    toast.info("All created partial orders have been reset.");
+  const handleCancel = async () => {
+    try {
+      for (const order of state.createdPartialOrders) {
+        await apiClient.delete(`/purchase-orders/${order.id}/`);
+      }
+      
+      const initialQuantityAssignments = {};
+      state.savedItems.forEach(item => {
+        initialQuantityAssignments[item.id] = {
+          remainingQuantity: item.quantity || 0,
+          assignments: []
+        };
+      });
+      setState(prev => ({
+        ...prev,
+        createdPartialOrders: [],
+        usedItemIds: [],
+        selectedItemIds: [],
+        isAllPartialsCreated: false,
+        quantityAssignments: initialQuantityAssignments,
+        currentPartialIndex: 0,
+        isWorkflowCompleted: false,
+      }));
+      toast.info("All created partial orders have been reset.");
+    } catch (error) {
+      console.error("Error deleting partial orders:", error);
+      toast.error("Failed to reset partial orders.");
+    }
   };
 
-  const handleFinish = () => {
-    if (!state.numberOfPartialOrders || state.createdPartialOrders.length !== state.numberOfPartialOrders || state.usedItemIds.length !== state.savedItems.length) {
-      toast.error("Please create exactly the specified number of partial orders with all items.");
+  const handleFinish = async () => {
+    if (!state.numberOfPartialOrders || state.createdPartialOrders.length !== state.numberOfPartialOrders) {
+      toast.error("Please create exactly the specified number of partial orders.");
       return;
     }
-    navigate("/view-quotation", { state: { quotationId: quotationData.id, partialOrders: state.createdPartialOrders } });
+
+    if (state.splitMode === "items" && state.usedItemIds.length !== state.savedItems.length) {
+      toast.error("All items must be assigned to partial orders.");
+      return;
+    }
+
+    if (state.splitMode === "quantity") {
+      const hasRemainingQuantity = Object.values(state.quantityAssignments).some(assignment => assignment.remainingQuantity > 0);
+      if (hasRemainingQuantity) {
+        toast.error("All item quantities must be fully assigned to partial orders.");
+        return;
+      }
+    }
+    try {
+      await apiClient.patch(`/quotations/${quotationData.id}/`, {
+        partial_order_workflow_completed: true
+      });
+
+      setState(prev => ({
+        ...prev,
+        isWorkflowCompleted: true,
+      }));
+
+      toast.success("Partial order workflow completed successfully!");
+      navigate("/view-quotation", { 
+        state: { 
+          quotationId: quotationData.id, 
+          partialOrders: state.createdPartialOrders,
+          workflowCompleted: true 
+        } 
+      });
+    } catch (error) {
+      console.error("Error completing workflow:", error);
+      toast.error("Failed to complete workflow.");
+    }
   };
 
-  const remainingItems = state.savedItems.filter(item => !state.usedItemIds.includes(item.id));
+  const handlePrevious = async () => {
+    if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
+      const confirmLeave = window.confirm(
+        "You have created partial orders but haven't completed the workflow. " +
+        "If you leave now, these partial orders will be deleted. Do you want to continue?"
+      );
+      
+      if (confirmLeave) {
+        try {
+          for (const order of state.createdPartialOrders) {
+            await apiClient.delete(`/purchase-orders/${order.id}/`);
+          }
+        } catch (error) {
+          console.error("Error cleaning up partial orders:", error);
+        }
+        navigate("/view-quotation");
+      }
+    } else {
+      navigate("/view-quotation");
+    }
+  };
+
+  const remainingItems = state.splitMode === "items"
+    ? state.savedItems.filter(item => !state.usedItemIds.includes(item.id))
+    : state.savedItems;
+  const canCreateMore = state.createdPartialOrders.length < state.numberOfPartialOrders;
 
   return (
     <div className="container mx-auto p-4 bg-transparent min-h-screen">
-      <h2 className="text-xl font-semibold mb-4 text-black">Partial Order Selection</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
+        <button
+          onClick={handlePrevious}
+          className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
+        >
+          Previous
+        </button>
+      </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">Number of Partial Orders</label>
@@ -221,20 +460,55 @@ const PartialOrderSelection = () => {
             onChange={handleNumberOfPartialOrdersChange}
             className="w-full p-2 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
             min="1"
-            max={state.savedItems.length}
             placeholder="Enter number of partial orders"
           />
         </div>
-        {remainingItems.length > 0 && (
+        {state.numberOfPartialOrders && (
           <div className="mb-4">
-            <h3 className="text-md font-semibold mb-2 text-black">Select Items</h3>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Split Mode</label>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="items"
+                  checked={state.splitMode === "items"}
+                  onChange={(e) => handleSplitModeChange(e.target.value)}
+                  className="mr-2"
+                />
+                Split by Items
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="quantity"
+                  checked={state.splitMode === "quantity"}
+                  onChange={(e) => handleSplitModeChange(e.target.value)}
+                  className="mr-2"
+                />
+                Split by Quantity
+              </label>
+            </div>
+          </div>
+        )}
+        {remainingItems.length > 0 && canCreateMore && (
+          <div className="mb-4">
+            <h3 className="text-md font-semibold mb-2 text-black">
+              {state.splitMode === "items" ? "Select Items" : `Assign Quantities for Partial Order ${state.currentPartialIndex + 1}`}
+            </h3>
             <div className="overflow-x-auto rounded-lg shadow-sm">
               <table className="min-w-full bg-white border border-gray-200">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="px-4 py-2 text-sm font-medium text-black text-left">Select</th>
+                    {state.splitMode === "items" && (
+                      <th className="px-4 py-2 text-sm font-medium text-black text-left">Select</th>
+                    )}
                     <th className="px-4 py-2 text-sm font-medium text-black text-left">Item</th>
-                    <th className="px-4 py-2 text-sm font-medium text-black text-left">Quantity</th>
+                    <th className="px-4 py-2 text-sm font-medium text-black text-left">
+                      {state.splitMode === "quantity" ? "Remaining Quantity" : "Quantity"}
+                    </th>
+                    {state.splitMode === "quantity" && (
+                      <th className="px-4 py-2 text-sm font-medium text-black text-left">Assign Quantity</th>
+                    )}
                     <th className="px-4 py-2 text-sm font-medium text-black text-left">Unit</th>
                     <th className="px-4 py-2 text-sm font-medium text-black text-left">Unit Price</th>
                   </tr>
@@ -242,18 +516,38 @@ const PartialOrderSelection = () => {
                 <tbody>
                   {remainingItems.map(item => (
                     <tr key={item.id} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-black">
-                        <input
-                          type="checkbox"
-                          checked={state.selectedItemIds.includes(item.id)}
-                          onChange={() => handleItemSelection(item.id)}
-                          disabled={state.usedItemIds.includes(item.id)}
-                        />
-                      </td>
+                      {state.splitMode === "items" && (
+                        <td className="px-4 py-3 text-sm text-black">
+                          <input
+                            type="checkbox"
+                            checked={state.selectedItemIds.includes(item.id)}
+                            onChange={() => handleItemSelection(item.id)}
+                            disabled={state.usedItemIds.includes(item.id)}
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-sm text-black">
                         {state.itemsList.find(i => i.id === item.item)?.name || item.item_name || item.product_name || "N/A"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-black">{item.quantity || "N/A"}</td>
+                      <td className="px-4 py-3 text-sm text-black">
+                        {state.splitMode === "quantity"
+                          ? (state.quantityAssignments[item.id]?.remainingQuantity || 0)
+                          : (item.quantity || "N/A")
+                        }
+                      </td>
+                      {state.splitMode === "quantity" && (
+                        <td className="px-4 py-3 text-sm text-black">
+                          <input
+                            type="number"
+                            value={getCurrentPartialAssignment(item.id)}
+                            onChange={(e) => handleQuantityAssignment(item.id, e.target.value)}
+                            className="w-full p-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            min="0"
+                            max={state.quantityAssignments[item.id]?.remainingQuantity || 0}
+                            placeholder="0"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-sm text-black">
                         {state.units.find(u => u.id === item.unit)?.name || "N/A"}
                       </td>
@@ -340,7 +634,7 @@ const PartialOrderSelection = () => {
             className={`px-3 py-2 rounded transition-colors duration-200 ${
               state.isAllPartialsCreated
                 ? "bg-green-500 text-white hover:bg-green-600"
-                : "bg-grey-200 text-black hover:bg-gray-300"
+                : "bg-gray-200 text-black hover:bg-gray-300"
             }`}
           >
             Finish
