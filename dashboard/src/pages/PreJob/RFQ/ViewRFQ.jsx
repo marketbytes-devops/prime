@@ -289,70 +289,75 @@ const ViewRFQ = () => {
                   <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">No RFQs found.</td>
                 </tr>
               ) : (
-                currentRfqs.map((rfq, index) => (
-                  <tr key={rfq.id} className="border hover:bg-gray-50">
-                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{new Date(rfq.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A'}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap min-w-[150px]">
-                      <select
-                        value={rfq.rfq_status || 'Pending'}
-                        onChange={e => handleStatusChange(rfq.id, e.target.value)}
-                        className="p-1 border rounded focus:outline-indigo-500 w-full"
-                        disabled={rfq.rfq_status === 'Completed'}
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => openModal(rfq)}
-                          className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                currentRfqs.map((rfq, index) => {
+                  const allItemsHaveUnitPrice = rfq.items.every(
+                    item => item.unit_price && parseFloat(item.unit_price) > 0
+                  );
+                  return (
+                    <tr key={rfq.id} className="border hover:bg-gray-50">
+                      <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                      <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                      <td className="border p-2 whitespace-nowrap">{new Date(rfq.created_at).toLocaleDateString()}</td>
+                      <td className="border p-2 whitespace-nowrap">
+                        {state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A'}
+                      </td>
+                      <td className="border p-2 whitespace-nowrap min-w-[150px]">
+                        <select
+                          value={rfq.rfq_status || 'Pending'}
+                          onChange={e => handleStatusChange(rfq.id, e.target.value)}
+                          className="p-1 border rounded focus:outline-indigo-500 w-full"
+                          disabled={rfq.hasQuotation}
                         >
-                          View Details
-                        </Button>
-                        <Button
-                          onClick={() => handleConvertToQuotation(rfq)}
-                          disabled={rfq.rfq_status !== 'Processing'}
-                          className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Processing'
-                            ? 'bg-purple-600 text-white hover:bg-purple-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Convert to Quotation
-                        </Button>
-                        <Button
-                          onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
-                          disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            rfq.hasQuotation || !hasPermission('rfq', 'edit')
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          onClick={() => handleDelete(rfq.id)}
-                          disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            rfq.hasQuotation || !hasPermission('rfq', 'delete')
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-red-600 text-white hover:bg-red-700'
-                          }`}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <option value="Pending">Pending</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </td>
+                      <td className="border p-2 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => openModal(rfq)}
+                            className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            onClick={() => handleConvertToQuotation(rfq)}
+                            disabled={rfq.rfq_status !== 'Processing' || !allItemsHaveUnitPrice}
+                            className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Processing' && allItemsHaveUnitPrice
+                              ? 'bg-purple-600 text-white hover:bg-purple-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Convert to Quotation
+                          </Button>
+                          <Button
+                            onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
+                            disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              rfq.hasQuotation || !hasPermission('rfq', 'edit')
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                              }`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(rfq.id)}
+                            disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              rfq.hasQuotation || !hasPermission('rfq', 'delete')
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                              }`}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
