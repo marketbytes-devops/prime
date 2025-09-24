@@ -53,7 +53,7 @@ const EditRFQ = () => {
           apiClient.get('items/'),
           apiClient.get('units/'),
         ]);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           company_name: rfqRes.data.company_name || '',
           company_address: rfqRes.data.company_address || '',
@@ -67,7 +67,7 @@ const EditRFQ = () => {
           due_date_for_quotation: rfqRes.data.due_date_for_quotation || '',
           rfq_status: rfqRes.data.rfq_status || 'Processing',
           items: rfqRes.data.items && rfqRes.data.items.length
-            ? rfqRes.data.items.map(item => ({
+            ? rfqRes.data.items.map((item) => ({
                 item: item.item || '',
                 quantity: item.quantity || '',
                 unit: item.unit || '',
@@ -80,17 +80,18 @@ const EditRFQ = () => {
           units: unitsRes.data || [],
           loading: false,
         }));
-        if ((isQuotation || scrollToItems) && itemsSectionRef.current) {
+        if (scrollToItems && itemsSectionRef.current) {
           itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+          toast.error('Please enter unit prices for all items.');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('Failed to load RFQ data.');
-        setState(prev => ({ ...prev, loading: false }));
+        setState((prev) => ({ ...prev, loading: false }));
       }
     };
     fetchData();
-  }, [id, isQuotation, scrollToItems]);
+  }, [id, scrollToItems]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -104,7 +105,7 @@ const EditRFQ = () => {
     assigned_sales_person: state.assigned_sales_person || null,
     due_date_for_quotation: state.due_date_for_quotation || null,
     rfq_status: state.rfq_status || null,
-    items: state.items.map(item => ({
+    items: state.items.map((item) => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
       unit: item.unit || null,
@@ -140,7 +141,7 @@ const EditRFQ = () => {
     quotation_status: 'Pending',
     followup_frequency: '24_hours',
     remarks: '',
-    items: state.items.map(item => ({
+    items: state.items.map((item) => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
       unit: item.unit || null,
@@ -165,13 +166,20 @@ const EditRFQ = () => {
     debounce(async () => {
       try {
         const rfqPayload = buildRfqPayload();
+        const hasUnitPrices = state.items.every(
+          (item) => item.unit_price != null && item.unit_price !== ''
+        );
+        if (hasUnitPrices && rfqPayload.rfq_status !== 'Completed') {
+          rfqPayload.rfq_status = 'Completed';
+          setState((prev) => ({ ...prev, rfq_status: 'Completed' }));
+        }
         await apiClient.patch(`rfqs/${id}/`, rfqPayload);
-        setState(prev => ({ ...prev, lastSaved: new Date() }));
+        setState((prev) => ({ ...prev, lastSaved: new Date() }));
       } catch (error) {
         console.error('Error autosaving RFQ:', error);
       }
     }, 2000),
-    [buildRfqPayload, id]
+    [buildRfqPayload, id, state.items]
   );
 
   useEffect(() => {
@@ -196,21 +204,21 @@ const EditRFQ = () => {
   ]);
 
   const addItem = () => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       items: [...prev.items, { item: '', quantity: '', unit: '', unit_price: '' }],
     }));
   };
 
-  const removeItem = index => {
-    setState(prev => ({
+  const removeItem = (index) => {
+    setState((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
     }));
   };
 
   const handleItemChange = (index, field, value) => {
-    setState(prev => {
+    setState((prev) => {
       const newItems = [...prev.items];
       newItems[index][field] = value;
       return { ...prev, items: newItems };
@@ -232,49 +240,46 @@ const EditRFQ = () => {
       state.rfq_status;
 
     const isItemsValid = state.items.every(
-      item =>
+      (item) =>
         item.item &&
         item.quantity &&
         item.unit &&
-        (!isQuotation || (isQuotation && item.unit_price && parseFloat(item.unit_price) > 0))
+        (!isQuotation || (isQuotation && item.unit_price))
     );
 
     return isBasicInfoValid && isItemsValid;
   };
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isFormValid()) {
-      toast.error('Please fill all required fields, including unit prices for quotations.');
+      toast.error('Please fill all required fields, including unit prices for quotation conversion.');
       if (isQuotation && itemsSectionRef.current) {
         itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
       }
       return;
     }
-    setState(prev => ({ ...prev, submitting: true }));
+    setState((prev) => ({ ...prev, submitting: true }));
     try {
-      const allItemsHaveUnitPrice = state.items.every(
-        item => item.unit_price && parseFloat(item.unit_price) > 0
+      const rfqPayload = buildRfqPayload();
+      const hasUnitPrices = state.items.every(
+        (item) => item.unit_price != null && item.unit_price !== ''
       );
-      const rfqPayload = {
-        ...buildRfqPayload(),
-        rfq_status: allItemsHaveUnitPrice ? 'Completed' : state.rfq_status,
-      };
+      if (hasUnitPrices) {
+        rfqPayload.rfq_status = 'Completed';
+      }
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
       if (isQuotation) {
         const quotationPayload = buildQuotationPayload();
         await apiClient.post('/quotations/', quotationPayload);
-        toast.success('Quotation created successfully!');
-        navigate('/view-quotation');
-      } else {
-        toast.success('RFQ updated successfully!');
-        navigate('/view-rfq');
       }
+      navigate(isQuotation ? '/view-quotation' : '/view-rfq');
+      toast.success(isQuotation ? 'Quotation created successfully!' : 'RFQ updated successfully!');
     } catch (error) {
       console.error('Error submitting:', error);
       toast.error('Failed to submit.');
     } finally {
-      setState(prev => ({ ...prev, submitting: false }));
+      setState((prev) => ({ ...prev, submitting: false }));
     }
   };
 
@@ -291,8 +296,8 @@ const EditRFQ = () => {
               type="text"
               placeholder="Enter company name"
               value={state.company_name || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_name: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_name: e.target.value }))
               }
               maxLength={100}
               required
@@ -306,8 +311,8 @@ const EditRFQ = () => {
               type="text"
               placeholder="Enter company address"
               value={state.company_address || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_address: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_address: e.target.value }))
               }
               required
             />
@@ -320,8 +325,8 @@ const EditRFQ = () => {
               type="text"
               placeholder="Enter company phone"
               value={state.company_phone || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_phone: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_phone: e.target.value }))
               }
               maxLength={20}
               required
@@ -335,8 +340,8 @@ const EditRFQ = () => {
               type="email"
               placeholder="Enter company email"
               value={state.company_email || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_email: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_email: e.target.value }))
               }
               required
             />
@@ -352,14 +357,14 @@ const EditRFQ = () => {
           </label>
           <select
             value={state.rfq_channel || ''}
-            onChange={e =>
-              setState(prev => ({ ...prev, rfq_channel: e.target.value }))
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
             }
             className="w-full p-2 border rounded-md focus:outline-indigo-600"
             required
           >
             <option value="">Select Channel</option>
-            {state.channels.map(channel => (
+            {state.channels.map((channel) => (
               <option key={channel.id} value={channel.id}>
                 {channel.channel_name}
               </option>
@@ -379,8 +384,8 @@ const EditRFQ = () => {
               type="text"
               placeholder="Enter contact name"
               value={state.point_of_contact_name || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, point_of_contact_name: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, point_of_contact_name: e.target.value }))
               }
               maxLength={100}
               required
@@ -395,8 +400,8 @@ const EditRFQ = () => {
                 type="email"
                 placeholder="Enter contact email"
                 value={state.point_of_contact_email || ''}
-                onChange={e =>
-                  setState(prev => ({ ...prev, point_of_contact_email: e.target.value }))
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, point_of_contact_email: e.target.value }))
                 }
                 required
               />
@@ -409,8 +414,8 @@ const EditRFQ = () => {
                 type="text"
                 placeholder="Enter contact phone"
                 value={state.point_of_contact_phone || ''}
-                onChange={e =>
-                  setState(prev => ({ ...prev, point_of_contact_phone: e.target.value }))
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, point_of_contact_phone: e.target.value }))
                 }
                 maxLength={20}
                 required
@@ -429,14 +434,14 @@ const EditRFQ = () => {
             </label>
             <select
               value={state.assigned_sales_person || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, assigned_sales_person: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, assigned_sales_person: e.target.value }))
               }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
               required
             >
               <option value="">Select Team Member</option>
-              {state.teamMembers.map(member => (
+              {state.teamMembers.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name} ({member.designation || 'No designation'})
                 </option>
@@ -450,8 +455,8 @@ const EditRFQ = () => {
             <InputField
               type="date"
               value={state.due_date_for_quotation || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, due_date_for_quotation: e.target.value }))
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, due_date_for_quotation: e.target.value }))
               }
               required
             />
@@ -467,8 +472,8 @@ const EditRFQ = () => {
           </label>
           <select
             value={state.rfq_status || ''}
-            onChange={e =>
-              setState(prev => ({ ...prev, rfq_status: e.target.value }))
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, rfq_status: e.target.value }))
             }
             className="w-full p-2 border rounded-md focus:outline-indigo-600"
             required
@@ -492,12 +497,12 @@ const EditRFQ = () => {
                 </label>
                 <select
                   value={item.item || ''}
-                  onChange={e => handleItemChange(index, 'item', e.target.value)}
+                  onChange={(e) => handleItemChange(index, 'item', e.target.value)}
                   className="w-full p-2 border rounded-md focus:outline-indigo-600"
                   required
                 >
                   <option value="">Select Item</option>
-                  {state.itemsList.map(i => (
+                  {state.itemsList.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.name}
                     </option>
@@ -512,7 +517,7 @@ const EditRFQ = () => {
                   type="number"
                   placeholder="Enter quantity"
                   value={item.quantity || ''}
-                  onChange={e => handleItemChange(index, 'quantity', e.target.value)}
+                  onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                   min={0}
                   required
                 />
@@ -523,12 +528,12 @@ const EditRFQ = () => {
                 </label>
                 <select
                   value={item.unit || ''}
-                  onChange={e => handleItemChange(index, 'unit', e.target.value)}
+                  onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
                   className="w-full p-2 border rounded-md focus:outline-indigo-600"
                   required
                 >
                   <option value="">Select Unit</option>
-                  {state.units.map(u => (
+                  {state.units.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
                     </option>
@@ -543,7 +548,7 @@ const EditRFQ = () => {
                   type="number"
                   placeholder="Enter unit price"
                   value={item.unit_price || ''}
-                  onChange={e => handleItemChange(index, 'unit_price', e.target.value)}
+                  onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                   min={0}
                   step="0.01"
                   required={isQuotation}

@@ -29,9 +29,9 @@ const ViewRFQ = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await apiClient.get("/profile/");
+        const response = await apiClient.get('/profile/');
         const user = response.data;
-        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
+        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
         const roleId = user.role?.id;
         if (roleId) {
           const res = await apiClient.get(`/roles/${roleId}/`);
@@ -40,7 +40,7 @@ const ViewRFQ = () => {
           setPermissions([]);
         }
       } catch (error) {
-        console.error("Unable to fetch user profile:", error);
+        console.error('Unable to fetch user profile:', error);
         setPermissions([]);
         setIsSuperadmin(false);
       } finally {
@@ -79,7 +79,7 @@ const ViewRFQ = () => {
         })
       );
 
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         rfqs: rfqsWithQuotationStatus || [],
         channels: channelsRes.data || [],
@@ -131,12 +131,10 @@ const ViewRFQ = () => {
     try {
       const rfqResponse = await apiClient.get(`rfqs/${rfq.id}/`);
       const currentRfq = rfqResponse.data;
-      const allItemsHaveUnitPrice = currentRfq.items.every(
-        item => item.unit_price && parseFloat(item.unit_price) > 0
-      );
-
-      if (!allItemsHaveUnitPrice) {
-        toast.error('Please enter unit prices for all items before converting to a quotation.');
+      const hasUnitPrices = currentRfq.items.every((item) => item.unit_price != null && item.unit_price !== '');
+      
+      if (!hasUnitPrices) {
+        toast.error('Please enter unit prices for all items.');
         navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true, scrollToItems: true } });
         return;
       }
@@ -155,7 +153,7 @@ const ViewRFQ = () => {
   };
 
   const openModal = (rfq) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isModalOpen: true,
       selectedRfq: rfq,
@@ -163,7 +161,7 @@ const ViewRFQ = () => {
   };
 
   const closeModal = () => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isModalOpen: false,
       selectedRfq: null,
@@ -171,7 +169,7 @@ const ViewRFQ = () => {
   };
 
   const filteredRfqs = state.rfqs
-    .filter(rfq =>
+    .filter((rfq) =>
       (rfq.company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       (rfq.series_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
     )
@@ -208,18 +206,18 @@ const ViewRFQ = () => {
   const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   const handlePageChange = (page) => {
-    setState(prev => ({ ...prev, currentPage: page }));
+    setState((prev) => ({ ...prev, currentPage: page }));
   };
 
   const handleNext = () => {
     if (state.currentPage < totalPages) {
-      setState(prev => ({ ...prev, currentPage: prev.currentPage + 1 }));
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
     }
   };
 
   const handlePrev = () => {
     if (state.currentPage > 1) {
-      setState(prev => ({ ...prev, currentPage: prev.currentPage - 1 }));
+      setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
     }
   };
 
@@ -236,7 +234,7 @@ const ViewRFQ = () => {
               type="text"
               placeholder="Search by company name or RFQ number..."
               value={state.searchTerm}
-              onChange={e => setState(prev => ({ ...prev, searchTerm: e.target.value }))}
+              onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full"
             />
           </div>
@@ -247,7 +245,7 @@ const ViewRFQ = () => {
             <select
               id="sort"
               value={state.sortBy}
-              onChange={e => setState(prev => ({ ...prev, sortBy: e.target.value }))}
+              onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
               className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="created_at">Creation Date (FIFO)</option>
@@ -263,7 +261,7 @@ const ViewRFQ = () => {
             <select
               id="sortOrder"
               value={state.sortOrder}
-              onChange={e => setState(prev => ({ ...prev, sortOrder: e.target.value }))}
+              onChange={(e) => setState((prev) => ({ ...prev, sortOrder: e.target.value }))}
               className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="asc">Ascending</option>
@@ -286,77 +284,77 @@ const ViewRFQ = () => {
             <tbody>
               {currentRfqs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">No RFQs found.</td>
+                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">
+                    No RFQs found.
+                  </td>
                 </tr>
               ) : (
-                currentRfqs.map((rfq, index) => {
-                  const allItemsHaveUnitPrice = rfq.items.every(
-                    item => item.unit_price && parseFloat(item.unit_price) > 0
-                  );
-                  return (
-                    <tr key={rfq.id} className="border hover:bg-gray-50">
-                      <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                      <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
-                      <td className="border p-2 whitespace-nowrap">{new Date(rfq.created_at).toLocaleDateString()}</td>
-                      <td className="border p-2 whitespace-nowrap">
-                        {state.teamMembers.find(m => m.id === rfq.assigned_sales_person)?.name || 'N/A'}
-                      </td>
-                      <td className="border p-2 whitespace-nowrap min-w-[150px]">
-                        <select
-                          value={rfq.rfq_status || 'Pending'}
-                          onChange={e => handleStatusChange(rfq.id, e.target.value)}
-                          className="p-1 border rounded focus:outline-indigo-500 w-full"
+                currentRfqs.map((rfq, index) => (
+                  <tr key={rfq.id} className="border hover:bg-gray-50">
+                    <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
+                    <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {new Date(rfq.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {state.teamMembers.find((m) => m.id === rfq.assigned_sales_person)?.name || 'N/A'}
+                    </td>
+                    <td className="border p-2 whitespace-nowrap min-w-[150px]">
+                      <select
+                        value={rfq.rfq_status || 'Pending'}
+                        onChange={(e) => handleStatusChange(rfq.id, e.target.value)}
+                        className="p-1 border rounded focus:outline-indigo-500 w-full"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </td>
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => openModal(rfq)}
+                          className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Processing">Processing</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                      </td>
-                      <td className="border p-2 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={() => openModal(rfq)}
-                            className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                          >
-                            View Details
-                          </Button>
-                          <Button
-                            onClick={() => handleConvertToQuotation(rfq)}
-                            disabled={rfq.rfq_status !== 'Processing' || !allItemsHaveUnitPrice}
-                            className={`px-3 py-1 rounded-md text-sm ${rfq.rfq_status === 'Processing' && allItemsHaveUnitPrice
+                          View Details
+                        </Button>
+                        <Button
+                          onClick={() => handleConvertToQuotation(rfq)}
+                          disabled={rfq.rfq_status !== 'Processing'}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            rfq.rfq_status === 'Processing'
                               ? 'bg-purple-600 text-white hover:bg-purple-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
-                          >
-                            Convert to Quotation
-                          </Button>
-                          <Button
-                            onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
-                            disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
-                            className={`px-3 py-1 rounded-md text-sm ${
-                              rfq.hasQuotation || !hasPermission('rfq', 'edit')
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                              }`}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            onClick={() => handleDelete(rfq.id)}
-                            disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
-                            className={`px-3 py-1 rounded-md text-sm ${
-                              rfq.hasQuotation || !hasPermission('rfq', 'delete')
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-red-600 text-white hover:bg-red-700'
-                              }`}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                          }`}
+                        >
+                          Convert to Quotation
+                        </Button>
+                        <Button
+                          onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
+                          disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            rfq.hasQuotation || !hasPermission('rfq', 'edit')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => handleDelete(rfq.id)}
+                          disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            rfq.hasQuotation || !hasPermission('rfq', 'delete')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -371,13 +369,14 @@ const ViewRFQ = () => {
           >
             Prev
           </Button>
-          {pageNumbers.map(page => (
+          {pageNumbers.map((page) => (
             <Button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              className={`px-3 py-1 rounded-md min-w-fit ${
+                state.currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               {page}
@@ -406,7 +405,7 @@ const ViewRFQ = () => {
               <p><strong>Company Address:</strong> {state.selectedRfq.company_address || 'N/A'}</p>
               <p><strong>Company Phone:</strong> {state.selectedRfq.company_phone || 'N/A'}</p>
               <p><strong>Company Email:</strong> {state.selectedRfq.company_email || 'N/A'}</p>
-              <p><strong>Channel:</strong> {state.channels.find(c => c.id === state.selectedRfq.rfq_channel)?.channel_name || 'N/A'}</p>
+              <p><strong>Channel:</strong> {state.channels.find((c) => c.id === state.selectedRfq.rfq_channel)?.channel_name || 'N/A'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
@@ -416,7 +415,7 @@ const ViewRFQ = () => {
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Assignment & Status</h3>
-              <p><strong>Assigned Sales Person:</strong> {state.teamMembers.find(m => m.id === state.selectedRfq.assigned_sales_person)?.name || 'N/A'}</p>
+              <p><strong>Assigned Sales Person:</strong> {state.teamMembers.find((m) => m.id === state.selectedRfq.assigned_sales_person)?.name || 'N/A'}</p>
               <p><strong>Due Date:</strong> {state.selectedRfq.due_date_for_quotation ? new Date(state.selectedRfq.due_date_for_quotation).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedRfq.rfq_status || 'Pending'}</p>
               <p><strong>Created:</strong> {new Date(state.selectedRfq.created_at).toLocaleDateString()}</p>
@@ -436,11 +435,13 @@ const ViewRFQ = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {state.selectedRfq.items.map(item => (
+                      {state.selectedRfq.items.map((item) => (
                         <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">{typeof item.item === 'string' ? item.item : (state.itemsList.find(i => i.id === item.item)?.name || 'N/A')}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {typeof item.item === 'string' ? item.item : (state.itemsList.find((i) => i.id === item.item)?.name || 'N/A')}
+                          </td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.units.find(u => u.id === item.unit)?.name || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                         </tr>
