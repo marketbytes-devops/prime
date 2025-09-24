@@ -309,21 +309,48 @@ const DeclinedWorkOrders = () => {
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         {state.selectedWO && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong>Created At:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Expected Completion:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong>Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+              <h3 className="text-lg font-medium text-black mb-2">Company Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedWO.quotation?.series_number || 'N/A'}</p>
+              <p><strong>Company Name:</strong> {state.selectedWO.quotation?.company_name || 'N/A'}</p>
+              <p><strong>Company Address:</strong> {state.selectedWO.quotation?.company_address || 'N/A'}</p>
+              <p><strong>Company Phone:</strong> {state.selectedWO.quotation?.company_phone || 'N/A'}</p>
+              <p><strong>Company Email:</strong> {state.selectedWO.quotation?.company_email || 'N/A'}</p>
+              <p><strong>Channel:</strong> {state.selectedWO.quotation?.channel || 'N/A'}</p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Items</h3>
+              <h3 className="text-lg font-medium text-black mb-2">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {state.selectedWO.quotation?.contact_name || 'N/A'}</p>
+              <p><strong>Contact Email:</strong> {state.selectedWO.quotation?.contact_email || 'N/A'}</p>
+              <p><strong>Contact Phone:</strong> {state.selectedWO.quotation?.contact_phone || 'N/A'}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black mb-2">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedWO.purchase_order?.series_number || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedWO.purchase_order?.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedWO.purchase_order?.order_type || 'N/A'}</p>
+              <p><strong>Created:</strong> {state.selectedWO.purchase_order?.created_at ? new Date(state.selectedWO.purchase_order.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>PO File:</strong> {state.selectedWO.purchase_order?.po_file ? (
+                <a href={state.selectedWO.purchase_order.po_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  View PO File
+                </a>
+              ) : 'N/A'}</p>
+              <p><strong>Assigned Sales Person:</strong> {state.selectedWO.purchase_order?.assigned_sales_person || 'N/A'}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black mb-2">Work Order Details</h3>
+              <p><strong>Work Order Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Work Order Type:</strong> {state.selectedWO.work_order_type || 'N/A'}</p>
+              <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
+              <p><strong>Onsite or Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
+              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
+              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
+              <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black mb-2">Items</h3>
               {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
