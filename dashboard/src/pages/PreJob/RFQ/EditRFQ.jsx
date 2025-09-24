@@ -4,6 +4,7 @@ import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
 import Loading from '../../../components/Loading';
+import { toast } from 'react-toastify';
 
 const debounce = (func, delay) => {
   let timeoutId;
@@ -18,6 +19,7 @@ const EditRFQ = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isQuotation = location.state?.isQuotation || false;
+  const scrollToItems = location.state?.scrollToItems || false;
   const itemsSectionRef = useRef(null);
   const [state, setState] = useState({
     company_name: '',
@@ -38,7 +40,7 @@ const EditRFQ = () => {
     units: [],
     loading: true,
     lastSaved: null,
-    submitting: false, 
+    submitting: false,
   });
 
   useEffect(() => {
@@ -51,7 +53,6 @@ const EditRFQ = () => {
           apiClient.get('items/'),
           apiClient.get('units/'),
         ]);
-        console.log('RFQ data:', rfqRes.data, 'Items:', rfqRes.data.items);
         setState(prev => ({
           ...prev,
           company_name: rfqRes.data.company_name || '',
@@ -79,17 +80,17 @@ const EditRFQ = () => {
           units: unitsRes.data || [],
           loading: false,
         }));
-        if (isQuotation && itemsSectionRef.current) {
+        if ((isQuotation || scrollToItems) && itemsSectionRef.current) {
           itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        alert('Failed to load RFQ data.');
+        toast.error('Failed to load RFQ data.');
         setState(prev => ({ ...prev, loading: false }));
       }
     };
     fetchData();
-  }, [id, isQuotation]);
+  }, [id, isQuotation, scrollToItems]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -164,7 +165,6 @@ const EditRFQ = () => {
     debounce(async () => {
       try {
         const rfqPayload = buildRfqPayload();
-        console.log('Autosaving RFQ:', rfqPayload);
         await apiClient.patch(`rfqs/${id}/`, rfqPayload);
         setState(prev => ({ ...prev, lastSaved: new Date() }));
       } catch (error) {
@@ -236,7 +236,7 @@ const EditRFQ = () => {
         item.item &&
         item.quantity &&
         item.unit &&
-        (!isQuotation || (isQuotation && item.unit_price))
+        (!isQuotation || (isQuotation && item.unit_price && parseFloat(item.unit_price) > 0))
     );
 
     return isBasicInfoValid && isItemsValid;
@@ -245,25 +245,36 @@ const EditRFQ = () => {
   const handleSubmit = async e => {
     e.preventDefault();
     if (!isFormValid()) {
-      alert('Please fill all required fields.');
+      toast.error('Please fill all required fields, including unit prices for quotations.');
+      if (isQuotation && itemsSectionRef.current) {
+        itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
       return;
     }
-    setState(prev => ({ ...prev, submitting: true })); // Start loading
+    setState(prev => ({ ...prev, submitting: true }));
     try {
-      const rfqPayload = buildRfqPayload();
-      console.log('Updating RFQ:', rfqPayload);
+      const allItemsHaveUnitPrice = state.items.every(
+        item => item.unit_price && parseFloat(item.unit_price) > 0
+      );
+      const rfqPayload = {
+        ...buildRfqPayload(),
+        rfq_status: allItemsHaveUnitPrice ? 'Completed' : state.rfq_status,
+      };
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
       if (isQuotation) {
         const quotationPayload = buildQuotationPayload();
-        console.log('Creating Quotation:', quotationPayload);
         await apiClient.post('/quotations/', quotationPayload);
+        toast.success('Quotation created successfully!');
+        navigate('/view-quotation');
+      } else {
+        toast.success('RFQ updated successfully!');
+        navigate('/view-rfq');
       }
-      navigate(isQuotation ? '/view-quotation' : '/view-rfq');
     } catch (error) {
       console.error('Error submitting:', error);
-      alert('Failed to submit.');
+      toast.error('Failed to submit.');
     } finally {
-      setState(prev => ({ ...prev, submitting: false })); // Stop loading
+      setState(prev => ({ ...prev, submitting: false }));
     }
   };
 

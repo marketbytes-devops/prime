@@ -71,7 +71,6 @@ const ViewRFQ = () => {
           try {
             const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
             const hasQuotation = quotationRes.data.length > 0;
-            console.log(`RFQ ${rfq.id} hasQuotation: ${hasQuotation}`);
             return { ...rfq, hasQuotation };
           } catch (error) {
             console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
@@ -120,7 +119,6 @@ const ViewRFQ = () => {
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
-      console.log(`Status updated for RFQ ${id} to ${newStatus}`);
       await fetchRFQs();
       toast.success('RFQ status updated successfully!');
     } catch (error) {
@@ -133,14 +131,22 @@ const ViewRFQ = () => {
     try {
       const rfqResponse = await apiClient.get(`rfqs/${rfq.id}/`);
       const currentRfq = rfqResponse.data;
+      const allItemsHaveUnitPrice = currentRfq.items.every(
+        item => item.unit_price && parseFloat(item.unit_price) > 0
+      );
+
+      if (!allItemsHaveUnitPrice) {
+        toast.error('Please enter unit prices for all items before converting to a quotation.');
+        navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true, scrollToItems: true } });
+        return;
+      }
+
       const payload = {
         rfq_status: 'Completed',
         items: currentRfq.items || [],
       };
       await apiClient.patch(`rfqs/${rfq.id}/`, payload);
-      console.log(`Status updated for RFQ ${rfq.id} to Completed`);
       toast.success('RFQ status updated to Completed!');
-      
       navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
     } catch (error) {
       console.error('Error initiating quotation conversion:', error);
@@ -296,6 +302,7 @@ const ViewRFQ = () => {
                         value={rfq.rfq_status || 'Pending'}
                         onChange={e => handleStatusChange(rfq.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
+                        disabled={rfq.rfq_status === 'Completed'}
                       >
                         <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
