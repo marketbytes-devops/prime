@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import apiClient from "../../../helpers/apiClient";
-import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
-import Loading from "../../../components/Loading";
-import { format, parse } from 'date-fns';
+import apiClient from "../../helpers/apiClient";
+import InputField from "../../components/InputField";
+import Button from "../../components/Button";
+import Loading from "../../components/Loading";
+import { format } from 'date-fns';
 
-const EditProcessingWorkOrders = () => {
+const EditDeclinedWorkOrders = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,7 +82,7 @@ const EditProcessingWorkOrders = () => {
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load work order.");
-      navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
+      navigate("/job-execution/processing-work-orders/declined-work-orders");
     }
   };
 
@@ -160,8 +160,8 @@ const EditProcessingWorkOrders = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      toast.success("Work Order updated successfully.");
-      navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
+      toast.success("Declined Work Order updated successfully.");
+      navigate("/job-execution/processing-work-orders/declined-work-orders");
     } catch (error) {
       console.error("Error updating work order:", error.response?.data || error);
       toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
@@ -174,7 +174,7 @@ const EditProcessingWorkOrders = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Edit Work Order - {state.workOrder.wo_number || "Not Provided"}</h1>
+      <h1 className="text-2xl font-bold mb-4">Edit Declined Work Order - {state.workOrder.wo_number || "Not Provided"}</h1>
       <div className="bg-white p-6 space-y-6 rounded-md shadow">
         <div className="space-y-4">
           <div>
@@ -351,7 +351,7 @@ const EditProcessingWorkOrders = () => {
             {state.isSaving ? "Saving..." : "Save Changes"}
           </Button>
           <Button
-            onClick={() => navigate("/job-execution/processing-work-orders/list-all-processing-work-orders")}
+            onClick={() => navigate("/job-execution/processing-work-orders/declined-work-orders")}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
           >
             Cancel
@@ -362,4 +362,4 @@ const EditProcessingWorkOrders = () => {
   );
 };
 
-export default EditProcessingWorkOrders;
+export default EditDeclinedWorkOrders;

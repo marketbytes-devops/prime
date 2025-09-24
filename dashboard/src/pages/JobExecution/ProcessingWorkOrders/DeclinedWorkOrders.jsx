@@ -90,7 +90,9 @@ const DeclinedWorkOrders = () => {
   };
 
   const handleUpdate = (woId) => {
-    navigate(`/job-execution/processing-work-orders/edit-work-order/${woId}`);
+    navigate(`/job-execution/processing-work-orders/edit-declined-work-order/${woId}`, {
+      state: { from: "/job-execution/processing-work-orders/declined-work-orders" },
+    });
   };
 
   const handleDecline = async () => {

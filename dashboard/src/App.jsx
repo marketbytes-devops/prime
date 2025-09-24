@@ -40,6 +40,7 @@ import Permissions from "./pages/UserRoles/Permissions";
 import apiClient from "./helpers/apiClient";
 import Loading from "./components/Loading";
 import InitiateDelivery from "./pages/JobExecution/ProcessingWorkOrders/InitiateDelivery";
+import EditDeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditDeclinedWorkOrders";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -242,6 +243,14 @@ function App() {
           element: (
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="declined_work_orders" requiredAction="view">
               <DeclinedWorkOrders />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/job-execution/processing-work-orders/edit-declined-work-order/:id",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="declined_work_orders" requiredAction="edit">
+              <EditDeclinedWorkOrders />
             </ProtectedRoute>
           ),
         },
