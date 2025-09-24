@@ -655,7 +655,7 @@ const ViewQuotation = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="min-w-[400px] border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                <th className="min-w-[350px] border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -722,7 +722,7 @@ const ViewQuotation = () => {
                           onChange={(e) =>
                             handleRemarkChange(quotation.id, e.target.value)
                           }
-                          className="min-w-[400px] p-1"
+                          className="min-w-[350px] p-1"
                           disabled={!state.isEditingRemark[quotation.id]}
                         />
                         <Button

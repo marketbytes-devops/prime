@@ -9,7 +9,7 @@ const PartialOrderSelection = () => {
   const { quotationData } = location.state || {};
   const [state, setState] = useState({
     numberOfPartialOrders: "",
-    splitMode: "items", 
+    splitMode: "items",
     selectedItemIds: [],
     savedItems: [],
     createdPartialOrders: [],
@@ -262,10 +262,10 @@ const PartialOrderSelection = () => {
         let isAllPartialsCreated = false;
         if (prev.splitMode === "items") {
           isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
-                                newUsedItemIds.length === prev.savedItems.length;
+            newUsedItemIds.length === prev.savedItems.length;
         } else if (prev.splitMode === "quantity") {
           isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
-                                Object.values(prev.quantityAssignments).every(assignment => assignment.remainingQuantity === 0);
+            Object.values(prev.quantityAssignments).every(assignment => assignment.remainingQuantity === 0);
         }
 
         return {
@@ -346,7 +346,7 @@ const PartialOrderSelection = () => {
       for (const order of state.createdPartialOrders) {
         await apiClient.delete(`/purchase-orders/${order.id}/`);
       }
-      
+
       const initialQuantityAssignments = {};
       state.savedItems.forEach(item => {
         initialQuantityAssignments[item.id] = {
@@ -400,12 +400,12 @@ const PartialOrderSelection = () => {
       }));
 
       toast.success("Partial order workflow completed successfully!");
-      navigate("/view-quotation", { 
-        state: { 
-          quotationId: quotationData.id, 
+      navigate("/view-quotation", {
+        state: {
+          quotationId: quotationData.id,
           partialOrders: state.createdPartialOrders,
-          workflowCompleted: true 
-        } 
+          workflowCompleted: true
+        }
       });
     } catch (error) {
       console.error("Error completing workflow:", error);
@@ -419,7 +419,7 @@ const PartialOrderSelection = () => {
         "You have created partial orders but haven't completed the workflow. " +
         "If you leave now, these partial orders will be deleted. Do you want to continue?"
       );
-      
+
       if (confirmLeave) {
         try {
           for (const order of state.createdPartialOrders) {
@@ -442,14 +442,14 @@ const PartialOrderSelection = () => {
 
   return (
     <div className="container mx-auto p-4 bg-transparent min-h-screen">
-      <div className="flex justify-start items-center mb-4">
+      <button
+        onClick={handlePrevious}
+        className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
+      >
+        Go Back
+      </button>
+      <div className="flex justify-center items-center mb-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
-        <button
-          onClick={handlePrevious}
-          className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
-        >
-          Go Back
-        </button>
       </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="mb-4">
@@ -620,22 +620,20 @@ const PartialOrderSelection = () => {
           </button>
           <button
             onClick={handleGeneratePartialOrder}
-            className={`px-3 py-2 rounded transition-colors duration-200 flex items-center ${
-              isGenerateDisabled()
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-green-500 text-white hover:bg-green-600"
-            }`}
+            className={`px-3 py-2 rounded transition-colors duration-200 flex items-center ${isGenerateDisabled()
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-green-500 text-white hover:bg-green-600"
+              }`}
             disabled={isGenerateDisabled()}
           >
             Generate Partial
           </button>
           <button
             onClick={handleFinish}
-            className={`px-3 py-2 rounded transition-colors duration-200 ${
-              state.isAllPartialsCreated
-                ? "bg-green-500 text-white hover:bg-green-600"
-                : "bg-gray-200 text-black hover:bg-gray-300"
-            }`}
+            className={`px-3 py-2 rounded transition-colors duration-200 ${state.isAllPartialsCreated
+              ? "bg-green-500 text-white hover:bg-green-600"
+              : "bg-gray-200 text-black hover:bg-gray-300"
+              }`}
           >
             Finish
           </button>
