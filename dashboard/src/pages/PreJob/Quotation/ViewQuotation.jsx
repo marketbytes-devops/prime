@@ -36,8 +36,6 @@ const ViewQuotation = () => {
     isNotApprovedModalOpen: false,
     notApprovedReason: "",
     selectedQuotationId: null,
-    remarkInputs: {}, // Track remark input values per quotation
-    remarkEditing: {}, // Track editing state per quotation
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -109,20 +107,6 @@ const ViewQuotation = () => {
         teamMembers: teamsRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
-        remarkInputs: quotationsWithPOs.reduce(
-          (acc, q) => ({
-            ...acc,
-            [q.id]: q.remarks || "",
-          }),
-          {}
-        ),
-        remarkEditing: quotationsWithPOs.reduce(
-          (acc, q) => ({
-            ...acc,
-            [q.id]: false,
-          }),
-          {}
-        ),
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -483,49 +467,6 @@ const ViewQuotation = () => {
     }
   };
 
-  const handleRemarkChange = (id, value) => {
-    setState((prev) => ({
-      ...prev,
-      remarkInputs: {
-        ...prev.remarkInputs,
-        [id]: value,
-      },
-      remarkEditing: {
-        ...prev.remarkEditing,
-        [id]: true,
-      },
-    }));
-  };
-
-  const handleRemarkUpdate = async (id) => {
-    try {
-      const value = state.remarkInputs[id] || "";
-      await apiClient.patch(`/quotations/${id}/`, { remarks: value || null });
-      setState((prev) => ({
-        ...prev,
-        remarkEditing: {
-          ...prev.remarkEditing,
-          [id]: false,
-        },
-      }));
-      await fetchQuotations();
-      toast.success("Remark is Saved");
-    } catch (error) {
-      console.error("Error updating remark:", error);
-      toast.error("Failed to update remark.");
-    }
-  };
-
-  const handleRemarkEdit = (id) => {
-    setState((prev) => ({
-      ...prev,
-      remarkEditing: {
-        ...prev.remarkEditing,
-        [id]: true,
-      },
-    }));
-  };
-
   const isPoComplete = (quotation) => {
     if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
       return false;
@@ -733,38 +674,18 @@ const ViewQuotation = () => {
                         : "N/A"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <InputField
-                          type="text"
-                          value={state.remarkInputs[quotation.id] || ""}
-                          onChange={(e) =>
-                            handleRemarkChange(quotation.id, e.target.value)
-                          }
-                          disabled={!state.remarkEditing[quotation.id]}
-                          className="w-full p-1"
-                        />
-                        <Button
-                          onClick={() =>
-                            state.remarkEditing[quotation.id]
-                              ? handleRemarkUpdate(quotation.id)
-                              : handleRemarkEdit(quotation.id)
-                          }
-                          disabled={
-                            state.remarkEditing[quotation.id] &&
-                            state.remarkInputs[quotation.id] ===
-                              (quotation.remarks || "")
-                          }
-                          className={`px-2 py-1 rounded-md text-sm ${
-                            state.remarkEditing[quotation.id] &&
-                            state.remarkInputs[quotation.id] ===
-                              (quotation.remarks || "")
-                              ? "bg-green-600 text-white hover:bg-green-700 cursor-not-allowed"
-                              : "bg-blue-600 text-white hover:bg-blue-700"
-                          }`}
-                        >
-                          {state.remarkEditing[quotation.id] ? "Update" : "Edit"}
-                        </Button>
-                      </div>
+                      <InputField
+                        type="text"
+                        value={quotation.remarks || ""}
+                        onChange={(e) =>
+                          handleUpdateField(
+                            quotation.id,
+                            "remarks",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-1"
+                      />
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -810,7 +731,7 @@ const ViewQuotation = () => {
                           ) ? (
                           <Button
                             onClick={() => handleUploadPO(quotation.id)}
-                            disabled={isPoComplete(quotation)}
+                            disabled={isPoComplete(quotation)} // Disable if PO is complete
                             className={`px-3 py-1 rounded-md text-sm ${
                               isPoComplete(quotation)
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -1127,12 +1048,14 @@ const ViewQuotation = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.unit_price
+                                    SAR 
+                                    {item.unit_price
                                       ? Number(item.unit_price).toFixed(2)
                                       : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.quantity && item.unit_price
+                                    SAR 
+                                    {item.quantity && item.unit_price
                                       ? Number(
                                           item.quantity * item.unit_price
                                         ).toFixed(2)
