@@ -161,7 +161,9 @@ const EditProcessingWorkOrders = () => {
       });
 
       toast.success("Work Order updated successfully.");
-      navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
+      // Redirect based on the origin of navigation
+      const fromPath = location.state?.from || "/job-execution/processing-work-orders/list-all-processing-work-orders";
+      navigate(fromPath);
     } catch (error) {
       console.error("Error updating work order:", error.response?.data || error);
       toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));

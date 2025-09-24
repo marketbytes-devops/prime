@@ -448,7 +448,7 @@ const PartialOrderSelection = () => {
       >
         Go Back
       </button>
-      <div className="flex justify-start items-center mb-4">
+      <div className="flex justify-start items-center mb-4 mt-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
       </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
