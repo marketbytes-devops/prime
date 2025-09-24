@@ -82,6 +82,7 @@ const DeclinedWorkOrders = () => {
   }, []);
 
   const handleViewWO = (wo) => {
+    console.log('Selected Work Order:', wo); // Debug log to inspect data
     setState((prev) => ({
       ...prev,
       isViewModalOpen: true,
@@ -308,8 +309,15 @@ const DeclinedWorkOrders = () => {
         onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
-        {state.selectedWO && (
+        {state.selectedWO ? (
           <div className="space-y-6">
+            {/* Debug Warnings */}
+            {!state.selectedWO.quotation && (
+              <p className="text-red-500">Warning: Quotation data is missing. Check API response.</p>
+            )}
+            {!state.selectedWO.purchase_order && (
+              <p className="text-red-500">Warning: Purchase Order data is missing. Check API response.</p>
+            )}
             {/* Company Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Company Details</h3>
@@ -322,7 +330,6 @@ const DeclinedWorkOrders = () => {
                 <p><strong>Channel:</strong> {state.selectedWO.quotation?.rfq_channel?.name || 'N/A'}</p>
               </div>
             </div>
-
             {/* Contact Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Contact Details</h3>
@@ -332,7 +339,6 @@ const DeclinedWorkOrders = () => {
                 <p><strong>Contact Phone:</strong> {state.selectedWO.quotation?.point_of_contact_phone || 'N/A'}</p>
               </div>
             </div>
-
             {/* Purchase Order Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Purchase Order Details</h3>
@@ -349,7 +355,6 @@ const DeclinedWorkOrders = () => {
                 <p><strong>Assigned Sales Person:</strong> {state.selectedWO.quotation?.assigned_sales_person?.name || 'N/A'}</p>
               </div>
             </div>
-
             {/* Work Order Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Work Order Details</h3>
@@ -364,7 +369,6 @@ const DeclinedWorkOrders = () => {
                 <p><strong>Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               </div>
             </div>
-
             {/* Items Table */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Items</h3>
@@ -420,6 +424,8 @@ const DeclinedWorkOrders = () => {
               )}
             </div>
           </div>
+        ) : (
+          <p className="text-red-500">No work order data available. Please try again.</p>
         )}
       </Modal>
       <Modal
