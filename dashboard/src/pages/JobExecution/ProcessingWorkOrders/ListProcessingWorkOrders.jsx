@@ -15,9 +15,9 @@ const ListProcessingWorkOrders = () => {
     itemsList: [],
     units: [],
     technicians: [],
-    quotations: [], // Added for company/contact details
-    channels: [], // Added for channel details
-    purchaseOrders: [], // Added for PO details
+    quotations: [],
+    channels: [],
+    purchaseOrders: [],
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -75,9 +75,9 @@ const ListProcessingWorkOrders = () => {
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
-        apiClient.get("quotations/"), // Added for company/contact details
-        apiClient.get("channels/"), // Added for channel details
-        apiClient.get("purchase-orders/"), // Added for PO details
+        apiClient.get("quotations/"),
+        apiClient.get("channels/"),
+        apiClient.get("purchase-orders/"),
       ]);
       setState((prev) => ({
         ...prev,
@@ -296,7 +296,7 @@ const ListProcessingWorkOrders = () => {
         </html>
       `);
       printWindow.document.close();
-      // Removed printWindow.print();
+      printWindow.print();
     } catch (error) {
       console.error("Error generating print:", error);
       toast.error(
