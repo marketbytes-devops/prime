@@ -16,6 +16,7 @@ const ListPurchaseOrders = () => {
     units: [],
     quotations: [],
     series: [],
+    channels: [], // Added channels to state
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -77,7 +78,7 @@ const ListPurchaseOrders = () => {
 
   const fetchData = async () => {
     try {
-      const [poRes, techRes, itemsRes, unitsRes, quotationsRes, seriesRes] =
+      const [poRes, techRes, itemsRes, unitsRes, quotationsRes, seriesRes, channelsRes] =
         await Promise.all([
           apiClient.get("purchase-orders/"),
           apiClient.get("technicians/"),
@@ -85,6 +86,7 @@ const ListPurchaseOrders = () => {
           apiClient.get("units/"),
           apiClient.get("quotations/"),
           apiClient.get("series/"),
+          apiClient.get("channels/"), // Added fetch for channels
         ]);
       const purchaseOrders = poRes.data || [];
       const workOrdersPromises = purchaseOrders.map((po) =>
@@ -113,6 +115,7 @@ const ListPurchaseOrders = () => {
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
         series: seriesRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
         workOrderStatusMap,
       }));
     } catch (error) {
@@ -552,216 +555,6 @@ const ListPurchaseOrders = () => {
     }
   };
 
-  const handlePrint = () => {
-    const po = state.selectedPO;
-    const quotation = state.quotations.find((q) => q.id === po.quotation);
-    const salesPersonName = quotation?.assigned_sales_person_name || "N/A";
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <html>
-        <head><title>Work Order for PO ${po.id}</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1>Work Order Details</h1>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Details</h2>
-            <p><strong>PO ID:</strong> ${po.id}</p>
-            <p><strong>Client PO Number:</strong> ${
-              po.client_po_number || "Nil"
-            }</p>
-            <p><strong>Order Type:</strong> ${po.order_type}</p>
-            <p><strong>Created:</strong> ${new Date(
-              po.created_at
-            ).toLocaleDateString()}</p>
-            <p><strong>PO File:</strong> ${
-              po.po_file
-                ? `<a href="${po.po_file}" target="_blank">View File</a>`
-                : "Nil"
-            }</p>
-            <p><strong>Assigned Sales Person:</strong> ${salesPersonName}</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Work Order Details</h2>
-            <p><strong>Work Order Type:</strong> ${state.woType || "N/A"}</p>
-            <p><strong>Date Received:</strong> ${
-              state.dateReceived
-                ? new Date(state.dateReceived).toLocaleDateString()
-                : "N/A"
-            }</p>
-            <p><strong>Expected Completion Date:</strong> ${
-              state.expectedCompletionDate
-                ? new Date(state.expectedCompletionDate).toLocaleDateString()
-                : "N/A"
-            }</p>
-            <p><strong>Onsite or Lab:</strong> ${state.onsiteOrLab || "N/A"}</p>
-            <p><strong>Site Location:</strong> ${
-              state.site_location || "N/A"
-            }</p>
-            <p><strong>Remarks:</strong> ${state.remarks || "N/A"}</p>
-          </div>
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 600;">Purchase Order Items</h2>
-            <table border="1" style="width: 100%; border-collapse: collapse;">
-              <tr style="background-color: #f2f2f2;">
-                <th style="padding: 8px; text-align: left;">Item</th>
-                <th style="padding: 8px; text-align: left;">Quantity</th>
-                <th style="padding: 8px; text-align: left;">Unit</th>
-                <th style="padding: 8px; text-align: left;">Unit Price</th>
-                <th style="padding: 8px; text-align: left;">Total Price</th>
-                <th style="padding: 8px; text-align: left;">Assigned To</th>
-                <th style="padding: 8px; text-align: left;">Certificate UUT Label</th>
-                <th style="padding: 8px; text-align: left;">Certificate Number</th>
-                <th style="padding: 8px; text-align: left;">Calibration Date</th>
-                <th style="padding: 8px; text-align: left;">Calibration Due Date</th>
-                <th style="padding: 8px; text-align: left;">UUC Serial Number</th>
-                <th style="padding: 8px; text-align: left;">Certificate</th>
-              </tr>
-              ${
-                state.woType === "Single"
-                  ? state.savedItems
-                      .map(
-                        (item) => `
-                        <tr>
-                          <td style="padding: 8px;">${item.name || "N/A"}</td>
-                          <td style="padding: 8px; text-align: center;">${
-                            item.quantity || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.units.find((u) => u.id === item.unit)?.name ||
-                            "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">SAR ${
-                            item.unit_price
-                              ? Number(item.unit_price).toFixed(2)
-                              : "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: right;">SAR ${
-                            item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
-                              : "0.00"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            state.technicians.find(
-                              (t) => t.id === parseInt(item.assigned_to)
-                            )?.name || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.certificate_uut_label || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.certificate_number || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.calibration_date
-                              ? new Date(
-                                  item.calibration_date
-                                ).toLocaleDateString()
-                              : "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.calibration_due_date
-                              ? new Date(
-                                  item.calibration_due_date
-                                ).toLocaleDateString()
-                              : "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.uuc_serial_number || "N/A"
-                          }</td>
-                          <td style="padding: 8px; text-align: left;">${
-                            item.certificate_file
-                              ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
-                              : "N/A"
-                          }</td>
-                        </tr>
-                      `
-                      )
-                      .join("")
-                  : state.createdSplitOrders
-                      .map(
-                        (order, index) => `
-                        <tr>
-                          <td colspan="12" style="padding: 8px; font-weight: bold;">Split Order ${
-                            index + 1
-                          }</td>
-                        </tr>
-                        ${order.items
-                          .map(
-                            (item) => `
-                              <tr>
-                                <td style="padding: 8px;">${
-                                  item.name || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: center;">${
-                                  item.quantity || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  state.units.find((u) => u.id === item.unit)
-                                    ?.name || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: right;">SAR ${
-                                  item.unit_price
-                                    ? Number(item.unit_price).toFixed(2)
-                                    : "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: right;">SAR ${
-                                  item.quantity && item.unit_price
-                                    ? Number(
-                                        item.quantity * item.unit_price
-                                      ).toFixed(2)
-                                    : "0.00"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  state.technicians.find(
-                                    (t) => t.id === parseInt(item.assigned_to)
-                                  )?.name || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.certificate_uut_label || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.certificate_number || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.calibration_date
-                                    ? new Date(
-                                        item.calibration_date
-                                      ).toLocaleDateString()
-                                    : "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.calibration_due_date
-                                    ? new Date(
-                                        item.calibration_due_date
-                                      ).toLocaleDateString()
-                                    : "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.uuc_serial_number || "N/A"
-                                }</td>
-                                <td style="padding: 8px; text-align: left;">${
-                                  item.certificate_file
-                                    ? `<a href="${item.certificate_file}" target="_blank">View Certificate</a>`
-                                    : "N/A"
-                                }</td>
-                              </tr>
-                            `
-                          )
-                          .join("")}
-                      `
-                      )
-                      .join("")
-              }
-            </table>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  };
-
   const handleDeletePO = async (poId) => {
     if (
       window.confirm("Are you sure you want to delete this purchase order?")
@@ -859,7 +652,7 @@ const ListPurchaseOrders = () => {
       company_address: quotation?.company_address || "N/A",
       company_phone: quotation?.company_phone || "N/A",
       company_email: quotation?.company_email || "N/A",
-      channel: state.channels?.find((c) => c.id === quotation?.rfq_channel)?.channel_name || "N/A",
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || "N/A",
       contact_name: quotation?.point_of_contact_name || "N/A",
       contact_email: quotation?.point_of_contact_email || "N/A",
       contact_phone: quotation?.point_of_contact_phone || "N/A",
@@ -1505,12 +1298,6 @@ const ListPurchaseOrders = () => {
               }`}
             >
               {state.isSubmitting ? "Submitting..." : "Submit"}
-            </Button>
-            <Button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              Print
             </Button>
           </div>
         </div>
