@@ -951,13 +951,13 @@ const ViewQuotation = () => {
                               ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
+                            SAR 
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            $
+                            SAR 
                             {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
