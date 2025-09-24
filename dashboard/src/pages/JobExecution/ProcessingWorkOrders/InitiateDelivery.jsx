@@ -206,17 +206,6 @@ const InitiateDelivery = () => {
     }));
   };
 
-  const removeComponent = (itemIndex, compIndex) => {
-    setState((prev) => ({
-      ...prev,
-      deliveryItems: prev.deliveryItems.map((item, i) =>
-        i === itemIndex
-          ? { ...item, components: item.components.filter((_, ci) => ci !== compIndex) }
-          : item
-      ),
-    }));
-  };
-
   const handleAssignedQuantityChange = (itemId, value) => {
     const assignedQuantity = value === '' ? '' : parseInt(value, 10);
     setState((prev) => {
@@ -293,23 +282,6 @@ const InitiateDelivery = () => {
           items: dn.items.map((item) =>
             item.id === itemId
               ? { ...item, components: [...item.components, { component: '', value: '' }] }
-              : item
-          ),
-        };
-      });
-      return { ...prev, createdSplitDNs: updatedSplitDNs };
-    });
-  };
-
-  const removeSplitDNComponent = (dnIndex, itemId, compIndex) => {
-    setState((prev) => {
-      const updatedSplitDNs = prev.createdSplitDNs.map((dn, i) => {
-        if (i !== dnIndex) return dn;
-        return {
-          ...dn,
-          items: dn.items.map((item) =>
-            item.id === itemId
-              ? { ...item, components: item.components.filter((_, ci) => ci !== compIndex) }
               : item
           ),
         };
@@ -737,9 +709,6 @@ const InitiateDelivery = () => {
                                     <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                       Component Value
                                     </th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                                      Actions
-                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -768,18 +737,6 @@ const InitiateDelivery = () => {
                                           className="w-full"
                                           disabled={!hasPermission('delivery', 'edit')}
                                         />
-                                      </td>
-                                      <td className="border p-2">
-                                        <button
-                                          onClick={() => {
-                                            const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
-                                            removeComponent(itemIndex, compIndex);
-                                          }}
-                                          className="text-red-600 hover:text-red-800 text-sm"
-                                          disabled={!hasPermission('delivery', 'edit')}
-                                        >
-                                          Remove
-                                        </button>
                                       </td>
                                     </tr>
                                   ))}
@@ -919,9 +876,6 @@ const InitiateDelivery = () => {
                                               <th className="border p-2 text-left text-sm font-medium text-gray-700">
                                                 Component Value
                                               </th>
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
-                                                Actions
-                                              </th>
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -960,15 +914,6 @@ const InitiateDelivery = () => {
                                                     className="w-full"
                                                     disabled={!hasPermission('delivery', 'edit')}
                                                   />
-                                                </td>
-                                                <td className="border p-2">
-                                                  <button
-                                                    onClick={() => removeSplitDNComponent(dnIndex, item.id, compIndex)}
-                                                    className="text-red-600 hover:text-red-800 text-sm"
-                                                    disabled={!hasPermission('delivery', 'edit')}
-                                                  >
-                                                    Remove
-                                                  </button>
                                                 </td>
                                               </tr>
                                             ))}
