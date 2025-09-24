@@ -12,6 +12,8 @@ const DeclinedWorkOrders = () => {
     itemsList: [],
     units: [],
     technicians: [],
+    quotations: [], // Added for quotation data
+    purchaseOrders: [], // Added for purchase order data
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -58,11 +60,13 @@ const DeclinedWorkOrders = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, itemsRes, unitsRes, techRes] = await Promise.all([
+      const [woRes, itemsRes, unitsRes, techRes, quotationsRes, poRes] = await Promise.all([
         apiClient.get('work-orders/', { params: { status: 'Declined' } }),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('technicians/'),
+        apiClient.get('quotations/'), // Added
+        apiClient.get('purchase-orders/'), // Added
       ]);
       setState((prev) => ({
         ...prev,
@@ -70,6 +74,8 @@ const DeclinedWorkOrders = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         technicians: techRes.data || [],
+        quotations: quotationsRes.data || [], // Added
+        purchaseOrders: poRes.data || [], // Added
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -80,6 +86,28 @@ const DeclinedWorkOrders = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const getQuotationDetails = (wo) => {
+    const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order);
+    const quotation = state.quotations.find((q) => q.id === wo.quotation);
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: quotation?.rfq_channel?.name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: purchaseOrder?.series_number || 'N/A',
+      client_po_number: purchaseOrder?.client_po_number || 'N/A',
+      order_type: purchaseOrder?.order_type || 'N/A',
+      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      po_file: purchaseOrder?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person?.name || 'N/A',
+    };
+  };
 
   const handleViewWO = (wo) => {
     console.log('Selected Work Order:', wo); // Debug log to inspect data
@@ -140,14 +168,14 @@ const DeclinedWorkOrders = () => {
   const filteredWOs = state.workOrders
     .filter(
       (wo) =>
-        (wo.quotation?.company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+        (getQuotationDetails(wo).company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
         (wo.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
         return new Date(b.created_at) - new Date(a.created_at);
       } else if (state.sortBy === 'company_name') {
-        return (a.quotation?.company_name || '').localeCompare(b.quotation?.company_name || '');
+        return (getQuotationDetails(a).company_name || '').localeCompare(getQuotationDetails(b).company_name || '');
       }
       return 0;
     });
@@ -312,47 +340,47 @@ const DeclinedWorkOrders = () => {
         {state.selectedWO ? (
           <div className="space-y-6">
             {/* Debug Warnings */}
-            {!state.selectedWO.quotation && (
-              <p className="text-red-500">Warning: Quotation data is missing. Check API response.</p>
+            {!state.quotations.find((q) => q.id === state.selectedWO.quotation) && (
+              <p className="text-red-500">Warning: Quotation data not found in quotations list. Check API response.</p>
             )}
-            {!state.selectedWO.purchase_order && (
-              <p className="text-red-500">Warning: Purchase Order data is missing. Check API response.</p>
+            {!state.purchaseOrders.find((po) => po.id === state.selectedWO.purchase_order) && (
+              <p className="text-red-500">Warning: Purchase Order data not found in purchase orders list. Check API response.</p>
             )}
             {/* Company Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Company Details</h3>
               <div className="grid grid-cols-2 gap-4">
-                <p><strong>Series Number:</strong> {state.selectedWO.quotation?.series_number || 'N/A'}</p>
-                <p><strong>Company Name:</strong> {state.selectedWO.quotation?.company_name || 'N/A'}</p>
-                <p><strong>Company Address:</strong> {state.selectedWO.quotation?.company_address || 'N/A'}</p>
-                <p><strong>Company Phone:</strong> {state.selectedWO.quotation?.company_phone || 'N/A'}</p>
-                <p><strong>Company Email:</strong> {state.selectedWO.quotation?.company_email || 'N/A'}</p>
-                <p><strong>Channel:</strong> {state.selectedWO.quotation?.rfq_channel?.name || 'N/A'}</p>
+                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+                <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+                <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+                <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+                <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+                <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
               </div>
             </div>
             {/* Contact Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Contact Details</h3>
               <div className="grid grid-cols-2 gap-4">
-                <p><strong>Contact Name:</strong> {state.selectedWO.quotation?.point_of_contact_name || 'N/A'}</p>
-                <p><strong>Contact Email:</strong> {state.selectedWO.quotation?.point_of_contact_email || 'N/A'}</p>
-                <p><strong>Contact Phone:</strong> {state.selectedWO.quotation?.point_of_contact_phone || 'N/A'}</p>
+                <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+                <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+                <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
               </div>
             </div>
             {/* Purchase Order Details */}
             <div>
               <h3 className="text-lg font-medium text-black mb-2">Purchase Order Details</h3>
               <div className="grid grid-cols-2 gap-4">
-                <p><strong>Series Number:</strong> {state.selectedWO.purchase_order?.series_number || 'N/A'}</p>
-                <p><strong>Client PO Number:</strong> {state.selectedWO.purchase_order?.client_po_number || 'N/A'}</p>
-                <p><strong>Order Type:</strong> {state.selectedWO.purchase_order?.order_type || 'N/A'}</p>
-                <p><strong>Created:</strong> {state.selectedWO.purchase_order?.created_at ? new Date(state.selectedWO.purchase_order.created_at).toLocaleDateString() : 'N/A'}</p>
-                <p><strong>PO File:</strong> {state.selectedWO.purchase_order?.po_file ? (
-                  <a href={state.selectedWO.purchase_order.po_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).po_series_number}</p>
+                <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO).client_po_number}</p>
+                <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO).order_type}</p>
+                <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO).created_at}</p>
+                <p><strong>PO File:</strong> {getQuotationDetails(state.selectedWO).po_file ? (
+                  <a href={getQuotationDetails(state.selectedWO).po_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                     View PO File
                   </a>
                 ) : 'N/A'}</p>
-                <p><strong>Assigned Sales Person:</strong> {state.selectedWO.quotation?.assigned_sales_person?.name || 'N/A'}</p>
+                <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
               </div>
             </div>
             {/* Work Order Details */}
