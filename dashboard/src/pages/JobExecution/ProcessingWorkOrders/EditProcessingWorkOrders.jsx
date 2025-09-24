@@ -5,21 +5,21 @@ import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Loading from "../../../components/Loading";
-import { format, parse } from 'date-fns'; // Added date-fns imports
+import { format, parse } from 'date-fns';
 
 const EditProcessingWorkOrders = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const dutRef = useRef(null); 
+  const dutRef = useRef(null);
   const [state, setState] = useState({
     workOrder: null,
     itemsList: [],
     units: [],
     technicians: [],
     items: [],
-    dateReceived: "", // Default to empty string to avoid null issues
-    expectedCompletionDate: "", // Default to empty string
+    dateReceived: "",
+    expectedCompletionDate: "",
     onsiteOrLab: "",
     siteLocation: "",
     remarks: "",
@@ -32,7 +32,7 @@ const EditProcessingWorkOrders = () => {
     const queryParams = new URLSearchParams(location.search);
     if (queryParams.get("scrollToDUT") === "true" && dutRef.current) {
       const element = dutRef.current;
-      const y = element.getBoundingClientRect().top + window.scrollY - 80; 
+      const y = element.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
   }, [location, state.workOrder]);
@@ -55,8 +55,8 @@ const EditProcessingWorkOrders = () => {
           unit_price: item.unit_price,
           certificate_uut_label: item.certificate_uut_label || "",
           certificate_number: item.certificate_number || "",
-          calibration_date: item.calibration_date || "", // Default to empty string
-          calibration_due_date: item.calibration_due_date || "", // Default to empty string
+          calibration_date: item.calibration_date || "",
+          calibration_due_date: item.calibration_due_date || "",
           uuc_serial_number: item.uuc_serial_number || "",
           assigned_to: item.assigned_to || "",
           certificate_file: item.certificate_file || null,
@@ -71,7 +71,7 @@ const EditProcessingWorkOrders = () => {
         units: unitsRes.data || [],
         technicians: techRes.data || [],
         items: expandedItems,
-        dateReceived: workOrder.date_received ? format(new Date(workOrder.date_received), 'dd-MM-yyyy') : "", // Format date if present
+        dateReceived: workOrder.date_received ? format(new Date(workOrder.date_received), 'dd-MM-yyyy') : "",
         expectedCompletionDate: workOrder.expected_completion_date ? format(new Date(workOrder.expected_completion_date), 'dd-MM-yyyy') : "",
         onsiteOrLab: workOrder.onsite_or_lab || "",
         siteLocation: workOrder.site_location || "",
@@ -131,8 +131,8 @@ const EditProcessingWorkOrders = () => {
 
       formData.append("purchase_order", state.workOrder?.purchase_order || "");
       formData.append("quotation", state.workOrder?.quotation || "");
-      formData.append("date_received", state.dateReceived || null); // Send null if empty
-      formData.append("expected_completion_date", state.expectedCompletionDate || null); // Send null if empty
+      formData.append("date_received", state.dateReceived || null);
+      formData.append("expected_completion_date", state.expectedCompletionDate || null);
       formData.append("onsite_or_lab", state.onsiteOrLab || "");
       formData.append("site_location", state.siteLocation || "");
       formData.append("remarks", state.remarks || "");
@@ -146,8 +146,8 @@ const EditProcessingWorkOrders = () => {
         formData.append(`items[${index}]unit_price`, item.unit_price || "");
         formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || "");
         formData.append(`items[${index}]certificate_number`, item.certificate_number || "");
-        formData.append(`items[${index}]calibration_date`, item.calibration_date || null); // Send null if empty
-        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || null); // Send null if empty
+        formData.append(`items[${index}]calibration_date`, item.calibration_date || null);
+        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || null);
         formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || "");
         formData.append(`items[${index}]assigned_to`, item.assigned_to || "");
         formData.append(`items[${index}]range`, item.range || "");
@@ -176,32 +176,31 @@ const EditProcessingWorkOrders = () => {
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Edit Work Order - {state.workOrder.wo_number || "Not Provided"}</h1>
       <div className="bg-white p-6 space-y-6 rounded-md shadow">
-        {/* Work Order Metadata Fields */}
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date Received</label>
             <InputField
-              type="date"
+              type="text"
               value={state.dateReceived}
-              onChange={(e) => setState((prev) => ({ ...prev, dateReceived: e.target.value }))}
-              className="w-full"
+              disabled={true}
+              className="w-full bg-gray-100 cursor-not-allowed"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Expected Completion Date</label>
             <InputField
-              type="date"
+              type="text"
               value={state.expectedCompletionDate}
-              onChange={(e) => setState((prev) => ({ ...prev, expectedCompletionDate: e.target.value }))}
-              className="w-full"
+              disabled={true}
+              className="w-full bg-gray-100 cursor-not-allowed"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Onsite or Lab</label>
             <select
               value={state.onsiteOrLab}
-              onChange={(e) => setState((prev) => ({ ...prev, onsiteOrLab: e.target.value }))}
-              className="p-2 border rounded w-full"
+              disabled={true}
+              className="p-2 border rounded w-full bg-gray-100 cursor-not-allowed"
             >
               <option value="">Select</option>
               <option value="Onsite">Onsite</option>
@@ -213,8 +212,8 @@ const EditProcessingWorkOrders = () => {
             <InputField
               type="text"
               value={state.siteLocation}
-              onChange={(e) => setState((prev) => ({ ...prev, siteLocation: e.target.value }))}
-              className="w-full"
+              disabled={true}
+              className="w-full bg-gray-100 cursor-not-allowed"
             />
           </div>
           <div>
@@ -222,13 +221,12 @@ const EditProcessingWorkOrders = () => {
             <InputField
               type="text"
               value={state.remarks}
-              onChange={(e) => setState((prev) => ({ ...prev, remarks: e.target.value }))}
-              className="w-full"
+              disabled={true}
+              className="w-full bg-gray-100 cursor-not-allowed"
             />
           </div>
         </div>
 
-        {/* Device Under Test Details */}
         <div ref={dutRef}>
           <h3 className="text-lg font-medium text-black mb-4">Device Under Test Details</h3>
           {state.items.map((item, index) => (
@@ -344,7 +342,6 @@ const EditProcessingWorkOrders = () => {
           ))}
         </div>
 
-        {/* Save and Cancel Buttons */}
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSubmit}
