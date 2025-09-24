@@ -36,8 +36,8 @@ const ViewQuotation = () => {
     isNotApprovedModalOpen: false,
     notApprovedReason: "",
     selectedQuotationId: null,
-    editingRemarks: {}, // Track editing state for each quotation's remarks
-    tempRemarks: {}, // Store temporary remarks for each quotation during editing
+    editingRemarks: {}, 
+    tempRemarks: {}, 
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -652,7 +652,7 @@ const ViewQuotation = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[200px]">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[250px]">
                   Remarks
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -711,7 +711,7 @@ const ViewQuotation = () => {
                           ).toLocaleDateString()
                         : "N/A"}
                     </td>
-                    <td className="border p-2 whitespace-nowrap min-w-[200px]">
+                    <td className="border p-2 whitespace-nowrap min-w-[250px]">
                       <div className="flex items-center gap-2">
                         <InputField
                           type="text"
@@ -732,10 +732,10 @@ const ViewQuotation = () => {
                               ? handleRemarkUpdate(quotation.id)
                               : handleRemarkEdit(quotation.id)
                           }
-                          className={`px-3 py-1 rounded-md text-sm ${
+                          className={`px-2 py-1 rounded-md text-sm ${
                             state.editingRemarks[quotation.id]
-                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                              : "bg-gray-300 text-gray-700 hover:bg-gray-400"
+                              ? "bg-green-600 text-white hover:bg-green-700"
+                              : "bg-indigo-600 text-gray-700 hover:bg-gray-400"
                           }`}
                         >
                           {state.editingRemarks[quotation.id]
