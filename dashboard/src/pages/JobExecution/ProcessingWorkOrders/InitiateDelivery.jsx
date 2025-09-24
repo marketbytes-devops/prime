@@ -168,12 +168,12 @@ const InitiateDelivery = () => {
       deliveryItems: prev.deliveryItems.map((item, i) =>
         i === index
           ? {
-            ...item,
-            [field]: value,
-            delivered_quantity: field === 'quantity' ? value : item.delivered_quantity,
-            remaining_quantity: field === 'quantity' ? parseInt(value) || 0 : item.remaining_quantity,
-            error: '',
-          }
+              ...item,
+              [field]: value,
+              delivered_quantity: field === 'quantity' ? value : item.delivered_quantity,
+              remaining_quantity: field === 'quantity' ? parseInt(value) || 0 : item.remaining_quantity,
+              error: '',
+            }
           : item
       ),
     }));
@@ -185,11 +185,11 @@ const InitiateDelivery = () => {
       deliveryItems: prev.deliveryItems.map((item, i) =>
         i === itemIndex
           ? {
-            ...item,
-            components: item.components.map((comp, ci) =>
-              ci === compIndex ? { ...comp, [field]: value } : comp
-            ),
-          }
+              ...item,
+              components: item.components.map((comp, ci) =>
+                ci === compIndex ? { ...comp, [field]: value } : comp
+              ),
+            }
           : item
       ),
     }));
@@ -223,14 +223,14 @@ const InitiateDelivery = () => {
       const updatedItems = prev.deliveryItems.map((item) =>
         item.id === itemId
           ? {
-            ...item,
-            assigned_quantity: assignedQuantity,
-            error:
-              assignedQuantity !== '' &&
+              ...item,
+              assigned_quantity: assignedQuantity,
+              error:
+                assignedQuantity !== '' &&
                 (isNaN(assignedQuantity) || assignedQuantity < 0 || assignedQuantity > item.remaining_quantity)
-                ? `Quantity must be between 0 and ${item.remaining_quantity}`
-                : '',
-          }
+                  ? `Quantity must be between 0 and ${item.remaining_quantity}`
+                  : '',
+            }
           : item
       );
       return { ...prev, deliveryItems: updatedItems };
@@ -246,14 +246,14 @@ const InitiateDelivery = () => {
           items: dn.items.map((item) =>
             item.id === itemId
               ? {
-                ...item,
-                [field]:
-                  field === 'quantity' || field === 'delivered_quantity' ? parseInt(value) || '' : value,
-                error:
-                  field === 'quantity' && value !== '' && (isNaN(value) || parseInt(value) <= 0)
-                    ? 'Quantity must be a positive number'
-                    : '',
-              }
+                  ...item,
+                  [field]:
+                    field === 'quantity' || field === 'delivered_quantity' ? parseInt(value) || '' : value,
+                  error:
+                    field === 'quantity' && value !== '' && (isNaN(value) || parseInt(value) <= 0)
+                      ? 'Quantity must be a positive number'
+                      : '',
+                }
               : item
           ),
         };
@@ -271,11 +271,11 @@ const InitiateDelivery = () => {
           items: dn.items.map((item) =>
             item.id === itemId
               ? {
-                ...item,
-                components: item.components.map((comp, ci) =>
-                  ci === compIndex ? { ...comp, [field]: value } : comp
-                ),
-              }
+                  ...item,
+                  components: item.components.map((comp, ci) =>
+                    ci === compIndex ? { ...comp, [field]: value } : comp
+                  ),
+                }
               : item
           ),
         };
@@ -333,11 +333,11 @@ const InitiateDelivery = () => {
       createdSplitDNs: prev.createdSplitDNs.map((dn, i) =>
         i === dnIndex
           ? {
-            ...dn,
-            items: dn.items.map((item) =>
-              item.id === itemId ? { ...item, showAdditionalInfo: !item.showAdditionalInfo } : item
-            ),
-          }
+              ...dn,
+              items: dn.items.map((item) =>
+                item.id === itemId ? { ...item, showAdditionalInfo: !item.showAdditionalInfo } : item
+              ),
+            }
           : dn
       ),
     }));
@@ -437,10 +437,10 @@ const InitiateDelivery = () => {
       const updatedItems = prev.deliveryItems.map((item) =>
         prev.selectedItemIds.includes(item.id)
           ? {
-            ...item,
-            remaining_quantity: item.remaining_quantity - (parseInt(item.assigned_quantity) || 0),
-            assigned_quantity: '',
-          }
+              ...item,
+              remaining_quantity: item.remaining_quantity - (parseInt(item.assigned_quantity) || 0),
+              assigned_quantity: '',
+            }
           : item
       );
       return {
@@ -592,13 +592,9 @@ const InitiateDelivery = () => {
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Quantity</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Unit</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Delivered Quantity</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Remaining Quantity</th>
+                  <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
                   <th className="border p-2 text-left text-sm font-medium text-gray-700">Additional Info</th>
-                  {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-                    <>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Remaining Quantity</th>
-                      <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned Quantity</th>
-                    </>
-                  )}
                 </tr>
               </thead>
               <tbody>
@@ -692,6 +688,19 @@ const InitiateDelivery = () => {
                           disabled={!hasPermission('delivery', 'edit')}
                         />
                       </td>
+                      <td className="border p-2">{item.remaining_quantity}</td>
+                      <td className="border p-2">
+                        <InputField
+                          type="number"
+                          value={item.assigned_quantity}
+                          onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
+                          className="w-full"
+                          min="0"
+                          max={item.remaining_quantity}
+                          disabled={state.deliveryType !== 'Multiple' || !hasPermission('delivery', 'edit')}
+                        />
+                        {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
+                      </td>
                       <td className="border p-2">
                         <button
                           onClick={() => toggleAdditionalInfo(item.id)}
@@ -701,28 +710,11 @@ const InitiateDelivery = () => {
                           {item.showAdditionalInfo ? 'Hide Components' : 'Show Components'}
                         </button>
                       </td>
-                      {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
-                        <>
-                          <td className="border p-2">{item.remaining_quantity}</td>
-                          <td className="border p-2">
-                            <InputField
-                              type="number"
-                              value={item.assigned_quantity}
-                              onChange={(e) => handleAssignedQuantityChange(item.id, e.target.value)}
-                              className="w-full"
-                              min="0"
-                              max={item.remaining_quantity}
-                              disabled={!hasPermission('delivery', 'edit')}
-                            />
-                            {item.error && <p className="text-red-500 text-xs">{item.error}</p>}
-                          </td>
-                        </>
-                      )}
                     </tr>
                     {item.showAdditionalInfo && (
                       <tr key={`components-${item.id}`}>
                         <td
-                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 9 : 7}
+                          colSpan={state.deliveryType === 'Multiple' && state.numberOfSplitDNs ? 10 : 9}
                           className="border p-2"
                         >
                           <h3 className="text-md font-semibold">Components for {item.name}</h3>
@@ -731,13 +723,13 @@ const InitiateDelivery = () => {
                               <table className="w-full border-collapse bg-gray-50 mt-2">
                                 <thead>
                                   <tr className="bg-gray-100">
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                       Component Name
                                     </th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                       Component Value
                                     </th>
-                                    <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                    <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                       Actions
                                     </th>
                                   </tr>
@@ -745,7 +737,7 @@ const InitiateDelivery = () => {
                                 <tbody>
                                   {item.components.map((comp, compIndex) => (
                                     <tr key={compIndex} className="border hover:bg-gray-100">
-                                      <td className="border p-2">
+                                      <td className="border p-2 w-1/3">
                                         <InputField
                                           value={comp.component}
                                           onChange={(e) => {
@@ -757,7 +749,7 @@ const InitiateDelivery = () => {
                                           disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
-                                      <td className="border p-2">
+                                      <td className="border p-2 w-1/3">
                                         <InputField
                                           value={comp.value}
                                           onChange={(e) => {
@@ -769,7 +761,7 @@ const InitiateDelivery = () => {
                                           disabled={!hasPermission('delivery', 'edit')}
                                         />
                                       </td>
-                                      <td className="border p-2">
+                                      <td className="border p-2 w-1/3">
                                         <button
                                           onClick={() => {
                                             const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
@@ -815,10 +807,11 @@ const InitiateDelivery = () => {
             <Button
               onClick={handleGenerateSplitDN}
               disabled={isGenerateDisabled() || !hasPermission('delivery', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${isGenerateDisabled() || !hasPermission('delivery', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${
+                isGenerateDisabled() || !hasPermission('delivery', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+              }`}
             >
               Generate Split Delivery Note
             </Button>
@@ -922,13 +915,13 @@ const InitiateDelivery = () => {
                                         <table className="w-full border-collapse bg-gray-50 mt-2">
                                           <thead>
                                             <tr className="bg-gray-100">
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                                 Component Name
                                               </th>
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                                 Component Value
                                               </th>
-                                              <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                                              <th className="border p-2 text-left text-sm font-medium text-gray-700 w-1/3">
                                                 Actions
                                               </th>
                                             </tr>
@@ -936,7 +929,7 @@ const InitiateDelivery = () => {
                                           <tbody>
                                             {item.components.map((comp, compIndex) => (
                                               <tr key={compIndex} className="border hover:bg-gray-100">
-                                                <td className="border p-2">
+                                                <td className="border p-2 w-1/3">
                                                   <InputField
                                                     value={comp.component}
                                                     onChange={(e) =>
@@ -953,7 +946,7 @@ const InitiateDelivery = () => {
                                                     disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
-                                                <td className="border p-2">
+                                                <td className="border p-2 w-1/3">
                                                   <InputField
                                                     value={comp.value}
                                                     onChange={(e) =>
@@ -970,7 +963,7 @@ const InitiateDelivery = () => {
                                                     disabled={!hasPermission('delivery', 'edit')}
                                                   />
                                                 </td>
-                                                <td className="border p-2">
+                                                <td className="border p-2 w-1/3">
                                                   <button
                                                     onClick={() => removeSplitDNComponent(dnIndex, item.id, compIndex)}
                                                     className="text-red-600 hover:text-red-800 text-sm"
@@ -1018,10 +1011,11 @@ const InitiateDelivery = () => {
           <Button
             onClick={handleSubmitDelivery}
             disabled={isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')}
-            className={`px-3 py-1 rounded-md text-sm ${isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')
+            className={`px-3 py-1 rounded-md text-sm ${
+              isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+            }`}
           >
             {state.isSubmitting ? 'Submitting...' : 'Submit Delivery'}
           </Button>
