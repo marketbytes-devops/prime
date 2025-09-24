@@ -15,6 +15,7 @@ const PendingDeliveries = () => {
     workOrders: [],
     purchaseOrders: [],
     quotations: [],
+    channels: [], // Added channels to state
     technicians: [],
     itemsList: [],
     units: [],
@@ -67,13 +68,14 @@ const PendingDeliveries = () => {
 
   const fetchData = async () => {
     try {
-      const [dnRes, woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [dnRes, woRes, poRes, quotationsRes, channelsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('delivery-notes/', {
           params: { delivery_status: 'Delivery Pending' },
         }),
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('quotations/'),
+        apiClient.get('channels/'), // Added fetch for channels
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -89,6 +91,7 @@ const PendingDeliveries = () => {
         workOrders: woRes.data || [],
         purchaseOrders: poRes.data || [],
         quotations: quotationsRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -118,18 +121,35 @@ const PendingDeliveries = () => {
     return state.quotations.find(q => q.id === purchaseOrder.quotation);
   };
 
-  const getCompanyNameByDN = (dn) => {
+  const getQuotationDetails = (dn) => {
     const workOrder = getWorkOrderByDN(dn);
     const purchaseOrder = getPurchaseOrderByWO(workOrder);
     const quotation = getQuotationByPO(purchaseOrder);
-    return quotation?.company_name || 'N/A';
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: purchaseOrder?.series_number || 'N/A',
+      client_po_number: purchaseOrder?.client_po_number || 'N/A',
+      order_type: purchaseOrder?.order_type || 'N/A',
+      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      po_file: purchaseOrder?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
+    };
+  };
+
+  const getCompanyNameByDN = (dn) => {
+    return getQuotationDetails(dn).company_name;
   };
 
   const getQuotationNumberByDN = (dn) => {
-    const workOrder = getWorkOrderByDN(dn);
-    const purchaseOrder = getPurchaseOrderByWO(workOrder);
-    const quotation = getQuotationByPO(purchaseOrder);
-    return quotation?.series_number || 'N/A';
+    return getQuotationDetails(dn).series_number;
   };
 
   const getWONumberByDN = (dn) => {
@@ -438,10 +458,46 @@ const PendingDeliveries = () => {
           {state.selectedDN ? (
             <div className="space-y-4">
               <div>
+                <h3 className="text-lg font-medium text-black">Company Details</h3>
+                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedDN).series_number}</p>
+                <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedDN).company_name}</p>
+                <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedDN).company_address}</p>
+                <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedDN).company_phone}</p>
+                <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedDN).company_email}</p>
+                <p><strong>Channel:</strong> {getQuotationDetails(state.selectedDN).channel}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-black">Contact Details</h3>
+                <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedDN).contact_name}</p>
+                <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedDN).contact_email}</p>
+                <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedDN).contact_phone}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedDN).po_series_number}</p>
+                <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedDN).client_po_number}</p>
+                <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedDN).order_type}</p>
+                <p><strong>Created:</strong> {getQuotationDetails(state.selectedDN).created_at}</p>
+                <p>
+                  <strong>PO File:</strong>{' '}
+                  {getQuotationDetails(state.selectedDN).po_file ? (
+                    <a
+                      href={getQuotationDetails(state.selectedDN).po_file}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:underline"
+                    >
+                      View File
+                    </a>
+                  ) : (
+                    'N/A'
+                  )}
+                </p>
+                <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedDN).assigned_sales_person}</p>
+              </div>
+              <div>
                 <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
                 <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
-                <p><strong>Company Name:</strong> {getCompanyNameByDN(state.selectedDN)}</p>
-                <p><strong>Quotation Number:</strong> {getQuotationNumberByDN(state.selectedDN)}</p>
                 <p><strong>WO Number:</strong> {getWONumberByDN(state.selectedDN)}</p>
                 <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
                 <p>
@@ -455,7 +511,7 @@ const PendingDeliveries = () => {
                       href={state.selectedDN.signed_delivery_note}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-indigo-600 hover:underline"
                     >
                       View Signed DN
                     </a>
