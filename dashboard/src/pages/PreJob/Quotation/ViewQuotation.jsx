@@ -36,6 +36,8 @@ const ViewQuotation = () => {
     isNotApprovedModalOpen: false,
     notApprovedReason: "",
     selectedQuotationId: null,
+    editingRemarks: {}, // Track editing state for each quotation's remarks
+    tempRemarks: {}, // Store temporary remarks for each quotation during editing
   });
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -107,6 +109,14 @@ const ViewQuotation = () => {
         teamMembers: teamsRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        editingRemarks: quotationsWithPOs.reduce(
+          (acc, q) => ({ ...acc, [q.id]: false }),
+          {}
+        ),
+        tempRemarks: quotationsWithPOs.reduce(
+          (acc, q) => ({ ...acc, [q.id]: q.remarks || "" }),
+          {}
+        ),
       }));
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -467,6 +477,34 @@ const ViewQuotation = () => {
     }
   };
 
+  const handleRemarkChange = (id, value) => {
+    setState((prev) => ({
+      ...prev,
+      tempRemarks: { ...prev.tempRemarks, [id]: value },
+    }));
+  };
+
+  const handleRemarkEdit = (id) => {
+    setState((prev) => ({
+      ...prev,
+      editingRemarks: { ...prev.editingRemarks, [id]: true },
+    }));
+  };
+
+  const handleRemarkUpdate = async (id) => {
+    const value = state.tempRemarks[id] || "";
+    try {
+      await handleUpdateField(id, "remarks", value);
+      setState((prev) => ({
+        ...prev,
+        editingRemarks: { ...prev.editingRemarks, [id]: false },
+      }));
+    } catch (error) {
+      console.error("Error updating remarks:", error);
+      toast.error("Failed to update remarks.");
+    }
+  };
+
   const isPoComplete = (quotation) => {
     if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
       return false;
@@ -614,7 +652,7 @@ const ViewQuotation = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Next Follow-up Date
                 </th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[200px]">
                   Remarks
                 </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -626,7 +664,7 @@ const ViewQuotation = () => {
               {currentQuotations.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="10"
+                    colSpan="9"
                     className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No quotations found.
@@ -673,19 +711,38 @@ const ViewQuotation = () => {
                           ).toLocaleDateString()
                         : "N/A"}
                     </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      <InputField
-                        type="text"
-                        value={quotation.remarks || ""}
-                        onChange={(e) =>
-                          handleUpdateField(
-                            quotation.id,
-                            "remarks",
-                            e.target.value
-                          )
-                        }
-                        className="w-full p-1"
-                      />
+                    <td className="border p-2 whitespace-nowrap min-w-[200px]">
+                      <div className="flex items-center gap-2">
+                        <InputField
+                          type="text"
+                          value={
+                            state.editingRemarks[quotation.id]
+                              ? state.tempRemarks[quotation.id] || ""
+                              : quotation.remarks || ""
+                          }
+                          onChange={(e) =>
+                            handleRemarkChange(quotation.id, e.target.value)
+                          }
+                          disabled={!state.editingRemarks[quotation.id]}
+                          className="w-full p-1"
+                        />
+                        <Button
+                          onClick={() =>
+                            state.editingRemarks[quotation.id]
+                              ? handleRemarkUpdate(quotation.id)
+                              : handleRemarkEdit(quotation.id)
+                          }
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            state.editingRemarks[quotation.id]
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "bg-gray-300 text-gray-700 hover:bg-gray-400"
+                          }`}
+                        >
+                          {state.editingRemarks[quotation.id]
+                            ? "Update"
+                            : "Edit"}
+                        </Button>
+                      </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -724,14 +781,12 @@ const ViewQuotation = () => {
                           Print
                         </Button>
                         {hasBothOrderTypes(quotation) ||
-                        isPoComplete(
-                          quotation
-                        ) ? null : quotation.purchase_orders?.some(
+                        isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
                           <Button
                             onClick={() => handleUploadPO(quotation.id)}
-                            disabled={isPoComplete(quotation)} // Disable if PO is complete
+                            disabled={isPoComplete(quotation)}
                             className={`px-3 py-1 rounded-md text-sm ${
                               isPoComplete(quotation)
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -753,9 +808,9 @@ const ViewQuotation = () => {
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
                             }`}
-                          >
-                            Convert to PO
-                          </Button>
+                        >
+                          Convert to PO
+                        </Button>
                         )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
