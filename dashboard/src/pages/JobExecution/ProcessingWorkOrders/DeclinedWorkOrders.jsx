@@ -14,6 +14,7 @@ const DeclinedWorkOrders = () => {
     technicians: [],
     quotations: [],
     purchaseOrders: [],
+    channels: [], // Added channels to state
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -60,13 +61,14 @@ const DeclinedWorkOrders = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, itemsRes, unitsRes, techRes, quotationsRes, poRes] = await Promise.all([
+      const [woRes, itemsRes, unitsRes, techRes, quotationsRes, poRes, channelsRes] = await Promise.all([
         apiClient.get('work-orders/', { params: { status: 'Declined' } }),
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('technicians/'),
         apiClient.get('quotations/'),
         apiClient.get('purchase-orders/'),
+        apiClient.get('channels/'), // Added fetch for channels
       ]);
       setState((prev) => ({
         ...prev,
@@ -76,6 +78,7 @@ const DeclinedWorkOrders = () => {
         technicians: techRes.data || [],
         quotations: quotationsRes.data || [],
         purchaseOrders: poRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -96,7 +99,7 @@ const DeclinedWorkOrders = () => {
       company_address: quotation?.company_address || 'N/A',
       company_phone: quotation?.company_phone || 'N/A',
       company_email: quotation?.company_email || 'N/A',
-      channel: quotation?.rfq_channel?.name || 'N/A',
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A', // Updated to use channels
       contact_name: quotation?.point_of_contact_name || 'N/A',
       contact_email: quotation?.point_of_contact_email || 'N/A',
       contact_phone: quotation?.point_of_contact_phone || 'N/A',
@@ -105,7 +108,7 @@ const DeclinedWorkOrders = () => {
       order_type: purchaseOrder?.order_type || 'N/A',
       created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
       po_file: purchaseOrder?.po_file || null,
-      assigned_sales_person: quotation?.assigned_sales_person?.name || 'N/A',
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A', // Updated to use assigned_sales_person_name
     };
   };
 
