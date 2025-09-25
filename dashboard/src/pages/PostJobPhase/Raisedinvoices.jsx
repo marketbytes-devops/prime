@@ -4,11 +4,13 @@ import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
+import { v4 as uuidv4 } from 'uuid';
 
 const RaisedInvoices = () => {
   const [state, setState] = useState({
     workOrders: [],
     purchaseOrders: [],
+    deliveryNotes: [],
     quotations: [],
     technicians: [],
     itemsList: [],
@@ -21,6 +23,7 @@ const RaisedInvoices = () => {
     selectedWO: null,
     isPaymentModalOpen: false,
     selectedWorkOrderId: null,
+    selectedDNItemId: null,
     paymentReferenceNumber: '',
     paymentReferenceError: '',
   });
@@ -60,23 +63,62 @@ const RaisedInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, poRes, dnRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
+        apiClient.get('delivery-notes/'),
         apiClient.get('quotations/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
       ]);
 
+      const deliveryNotes = dnRes.data
+        .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
+        .map((dn) => ({
+          ...dn,
+          items: dn.items.map((item) => ({
+            ...item,
+            uom: item.uom ? Number(item.uom) : null,
+            components: item.components || [],
+            invoice_status: item.invoice_status ? item.invoice_status.toLowerCase() : 'pending',
+          })),
+        }));
+
+      const workOrderDeliveryPairs = [];
+      const workOrders = woRes.data || [];
+
+      workOrders.forEach((workOrder) => {
+        const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
+        if (relatedDNs.length > 0) {
+          relatedDNs.forEach((dn) => {
+            dn.items.forEach((dnItem) => {
+              if (dnItem.invoice_status === 'processed') {
+                workOrderDeliveryPairs.push({
+                  id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
+                  workOrder,
+                  deliveryNote: dn,
+                  deliveryNoteItem: dnItem,
+                  workOrderId: workOrder.id,
+                  deliveryNoteId: dn.id,
+                  deliveryNoteItemId: dnItem.id,
+                });
+              }
+            });
+          });
+        }
+      });
+
       setState((prev) => ({
         ...prev,
-        workOrders: woRes.data || [],
+        workOrders,
         purchaseOrders: poRes.data || [],
+        deliveryNotes,
         quotations: quotationsRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        workOrderDeliveryPairs,
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -88,19 +130,21 @@ const RaisedInvoices = () => {
     fetchData();
   }, []);
 
-  const handleViewWO = (workOrder) => {
+  const handleViewWO = (pair) => {
     setState((prev) => ({
       ...prev,
       isWOModalOpen: true,
-      selectedWO: workOrder,
+      selectedWO: pair.workOrder,
+      selectedDNItemId: pair.deliveryNoteItemId,
     }));
   };
 
-  const handlePaymentProcess = (workOrderId) => {
+  const handlePaymentProcess = (pair) => {
     setState((prev) => ({
       ...prev,
       isPaymentModalOpen: true,
-      selectedWorkOrderId: workOrderId,
+      selectedWorkOrderId: pair.workOrderId,
+      selectedDNItemId: pair.deliveryNoteItemId,
       paymentReferenceNumber: '',
       paymentReferenceError: '',
     }));
@@ -122,29 +166,36 @@ const RaisedInvoices = () => {
       return;
     }
     try {
-      const payload = {
-        invoice_status: 'Processed',
-        payment_reference_number: state.paymentReferenceNumber,
-      };
-      await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
-      toast.success('Invoice status updated to Processed.');
+      const formData = new FormData();
+      formData.append('invoice_status', 'processed');
+      formData.append('delivery_note_item_id', state.selectedDNItemId);
+      formData.append('payment_reference_number', state.paymentReferenceNumber);
+
+      await apiClient.patch(
+        `work-orders/${state.selectedWorkOrderId}/update-delivery-note-item-invoice-status/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      toast.success('Payment processed successfully.');
       setState((prev) => ({
         ...prev,
         isPaymentModalOpen: false,
         selectedWorkOrderId: null,
+        selectedDNItemId: null,
         paymentReferenceNumber: '',
         paymentReferenceError: '',
       }));
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error('Error processing payment:', error);
       toast.error('Failed to process payment.');
     }
   };
 
-  const viewInvoice = (workOrder) => {
-    if (workOrder.invoice_file) {
-      window.open(workOrder.invoice_file, '_blank');
+  const viewInvoice = (pair) => {
+    if (pair.deliveryNoteItem?.invoice_file) {
+      window.open(pair.deliveryNoteItem.invoice_file, '_blank');
     } else {
       toast.error('No invoice file available.');
     }
@@ -158,39 +209,47 @@ const RaisedInvoices = () => {
     return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
   };
 
-  const calculateFollowUpDate = (workOrder) => {
-    if (!workOrder.created_at || !workOrder.due_in_days) return 'N/A';
-    const createdDate = new Date(workOrder.created_at);
-    const followUpDate = new Date(createdDate);
-    followUpDate.setDate(createdDate.getDate() + parseInt(workOrder.due_in_days));
-    return followUpDate.toLocaleDateString();
-  };
-
-  const getCompanyName = (workOrder) => {
+  const getQuotationDetails = (workOrder) => {
     const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
-    if (!po) return 'N/A';
-    const quotation = state.quotations.find((q) => q.id === po.quotation);
-    return quotation?.company_name || 'N/A';
+    const quotation = po ? state.quotations.find((q) => q.id === po.quotation) : null;
+    return {
+      company_name: quotation?.company_name || 'N/A',
+      series_number: quotation?.series_number || 'N/A',
+    };
   };
 
-  const filteredWorkOrders = state.workOrders
-    .filter(
-      (workOrder) =>
-        workOrder.invoice_status === 'raised' && // Changed from 'Raised' to 'raised'
-        ((workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-         getCompanyName(workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()))
+  const getWONumberByDN = (dn) => {
+    const workOrder = state.workOrders.find((wo) => wo.id === dn.work_order_id);
+    return workOrder?.wo_number || 'N/A';
+  };
+
+  const getDNSeriesNumber = (deliveryNote) => {
+    return deliveryNote?.dn_number || 'N/A';
+  };
+
+  const getItemName = (itemId) => {
+    const item = state.itemsList.find((i) => i.id === itemId);
+    return item ? item.name : 'N/A';
+  };
+
+  const filteredPairs = state.workOrderDeliveryPairs
+    .filter((pair) =>
+      (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getItemName(pair.deliveryNoteItem.item).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
-        return new Date(b.created_at) - new Date(a.created_at);
+        return new Date(b.workOrder.created_at) - new Date(a.workOrder.created_at);
       }
       return 0;
     });
 
-  const totalPages = Math.ceil(filteredWorkOrders.length / state.itemsPerPage);
+  const totalPages = Math.ceil(filteredPairs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
-  const currentWorkOrders = filteredWorkOrders.slice(startIndex, startIndex + state.itemsPerPage);
-
+  const currentPairs = filteredPairs.slice(startIndex, startIndex + state.itemsPerPage);
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
@@ -215,14 +274,14 @@ const RaisedInvoices = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Raised Invoices</h1>
+      <h1 className="text-2xl font-bold mb-4">Processed Invoices</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4 items-center">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Invoices</label>
             <InputField
               type="text"
-              placeholder="Search by WO Number or Company Name..."
+              placeholder="Search by WO Number, Quotation, DN Number, Company Name, or Item..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full p-2 border rounded focus:outline-indigo-500"
@@ -245,33 +304,39 @@ const RaisedInvoices = () => {
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Next Follow Up Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {currentWorkOrders.length === 0 ? (
+              {currentPairs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="border p-2 text-center text-gray-500">
-                    No raised invoices found.
+                  <td colSpan="10" className="border p-2 text-center text-gray-500">
+                    No processed invoices found.
                   </td>
                 </tr>
               ) : (
-                currentWorkOrders.map((workOrder, index) => (
-                  <tr key={workOrder.id} className="border hover:bg-gray-50">
+                currentPairs.map((pair, index) => (
+                  <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{getCompanyName(workOrder)}</td>
-                    <td className="border p-2 whitespace-nowrap">{workOrder.wo_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{new Date(workOrder.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(workOrder.items)}</td>
-                    <td className="border p-2 whitespace-nowrap">{calculateFollowUpDate(workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
+                    <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getItemName(pair.deliveryNoteItem.item)}</td>
+                    <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
+                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem.invoice_status}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
-                          onClick={() => handlePaymentProcess(workOrder.id)}
+                          onClick={() => handlePaymentProcess(pair)}
                           disabled={!hasPermission('raised_invoices', 'edit')}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             hasPermission('raised_invoices', 'edit')
@@ -282,10 +347,16 @@ const RaisedInvoices = () => {
                           Payment Process
                         </Button>
                         <Button
-                          onClick={() => viewInvoice(workOrder)}
+                          onClick={() => viewInvoice(pair)}
                           className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm whitespace-nowrap"
                         >
                           View Invoice
+                        </Button>
+                        <Button
+                          onClick={() => handleViewWO(pair)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
+                        >
+                          View WO
                         </Button>
                       </div>
                     </td>
@@ -330,7 +401,7 @@ const RaisedInvoices = () => {
 
       <Modal
         isOpen={state.isWOModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
+        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null, selectedDNItemId: null }))}
         title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
       >
         {state.selectedWO ? (
@@ -338,23 +409,22 @@ const RaisedInvoices = () => {
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Company Name:</strong> {getCompanyName(state.selectedWO)}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.selectedWO.invoice_status || 'Raised'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_status || 'Processed'}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
               {state.selectedWO.manager_approval_status === 'Declined' && (
                 <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
               )}
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}</p>
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.received_date ? new Date(state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId).deliveryNoteItem.received_date).toLocaleDateString() : 'N/A'}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Next Follow Up Date:</strong> {calculateFollowUpDate(state.selectedWO)}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
               <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.selectedWO.invoice_file ? (
+              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_file ? (
                 <a
-                  href={state.selectedWO.invoice_file}
+                  href={state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_file}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-800"
@@ -431,6 +501,7 @@ const RaisedInvoices = () => {
           ...prev,
           isPaymentModalOpen: false,
           selectedWorkOrderId: null,
+          selectedDNItemId: null,
           paymentReferenceNumber: '',
           paymentReferenceError: '',
         }))}
@@ -460,6 +531,7 @@ const RaisedInvoices = () => {
                 ...prev,
                 isPaymentModalOpen: false,
                 selectedWorkOrderId: null,
+                selectedDNItemId: null,
                 paymentReferenceNumber: '',
                 paymentReferenceError: '',
               }))}
