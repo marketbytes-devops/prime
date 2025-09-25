@@ -162,19 +162,20 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
+        invoice_file = request.FILES.get('invoice_file')
+        delivery_note_id = request.data.get('delivery_note_id')
 
         if not new_status:
+            logger.warning(f"No invoice status provided for WorkOrder {pk}")
             return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        data = {'invoice_status': new_status}
-        if new_status == 'raised':
-            if not due_in_days or int(due_in_days) <= 0:
-                return Response({'error': 'Due in days is required and must be a positive integer for Raised status'}, status=status.HTTP_400_BAD_REQUEST)
-            data['due_in_days'] = int(due_in_days)
-        elif new_status == 'processed':
-            if not received_date:
-                return Response({'error': 'Received date is required for Processed status'}, status=status.HTTP_400_BAD_REQUEST)
-            data['received_date'] = received_date
+        data = {
+            'invoice_status': new_status,
+            'due_in_days': int(due_in_days) if due_in_days else None,
+            'received_date': received_date if received_date else None,
+            'invoice_file': invoice_file,
+            'delivery_note_id': delivery_note_id if delivery_note_id else None
+        }
 
         serializer = self.get_serializer(work_order, data=data, partial=True)
         if serializer.is_valid():

@@ -220,10 +220,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     items = WorkOrderItemSerializer(many=True, required=False)
     delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
-    purchase_order_file = serializers.FileField(required=False)
-    work_order_file = serializers.FileField(required=False)
-    signed_delivery_note_file = serializers.FileField(required=False)
-    invoice_file = serializers.FileField(required=False)
+    purchase_order_file = serializers.FileField(required=False, allow_null=True)
+    work_order_file = serializers.FileField(required=False, allow_null=True)
+    signed_delivery_note_file = serializers.FileField(required=False, allow_null=True)
+    invoice_file = serializers.FileField(required=False, allow_null=True)
     invoice_status = serializers.ChoiceField(
         choices=[
             ("pending", "Pending"),
@@ -379,6 +379,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         new_invoice_status = data.get("invoice_status")
         due_in_days = data.get("due_in_days")
         received_date = data.get("received_date")
+        invoice_file = data.get("invoice_file")
+        delivery_note_id = data.get("delivery_note_id")
+
         if new_invoice_status:
             if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
                 raise serializers.ValidationError(
@@ -395,6 +398,19 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             ):
                 raise serializers.ValidationError(
                     "Cannot change invoice status from 'processed' to another status."
+                )
+            if new_invoice_status in ["raised", "processed"] and not invoice_file:
+                raise serializers.ValidationError(
+                    f"Invoice file is required for '{new_invoice_status}' status."
+                )
+        if invoice_file and not new_invoice_status:
+            raise serializers.ValidationError(
+                "Invoice status must be provided when uploading an invoice file."
+            )
+        if delivery_note_id:
+            if not DeliveryNote.objects.filter(id=delivery_note_id).exists():
+                raise serializers.ValidationError(
+                    "Invalid delivery note ID provided."
                 )
         return data
 
@@ -473,6 +489,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
+        invoice_file = validated_data.pop("invoice_file", None)
         request = self.context.get("request")
         if hasattr(request, "data") and any(
             key.startswith("items[") for key in request.data.keys()
@@ -507,6 +524,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             received_date=validated_data.get("received_date"),
             wo_type=validated_data.get("wo_type"),
             application_status=validated_data.get("application_status"),
+            invoice_file=invoice_file,
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
         for item_data in items_data:
@@ -524,9 +542,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
+        invoice_file = validated_data.pop("invoice_file", None)
         previous_invoice_status = instance.invoice_status
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        if invoice_file:
+            instance.invoice_file = invoice_file
         instance.save()
         logger.info(f"Updated WorkOrder {instance.id}")
         if items_data is not None:
