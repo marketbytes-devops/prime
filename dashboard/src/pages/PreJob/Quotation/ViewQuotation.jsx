@@ -301,21 +301,12 @@ const ViewQuotation = () => {
     try {
       for (const poId of Object.keys(state.poUploads)) {
         const { clientPoNumber, poFile, poStatus } = state.poUploads[poId];
-        if (poStatus === "available") {
-          const formData = new FormData();
-          formData.append("client_po_number", clientPoNumber);
-          formData.append("po_file", poFile);
-          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        } else if (poStatus === "not_available") {
-          const formData = new FormData();
-          formData.append("client_po_number", "");
-          formData.append("po_file", "");
-          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        }
+        const formData = new FormData();
+        formData.append("client_po_number", poStatus === "available" ? clientPoNumber : "");
+        formData.append("po_file", poStatus === "available" && poFile ? poFile : "");
+        await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
       await fetchQuotations();
       setState((prev) => ({
@@ -512,19 +503,13 @@ const ViewQuotation = () => {
     if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
       return false;
     }
-    const hasFullOrder = quotation.purchase_orders.some(
-      (po) => po.order_type === "full" && (po.client_po_number || po.po_file)
-    );
-    if (hasFullOrder) {
-      return true;
-    }
-    const partialOrders = quotation.purchase_orders.filter(
-      (po) => po.order_type === "partial"
-    );
-    if (partialOrders.length === 0) {
-      return false;
-    }
-    return partialOrders.every((po) => po.client_po_number || po.po_file);
+    return quotation.purchase_orders.every((po) => {
+      return (
+        (po.order_type === "full" && po.client_po_number && po.po_file) ||
+        (po.order_type === "partial" &&
+          ((po.client_po_number && po.po_file) || (!po.client_po_number && !po.po_file)))
+      );
+    });
   };
 
   const filteredQuotations = state.quotations
@@ -778,16 +763,14 @@ const ViewQuotation = () => {
                           Print
                         </Button>
                         {hasBothOrderTypes(quotation) ||
-                        isPoComplete(
-                          quotation
-                        ) ? null : quotation.purchase_orders?.some(
+                        isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
                           <Button
                             onClick={() => handleUploadPO(quotation.id)}
-                            disabled={isPoComplete(quotation)}
+                            disabled={isPoComplete(quotation) || !hasPermission("quotation", "edit")}
                             className={`px-3 py-1 rounded-md text-sm ${
-                              isPoComplete(quotation)
+                              isPoComplete(quotation) || !hasPermission("quotation", "edit")
                                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                 : "bg-yellow-600 text-white hover:bg-yellow-700"
                             }`}
@@ -799,11 +782,13 @@ const ViewQuotation = () => {
                             onClick={() => handleConvertToPO(quotation.id)}
                             disabled={
                               quotation.quotation_status !== "Approved" ||
-                              isPoComplete(quotation)
+                              isPoComplete(quotation) ||
+                              !hasPermission("quotation", "edit")
                             }
                             className={`px-3 py-1 rounded-md text-sm ${
                               quotation.quotation_status === "Approved" &&
-                              !isPoComplete(quotation)
+                              !isPoComplete(quotation) &&
+                              hasPermission("quotation", "edit")
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
                             }`}
