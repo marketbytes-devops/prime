@@ -232,6 +232,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         ],
         required=False,
     )
+    invoice_delivery_note = serializers.PrimaryKeyRelatedField(
+        queryset=DeliveryNote.objects.all(),
+        allow_null=True,
+        required=False
+    )
     due_in_days = serializers.IntegerField(required=False, allow_null=True)
     received_date = serializers.DateField(
         required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
@@ -282,6 +287,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "invoice_file",
             "payment_reference_number",
             "email_sent",
+            'invoice_delivery_note',
         ]
 
     def send_invoice_status_change_email(self, work_order, new_status):

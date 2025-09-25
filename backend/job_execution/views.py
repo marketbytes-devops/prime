@@ -156,13 +156,21 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
         return Response({'status': 'Work Order resubmitted for Manager Approval'})
 
-    @action(detail=True, methods=['post'], url_path='update-invoice-status')
+    @action(detail=True, methods=['patch'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
         work_order = self.get_object()
-        new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
+        work_order = self.get_object()
+        new_status = request.data.get('invoice_status')
+        delivery_note_id = request.data.get('delivery_note_id')
 
+        if delivery_note_id:
+            delivery_note = DeliveryNote.objects.get(id=delivery_note_id)
+            work_order.invoice_delivery_note = delivery_note
+        work_order.invoice_status = new_status
+        work_order.save()
+    
         if not new_status:
             return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
 

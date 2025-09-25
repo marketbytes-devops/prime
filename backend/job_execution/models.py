@@ -4,8 +4,16 @@ from item.models import Item
 from unit.models import Unit
 from team.models import Technician
 from series.models import NumberSeries
+from models import DeliveryNote
 
 class WorkOrder(models.Model):
+    invoice_delivery_note = models.ForeignKey(
+        DeliveryNote,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoice_work_orders'
+    )
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='work_orders', null=True, blank=True)
     wo_number = models.CharField(max_length=50, unique=True, blank=True, null=True)

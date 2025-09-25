@@ -16,7 +16,7 @@ const PendingInvoices = () => {
     itemsList: [],
     units: [],
     quotations: [],
-    channels: [], // Added channels to state
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -44,6 +44,7 @@ const PendingInvoices = () => {
     dnUploadErrors: { signedDeliveryNote: '' },
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
+    selectedDNForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
     invoiceUploadType: '',
@@ -99,7 +100,7 @@ const PendingInvoices = () => {
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('quotations/'),
-        apiClient.get('channels/'), // Added fetch for channels
+        apiClient.get('channels/'),
       ]);
 
       const deliveryNotes = dnRes.data
@@ -119,10 +120,10 @@ const PendingInvoices = () => {
       })) || [];
 
       const workOrderDeliveryPairs = [];
-      
+
       workOrders.forEach(workOrder => {
         const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
-        
+
         if (relatedDNs.length > 0) {
           relatedDNs.forEach(dn => {
             workOrderDeliveryPairs.push({
@@ -153,7 +154,7 @@ const PendingInvoices = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
+        channels: channelsRes.data || [],
         workOrderDeliveryPairs: workOrderDeliveryPairs,
       }));
     } catch (error) {
@@ -190,7 +191,7 @@ const PendingInvoices = () => {
 
   const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
-    
+
     if (type === 'wo') {
       setState((prev) => ({
         ...prev,
@@ -405,7 +406,7 @@ const PendingInvoices = () => {
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: workOrder,
-      selectedDNId: pair.deliveryNoteId,
+      selectedDNForInvoiceUpload: pair.deliveryNote,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
       invoiceUploadType: status === 'raised' ? 'Proforma' : 'Final',
@@ -435,12 +436,12 @@ const PendingInvoices = () => {
       } else if (state.newStatus === 'processed' && state.receivedDate) {
         payload.received_date = state.receivedDate;
       }
-      
-      if (state.selectedDNId) {
-        payload.delivery_note_id = state.selectedDNId;
+
+      if (state.selectedDNForInvoiceUpload) {
+        payload.delivery_note_id = state.selectedDNForInvoiceUpload.id;
       }
 
-      await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
+      await apiClient.post(`work-orders/${state.selectedWOForInvoiceUpload.id}/update-invoice-status/`, payload);
 
       const formData = new FormData();
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
@@ -453,7 +454,7 @@ const PendingInvoices = () => {
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
-        selectedDNId: null,
+        selectedDNForInvoiceUpload: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: '',
@@ -494,7 +495,7 @@ const PendingInvoices = () => {
       ...prev,
       isStatusModalOpen: true,
       selectedWorkOrderId: workOrder.id,
-      selectedDNId: pair.deliveryNoteId,
+      selectedDNForInvoiceUpload: pair.deliveryNote,
       newStatus,
       dueInDays: '',
       receivedDate: '',
@@ -502,12 +503,11 @@ const PendingInvoices = () => {
       invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
     }));
   };
-  
+
   const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
+    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNForInvoiceUpload } = state;
     const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
-  
+
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
         'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
@@ -541,7 +541,7 @@ const PendingInvoices = () => {
         invoiceUploadErrors: { invoiceFile: '' },
       }));
     } else {
-      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
+      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNForInvoiceUpload?.id);
     }
   };
 
@@ -554,7 +554,7 @@ const PendingInvoices = () => {
       } else if (newStatus === 'processed' && receivedDate) {
         payload.received_date = receivedDate;
       }
-      
+
       if (deliveryNoteId) {
         payload.delivery_note_id = deliveryNoteId;
       }
@@ -565,7 +565,7 @@ const PendingInvoices = () => {
         ...prev,
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
-        selectedDNId: null,
+        selectedDNForInvoiceUpload: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
