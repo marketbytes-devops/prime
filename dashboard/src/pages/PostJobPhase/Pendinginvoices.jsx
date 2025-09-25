@@ -153,7 +153,7 @@ const PendingInvoices = () => {
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
         workOrderDeliveryPairs: workOrderDeliveryPairs,
       }));
     } catch (error) {
