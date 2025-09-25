@@ -379,6 +379,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         new_invoice_status = data.get("invoice_status")
         due_in_days = data.get("due_in_days")
         received_date = data.get("received_date")
+        invoice_file = data.get("invoice_file")
+
         if new_invoice_status:
             if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
                 raise serializers.ValidationError(
@@ -391,10 +393,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             if (
                 instance
                 and instance.invoice_status == "processed"
-                and new_invoice_status != "processed"
+                and instance.received_date
+                and instance.invoice_file
+                and new_invoice_status in ["pending", "raised"]
             ):
                 raise serializers.ValidationError(
-                    "Cannot change invoice status from 'processed' to another status."
+                    "Cannot change invoice status from 'processed' to 'pending' or 'raised' once processed with all required fields."
                 )
         return data
 
