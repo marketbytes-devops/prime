@@ -15,7 +15,7 @@ const PendingDeliveries = () => {
     workOrders: [],
     purchaseOrders: [],
     quotations: [],
-    channels: [], // Added channels to state
+    channels: [],
     technicians: [],
     itemsList: [],
     units: [],
@@ -28,7 +28,6 @@ const PendingDeliveries = () => {
     isCompleteModalOpen: false,
     selectedDNForComplete: null,
     signedDeliveryNote: null,
-    dueInDays: '',
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -75,7 +74,7 @@ const PendingDeliveries = () => {
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('quotations/'),
-        apiClient.get('channels/'), // Added fetch for channels
+        apiClient.get('channels/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -91,7 +90,7 @@ const PendingDeliveries = () => {
         workOrders: woRes.data || [],
         purchaseOrders: poRes.data || [],
         quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
+        channels: channelsRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -106,7 +105,6 @@ const PendingDeliveries = () => {
     fetchData();
   }, []);
 
-  // Helper functions to get related data
   const getWorkOrderByDN = (dn) => {
     return state.workOrders.find(wo => wo.id === dn.work_order_id);
   };
@@ -171,18 +169,13 @@ const PendingDeliveries = () => {
       isCompleteModalOpen: true,
       selectedDNForComplete: dn,
       signedDeliveryNote: null,
-      dueInDays: '',
     }));
   };
 
   const handleCompleteDelivery = async () => {
-    const { selectedDNForComplete, signedDeliveryNote, dueInDays } = state;
+    const { selectedDNForComplete, signedDeliveryNote } = state;
     if (!signedDeliveryNote) {
-      toast.error('Please upload a signed delivery note.');
-      return;
-    }
-    if (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0) {
-      toast.error('Please enter a valid number of days for invoice due date.');
+      toast.warn('Please upload a signed delivery note before submitting.');
       return;
     }
 
@@ -195,7 +188,6 @@ const PendingDeliveries = () => {
       const formData = new FormData();
       formData.append('signed_delivery_note', signedDeliveryNote);
       formData.append('invoice_status', 'Raised');
-      formData.append('due_in_days', parseInt(dueInDays));
       await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -206,7 +198,6 @@ const PendingDeliveries = () => {
         isCompleteModalOpen: false,
         selectedDNForComplete: null,
         signedDeliveryNote: null,
-        dueInDays: '',
       }));
       fetchData();
     } catch (error) {
@@ -586,7 +577,6 @@ const PendingDeliveries = () => {
               isCompleteModalOpen: false,
               selectedDNForComplete: null,
               signedDeliveryNote: null,
-              dueInDays: '',
             }))
           }
           title={`Complete Delivery - ${state.selectedDNForComplete?.dn_number || 'N/A'}`}
@@ -603,17 +593,6 @@ const PendingDeliveries = () => {
                 disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days for Invoice</label>
-              <InputField
-                type="number"
-                value={state.dueInDays}
-                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-                min="1"
-                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
-              />
-            </div>
             <div className="flex justify-end gap-2">
               <Button
                 onClick={() =>
@@ -622,7 +601,6 @@ const PendingDeliveries = () => {
                     isCompleteModalOpen: false,
                     selectedDNForComplete: null,
                     signedDeliveryNote: null,
-                    dueInDays: '',
                   }))
                 }
                 disabled={isSubmitting}
