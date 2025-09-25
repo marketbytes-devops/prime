@@ -3,7 +3,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
-from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemComponentSerializer
+from .serializers import (
+    WorkOrderSerializer,
+    DeliveryNoteSerializer,
+    InitiateDeliverySerializer,
+    DeliveryNoteItemSerializer, 
+    DeliveryNoteItemComponentSerializer
+)
 from django.db.models import Max
 from series.models import NumberSeries
 import logging
@@ -74,21 +80,30 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             logger.info(f"WorkOrder {pk} moved to Manager Approval")
             return Response({'status': 'Work Order moved to Manager Approval'})
         logger.warning(f"WorkOrder {pk} cannot move to approval: missing certificate data")
-        return Response({'error': 'All items must have certificate number and calibration due date'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'All items must have certificate number and calibration due date'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(detail=True, methods=['post'], url_path='approve')
     def approve(self, request, pk=None):
         work_order = self.get_object()
         if work_order.status != 'Manager Approval':
             logger.warning(f"WorkOrder {pk} not in Manager Approval status")
-            return Response({'error': 'Work Order must be in Manager Approval status'}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {'error': 'Work Order must be in Manager Approval status'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             dn_series = NumberSeries.objects.get(series_name='Delivery Note')
         except NumberSeries.DoesNotExist:
             logger.error("Delivery Note series not found")
-            return Response({'error': 'Delivery Note series not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            return Response(
+                {'error': 'Delivery Note series not configured'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
         with transaction.atomic():
             delivery_note = work_order.delivery_notes.first()
             if delivery_note:
@@ -115,12 +130,14 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         invoice_status='pending'
                     )
                 logger.info(f"Created new Delivery Note with temp DN for WorkOrder {pk}")
-            
+
             work_order.manager_approval_status = 'Approved'
             work_order.status = 'Approved'
             work_order.save()
-        
-        return Response({'status': 'Work Order approved and Delivery Note updated/created with temporary DN'})
+
+        return Response(
+            {'status': 'Work Order approved and Delivery Note updated/created with temporary DN'}
+        )
 
     @action(detail=True, methods=['post'], url_path='decline')
     def decline(self, request, pk=None):
@@ -128,7 +145,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         decline_reason = request.data.get('decline_reason')
         if work_order.status != 'Manager Approval' or not decline_reason:
             logger.warning(f"WorkOrder {pk} decline failed: invalid status or no decline reason")
-            return Response({'error': 'Work Order must be in Manager Approval status and decline reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Work Order must be in Manager Approval status and decline reason is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         work_order.manager_approval_status = 'Declined'
         work_order.status = 'Declined'
@@ -143,7 +163,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         work_order = self.get_object()
         if work_order.status != 'Declined':
             logger.warning(f"WorkOrder {pk} not in Declined status for resubmit")
-            return Response({'error': 'Work Order must be in Declined status to resubmit'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Work Order must be in Declined status to resubmit'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         work_order.manager_approval_status = 'Pending'
         work_order.status = 'Manager Approval'
@@ -161,27 +184,45 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         invoice_file = request.FILES.get('invoice_file')
 
         if not delivery_note_item_id:
-            return Response({'error': 'Delivery note item ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Delivery note item ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         if not new_status:
-            return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Invoice status is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             delivery_note_item = DeliveryNoteItem.objects.get(id=delivery_note_item_id)
         except DeliveryNoteItem.DoesNotExist:
-            return Response({'error': 'Delivery note item not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Delivery note item not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         if new_status == 'raised':
             if not due_in_days or int(due_in_days) <= 0:
-                return Response({'error': 'Due in days is required and must be a positive integer for Raised status'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Due in days is required and must be a positive integer for Raised status'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             delivery_note_item.due_in_days = int(due_in_days)
 
         if new_status == 'processed':
             if not received_date:
-                return Response({'error': 'Received date is required for Processed status'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Received date is required for Processed status'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             delivery_note_item.received_date = received_date
 
         if delivery_note_item.invoice_status == 'processed' and new_status != 'processed':
-            return Response({'error': "Cannot change invoice status from 'processed' to another status."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': "Cannot change invoice status from 'processed' to another status."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         previous_invoice_status = delivery_note_item.invoice_status
         delivery_note_item.invoice_status = new_status
@@ -190,7 +231,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         delivery_note_item.save()
 
         if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
-            serializer = self.get_serializer()
+            serializer = WorkOrderSerializer()
             email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
             logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
 
@@ -202,7 +243,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         work_order = self.get_object()
         if work_order.status != 'Approved':
             logger.warning(f"WorkOrder {pk} not in Approved status for initiating delivery")
-            return Response({'error': 'Work Order must be in Approved status to initiate delivery'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Work Order must be in Approved status to initiate delivery'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = InitiateDeliverySerializer(data=request.data)
         if not serializer.is_valid():
@@ -216,7 +260,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             dn_series = NumberSeries.objects.get(series_name='Delivery Note')
         except NumberSeries.DoesNotExist:
             logger.error("Delivery Note series not found")
-            return Response({'error': 'Delivery Note series not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {'error': 'Delivery Note series not found'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         with transaction.atomic():
             work_order_items = {item.id: item.quantity for item in work_order.items.all()}
@@ -322,8 +369,14 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             value=component_data.get('value')
                         )
                     logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items_data)} items")
-            
-        return Response({'status': 'Delivery initiated successfully', 'delivery_type': delivery_type, 'dn_number': dn_number})
+
+        return Response(
+            {
+                'status': 'Delivery initiated successfully',
+                'delivery_type': delivery_type,
+                'dn_number': dn_number
+            }
+        )
 
 class DeliveryNoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryNote.objects.all()
@@ -336,7 +389,10 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         signed_delivery_note = request.FILES.get('signed_delivery_note')
         if not signed_delivery_note:
             logger.warning(f"No signed delivery note provided for Delivery Note {pk}")
-            return Response({'error': 'Signed Delivery Note is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Signed Delivery Note is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         delivery_note.signed_delivery_note = signed_delivery_note
         delivery_note.delivery_status = 'Delivered'
