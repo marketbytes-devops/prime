@@ -10,22 +10,24 @@ const RaisedInvoices = () => {
     workOrders: [],
     purchaseOrders: [],
     deliveryNotes: [],
-    quotations: [],
     technicians: [],
     itemsList: [],
     units: [],
+    quotations: [],
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
     itemsPerPage: 20,
     isWOModalOpen: false,
     selectedWO: null,
-    isPaymentModalOpen: false,
-    selectedWorkOrderId: null,
-    selectedDNItemId: null,
-    paymentReferenceNumber: '',
-    paymentReferenceError: '',
+    isPOModalOpen: false,
+    selectedPO: null,
+    isDNModalOpen: false,
+    selectedDN: null,
+    workOrderDeliveryPairs: [],
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -62,14 +64,15 @@ const RaisedInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, dnRes, quotationsRes, techRes, itemsRes, unitsRes] = await Promise.all([
+      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('delivery-notes/'),
-        apiClient.get('quotations/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
+        apiClient.get('quotations/'),
+        apiClient.get('channels/'),
       ]);
 
       const deliveryNotes = dnRes.data
@@ -84,28 +87,27 @@ const RaisedInvoices = () => {
           })),
         }));
 
-      const workOrderDeliveryPairs = [];
       const workOrders = woRes.data || [];
+
+      const workOrderDeliveryPairs = [];
 
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
-        if (relatedDNs.length > 0) {
-          relatedDNs.forEach((dn) => {
-            dn.items.forEach((dnItem) => {
-              if (dnItem.invoice_status === 'processed') {
-                workOrderDeliveryPairs.push({
-                  id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
-                  workOrder,
-                  deliveryNote: dn,
-                  deliveryNoteItem: dnItem,
-                  workOrderId: workOrder.id,
-                  deliveryNoteId: dn.id,
-                  deliveryNoteItemId: dnItem.id,
-                });
-              }
-            });
+        relatedDNs.forEach((dn) => {
+          dn.items.forEach((dnItem) => {
+            if (dnItem.invoice_status === 'raised') {
+              workOrderDeliveryPairs.push({
+                id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
+                workOrder,
+                deliveryNote: dn,
+                deliveryNoteItem: dnItem,
+                workOrderId: workOrder.id,
+                deliveryNoteId: dn.id,
+                deliveryNoteItemId: dnItem.id,
+              });
+            }
           });
-        }
+        });
       });
 
       setState((prev) => ({
@@ -113,10 +115,11 @@ const RaisedInvoices = () => {
         workOrders,
         purchaseOrders: poRes.data || [],
         deliveryNotes,
-        quotations: quotationsRes.data || [],
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
+        quotations: quotationsRes.data || [],
+        channels: channelsRes.data || [],
         workOrderDeliveryPairs,
       }));
     } catch (error) {
@@ -129,74 +132,64 @@ const RaisedInvoices = () => {
     fetchData();
   }, []);
 
-  const handleViewWO = (pair) => {
-    setState((prev) => ({
-      ...prev,
-      isWOModalOpen: true,
-      selectedWO: pair.workOrder,
-      selectedDNItemId: pair.deliveryNoteItemId,
-    }));
+  const getQuotationDetails = (workOrder) => {
+    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
+    const quotation = po ? state.quotations.find((q) => q.id === po.quotation) : null;
+    return {
+      series_number: quotation?.series_number || 'N/A',
+      company_name: quotation?.company_name || 'N/A',
+      company_address: quotation?.company_address || 'N/A',
+      company_phone: quotation?.company_phone || 'N/A',
+      company_email: quotation?.company_email || 'N/A',
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
+      contact_name: quotation?.point_of_contact_name || 'N/A',
+      contact_email: quotation?.point_of_contact_email || 'N/A',
+      contact_phone: quotation?.point_of_contact_phone || 'N/A',
+      po_series_number: po?.series_number || 'N/A',
+      client_po_number: po?.client_po_number || 'N/A',
+      order_type: po?.order_type || 'N/A',
+      created_at: po?.created_at ? new Date(po.created_at).toLocaleDateString() : 'N/A',
+      po_file: po?.po_file || null,
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
+    };
   };
 
-  const handlePaymentProcess = (pair) => {
-    setState((prev) => ({
-      ...prev,
-      isPaymentModalOpen: true,
-      selectedWorkOrderId: pair.workOrderId,
-      selectedDNItemId: pair.deliveryNoteItemId,
-      paymentReferenceNumber: '',
-      paymentReferenceError: '',
-    }));
-  };
+  const handleViewDocument = (pair, type) => {
+    const workOrder = pair.workOrder;
 
-  const validatePayment = () => {
-    let isValid = true;
-    const errors = { paymentReferenceError: '' };
-    if (!state.paymentReferenceNumber.trim()) {
-      errors.paymentReferenceError = 'Payment Reference Number is required';
-      isValid = false;
-    }
-    setState((prev) => ({ ...prev, paymentReferenceError: errors.paymentReferenceError }));
-    return isValid;
-  };
-
-  const handlePaymentSubmit = async () => {
-    if (!validatePayment()) {
-      return;
-    }
-    try {
-      const formData = new FormData();
-      formData.append('invoice_status', 'processed');
-      formData.append('delivery_note_item_id', state.selectedDNItemId);
-      formData.append('payment_reference_number', state.paymentReferenceNumber);
-
-      await apiClient.patch(
-        `work-orders/${state.selectedWorkOrderId}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      toast.success('Payment processed successfully.');
+    if (type === 'wo') {
       setState((prev) => ({
         ...prev,
-        isPaymentModalOpen: false,
-        selectedWorkOrderId: null,
-        selectedDNItemId: null,
-        paymentReferenceNumber: '',
-        paymentReferenceError: '',
+        isWOModalOpen: true,
+        selectedWO: workOrder,
       }));
-      await fetchData();
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      toast.error('Failed to process payment.');
-    }
-  };
-
-  const viewInvoice = (pair) => {
-    if (pair.deliveryNoteItem?.invoice_file) {
-      window.open(pair.deliveryNoteItem.invoice_file, '_blank');
-    } else {
-      toast.error('No invoice file available.');
+    } else if (type === 'po') {
+      const poId = workOrder.purchase_order;
+      const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
+      setState((prev) => ({
+        ...prev,
+        isPOModalOpen: true,
+        selectedPO: purchaseOrder || null,
+      }));
+      if (!purchaseOrder) {
+        toast.error('Purchase order not found.');
+      }
+    } else if (type === 'dn') {
+      if (!pair.deliveryNote) {
+        toast.error('Delivery note not found.');
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        isDNModalOpen: true,
+        selectedDN: pair.deliveryNote,
+      }));
+    } else if (type === 'invoice') {
+      if (pair.deliveryNoteItem?.invoice_file) {
+        window.open(pair.deliveryNoteItem.invoice_file, '_blank');
+      } else {
+        toast.error('No invoice file available.');
+      }
     }
   };
 
@@ -206,15 +199,6 @@ const RaisedInvoices = () => {
     if (technicianIds.length > 1) return 'Multiple';
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
     return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
-  };
-
-  const getQuotationDetails = (workOrder) => {
-    const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
-    const quotation = po ? state.quotations.find((q) => q.id === po.quotation) : null;
-    return {
-      company_name: quotation?.company_name || 'N/A',
-      series_number: quotation?.series_number || 'N/A',
-    };
   };
 
   const getWONumberByDN = (dn) => {
@@ -237,7 +221,7 @@ const RaisedInvoices = () => {
       getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getItemName(pair.deliveryNoteItem.item).toLowerCase().includes(state.searchTerm.toLowerCase())
+      (pair.deliveryNoteItem && getItemName(pair.deliveryNoteItem.item).toLowerCase().includes(state.searchTerm.toLowerCase()))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -273,11 +257,11 @@ const RaisedInvoices = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Processed Invoices</h1>
+      <h1 className="text-2xl font-bold mb-4">Raised Invoices</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
-        <div className="mb-6 flex gap-4 items-center">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search Invoices</label>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
               placeholder="Search by WO Number, Quotation, DN Number, Company Name, or Item..."
@@ -286,7 +270,7 @@ const RaisedInvoices = () => {
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
           </div>
-          <div className="w-40">
+          <div className="flex-1 min-w-[150px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={state.sortBy}
@@ -309,15 +293,15 @@ const RaisedInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentPairs.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="border p-2 text-center text-gray-500">
-                    No processed invoices found.
+                    No raised invoices found.
                   </td>
                 </tr>
               ) : (
@@ -328,37 +312,62 @@ const RaisedInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
-                    <td className="border p-2 whitespace-nowrap">{getItemName(pair.deliveryNoteItem.item)}</td>
-                    <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
+                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem ? getItemName(pair.deliveryNoteItem.item) : 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {pair.workOrder.created_at
+                        ? new Date(pair.workOrder.created_at).toLocaleDateString()
+                        : 'N/A'}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
-                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem.invoice_status}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Button
-                          onClick={() => handlePaymentProcess(pair)}
-                          disabled={!hasPermission('raised_invoices', 'edit')}
+                          onClick={() => handleViewDocument(pair, 'po')}
+                          disabled={!hasPermission('raised_invoices', 'view')}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            hasPermission('raised_invoices', 'edit')
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            !hasPermission('raised_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
-                          Payment Process
+                          View PO
                         </Button>
                         <Button
-                          onClick={() => viewInvoice(pair)}
-                          className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm whitespace-nowrap"
-                        >
-                          View Invoice
-                        </Button>
-                        <Button
-                          onClick={() => handleViewWO(pair)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm whitespace-nowrap"
+                          onClick={() => handleViewDocument(pair, 'wo')}
+                          disabled={!hasPermission('raised_invoices', 'view')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            !hasPermission('raised_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
                         >
                           View WO
                         </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'dn')}
+                          disabled={!hasPermission('raised_invoices', 'view')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            !hasPermission('raised_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                        >
+                          View DN
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={!hasPermission('raised_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            !hasPermission('raised_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          }`}
+                        >
+                          View Invoice
+                        </Button>
                       </div>
                     </td>
+                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem?.invoice_status || 'Raised'}</td>
                   </tr>
                 ))
               )}
@@ -366,11 +375,15 @@ const RaisedInvoices = () => {
           </table>
         </div>
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-4 w-fit">
+          <div className="flex justify-center gap-2 mt-4">
             <Button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              className={`px-3 py-1 rounded-md text-sm ${
+                state.currentPage === 1
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               Prev
             </Button>
@@ -378,7 +391,7 @@ const RaisedInvoices = () => {
               <Button
                 key={page}
                 onClick={() => handlePageChange(page)}
-                className={`px-3 py-1 rounded-md min-w-fit ${
+                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
                   state.currentPage === page
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -390,7 +403,11 @@ const RaisedInvoices = () => {
             <Button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
+              className={`px-3 py-1 rounded-md text-sm ${
+                state.currentPage === totalPages
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               Next
             </Button>
@@ -399,50 +416,126 @@ const RaisedInvoices = () => {
       </div>
 
       <Modal
-        isOpen={state.isWOModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null, selectedDNItemId: null }))}
-        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
+        isOpen={state.isPOModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
+        title={`Purchase Order Details - ${state.selectedPO?.series_number || 'N/A'}`}
       >
-        {state.selectedWO ? (
+        {state.selectedPO && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</strong> {state.selectedWO.status || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_status || 'Processed'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Manager Approval Status:</strong> {state.selectedWO.manager_approval_status || 'N/A'}</p>
-              {state.selectedWO.manager_approval_status === 'Declined' && (
-                <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Decline Reason:</strong> {state.selectedWO.decline_reason || 'N/A'}</p>
-              )}
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Created At:</strong> {state.selectedWO.created_at ? new Date(state.selectedWO.created_at).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Received Date:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.received_date ? new Date(state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId).deliveryNoteItem.received_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Onsite/Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong className="text-sm font-medium text-gray-700 whitespace-nowrap">Invoice File:</strong> {state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_file ? (
-                <a
-                  href={state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === state.selectedWO.id && pair.deliveryNoteItemId === state.selectedDNItemId)?.deliveryNoteItem.invoice_file}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  View Invoice
-                </a>
-              ) : 'Not Uploaded'}</p>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
+              <p><strong>Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
+              <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
+              <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
+              <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
+              <p>
+                <strong>PO File:</strong>{' '}
+                {state.selectedPO.po_file ? (
+                  <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).assigned_sales_person}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
+              {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedPO.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.itemsList.find((i) => i.id === item.item)?.name || item.item_name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === item.unit)?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            ${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={state.isWOModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
+        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
+      >
+        {state.selectedWO && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
+              <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
+              <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
+              <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
               {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-100">
+                      <tr className="bg-gray-200">
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
@@ -454,29 +547,40 @@ const RaisedInvoices = () => {
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
-                        <tr key={item.id} className="border hover:bg-gray-50">
-                          <td className="border p-2 whitespace-nowrap">{state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{state.technicians.find((t) => t.id === item.assigned_to)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.itemsList.find((i) => i.id === item.item)?.name || 'Not Provided'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'Not Provided'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === item.unit)?.name || 'Not Provided'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.range || 'Not Provided'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'Not Provided'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'Not Provided'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.calibration_date
+                              ? new Date(item.calibration_date).toLocaleDateString()
+                              : 'Not Provided'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.calibration_due_date
+                              ? new Date(item.calibration_due_date).toLocaleDateString()
+                              : 'Not Provided'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'Not Provided'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
                               <a
                                 href={item.certificate_file}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800"
+                                className="text-indigo-600 hover:underline"
                               >
                                 View Certificate
                               </a>
                             ) : (
-                              'N/A'
+                              'Not Provided'
                             )}
                           </td>
                         </tr>
@@ -489,68 +593,108 @@ const RaisedInvoices = () => {
               )}
             </div>
           </div>
-        ) : (
-          <p className="text-gray-500">No work order selected.</p>
         )}
       </Modal>
 
       <Modal
-        isOpen={state.isPaymentModalOpen}
-        onClose={() => setState((prev) => ({
-          ...prev,
-          isPaymentModalOpen: false,
-          selectedWorkOrderId: null,
-          selectedDNItemId: null,
-          paymentReferenceNumber: '',
-          paymentReferenceError: '',
-        }))}
-        title="Process Payment"
+        isOpen={state.isDNModalOpen}
+        onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
+        title={`Delivery Note Details - ${state.selectedDN?.dn_number || 'N/A'}`}
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Reference Number</label>
-            <InputField
-              type="text"
-              placeholder="Enter payment reference number"
-              value={state.paymentReferenceNumber}
-              onChange={(e) => setState((prev) => ({
-                ...prev,
-                paymentReferenceNumber: e.target.value,
-                paymentReferenceError: '',
-              }))}
-              className="w-full p-2 border rounded focus:outline-indigo-500"
-            />
-            {state.paymentReferenceError && (
-              <p className="text-red-500 text-sm mt-1">{state.paymentReferenceError}</p>
-            )}
+        {state.selectedDN && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).channel}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_phone}</p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
+              <p><strong>DN Number:</strong> {state.selectedDN.dn_number || 'N/A'}</p>
+              <p><strong>WO Number:</strong> {getWONumberByDN(state.selectedDN)}</p>
+              <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
+              <p>
+                <strong>Created At:</strong>{' '}
+                {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}
+              </p>
+              <p>
+                <strong>Signed Delivery Note:</strong>{' '}
+                {state.selectedDN.signed_delivery_note ? (
+                  <a href={state.selectedDN.signed_delivery_note} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    View File
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">Items</h3>
+              {state.selectedDN.items && state.selectedDN.items.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200">
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Delivered Quantity</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Components</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.selectedDN.items.map((item) => (
+                        <tr key={item.id} className="border">
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {state.units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap bg-gray-100">
+                            {item.components && item.components.length > 0 ? (
+                              <div className="space-y-2">
+                                {item.components.map((comp, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-2 p-2 border border-gray-300 rounded-md bg-white"
+                                  >
+                                    <span className="font-medium text-gray-700">{comp.component || 'N/A'} :</span>
+                                    <span className="text-gray-600">{comp.value || 'N/A'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              'No components'
+                            )}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">{item.invoice_status || 'Pending'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No items available.</p>
+              )}
+            </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => setState((prev) => ({
-                ...prev,
-                isPaymentModalOpen: false,
-                selectedWorkOrderId: null,
-                selectedDNItemId: null,
-                paymentReferenceNumber: '',
-                paymentReferenceError: '',
-              }))}
-              className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handlePaymentSubmit}
-              disabled={!hasPermission('raised_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md ${
-                hasPermission('raised_invoices', 'edit')
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Submit
-            </Button>
-          </div>
-        </div>
+        )}
       </Modal>
     </div>
   );
