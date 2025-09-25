@@ -608,7 +608,6 @@ const ViewQuotation = () => {
     return hasNilOrder;
   };
 
-
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">View Quotations</h1>
@@ -796,36 +795,41 @@ const ViewQuotation = () => {
                         >
                           Print
                         </Button>
-                        {hasBothOrderTypes(quotation) ||
+                          {hasBothOrderTypes(quotation) ||
                           isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
-                          <Button
-                            onClick={() => handleUploadPO(quotation.id)}
-                            disabled={!shouldEnableUploadPO(quotation)}
-                            className={`px-3 py-1 rounded-md text-sm ${shouldEnableUploadPO(quotation)
-                                ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              }`}
-                          >
-                            Upload PO
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => handleConvertToPO(quotation.id)}
-                            disabled={
-                              quotation.quotation_status !== "Approved" ||
-                              isPoComplete(quotation)
-                            }
-                            className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved" &&
+                            <Button
+                              onClick={() => shouldEnableUploadPO(quotation) && handleUploadPO(quotation.id)}
+                              disabled={!shouldEnableUploadPO(quotation)}
+                              className="px-3 py-1 rounded-md text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
+                              style={shouldEnableUploadPO(quotation) ? {
+                                backgroundColor: '#d97706',
+                                color: 'white',
+                                cursor: 'pointer'
+                              } : {
+                                cursor: 'not-allowed'
+                              }}
+                            >
+                              Upload PO
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => handleConvertToPO(quotation.id)}
+                              disabled={
+                                quotation.quotation_status !== "Approved" ||
+                                isPoComplete(quotation)
+                              }
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                quotation.quotation_status === "Approved" &&
                                 !isPoComplete(quotation)
-                                ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
                               }`}
-                          >
-                            Convert to PO
-                          </Button>
-                        )}
+                            >
+                              Convert to PO
+                            </Button>
+                          )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           disabled={!hasPermission("quotation", "delete")}
