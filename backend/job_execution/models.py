@@ -4,11 +4,10 @@ from item.models import Item
 from unit.models import Unit
 from team.models import Technician
 from series.models import NumberSeries
-from models import DeliveryNote
 
 class WorkOrder(models.Model):
     invoice_delivery_note = models.ForeignKey(
-        DeliveryNote,
+        'DeliveryNote',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
