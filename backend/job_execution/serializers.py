@@ -95,16 +95,8 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryNote
         fields = [
-            "id",
-            "dn_number",
-            "work_order",
-            "work_order_id",
-            "work_order_number",
-            "signed_delivery_note",
-            "delivery_status",
-            "created_at",
-            "items",
-            "series",
+            'id', 'work_order', 'dn_number', 'signed_delivery_note', 'delivery_status',
+            'series', 'created_at', 'invoice_status', 'invoice_file', 'due_in_days', 'received_date'
         ]
 
     def update(self, instance, validated_data):
@@ -137,6 +129,19 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
                         value=component_data.get("value"),
                     )
         return instance
+    
+    def validate(self, data):
+        invoice_status = data.get('invoice_status', self.instance.invoice_status if self.instance else None)
+        if invoice_status == 'raised':
+            if self.instance and self.instance.invoice_status == 'raised':
+                raise serializers.ValidationError("Cannot set invoice status to 'raised' again.")
+            if not data.get('due_in_days'):
+                raise serializers.ValidationError("due_in_days is required when invoice_status is 'raised'.")
+            if data.get('due_in_days') <= 0:
+                raise serializers.ValidationError("due_in_days must be a positive integer.")
+        if invoice_status == 'processed' and not data.get('received_date'):
+            raise serializers.ValidationError("received_date is required when invoice_status is 'processed'.")
+        return data
 
 class InitiateDeliverySerializer(serializers.Serializer):
     delivery_type = serializers.ChoiceField(choices=["Single", "Multiple"])

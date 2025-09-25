@@ -73,18 +73,40 @@ class WorkOrderItem(models.Model):
         return f"{self.item} - {self.work_order}"
 
 class DeliveryNote(models.Model):
-    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='delivery_notes')
+    work_order = models.ForeignKey('WorkOrder', on_delete=models.CASCADE, related_name='delivery_notes')
     dn_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     signed_delivery_note = models.FileField(upload_to='delivery_notes/', null=True, blank=True)
     delivery_status = models.CharField(
         max_length=20,
-        choices=[('Delivery Pending', 'Delivery Pending'), ('Delivered', 'Delivered')],
+        choices=[
+            ('Delivery Pending', 'Delivery Pending'),
+            ('Delivered', 'Delivered')
+        ],
+        default='Delivery Pending'
     )
     series = models.ForeignKey(NumberSeries, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    invoice_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('raised', 'Raised'),
+            ('processed', 'Processed')
+        ],
+        default='pending',
+        null=True, blank=True
+    )
+    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
+    due_in_days = models.PositiveIntegerField(null=True, blank=True)
+    received_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Delivery Note'
+        verbose_name_plural = 'Delivery Notes'
 
     def __str__(self):
-        return f"DN {self.dn_number} - {self.work_order.wo_number}"
+        return self.dn_number or f'Delivery Note {self.id}'
 
 class DeliveryNoteItem(models.Model):
     delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')
