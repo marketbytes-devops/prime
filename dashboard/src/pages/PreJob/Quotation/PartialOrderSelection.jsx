@@ -9,7 +9,7 @@ const PartialOrderSelection = () => {
   const { quotationData } = location.state || {};
   const [state, setState] = useState({
     numberOfPartialOrders: "",
-    splitMode: "items",
+    splitMode: "items", // "items" or "quantity"
     selectedItemIds: [],
     savedItems: [],
     createdPartialOrders: [],
@@ -17,8 +17,10 @@ const PartialOrderSelection = () => {
     units: [],
     itemsList: [],
     isAllPartialsCreated: false,
+    // Quantity-based splitting state
     quantityAssignments: {}, // { itemId: { remainingQuantity: number, assignments: [{ quantity: number, partialOrderIndex: number }] } }
     currentPartialIndex: 0,
+    // Track if the workflow is properly completed
     isWorkflowCompleted: false,
   });
 
@@ -40,6 +42,8 @@ const PartialOrderSelection = () => {
           unit: item.unit || null,
           unit_price: item.unit_price || 0,
         }));
+
+        // Initialize quantity assignments for each item
         const initialQuantityAssignments = {};
         initialSavedItems.forEach(item => {
           initialQuantityAssignments[item.id] = {
@@ -68,6 +72,8 @@ const PartialOrderSelection = () => {
       toast.error("Number of partial orders must be at least 1.");
       return;
     }
+
+    // Reset all state when changing number of partial orders
     const initialQuantityAssignments = {};
     state.savedItems.forEach(item => {
       initialQuantityAssignments[item.id] = {
@@ -89,6 +95,7 @@ const PartialOrderSelection = () => {
   };
 
   const handleSplitModeChange = (mode) => {
+    // Reset state when changing split mode
     const initialQuantityAssignments = {};
     state.savedItems.forEach(item => {
       initialQuantityAssignments[item.id] = {
@@ -109,6 +116,7 @@ const PartialOrderSelection = () => {
     }));
   };
 
+  // Items-based selection (existing functionality)
   const handleItemSelection = (itemId) => {
     if (state.splitMode !== "items") return;
 
@@ -130,6 +138,7 @@ const PartialOrderSelection = () => {
     });
   };
 
+  // Quantity-based assignment
   const handleQuantityAssignment = (itemId, quantity) => {
     const assignedQuantity = quantity === "" ? 0 : parseInt(quantity, 10);
     const item = state.savedItems.find(item => item.id === itemId);
@@ -147,6 +156,7 @@ const PartialOrderSelection = () => {
     setState(prev => {
       const newQuantityAssignments = { ...prev.quantityAssignments };
 
+      // Remove existing assignment for current partial order if any
       const existingAssignmentIndex = newQuantityAssignments[itemId].assignments
         .findIndex(a => a.partialOrderIndex === prev.currentPartialIndex);
 
@@ -156,6 +166,7 @@ const PartialOrderSelection = () => {
         newQuantityAssignments[itemId].assignments.splice(existingAssignmentIndex, 1);
       }
 
+      // Add new assignment if quantity > 0
       if (assignedQuantity > 0) {
         newQuantityAssignments[itemId].remainingQuantity -= assignedQuantity;
         newQuantityAssignments[itemId].assignments.push({
@@ -192,6 +203,7 @@ const PartialOrderSelection = () => {
       if (remainingPartialOrders === 1 && selectedItemIds.length !== remainingItemsCount) return true;
       if (selectedItemIds.some(id => usedItemIds.includes(id))) return true;
     } else if (splitMode === "quantity") {
+      // Check if any item has assignments for current partial order
       const hasAssignments = Object.values(state.quantityAssignments).some(assignment =>
         assignment.assignments.some(a => a.partialOrderIndex === state.currentPartialIndex)
       );
@@ -205,6 +217,7 @@ const PartialOrderSelection = () => {
     if (state.splitMode === "items") {
       selectedItems = state.savedItems.filter(item => state.selectedItemIds.includes(item.id));
     } else if (state.splitMode === "quantity") {
+      // Create items based on quantity assignments for current partial order
       selectedItems = [];
       Object.entries(state.quantityAssignments).forEach(([itemId, assignment]) => {
         const partialAssignment = assignment.assignments.find(a => a.partialOrderIndex === state.currentPartialIndex);
@@ -259,13 +272,14 @@ const PartialOrderSelection = () => {
           newUsedItemIds = [...prev.usedItemIds, ...prev.selectedItemIds];
         }
 
+        // Check if all partials are created
         let isAllPartialsCreated = false;
         if (prev.splitMode === "items") {
           isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
-            newUsedItemIds.length === prev.savedItems.length;
+                                newUsedItemIds.length === prev.savedItems.length;
         } else if (prev.splitMode === "quantity") {
           isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
-            Object.values(prev.quantityAssignments).every(assignment => assignment.remainingQuantity === 0);
+                                Object.values(prev.quantityAssignments).every(assignment => assignment.remainingQuantity === 0);
         }
 
         return {
@@ -275,6 +289,7 @@ const PartialOrderSelection = () => {
           selectedItemIds: [],
           currentPartialIndex: prev.currentPartialIndex + 1,
           isAllPartialsCreated,
+          // Don't mark as completed until finish is called
           isWorkflowCompleted: false,
         };
       });
@@ -299,12 +314,14 @@ const PartialOrderSelection = () => {
         if (prev.splitMode === "items") {
           newUsedItemIds = prev.usedItemIds.filter(id => !orderToCancel.itemIds.includes(id));
         } else if (prev.splitMode === "quantity") {
+          // Restore quantities for cancelled partial order
           const newQuantityAssignments = { ...prev.quantityAssignments };
           Object.entries(newQuantityAssignments).forEach(([itemId, assignment]) => {
             const cancelledAssignment = assignment.assignments.find(a => a.partialOrderIndex === index);
             if (cancelledAssignment) {
               newQuantityAssignments[itemId].remainingQuantity += cancelledAssignment.quantity;
               newQuantityAssignments[itemId].assignments = assignment.assignments.filter(a => a.partialOrderIndex !== index);
+              // Adjust indices of remaining assignments
               newQuantityAssignments[itemId].assignments = assignment.assignments.map(a =>
                 a.partialOrderIndex > index ? { ...a, partialOrderIndex: a.partialOrderIndex - 1 } : a
               );
@@ -322,7 +339,7 @@ const PartialOrderSelection = () => {
         }
 
         const isAllPartialsCreated = newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
-          newUsedItemIds.length === prev.savedItems.length;
+                                    newUsedItemIds.length === prev.savedItems.length;
 
         return {
           ...prev,
@@ -342,11 +359,12 @@ const PartialOrderSelection = () => {
   };
 
   const handleCancel = async () => {
+    // Delete all created partial orders from backend
     try {
       for (const order of state.createdPartialOrders) {
         await apiClient.delete(`/purchase-orders/${order.id}/`);
       }
-
+      
       const initialQuantityAssignments = {};
       state.savedItems.forEach(item => {
         initialQuantityAssignments[item.id] = {
@@ -389,7 +407,10 @@ const PartialOrderSelection = () => {
         return;
       }
     }
+
+    // Mark workflow as completed and update quotation status
     try {
+      // Update the quotation to mark partial order workflow as completed
       await apiClient.patch(`/quotations/${quotationData.id}/`, {
         partial_order_workflow_completed: true
       });
@@ -400,12 +421,12 @@ const PartialOrderSelection = () => {
       }));
 
       toast.success("Partial order workflow completed successfully!");
-      navigate("/view-quotation", {
-        state: {
-          quotationId: quotationData.id,
+      navigate("/view-quotation", { 
+        state: { 
+          quotationId: quotationData.id, 
           partialOrders: state.createdPartialOrders,
-          workflowCompleted: true
-        }
+          workflowCompleted: true 
+        } 
       });
     } catch (error) {
       console.error("Error completing workflow:", error);
@@ -414,13 +435,15 @@ const PartialOrderSelection = () => {
   };
 
   const handlePrevious = async () => {
+    // Show confirmation dialog if there are unsaved changes
     if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
       const confirmLeave = window.confirm(
         "You have created partial orders but haven't completed the workflow. " +
         "If you leave now, these partial orders will be deleted. Do you want to continue?"
       );
-
+      
       if (confirmLeave) {
+        // Delete all created partial orders
         try {
           for (const order of state.createdPartialOrders) {
             await apiClient.delete(`/purchase-orders/${order.id}/`);
@@ -442,18 +465,18 @@ const PartialOrderSelection = () => {
 
   return (
     <div className="container mx-auto p-4 bg-transparent min-h-screen">
-      <button
-        onClick={handlePrevious}
-        className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
-      >
-        Go Back
-      </button>
-      <div className="flex justify-start items-center mb-4 mt-4">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
+        <button
+          onClick={handlePrevious}
+          className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
+        >
+          Previous
+        </button>
       </div>
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Number of Partial Orders</label>
+          <label className="block text-sm font-medium text-gray-700">Number of Partial Orders</label>
           <input
             type="number"
             value={state.numberOfPartialOrders}
@@ -552,7 +575,7 @@ const PartialOrderSelection = () => {
                         {state.units.find(u => u.id === item.unit)?.name || "N/A"}
                       </td>
                       <td className="px-4 py-3 text-sm text-black">
-                        SAR {item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
+                        ${item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
                       </td>
                     </tr>
                   ))}
@@ -597,10 +620,10 @@ const PartialOrderSelection = () => {
                             {state.units.find(u => u.id === item.unit)?.name || "N/A"}
                           </td>
                           <td className="px-4 py-3 text-sm text-black">
-                            SAR {item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
+                            ${item.unit_price != null ? Number(item.unit_price).toFixed(2) : "0.00"}
                           </td>
                           <td className="px-4 py-3 text-sm text-black">
-                            SAR {item.total_price != null ? Number(item.total_price).toFixed(2) : "0.00"}
+                            ${item.total_price != null ? Number(item.total_price).toFixed(2) : "0.00"}
                           </td>
                         </tr>
                       ))}
@@ -620,20 +643,22 @@ const PartialOrderSelection = () => {
           </button>
           <button
             onClick={handleGeneratePartialOrder}
-            className={`px-3 py-2 rounded transition-colors duration-200 flex items-center ${isGenerateDisabled()
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-green-500 text-white hover:bg-green-600"
-              }`}
+            className={`px-3 py-2 rounded transition-colors duration-200 flex items-center ${
+              isGenerateDisabled()
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
             disabled={isGenerateDisabled()}
           >
             Generate Partial
           </button>
           <button
             onClick={handleFinish}
-            className={`px-3 py-2 rounded transition-colors duration-200 ${state.isAllPartialsCreated
-              ? "bg-green-500 text-white hover:bg-green-600"
-              : "bg-gray-200 text-black hover:bg-gray-300"
-              }`}
+            className={`px-3 py-2 rounded transition-colors duration-200 ${
+              state.isAllPartialsCreated
+                ? "bg-green-500 text-white hover:bg-green-600"
+                : "bg-gray-200 text-black hover:bg-gray-300"
+            }`}
           >
             Finish
           </button>
