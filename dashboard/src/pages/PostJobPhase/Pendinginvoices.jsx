@@ -790,7 +790,7 @@ const PendingInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th>
+                {/* <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th> */}
               </tr>
             </thead>
             <tbody>
@@ -887,7 +887,7 @@ const PendingInvoices = () => {
                         'N/A'
                       )}
                     </td>
-                    <td className="border p-2 whitespace-nowrap">
+                    {/* <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {hasPermission('pending_invoices', 'edit') && isDNReadyForUpload(pair.deliveryNote) && (
                           <Button
@@ -903,7 +903,7 @@ const PendingInvoices = () => {
                           </Button>
                         )}
                       </div>
-                    </td>
+                    </td> */}
                   </tr>
                 ))
               )}
