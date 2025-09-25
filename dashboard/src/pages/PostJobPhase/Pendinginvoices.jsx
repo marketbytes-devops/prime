@@ -16,7 +16,7 @@ const PendingInvoices = () => {
     itemsList: [],
     units: [],
     quotations: [],
-    channels: [],
+    channels: [], // Added channels to state
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -53,6 +53,7 @@ const PendingInvoices = () => {
     woUploadErrors: { certificateFile: '' },
     workOrderDeliveryPairs: [],
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -98,8 +99,9 @@ const PendingInvoices = () => {
         apiClient.get('items/'),
         apiClient.get('units/'),
         apiClient.get('quotations/'),
-        apiClient.get('channels/'),
+        apiClient.get('channels/'), // Added fetch for channels
       ]);
+
       const deliveryNotes = dnRes.data
         .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
         .map((dn) => ({
@@ -110,15 +112,17 @@ const PendingInvoices = () => {
             components: item.components || [],
           })),
         }));
+
       const workOrders = woRes.data.map(wo => ({
         ...wo,
         invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
       })) || [];
+
       const workOrderDeliveryPairs = [];
-     
+      
       workOrders.forEach(workOrder => {
         const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
-       
+        
         if (relatedDNs.length > 0) {
           relatedDNs.forEach(dn => {
             workOrderDeliveryPairs.push({
@@ -139,6 +143,7 @@ const PendingInvoices = () => {
           });
         }
       });
+
       setState((prev) => ({
         ...prev,
         workOrders: workOrders,
@@ -185,7 +190,7 @@ const PendingInvoices = () => {
 
   const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
-   
+    
     if (type === 'wo') {
       setState((prev) => ({
         ...prev,
@@ -430,16 +435,19 @@ const PendingInvoices = () => {
       } else if (state.newStatus === 'processed' && state.receivedDate) {
         payload.received_date = state.receivedDate;
       }
-     
+      
       if (state.selectedDNId) {
         payload.delivery_note_id = state.selectedDNId;
       }
+
       await apiClient.post(`work-orders/${state.selectedWorkOrderId}/update-invoice-status/`, payload);
+
       const formData = new FormData();
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
       await apiClient.patch(`/work-orders/${state.selectedWOForInvoiceUpload.id}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+
       toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
         ...prev,
@@ -494,12 +502,12 @@ const PendingInvoices = () => {
       invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
     }));
   };
-
+  
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
     const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
     const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
- 
+  
     if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
         'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
@@ -546,10 +554,11 @@ const PendingInvoices = () => {
       } else if (newStatus === 'processed' && receivedDate) {
         payload.received_date = receivedDate;
       }
-     
+      
       if (deliveryNoteId) {
         payload.delivery_note_id = deliveryNoteId;
       }
+
       await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
       toast.success('Work order invoice status updated successfully.');
       setState((prev) => ({
@@ -780,7 +789,12 @@ const PendingInvoices = () => {
                       <select
                         value={pair.workOrder.invoice_status || 'pending'}
                         onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                        className="w-full p-2 border rounded focus:outline-indigo-500 text-sm"
+                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
+                        className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
+                          isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : ''
+                        }`}
                       >
                         <option value="pending">Pending</option>
                         <option value="raised">Raised</option>
@@ -836,6 +850,7 @@ const PendingInvoices = () => {
           </div>
         )}
       </div>
+
       <Modal
         isOpen={state.isPOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isPOModalOpen: false, selectedPO: null }))}
@@ -918,6 +933,7 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isWOModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isWOModalOpen: false, selectedWO: null }))}
@@ -1026,6 +1042,7 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
@@ -1124,6 +1141,7 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+
       <Modal
         isOpen={state.isUploadPOModalOpen}
         onClose={() => setState((prev) => ({
@@ -1248,6 +1266,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadWOModalOpen}
         onClose={() => setState((prev) => ({
@@ -1310,6 +1329,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadDNModalOpen}
         onClose={() => setState((prev) => ({
@@ -1372,6 +1392,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isUploadInvoiceModalOpen}
         onClose={() => setState((prev) => ({
@@ -1453,6 +1474,7 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
+
       <Modal
         isOpen={state.isStatusModalOpen}
         onClose={() => setState((prev) => ({
