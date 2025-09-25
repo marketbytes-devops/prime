@@ -5,7 +5,6 @@ import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import { useNavigate } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid';
 
 const PendingInvoices = () => {
   const navigate = useNavigate();
