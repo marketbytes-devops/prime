@@ -136,7 +136,7 @@ const PendingInvoices = () => {
         } else {
           workOrderDeliveryPairs.push({
             id: `${workOrder.id}-no-dn`,
-            workOrder: workOrder,
+            workOrder,
             deliveryNote: null,
             workOrderId: workOrder.id,
             deliveryNoteId: null,
@@ -616,7 +616,11 @@ const PendingInvoices = () => {
   };
 
   const canUploadInvoice = (pair) => {
-    return isPOComplete(pair.workOrder) && isDUTComplete(pair.workOrder) && isDNComplete(pair.deliveryNote);
+    return (
+      isPOComplete(pair.workOrder) &&
+      isDUTComplete(pair.workOrder) &&
+      isDNComplete(pair.deliveryNote)
+    );
   };
 
   const getAssignedTechnicians = (items) => {
@@ -636,19 +640,12 @@ const PendingInvoices = () => {
     return deliveryNote?.dn_number || 'N/A';
   };
 
-  const filteredPairs = state.workOrderDeliveryPairs
-    .filter((pair) =>
-      (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (state.sortBy === 'created_at') {
-        return new Date(b.workOrder.created_at) - new Date(a.workOrder.created_at);
-      }
-      return 0;
-    });
+  const filteredPairs = state.workOrderDeliveryPairs.filter((pair) =>
+    (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+    getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+    getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+    getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase())
+  );
 
   const totalPages = Math.ceil(filteredPairs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
