@@ -608,6 +608,7 @@ const ViewQuotation = () => {
     return hasNilOrder;
   };
 
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">View Quotations</h1>
@@ -800,16 +801,13 @@ const ViewQuotation = () => {
                             (po) => po.order_type === "partial"
                           ) ? (
                             <Button
-                              onClick={() => shouldEnableUploadPO(quotation) && handleUploadPO(quotation.id)}
+                              onClick={() => handleUploadPO(quotation.id)}
                               disabled={!shouldEnableUploadPO(quotation)}
-                              className="px-3 py-1 rounded-md text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
-                              style={shouldEnableUploadPO(quotation) ? {
-                                backgroundColor: '#d97706',
-                                color: 'white',
-                                cursor: 'pointer'
-                              } : {
-                                cursor: 'not-allowed'
-                              }}
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                shouldEnableUploadPO(quotation)
+                                  ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              }`}
                             >
                               Upload PO
                             </Button>
