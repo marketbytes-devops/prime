@@ -301,12 +301,21 @@ const ViewQuotation = () => {
     try {
       for (const poId of Object.keys(state.poUploads)) {
         const { clientPoNumber, poFile, poStatus } = state.poUploads[poId];
-        const formData = new FormData();
-        formData.append("client_po_number", poStatus === "available" ? clientPoNumber : "");
-        formData.append("po_file", poStatus === "available" && poFile ? poFile : "");
-        await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        if (poStatus === "available") {
+          const formData = new FormData();
+          formData.append("client_po_number", clientPoNumber);
+          formData.append("po_file", poFile);
+          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } else if (poStatus === "not_available") {
+          const formData = new FormData();
+          formData.append("client_po_number", "");
+          formData.append("po_file", "");
+          await apiClient.patch(`/purchase-orders/${poId}/`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        }
       }
       await fetchQuotations();
       setState((prev) => ({
@@ -503,13 +512,19 @@ const ViewQuotation = () => {
     if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
       return false;
     }
-    return quotation.purchase_orders.every((po) => {
-      return (
-        (po.order_type === "full" && po.client_po_number && po.po_file) ||
-        (po.order_type === "partial" &&
-          ((po.client_po_number && po.po_file) || (!po.client_po_number && !po.po_file)))
-      );
-    });
+    const hasFullOrder = quotation.purchase_orders.some(
+      (po) => po.order_type === "full" && (po.client_po_number || po.po_file)
+    );
+    if (hasFullOrder) {
+      return true;
+    }
+    const partialOrders = quotation.purchase_orders.filter(
+      (po) => po.order_type === "partial"
+    );
+    if (partialOrders.length === 0) {
+      return false;
+    }
+    return partialOrders.every((po) => po.client_po_number || po.po_file);
   };
 
   const filteredQuotations = state.quotations
@@ -571,6 +586,28 @@ const ViewQuotation = () => {
     );
     return hasFull && hasPartial;
   };
+
+  const shouldEnableUploadPO = (quotation) => {
+    if (!quotation.purchase_orders || quotation.purchase_orders.length === 0) {
+      return false;
+    }
+
+    const partialOrders = quotation.purchase_orders.filter(
+      (po) => po.order_type === "partial"
+    );
+
+    if (partialOrders.length === 0) {
+      return false;
+    }
+
+    // Check if at least one partial order has "Nil" status (missing both client_po_number and po_file)
+    const hasNilOrder = partialOrders.some(
+      (po) => !po.client_po_number && !po.po_file
+    );
+
+    return hasNilOrder;
+  };
+
 
   return (
     <div className="mx-auto p-4">
@@ -695,8 +732,8 @@ const ViewQuotation = () => {
                     <td className="border p-2 whitespace-nowrap">
                       {quotation.next_followup_date
                         ? new Date(
-                            quotation.next_followup_date
-                          ).toLocaleDateString()
+                          quotation.next_followup_date
+                        ).toLocaleDateString()
                         : "N/A"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -716,11 +753,10 @@ const ViewQuotation = () => {
                               ? handleRemarkSubmit(quotation.id)
                               : handleEditRemark(quotation.id)
                           }
-                          className={`px-2 py-1 rounded-md text-sm ${
-                            state.isEditingRemark[quotation.id]
+                          className={`px-2 py-1 rounded-md text-sm ${state.isEditingRemark[quotation.id]
                               ? "bg-indigo-600 text-white hover:bg-indigo-700"
                               : "bg-green-600 text-white hover:bg-green-700"
-                          }`}
+                            }`}
                         >
                           {state.isEditingRemark[quotation.id] ? "Update" : "Edit"}
                         </Button>
@@ -742,38 +778,35 @@ const ViewQuotation = () => {
                             isPoComplete(quotation) ||
                             !hasPermission("quotation", "edit")
                           }
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            isPoComplete(quotation) ||
-                            !hasPermission("quotation", "edit")
+                          className={`px-3 py-1 rounded-md text-sm ${isPoComplete(quotation) ||
+                              !hasPermission("quotation", "edit")
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-blue-600 text-white hover:bg-blue-700"
-                          }`}
+                            }`}
                         >
                           Edit
                         </Button>
                         <Button
                           onClick={() => handlePrint(quotation)}
                           disabled={quotation.quotation_status !== "Approved"}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            quotation.quotation_status === "Approved"
+                          className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved"
                               ? "bg-green-600 text-white hover:bg-green-700"
                               : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          }`}
+                            }`}
                         >
                           Print
                         </Button>
                         {hasBothOrderTypes(quotation) ||
-                        isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
+                          isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
                           <Button
                             onClick={() => handleUploadPO(quotation.id)}
-                            disabled={isPoComplete(quotation) || !hasPermission("quotation", "edit")}
-                            className={`px-3 py-1 rounded-md text-sm ${
-                              isPoComplete(quotation) || !hasPermission("quotation", "edit")
-                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                : "bg-yellow-600 text-white hover:bg-yellow-700"
-                            }`}
+                            disabled={!shouldEnableUploadPO(quotation)}
+                            className={`px-3 py-1 rounded-md text-sm ${shouldEnableUploadPO(quotation)
+                                ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              }`}
                           >
                             Upload PO
                           </Button>
@@ -782,16 +815,13 @@ const ViewQuotation = () => {
                             onClick={() => handleConvertToPO(quotation.id)}
                             disabled={
                               quotation.quotation_status !== "Approved" ||
-                              isPoComplete(quotation) ||
-                              !hasPermission("quotation", "edit")
+                              isPoComplete(quotation)
                             }
-                            className={`px-3 py-1 rounded-md text-sm ${
-                              quotation.quotation_status === "Approved" &&
-                              !isPoComplete(quotation) &&
-                              hasPermission("quotation", "edit")
+                            className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved" &&
+                                !isPoComplete(quotation)
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            }`}
+                              }`}
                           >
                             Convert to PO
                           </Button>
@@ -799,11 +829,10 @@ const ViewQuotation = () => {
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           disabled={!hasPermission("quotation", "delete")}
-                          className={`px-3 py-1 rounded-md text-sm ${
-                            !hasPermission("quotation", "delete")
+                          className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "delete")
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-red-600 text-white hover:bg-red-700"
-                          }`}
+                            }`}
                         >
                           Delete
                         </Button>
@@ -829,11 +858,10 @@ const ViewQuotation = () => {
             <Button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded-md min-w-fit ${
-                state.currentPage === page
+              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
             >
               {page}
             </Button>
@@ -916,8 +944,8 @@ const ViewQuotation = () => {
                 <strong>Due Date:</strong>{" "}
                 {state.selectedQuotation.due_date_for_quotation
                   ? new Date(
-                      state.selectedQuotation.due_date_for_quotation
-                    ).toLocaleDateString()
+                    state.selectedQuotation.due_date_for_quotation
+                  ).toLocaleDateString()
                   : "N/A"}
               </p>
               <p>
@@ -940,8 +968,8 @@ const ViewQuotation = () => {
                 <strong>Next Follow-up Date:</strong>{" "}
                 {state.selectedQuotation.next_followup_date
                   ? new Date(
-                      state.selectedQuotation.next_followup_date
-                    ).toLocaleDateString()
+                    state.selectedQuotation.next_followup_date
+                  ).toLocaleDateString()
                   : "N/A"}
               </p>
               <p>
@@ -952,8 +980,8 @@ const ViewQuotation = () => {
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedQuotation.items &&
-              Array.isArray(state.selectedQuotation.items) &&
-              state.selectedQuotation.items.length > 0 ? (
+                Array.isArray(state.selectedQuotation.items) &&
+                state.selectedQuotation.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -997,8 +1025,8 @@ const ViewQuotation = () => {
                           <td className="border p-2 whitespace-nowrap">
                             SAR {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
-                                  2
-                                )
+                                2
+                              )
                               : "0.00"}
                           </td>
                         </tr>
@@ -1092,8 +1120,8 @@ const ViewQuotation = () => {
                                   <td className="border p-2 whitespace-nowrap">
                                     SAR {item.quantity && item.unit_price
                                       ? Number(
-                                          item.quantity * item.unit_price
-                                        ).toFixed(2)
+                                        item.quantity * item.unit_price
+                                      ).toFixed(2)
                                       : "0.00"}
                                   </td>
                                 </tr>
@@ -1405,22 +1433,20 @@ const ViewQuotation = () => {
             <Button
               onClick={handleNotApprovedSubmit}
               disabled={isSubmitting}
-              className={`px-4 py-2 rounded-md ${
-                isSubmitting
+              className={`px-4 py-2 rounded-md ${isSubmitting
                   ? "bg-indigo-400 text-white cursor-not-allowed"
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
-              }`}
+                }`}
             >
               {isSubmitting ? "Submitting..." : "Submit"}
             </Button>
             <Button
               onClick={closeNotApprovedModal}
               disabled={isSubmitting}
-              className={`px-4 py-2 rounded-md ${
-                isSubmitting
+              className={`px-4 py-2 rounded-md ${isSubmitting
                   ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                   : "bg-gray-300 text-gray-700 hover:bg-gray-400"
-              }`}
+                }`}
             >
               Cancel
             </Button>
