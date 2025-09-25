@@ -34,6 +34,18 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
         queryset=Unit.objects.all(), allow_null=True
     )
     components = DeliveryNoteItemComponentSerializer(many=True, required=False)
+    invoice_file = serializers.FileField(required=False, allow_null=True)
+    invoice_status = serializers.ChoiceField(
+        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
+        required=False
+    )
+    due_in_days = serializers.IntegerField(required=False, allow_null=True)
+    received_date = serializers.DateField(
+        required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
+    )
+    payment_reference_number = serializers.CharField(
+        max_length=100, required=False, allow_null=True
+    )
 
     class Meta:
         model = DeliveryNoteItem
@@ -45,6 +57,11 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity",
             "uom",
             "components",
+            "invoice_file",
+            "invoice_status",
+            "due_in_days",
+            "received_date",
+            "payment_reference_number",
         ]
 
     def validate(self, data):
@@ -52,6 +69,18 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"delivered_quantity": "Delivered quantity must equal quantity."}
             )
+        new_invoice_status = data.get("invoice_status")
+        due_in_days = data.get("due_in_days")
+        received_date = data.get("received_date")
+        if new_invoice_status:
+            if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
+                raise serializers.ValidationError(
+                    "Due in days is required and must be a positive integer for 'raised' status."
+                )
+            if new_invoice_status == "processed" and not received_date:
+                raise serializers.ValidationError(
+                    "Received date is required for 'processed' status."
+                )
         return data
 
     def create(self, validated_data):
@@ -72,6 +101,13 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity", instance.delivered_quantity
         )
         instance.uom = validated_data.get("uom", instance.uom)
+        instance.invoice_file = validated_data.get("invoice_file", instance.invoice_file)
+        instance.invoice_status = validated_data.get("invoice_status", instance.invoice_status)
+        instance.due_in_days = validated_data.get("due_in_days", instance.due_in_days)
+        instance.received_date = validated_data.get("received_date", instance.received_date)
+        instance.payment_reference_number = validated_data.get(
+            "payment_reference_number", instance.payment_reference_number
+        )
         instance.save()
         instance.components.all().delete()
         for component_data in components_data:
@@ -129,6 +165,11 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
                     quantity=item_data.get("quantity"),
                     delivered_quantity=item_data.get("delivered_quantity"),
                     uom=item_data.get("uom"),
+                    invoice_file=item_data.get("invoice_file"),
+                    invoice_status=item_data.get("invoice_status", "pending"),
+                    due_in_days=item_data.get("due_in_days"),
+                    received_date=item_data.get("received_date"),
+                    payment_reference_number=item_data.get("payment_reference_number"),
                 )
                 for component_data in components_data:
                     DeliveryNoteItemComponent.objects.create(
@@ -223,24 +264,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order_file = serializers.FileField(required=False)
     work_order_file = serializers.FileField(required=False)
     signed_delivery_note_file = serializers.FileField(required=False)
-    invoice_file = serializers.FileField(required=False)
-    invoice_status = serializers.ChoiceField(
-        choices=[
-            ("pending", "Pending"),
-            ("raised", "Raised"),
-            ("processed", "Processed"),
-        ],
-        required=False,
-    )
-    invoice_delivery_note = serializers.PrimaryKeyRelatedField(
-        queryset=DeliveryNote.objects.all(),
-        allow_null=True,
-        required=False
-    )
-    due_in_days = serializers.IntegerField(required=False, allow_null=True)
-    received_date = serializers.DateField(
-        required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
-    )
     wo_type = serializers.CharField(required=False, allow_null=True)
     application_status = serializers.CharField(
         max_length=20, allow_null=True, required=False
@@ -251,10 +274,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     expected_completion_date = serializers.DateField(
         required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
     )
-    payment_reference_number = serializers.CharField(
-        max_length=100, required=False, allow_null=True
-    )
-    email_sent = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = WorkOrder
@@ -279,22 +298,16 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "purchase_order_file",
             "work_order_file",
             "signed_delivery_note_file",
-            "invoice_status",
-            "due_in_days",
-            "received_date",
             "wo_type",
             "application_status",
-            "invoice_file",
-            "payment_reference_number",
-            "email_sent",
-            'invoice_delivery_note',
+            "invoice_delivery_note",
         ]
 
-    def send_invoice_status_change_email(self, work_order, new_status):
+    def send_invoice_status_change_email(self, delivery_note_item, new_status):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
+        work_order = delivery_note_item.delivery_note.work_order
         if (
             work_order.quotation
             and work_order.quotation.assigned_sales_person
@@ -315,13 +328,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 if user.email:
                     recipient_list.append((user.email, user.name or user.username))
 
-        # Remove duplicates while preserving names
         recipient_dict = {email: name for email, name in recipient_list}
         recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
         if recipient_list:
             for email, name in recipient_list:
-                # Determine salutation
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
                 elif (
@@ -345,16 +356,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 else:
                     salutation = "Dear Recipient"
 
-                subject = f"Work Order #{work_order.wo_number} Invoice Status Changed to {new_status}"
+                subject = f"Delivery Note Item #{delivery_note_item.id} Invoice Status Changed to {new_status}"
                 message = (
                     f"{salutation},\n\n"
-                    f"The invoice status for the following Work Order has been updated:\n"
+                    f"The invoice status for the following Delivery Note Item has been updated:\n"
                     f"------------------------------------------------------------\n"
                     f"🔹 Work Order Number: {work_order.wo_number}\n"
+                    f"🔹 Delivery Note Number: {delivery_note_item.delivery_note.dn_number}\n"
+                    f"🔹 Item ID: {delivery_note_item.id}\n"
                     f"🔹 Project: {work_order.quotation.company_name or 'Unnamed'}\n"
                     f"🔹 New Invoice Status: {new_status}\n"
-                    f"🔹 Due in Days: {work_order.due_in_days or 'Not specified'}\n"
-                    f"🔹 Received Date: {work_order.received_date or 'Not specified'}\n"
+                    f"🔹 Due in Days: {delivery_note_item.due_in_days or 'Not specified'}\n"
+                    f"🔹 Received Date: {delivery_note_item.received_date or 'Not specified'}\n"
                     f"------------------------------------------------------------\n"
                     f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
                     f"Best regards,\n"
@@ -372,37 +385,13 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                     )
                     email_sent = True
                     logger.info(
-                        f"Invoice status change email sent to {email} for WO #{work_order.wo_number}"
+                        f"Invoice status change email sent to {email} for Delivery Note Item #{delivery_note_item.id}"
                     )
                 except Exception as e:
                     logger.error(
-                        f"Failed to send invoice status change email to {email} for WO #{work_order.wo_number}: {str(e)}"
+                        f"Failed to send invoice status change email to {email} for Delivery Note Item #{delivery_note_item.id}: {str(e)}"
                     )
         return email_sent
-
-    def validate(self, data):
-        instance = getattr(self, "instance", None)
-        new_invoice_status = data.get("invoice_status")
-        due_in_days = data.get("due_in_days")
-        received_date = data.get("received_date")
-        if new_invoice_status:
-            if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
-                raise serializers.ValidationError(
-                    "Due in days is required and must be a positive integer for 'raised' status."
-                )
-            if new_invoice_status == "processed" and not received_date:
-                raise serializers.ValidationError(
-                    "Received date is required for 'processed' status."
-                )
-            if (
-                instance
-                and instance.invoice_status == "processed"
-                and new_invoice_status != "processed"
-            ):
-                raise serializers.ValidationError(
-                    "Cannot change invoice status from 'processed' to another status."
-                )
-        return data
 
     def parse_formdata_items(self, request_data):
         items_data = []
@@ -461,17 +450,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                             value = float(value)
                         except (ValueError, TypeError):
                             value = None
-                    elif (
-                        item_key
-                        in [
-                            "calibration_date",
-                            "calibration_due_date",
-                            "date_received",
-                            "expected_completion_date",
-                        ]
-                        and value
-                    ):
-                        logger.info(f"Received date for {item_key}: {value}")
                     item_data[item_key] = value
             if item_data:
                 items_data.append(item_data)
@@ -508,9 +486,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             onsite_or_lab=validated_data.get("onsite_or_lab"),
             site_location=validated_data.get("site_location"),
             remarks=validated_data.get("remarks"),
-            invoice_status=validated_data.get("invoice_status", "pending"),
-            due_in_days=validated_data.get("due_in_days"),
-            received_date=validated_data.get("received_date"),
             wo_type=validated_data.get("wo_type"),
             application_status=validated_data.get("application_status"),
         )
@@ -520,17 +495,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             logger.info(f"Creating item with data: {dict(item_data)}")
             WorkOrderItem.objects.create(work_order=work_order, **item_data)
             logger.info(f"Created WorkOrderItem for WorkOrder {work_order.id}")
-        if work_order.invoice_status in ["raised", "processed"]:
-            email_sent = self.send_invoice_status_change_email(
-                work_order, work_order.invoice_status
-            )
-            work_order.email_sent = email_sent
-            work_order.save()
         return work_order
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
-        previous_invoice_status = instance.invoice_status
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -541,19 +509,4 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                 logger.info(f"Creating item with data: {dict(item_data)}")
                 WorkOrderItem.objects.create(work_order=instance, **item_data)
                 logger.info(f"Updated items for WorkOrder {instance.id}")
-        if (
-            "invoice_status" in validated_data
-            and validated_data["invoice_status"] != previous_invoice_status
-            and validated_data["invoice_status"] in ["raised", "processed"]
-        ):
-            email_sent = self.send_invoice_status_change_email(
-                instance, validated_data["invoice_status"]
-            )
-            instance.email_sent = email_sent
-            instance.save()
         return instance
-
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation["email_sent"] = getattr(instance, "email_sent", False)
-        return representation

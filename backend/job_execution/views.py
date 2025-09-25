@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
-from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemComponentSerializer
+from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemSerializer
 from django.db.models import Max
 from series.models import NumberSeries
 import logging
@@ -21,7 +21,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         purchase_order_id = self.request.query_params.get('purchase_order')
         status = self.request.query_params.get('status')
-        invoice_status = self.request.query_params.get('invoice_status')
         if purchase_order_id:
             queryset = queryset.filter(purchase_order_id=purchase_order_id)
         if status:
@@ -30,9 +29,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(status__in=statuses)
             else:
                 queryset = queryset.filter(status=status)
-        if invoice_status:
-            queryset = queryset.filter(invoice_status=invoice_status)
-        logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, invoice_status={invoice_status}, count={queryset.count()}")
+        logger.info(f"Queryset filtered: purchase_order={purchase_order_id}, status={status}, count={queryset.count()}")
         return queryset
 
     def create(self, request, *args, **kwargs):
@@ -95,18 +92,16 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             delivery_note = work_order.delivery_notes.first()
             if delivery_note:
-                # Update existing delivery note with a temporary DN number
-                delivery_note.dn_number = f"TEMP-DN-{work_order.id:06d}"  # Temporary DN number
+                delivery_note.dn_number = f"TEMP-DN-{work_order.id:06d}"
                 delivery_note.series = dn_series
                 delivery_note.delivery_status = 'Delivery Pending'
                 delivery_note.save()
                 logger.info(f"Updated existing Delivery Note with temp DN for WorkOrder {pk}")
             else:
-                # Create new delivery note with a temporary DN number
                 delivery_note = DeliveryNote.objects.create(
                     work_order=work_order,
                     series=dn_series,
-                    dn_number=f"TEMP-DN-{work_order.id:06d}",  # Temporary DN number
+                    dn_number=f"TEMP-DN-{work_order.id:06d}",
                     delivery_status='Delivery Pending'
                 )
                 for item in work_order.items.all():
@@ -116,7 +111,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         range=item.range,
                         quantity=item.quantity,
                         delivered_quantity=item.quantity,
-                        uom=item.unit
+                        uom=item.unit,
+                        invoice_status='pending'
                     )
                 logger.info(f"Created new Delivery Note with temp DN for WorkOrder {pk}")
             
@@ -156,38 +152,49 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         logger.info(f"WorkOrder {pk} resubmitted for Manager Approval")
         return Response({'status': 'Work Order resubmitted for Manager Approval'})
 
-    @action(detail=True, methods=['patch'], url_path='update-invoice-status')
-    def update_invoice_status(self, request, pk=None):
-        work_order = self.get_object()
+    @action(detail=True, methods=['patch'], url_path='update-delivery-note-item-invoice-status')
+    def update_delivery_note_item_invoice_status(self, request, pk=None):
+        delivery_note_item_id = request.data.get('delivery_note_item_id')
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
-        delivery_note_id = request.data.get('delivery_note_id')
+        invoice_file = request.FILES.get('invoice_file')
 
+        if not delivery_note_item_id:
+            return Response({'error': 'Delivery note item ID is required'}, status=status.HTTP_400_BAD_REQUEST)
         if not new_status:
             return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            delivery_note_item = DeliveryNoteItem.objects.get(id=delivery_note_item_id)
+        except DeliveryNoteItem.DoesNotExist:
+            return Response({'error': 'Delivery note item not found'}, status=status.HTTP_404_NOT_FOUND)
 
         if new_status == 'raised':
             if not due_in_days or int(due_in_days) <= 0:
                 return Response({'error': 'Due in days is required and must be a positive integer for Raised status'}, status=status.HTTP_400_BAD_REQUEST)
-            work_order.due_in_days = int(due_in_days)
+            delivery_note_item.due_in_days = int(due_in_days)
 
         if new_status == 'processed':
             if not received_date:
                 return Response({'error': 'Received date is required for Processed status'}, status=status.HTTP_400_BAD_REQUEST)
-            work_order.received_date = received_date
+            delivery_note_item.received_date = received_date
 
-        if delivery_note_id:
-            try:
-                delivery_note = DeliveryNote.objects.get(id=delivery_note_id)
-                work_order.invoice_delivery_note = delivery_note
-            except DeliveryNote.DoesNotExist:
-                return Response({'error': 'Delivery note not found'}, status=status.HTTP_404_NOT_FOUND)
+        if delivery_note_item.invoice_status == 'processed' and new_status != 'processed':
+            return Response({'error': "Cannot change invoice status from 'processed' to another status."}, status=status.HTTP_400_BAD_REQUEST)
 
-        work_order.invoice_status = new_status
-        work_order.save()
+        previous_invoice_status = delivery_note_item.invoice_status
+        delivery_note_item.invoice_status = new_status
+        if invoice_file:
+            delivery_note_item.invoice_file = invoice_file
+        delivery_note_item.save()
 
-        serializer = self.get_serializer(work_order)
+        if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
+            serializer = self.get_serializer()
+            email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
+            logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
+
+        serializer = DeliveryNoteItemSerializer(delivery_note_item)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
@@ -235,7 +242,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-            # Generate the actual DN number
             max_sequence = DeliveryNote.objects.filter(dn_number__startswith=dn_series.prefix).aggregate(
                 Max('dn_number')
             )['dn_number__max']
@@ -245,7 +251,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             if delivery_type == 'Single':
                 delivery_note = work_order.delivery_notes.first()
                 if delivery_note:
-                    # Update existing delivery note with actual DN number
                     delivery_note.dn_number = dn_number
                     delivery_note.items.all().delete()
                     for item_data in items_data:
@@ -256,7 +261,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             range=item_data.get('range'),
                             quantity=item_data.get('quantity'),
                             delivered_quantity=item_data.get('delivered_quantity'),
-                            uom=item_data.get('uom')
+                            uom=item_data.get('uom'),
+                            invoice_status='pending'
                         )
                         for component_data in components_data:
                             DeliveryNoteItemComponent.objects.create(
@@ -267,7 +273,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     delivery_note.save()
                     logger.info(f"Updated Delivery Note {dn_number} for WorkOrder {pk}")
                 else:
-                    # Create new delivery note with actual DN number
                     delivery_note = DeliveryNote.objects.create(
                         work_order=work_order,
                         dn_number=dn_number,
@@ -282,7 +287,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             range=item_data.get('range'),
                             quantity=item_data.get('quantity'),
                             delivered_quantity=item_data.get('delivered_quantity'),
-                            uom=item_data.get('uom')
+                            uom=item_data.get('uom'),
+                            invoice_status='pending'
                         )
                         for component_data in components_data:
                             DeliveryNoteItemComponent.objects.create(
@@ -292,7 +298,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             )
                     logger.info(f"Created Delivery Note {dn_number} for WorkOrder {pk} with {len(items_data)} items")
             else:  # Multiple
-                # Create new delivery note with actual DN number
                 delivery_note = DeliveryNote.objects.create(
                     work_order=work_order,
                     dn_number=dn_number,
@@ -307,7 +312,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         range=item_data.get('range'),
                         quantity=item_data.get('quantity'),
                         delivered_quantity=item_data.get('delivered_quantity'),
-                        uom=item_data.get('uom')
+                        uom=item_data.get('uom'),
+                        invoice_status='pending'
                     )
                     for component_data in components_data:
                         DeliveryNoteItemComponent.objects.create(
@@ -336,28 +342,9 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         delivery_note.delivery_status = 'Delivered'
         delivery_note.save()
         work_order = delivery_note.work_order
-        work_order.status = 'Delivered'
-        work_order.save()
-        logger.info(f"Signed Delivery Note uploaded for Delivery Note {pk}, WorkOrder {work_order.id} set to Delivered")
+        # Check if all delivery notes for the work order are delivered
+        if all(dn.delivery_status == 'Delivered' for dn in work_order.delivery_notes.all()):
+            work_order.status = 'Delivered'
+            work_order.save()
+        logger.info(f"Signed Delivery Note uploaded for Delivery Note {pk}, WorkOrder {work_order.id} status updated")
         return Response({'status': 'Signed Delivery Note uploaded and status updated'})
-
-class DeliveryNoteItemComponentViewSet(viewsets.ModelViewSet):
-    queryset = DeliveryNoteItemComponent.objects.all()
-    serializer_class = DeliveryNoteItemComponentSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        delivery_note_item_id = self.request.query_params.get('delivery_note_item_id')
-        if delivery_note_item_id:
-            queryset = queryset.filter(delivery_note_item_id=delivery_note_item_id)
-        return queryset
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            self.perform_create(serializer)
-            logger.info(f"DeliveryNoteItemComponent created: {serializer.data['id']}")
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        logger.error(f"Create failed: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

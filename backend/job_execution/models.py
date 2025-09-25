@@ -44,20 +44,9 @@ class WorkOrder(models.Model):
     )
     decline_reason = models.TextField(null=True, blank=True)
     created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
-    invoice_status = models.CharField(
-        max_length=20,
-        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
-        default='pending',
-        null=True,
-        blank=True
-    )
-    due_in_days = models.IntegerField(null=True, blank=True)
-    received_date = models.DateField(null=True, blank=True)
     wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
     application_status = models.CharField(max_length=20, null=True, blank=True)
-    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
-    payment_reference_number = models.CharField(max_length=100, null=True, blank=True)
-    
+
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 
@@ -100,6 +89,17 @@ class DeliveryNoteItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
     uom = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
+    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
+    invoice_status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
+        default='pending',
+        null=True,
+        blank=True
+    )
+    due_in_days = models.IntegerField(null=True, blank=True)
+    received_date = models.DateField(null=True, blank=True)
+    payment_reference_number = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"{self.item} - {self.delivery_note}"
