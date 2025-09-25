@@ -7,7 +7,7 @@ from .serializers import (
     WorkOrderSerializer,
     DeliveryNoteSerializer,
     InitiateDeliverySerializer,
-    DeliveryNoteItemSerializer, 
+    DeliveryNoteItemSerializer,
     DeliveryNoteItemComponentSerializer
 )
 from django.db.models import Max
@@ -398,9 +398,29 @@ class DeliveryNoteViewSet(viewsets.ModelViewSet):
         delivery_note.delivery_status = 'Delivered'
         delivery_note.save()
         work_order = delivery_note.work_order
-        # Check if all delivery notes for the work order are delivered
         if all(dn.delivery_status == 'Delivered' for dn in work_order.delivery_notes.all()):
             work_order.status = 'Delivered'
             work_order.save()
         logger.info(f"Signed Delivery Note uploaded for Delivery Note {pk}, WorkOrder {work_order.id} status updated")
         return Response({'status': 'Signed Delivery Note uploaded and status updated'})
+
+class DeliveryNoteItemComponentViewSet(viewsets.ModelViewSet):
+    queryset = DeliveryNoteItemComponent.objects.all()
+    serializer_class = DeliveryNoteItemComponentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        delivery_note_item_id = self.request.query_params.get('delivery_note_item_id')
+        if delivery_note_item_id:
+            queryset = queryset.filter(delivery_note_item_id=delivery_note_item_id)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            logger.info(f"DeliveryNoteItemComponent created: {serializer.data['id']}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Create failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
