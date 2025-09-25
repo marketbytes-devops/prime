@@ -32,6 +32,7 @@ const PendingInvoices = () => {
     selectedDNId: null,
     selectedDNItemId: null,
     newStatus: '',
+    dueInDays: '',
     receivedDate: '',
     originalInvoiceStatus: '',
     isUploadPOModalOpen: false,
@@ -47,6 +48,7 @@ const PendingInvoices = () => {
     selectedDNItemForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
+    invoiceUploadType: '',
     isUploadWOModalOpen: false,
     selectedWOForUpload: null,
     woUpload: { certificateFile: null },
@@ -382,7 +384,7 @@ const PendingInvoices = () => {
     }
     try {
       setIsSubmitting(true);
-      const formData = new Ascending;
+      const formData = new FormData();
       formData.append('signed_delivery_note', state.dnUpload.signedDeliveryNote);
       await apiClient.post(`/delivery-notes/${state.selectedDNForUpload.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -419,7 +421,6 @@ const PendingInvoices = () => {
       invoiceUploadErrors: { invoiceFile: '' },
       invoiceUploadType: 'Final',
       newStatus: 'processed',
-      receivedDate: '',
     }));
   };
 
@@ -427,7 +428,7 @@ const PendingInvoices = () => {
     let isValid = true;
     const errors = { invoiceFile: '' };
     if (!state.invoiceUpload.invoiceFile) {
-      errors.invoiceFile = 'Final Invoice File is required';
+      errors.invoiceFile = `${state.invoiceUploadType} Invoice File is required`;
       isValid = false;
     }
     setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
@@ -441,8 +442,8 @@ const PendingInvoices = () => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
-      formData.append('invoice_status', 'processed');
-      if (state.receivedDate) {
+      formData.append('invoice_status', state.newStatus);
+      if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
       formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
@@ -454,7 +455,7 @@ const PendingInvoices = () => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      toast.success('Final Invoice file uploaded and status updated successfully.');
+      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
@@ -468,22 +469,38 @@ const PendingInvoices = () => {
         selectedDNId: null,
         selectedDNItemId: null,
         newStatus: '',
+        dueInDays: '',
         receivedDate: '',
         originalInvoiceStatus: '',
       }));
       await fetchData();
     } catch (error) {
-      console.error('Error uploading final invoice file:', error);
-      toast.error('Failed to upload final invoice file.');
+      console.error(`Error uploading ${state.invoiceUploadType.toLowerCase()} invoice file:`, error);
+      toast.error(`Failed to upload ${state.invoiceUploadType.toLowerCase()} invoice file.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUpdateStatus = (pair) => {
+  const handleUpdateStatus = (pair, newStatus) => {
     const deliveryNoteItem = pair.deliveryNoteItem;
     if (!deliveryNoteItem) {
       toast.error('Delivery note item not found.');
+      return;
+    }
+    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.warn(
+        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
       return;
     }
     if (deliveryNoteItem.invoice_status === 'processed') {
@@ -507,21 +524,38 @@ const PendingInvoices = () => {
       selectedWorkOrderId: pair.workOrderId,
       selectedDNId: pair.deliveryNoteId,
       selectedDNItemId: deliveryNoteItem.id,
-      newStatus: 'processed',
+      newStatus,
+      dueInDays: '',
       receivedDate: '',
       originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
-      invoiceUploadType: 'Final',
+      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
     }));
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedDNItemId, newStatus, receivedDate } = state;
+    const { selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
     const deliveryNoteItem = state.workOrderDeliveryPairs
       .find((pair) => pair.deliveryNoteItemId === selectedDNItemId)
       ?.deliveryNoteItem;
 
     if (!deliveryNoteItem) {
       toast.error('Delivery note item not found.');
+      return;
+    }
+
+    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.error(
+        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
       return;
     }
 
@@ -541,22 +575,73 @@ const PendingInvoices = () => {
       return;
     }
 
+    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+      toast.error('Please enter a valid number of days.');
+      return;
+    }
+
     if (newStatus === 'processed' && !receivedDate) {
       toast.error('Please select a received date.');
       return;
     }
 
-    setState((prev) => ({
-      ...prev,
-      isStatusModalOpen: false,
-      isUploadInvoiceModalOpen: true,
-      selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-        (pair) => pair.deliveryNoteItemId === selectedDNItemId
-      ).workOrder,
-      selectedDNItemForInvoiceUpload: deliveryNoteItem,
-      invoiceUpload: { invoiceFile: null },
-      invoiceUploadErrors: { invoiceFile: '' },
-    }));
+    if (newStatus === 'processed') {
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        isUploadInvoiceModalOpen: true,
+        selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
+          (pair) => pair.deliveryNoteItemId === selectedDNItemId
+        ).workOrder,
+        selectedDNItemForInvoiceUpload: deliveryNoteItem,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
+      }));
+    } else {
+      confirmStatusUpdate(selectedDNItemId, newStatus, dueInDays, receivedDate);
+    }
+  };
+
+  const confirmStatusUpdate = async (deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('invoice_status', newStatus);
+      if (newStatus === 'raised' && dueInDays) {
+        formData.append('due_in_days', parseInt(dueInDays));
+      }
+      formData.append('delivery_note_item_id', deliveryNoteItemId);
+
+      const workOrderId = state.workOrderDeliveryPairs.find(
+        (pair) => pair.deliveryNoteItemId === deliveryNoteItemId
+      ).workOrderId;
+
+      await apiClient.patch(
+        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      toast.success('Delivery note item invoice status updated successfully.');
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        selectedWorkOrderId: null,
+        selectedDNId: null,
+        selectedDNItemId: null,
+        newStatus: '',
+        dueInDays: '',
+        receivedDate: '',
+        originalInvoiceStatus: '',
+        invoiceUploadType: '',
+      }));
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating delivery note item invoice status:', error);
+      toast.error('Failed to update delivery note item invoice status.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isDUTComplete = (wo) => {
@@ -786,7 +871,7 @@ const PendingInvoices = () => {
                       {pair.deliveryNoteItem ? (
                         <select
                           value={pair.deliveryNoteItem.invoice_status || 'pending'}
-                          onChange={(e) => handleUpdateStatus(pair)}
+                          onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
                           className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
                             isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
@@ -795,6 +880,7 @@ const PendingInvoices = () => {
                           }`}
                         >
                           <option value="pending">Pending</option>
+                          <option value="raised">Raised</option>
                           <option value="processed">Processed</option>
                         </select>
                       ) : (
@@ -993,7 +1079,7 @@ const PendingInvoices = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className= "border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
@@ -1416,14 +1502,15 @@ const PendingInvoices = () => {
           selectedDNId: null,
           selectedDNItemId: null,
           newStatus: '',
+          dueInDays: '',
           receivedDate: '',
           originalInvoiceStatus: '',
         }))}
-        title={`Upload Final Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - Item: ${state.selectedDNItemForInvoiceUpload ? getItemName(state.selectedDNItemForInvoiceUpload.item) : 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - Item: ${state.selectedDNItemForInvoiceUpload ? getItemName(state.selectedDNItemForInvoiceUpload.item) : 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Final Invoice File</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{state.invoiceUploadType} Invoice File</label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -1440,15 +1527,6 @@ const PendingInvoices = () => {
               <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
             )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
-            <InputField
-              type="date"
-              value={state.receivedDate}
-              onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
-              className="w-full p-2 border rounded focus:outline-indigo-500"
-            />
-          </div>
           <div className="flex justify-end gap-2">
             <Button
               onClick={() => setState((prev) => ({
@@ -1464,6 +1542,7 @@ const PendingInvoices = () => {
                 selectedDNId: null,
                 selectedDNItemId: null,
                 newStatus: '',
+                dueInDays: '',
                 receivedDate: '',
                 originalInvoiceStatus: '',
               }))}
@@ -1500,22 +1579,43 @@ const PendingInvoices = () => {
           selectedDNId: null,
           selectedDNItemId: null,
           newStatus: '',
+          dueInDays: '',
           receivedDate: '',
           originalInvoiceStatus: '',
           invoiceUploadType: '',
         }))}
-        title={`Update Invoice Status to Processed`}
+        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
-            <InputField
-              type="date"
-              value={state.receivedDate}
-              onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
-              className="w-full p-2 border rounded focus:outline-indigo-500"
-            />
-          </div>
+          {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
+            <p className="text-red-500 text-sm">
+              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
+            </p>
+          )}
+          {state.newStatus === 'raised' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
+              <InputField
+                type="number"
+                placeholder="Enter number of days"
+                value={state.dueInDays}
+                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+                min="1"
+              />
+            </div>
+          )}
+          {state.newStatus === 'processed' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
+              <InputField
+                type="date"
+                value={state.receivedDate}
+                onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+              />
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               onClick={() => setState((prev) => ({
@@ -1523,6 +1623,7 @@ const PendingInvoices = () => {
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
                 newStatus: '',
+                dueInDays: '',
                 receivedDate: '',
                 originalInvoiceStatus: '',
                 invoiceUploadType: '',
