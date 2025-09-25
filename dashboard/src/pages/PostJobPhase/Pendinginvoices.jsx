@@ -16,7 +16,7 @@ const PendingInvoices = () => {
     itemsList: [],
     units: [],
     quotations: [],
-    channels: [], // Added channels to state
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -89,35 +89,35 @@ const PendingInvoices = () => {
     return perm && perm[`can_${action}`];
   };
 
-  const fetchData = async () => {
-    try {
-      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
-        apiClient.get('work-orders/'),
-        apiClient.get('purchase-orders/'),
-        apiClient.get('delivery-notes/'),
-        apiClient.get('technicians/'),
-        apiClient.get('items/'),
-        apiClient.get('units/'),
-        apiClient.get('quotations/'),
-        apiClient.get('channels/'), // Added fetch for channels
-      ]);
+const fetchData = async () => {
+  try {
+    const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
+      apiClient.get('work-orders/'),
+      apiClient.get('purchase-orders/'),
+      apiClient.get('delivery-notes/'),
+      apiClient.get('technicians/'),
+      apiClient.get('items/'),
+      apiClient.get('units/'),
+      apiClient.get('quotations/'),
+      apiClient.get('channels/'),
+    ]);
 
-      const deliveryNotes = dnRes.data
-        .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
-        .map((dn) => ({
-          ...dn,
-          items: dn.items.map((item) => ({
-            ...item,
-            uom: item.uom ? Number(item.uom) : null,
-            components: item.components || [],
-          })),
-        }));
+    const deliveryNotes = dnRes.data
+      .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
+      .map((dn) => ({
+        ...dn,
+        items: dn.items.map((item) => ({
+          ...item,
+          uom: item.uom ? Number(item.uom) : null,
+          components: item.components || [],
+        })),
+      }));
 
-      const workOrders = woRes.data.map(wo => ({
-        ...wo,
-        invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
-      })) || [];
-      
+    const workOrders = woRes.data.map(wo => ({
+      ...wo,
+      invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
+    })) || [];
+
     const workOrderDeliveryPairs = [];
 
     workOrders.forEach(workOrder => {
@@ -144,23 +144,24 @@ const PendingInvoices = () => {
       }
     });
 
-      setState((prev) => ({
-        ...prev,
-        workOrders: workOrders,
-        purchaseOrders: poRes.data || [],
-        deliveryNotes: deliveryNotes,
-        technicians: techRes.data || [],
-        itemsList: itemsRes.data || [],
-        units: unitsRes.data || [],
-        quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
-        workOrderDeliveryPairs: workOrderDeliveryPairs,
-      }));
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load data.');
-    }
-  };
+    setState((prev) => ({
+      ...prev,
+      workOrders: workOrders,
+      purchaseOrders: poRes.data || [],
+      deliveryNotes: deliveryNotes,
+      technicians: techRes.data || [],
+      itemsList: itemsRes.data || [],
+      units: unitsRes.data || [],
+      quotations: quotationsRes.data || [],
+      channels: channelsRes.data || [],
+      workOrderDeliveryPairs: workOrderDeliveryPairs,
+    }));
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    toast.error('Failed to load data.');
+  }
+};
+
 
   useEffect(() => {
     fetchData();
@@ -473,111 +474,57 @@ const PendingInvoices = () => {
     }
   };
 
-const handleUpdateStatus = (pair, newStatus) => {
+  const handleUpdateStatus = (pair, newStatus) => {
   const workOrder = pair.workOrder;
-  if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-    toast.warn(
-      'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-      {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      }
-    );
+  if (workOrder.invoice_status === 'processed') {
+    toast.error('Once processed, the invoice status cannot be changed.');
     return;
   }
   setState((prev) => ({
-    ...prev,
-    isStatusModalOpen: true,
-    selectedWorkOrderId: workOrder.id,
-    selectedDNId: pair.deliveryNoteId,
-    newStatus,
-    dueInDays: '',
-    receivedDate: '',
-    originalInvoiceStatus: workOrder?.invoice_status || 'pending',
-    invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
-  }));
+      ...prev,
+      isStatusModalOpen: true,
+      selectedWorkOrderId: workOrder.id,
+      selectedDNId: pair.deliveryNoteId,
+      newStatus,
+      dueInDays: '',
+      receivedDate: '',
+      originalInvoiceStatus: workOrder?.invoice_status || 'pending',
+      invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
+    }));
 };
- 
-  // const handleStatusModalSubmit = () => {
-  //   const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
-  //   const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-  //   const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
-  
-  //   if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-  //     toast.error(
-  //       'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
-  //       {
-  //         position: 'top-right',
-  //         autoClose: 5000,
-  //         hideProgressBar: false,
-  //         closeOnClick: true,
-  //         pauseOnHover: true,
-  //         draggable: true,
-  //         theme: 'colored',
-  //       }
-  //     );
-  //     return;
-  //   }
-  //   if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-  //     toast.error('Please enter a valid number of days.');
-  //     return;
-  //   }
-  //   if (newStatus === 'processed' && !receivedDate) {
-  //     toast.error('Please select a received date.');
-  //     return;
-  //   }
-  //   if (newStatus === 'processed') {
-  //     setState((prev) => ({
-  //       ...prev,
-  //       isStatusModalOpen: false,
-  //       isUploadInvoiceModalOpen: true,
-  //       selectedWOForInvoiceUpload: workOrder,
-  //       invoiceUpload: { invoiceFile: null },
-  //       invoiceUploadErrors: { invoiceFile: '' },
-  //     }));
-  //   } else {
-  //     confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
-  //   }
-  // };
 
-  const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
-    const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+const handleStatusModalSubmit = () => {
+  const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
+  const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
 
-    if (workOrder.invoice_status === 'processed') {
-      toast.error(
-        'Invoice status is already "Processed". No further changes allowed.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-          zIndex: 9999,
-        }
-      );
-      return;
-    }
+  if (workOrder.invoice_status === 'processed') {
+    toast.error('Once processed, the invoice status cannot be changed.');
+    return;
+  }
 
-    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-      toast.error('Please enter a valid number of days.');
-      return;
-    }
+  if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+    toast.error('Please enter a valid number of days.');
+    return;
+  }
 
-    if (newStatus === 'processed' && !receivedDate) {
-      toast.error('Please select a received date.');
-      return;
-    }
+  if (newStatus === 'processed' && !receivedDate) {
+    toast.error('Please select a received date.');
+    return;
+  }
 
+  if (newStatus === 'processed') {
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: false,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: workOrder,
+      invoiceUpload: { invoiceFile: null },
+      invoiceUploadErrors: { invoiceFile: '' },
+    }));
+  } else {
     confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
-  };
+  }
+};
 
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate, deliveryNoteId) => {
@@ -769,48 +716,72 @@ const handleUpdateStatus = (pair, newStatus) => {
                     <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
-                     <div className="flex items-center gap-2">
-        <Button
-          onClick={() => handleViewDocument(pair, 'po')}
-          disabled={isSubmitting || !hasPermission('pending_invoices', 'view')}
-          className="px-3 py-1 rounded-md text-sm whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700"
-        >
-          View PO
-        </Button>
-        <Button
-          onClick={() => handleViewDocument(pair, 'wo')}
-          disabled={isSubmitting || !isDUTComplete(pair.workOrder)}
-          className="px-3 py-1 rounded-md text-sm whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
-        >
-          View WO
-        </Button>
-        <Button
-          onClick={() => handleViewDocument(pair, 'dn')}
-          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNote}
-          className="px-3 py-1 rounded-md text-sm whitespace-nowrap bg-purple-600 text-white hover:bg-purple-700"
-        >
-          View DN
-        </Button>
-        <Button
-          onClick={() => handleUploadInvoice(pair, 'raised')}
-          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-          className="px-3 py-1 rounded-md text-sm whitespace-nowrap bg-indigo-600 text-white hover:bg-indigo-700"
-        >
-          Upload Invoice
-        </Button>
-      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : isPOEmpty(pair.workOrder)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'wo')}
+                          disabled={isSubmitting || !isDUTComplete(pair.workOrder)}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !isDUTComplete(pair.workOrder)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 'View WO'}
+                        </Button>
+                        <Button
+                          onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : isDNReadyForUpload(pair.deliveryNote)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={isSubmitting || !pair.workOrder.invoice_file || !canUploadInvoice(pair)}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !pair.workOrder.invoice_file || !canUploadInvoice(pair)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : pair.workOrder.invoice_file ? 'View Invoice' : 'No Invoice'}
+                        </Button>
+                      </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                     <select
-        value={pair.workOrder.invoice_status || 'pending'}
-        onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair) || pair.workOrder.invoice_status === 'processed'}
-        className="w-full p-2 border rounded focus:outline-indigo-500 text-sm"
-      >
-        <option value="pending">Pending</option>
-        <option value="raised">Raised</option>
-        <option value="processed">Processed</option>
-      </select>
+                      <select
+                        value={pair.workOrder.invoice_status || 'pending'}
+                        onChange={(e) => handleUpdateStatus(pair, e.target.value)}
+                        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
+                        className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
+                          isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : ''
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="raised">Raised</option>
+                        <option value="processed">Processed</option>
+                      </select>
                     </td>
                   </tr>
                 ))
