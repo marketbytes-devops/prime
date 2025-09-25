@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
-from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemSerializer
+from .serializers import WorkOrderSerializer, DeliveryNoteSerializer, InitiateDeliverySerializer, DeliveryNoteItemComponentSerializer
 from django.db.models import Max
 from series.models import NumberSeries
 import logging
