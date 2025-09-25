@@ -4,7 +4,6 @@ import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
-import { v4 as uuidv4 } from 'uuid';
 
 const RaisedInvoices = () => {
   const [state, setState] = useState({
