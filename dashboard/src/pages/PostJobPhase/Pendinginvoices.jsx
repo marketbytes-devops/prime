@@ -565,7 +565,12 @@ const PendingInvoices = () => {
         payload.delivery_note_id = deliveryNoteId;
       }
 
-      await apiClient.post(`work-orders/${workOrderId}/update-invoice-status/`, payload);
+      // Use PATCH instead of POST
+      await apiClient.patch(
+        `work-orders/${workOrderId}/update-invoice-status/`,
+        payload
+      );
+
       toast.success('Work order invoice status updated successfully.');
       setState((prev) => ({
         ...prev,
