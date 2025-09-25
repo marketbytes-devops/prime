@@ -118,6 +118,7 @@ const PendingInvoices = () => {
         invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
       })) || [];
 
+      // Create work order-delivery note pairs for display
       const workOrderDeliveryPairs = [];
       
       workOrders.forEach(workOrder => {
@@ -166,6 +167,7 @@ const PendingInvoices = () => {
     fetchData();
   }, []);
 
+  // Helper functions to get related data
   const getQuotationDetails = (workOrder) => {
     const po = state.purchaseOrders.find((po) => po.id === workOrder.purchase_order);
     const quotation = po ? state.quotations.find((q) => q.id === po.quotation) : null;
@@ -175,7 +177,7 @@ const PendingInvoices = () => {
       company_address: quotation?.company_address || 'N/A',
       company_phone: quotation?.company_phone || 'N/A',
       company_email: quotation?.company_email || 'N/A',
-      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
+      channel: quotation ? state.channels.find((c) => c.id === quotation.rfq_channel)?.channel_name || 'N/A' : 'N/A',
       contact_name: quotation?.point_of_contact_name || 'N/A',
       contact_email: quotation?.point_of_contact_email || 'N/A',
       contact_phone: quotation?.point_of_contact_phone || 'N/A',
@@ -186,6 +188,31 @@ const PendingInvoices = () => {
       po_file: po?.po_file || null,
       assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
     };
+  };
+
+  const getAssignedTechnicians = (items) => {
+    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
+    if (technicianIds.length === 0) return 'None';
+    if (technicianIds.length > 1) return 'Multiple';
+    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
+    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
+  };
+
+  const getCompanyName = (workOrder) => {
+    return getQuotationDetails(workOrder).company_name;
+  };
+
+  const getQuotationSeriesNumber = (workOrder) => {
+    return getQuotationDetails(workOrder).series_number;
+  };
+
+  const getDNSeriesNumber = (deliveryNote) => {
+    return deliveryNote?.dn_number || 'N/A';
+  };
+
+  const getWONumberByDN = (dn) => {
+    const workOrder = state.workOrders.find(wo => wo.id === dn.work_order_id);
+    return workOrder?.wo_number || 'N/A';
   };
 
   const handleViewDocument = (pair, type) => {
@@ -473,77 +500,77 @@ const PendingInvoices = () => {
     }
   };
 
-const handleUpdateStatus = (pair, newStatus) => {
-  const workOrder = pair.workOrder;
-  if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-    toast.warn(
-      'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-      {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      }
-    );
-    return;
-  }
-  setState((prev) => ({
-    ...prev,
-    isStatusModalOpen: true,
-    selectedWorkOrderId: workOrder.id,
-    selectedDNId: pair.deliveryNoteId,
-    newStatus,
-    dueInDays: '',
-    receivedDate: '',
-    originalInvoiceStatus: workOrder?.invoice_status || 'pending',
-    invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
-  }));
-};
- 
-const handleStatusModalSubmit = () => {
-  const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
-  const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-  const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
- 
-  if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-    toast.error(
-      'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
-      {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      }
-    );
-    return;
-  }
-  if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-    toast.error('Please enter a valid number of days.');
-    return;
-  }
-  if (newStatus === 'processed' && !receivedDate) {
-    toast.error('Please select a received date.');
-    return;
-  }
-  if (newStatus === 'processed') {
+  const handleUpdateStatus = (pair, newStatus) => {
+    const workOrder = pair.workOrder;
+    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.warn(
+        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
     setState((prev) => ({
       ...prev,
-      isStatusModalOpen: false,
-      isUploadInvoiceModalOpen: true,
-      selectedWOForInvoiceUpload: workOrder,
-      invoiceUpload: { invoiceFile: null },
-      invoiceUploadErrors: { invoiceFile: '' },
+      isStatusModalOpen: true,
+      selectedWorkOrderId: workOrder.id,
+      selectedDNId: pair.deliveryNoteId,
+      newStatus,
+      dueInDays: '',
+      receivedDate: '',
+      originalInvoiceStatus: workOrder?.invoice_status || 'pending',
+      invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
     }));
-  } else {
-    confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
-  }
-};
+  };
+
+  const handleStatusModalSubmit = () => {
+    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
+    const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
+    
+    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.error(
+        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
+    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+      toast.error('Please enter a valid number of days.');
+      return;
+    }
+    if (newStatus === 'processed' && !receivedDate) {
+      toast.error('Please select a received date.');
+      return;
+    }
+    if (newStatus === 'raised' || newStatus === 'processed') {
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        isUploadInvoiceModalOpen: true,
+        selectedWOForInvoiceUpload: workOrder,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
+      }));
+    } else {
+      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
+    }
+  };
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate, deliveryNoteId) => {
     try {
@@ -619,29 +646,12 @@ const handleStatusModalSubmit = () => {
     return isPOComplete(pair.workOrder) && isDUTComplete(pair.workOrder) && isDNComplete(pair.deliveryNote);
   };
 
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
-  };
-
-  const getWONumberByDN = (dn) => {
-    const workOrder = state.workOrders.find(wo => wo.id === dn.work_order_id);
-    return workOrder?.wo_number || 'N/A';
-  };
-
-  const getDNSeriesNumber = (deliveryNote) => {
-    return deliveryNote?.dn_number || 'N/A';
-  };
-
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationSeriesNumber(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase())
+      getCompanyName(pair.workOrder).toLowerCase().includes(state.searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -727,8 +737,8 @@ const handleStatusModalSubmit = () => {
                 currentPairs.map((pair, index) => (
                   <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
-                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
-                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
+                    <td className="border p-2 whitespace-nowrap">{getCompanyName(pair.workOrder)}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationSeriesNumber(pair.workOrder)}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">{new Date(pair.workOrder.created_at).toLocaleDateString()}</td>
@@ -860,18 +870,18 @@ const handleStatusModalSubmit = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_phone}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
@@ -889,7 +899,7 @@ const handleStatusModalSubmit = () => {
                   'N/A'
                 )}
               </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).assigned_sales_person}</p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -1052,18 +1062,18 @@ const handleStatusModalSubmit = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_phone}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
