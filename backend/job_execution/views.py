@@ -159,38 +159,36 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='update-invoice-status')
     def update_invoice_status(self, request, pk=None):
         work_order = self.get_object()
+        new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
-        work_order = self.get_object()
-        new_status = request.data.get('invoice_status')
         delivery_note_id = request.data.get('delivery_note_id')
 
-        if delivery_note_id:
-            delivery_note = DeliveryNote.objects.get(id=delivery_note_id)
-            work_order.invoice_delivery_note = delivery_note
-        work_order.invoice_status = new_status
-        work_order.save()
-    
         if not new_status:
             return Response({'error': 'Invoice status is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        data = {'invoice_status': new_status}
         if new_status == 'raised':
             if not due_in_days or int(due_in_days) <= 0:
                 return Response({'error': 'Due in days is required and must be a positive integer for Raised status'}, status=status.HTTP_400_BAD_REQUEST)
-            data['due_in_days'] = int(due_in_days)
-        elif new_status == 'processed':
+            work_order.due_in_days = int(due_in_days)
+
+        if new_status == 'processed':
             if not received_date:
                 return Response({'error': 'Received date is required for Processed status'}, status=status.HTTP_400_BAD_REQUEST)
-            data['received_date'] = received_date
+            work_order.received_date = received_date
 
-        serializer = self.get_serializer(work_order, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            logger.info(f"WorkOrder {work_order.id} invoice status updated to {new_status}")
-            return Response(serializer.data)
-        logger.error(f"Invoice status update failed: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if delivery_note_id:
+            try:
+                delivery_note = DeliveryNote.objects.get(id=delivery_note_id)
+                work_order.invoice_delivery_note = delivery_note
+            except DeliveryNote.DoesNotExist:
+                return Response({'error': 'Delivery note not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        work_order.invoice_status = new_status
+        work_order.save()
+
+        serializer = self.get_serializer(work_order)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
     def initiate_delivery(self, request, pk=None):

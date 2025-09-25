@@ -441,13 +441,19 @@ const PendingInvoices = () => {
         payload.delivery_note_id = state.selectedDNForInvoiceUpload.id;
       }
 
-      await apiClient.post(`work-orders/${state.selectedWOForInvoiceUpload.id}/update-invoice-status/`, payload);
+      // Use PATCH instead of POST
+      await apiClient.patch(
+        `work-orders/${state.selectedWOForInvoiceUpload.id}/update-invoice-status/`,
+        payload
+      );
 
       const formData = new FormData();
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
-      await apiClient.patch(`/work-orders/${state.selectedWOForInvoiceUpload.id}/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await apiClient.patch(
+        `work-orders/${state.selectedWOForInvoiceUpload.id}/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
 
       toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
