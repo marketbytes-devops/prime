@@ -166,6 +166,7 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
     calibration_due_date = serializers.DateField(
         required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
     )
+    certificate_file = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
         model = WorkOrderItem
@@ -220,10 +221,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     items = WorkOrderItemSerializer(many=True, required=False)
     delivery_notes = DeliveryNoteSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source="created_by.name", read_only=True)
-    purchase_order_file = serializers.FileField(required=False)
-    work_order_file = serializers.FileField(required=False)
-    signed_delivery_note_file = serializers.FileField(required=False)
-    invoice_file = serializers.FileField(required=False)
+    purchase_order_file = serializers.FileField(required=False, allow_null=True)
+    work_order_file = serializers.FileField(required=False, allow_null=True)
+    signed_delivery_note_file = serializers.FileField(required=False, allow_null=True)
+    invoice_file = serializers.FileField(required=False, allow_null=True)
     invoice_status = serializers.ChoiceField(
         choices=[
             ("pending", "Pending"),
@@ -288,7 +289,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
+        # Collect recipient emails (Admin, Superadmin, and Assigned Sales Person)
         if (
             work_order.quotation
             and work_order.quotation.assigned_sales_person
@@ -379,8 +380,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         new_invoice_status = data.get("invoice_status")
         due_in_days = data.get("due_in_days")
         received_date = data.get("received_date")
-        invoice_file = data.get("invoice_file")
-
         if new_invoice_status:
             if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
                 raise serializers.ValidationError(
@@ -393,12 +392,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             if (
                 instance
                 and instance.invoice_status == "processed"
-                and instance.received_date
-                and instance.invoice_file
-                and new_invoice_status in ["pending", "raised"]
+                and new_invoice_status != "processed"
             ):
                 raise serializers.ValidationError(
-                    "Cannot change invoice status from 'processed' to 'pending' or 'raised' once processed with all required fields."
+                    "Cannot change invoice status from 'processed' to another status."
                 )
         return data
 
@@ -447,11 +444,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
                             value = None
                     elif item_key == "range" and value:
                         try:
-                            value = int(value)
+                            value = str(value)  # Changed to string to match model
                         except (ValueError, TypeError):
                             raise serializers.ValidationError(
                                 {
-                                    "range": f"Invalid range value for item {index}: must be an integer."
+                                    "range": f"Invalid range value for item {index}: must be a valid string."
                                 }
                             )
                     elif item_key == "unit_price" and value:
@@ -511,6 +508,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             received_date=validated_data.get("received_date"),
             wo_type=validated_data.get("wo_type"),
             application_status=validated_data.get("application_status"),
+            invoice_file=validated_data.get("invoice_file"),
         )
         logger.info(f"Created WorkOrder {work_order.id} with wo_number {wo_number}")
         for item_data in items_data:
@@ -555,3 +553,47 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation["email_sent"] = getattr(instance, "email_sent", False)
         return representation
+
+class WorkOrderInvoiceStatusSerializer(serializers.Serializer):
+    invoice_status = serializers.ChoiceField(
+        choices=[
+            ("pending", "Pending"),
+            ("raised", "Raised"),
+            ("processed", "Processed"),
+        ]
+    )
+    delivery_note_id = serializers.IntegerField(required=False, allow_null=True)
+    received_date = serializers.DateField(
+        required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
+    )
+
+    def validate(self, data):
+        invoice_status = data.get("invoice_status")
+        delivery_note_id = data.get("delivery_note_id")
+        received_date = data.get("received_date")
+        instance = self.context.get("instance")
+
+        if invoice_status == "raised" and not delivery_note_id:
+            raise serializers.ValidationError(
+                {"delivery_note_id": "Delivery note ID is required for 'raised' status."}
+            )
+        if invoice_status == "processed" and not received_date:
+            raise serializers.ValidationError(
+                {"received_date": "Received date is required for 'processed' status."}
+            )
+        if (
+            instance
+            and instance.invoice_status == "processed"
+            and invoice_status != "processed"
+        ):
+            raise serializers.ValidationError(
+                "Cannot change invoice status from 'processed' to another status."
+            )
+        if delivery_note_id:
+            try:
+                DeliveryNote.objects.get(id=delivery_note_id)
+            except DeliveryNote.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"delivery_note_id": "Invalid delivery note ID."}
+                )
+        return data
