@@ -15,7 +15,7 @@ const PendingDeliveries = () => {
     workOrders: [],
     purchaseOrders: [],
     quotations: [],
-    channels: [],
+    channels: [], // Added channels to state
     technicians: [],
     itemsList: [],
     units: [],
@@ -28,6 +28,7 @@ const PendingDeliveries = () => {
     isCompleteModalOpen: false,
     selectedDNForComplete: null,
     signedDeliveryNote: null,
+    dueInDays: '',
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -74,7 +75,7 @@ const PendingDeliveries = () => {
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('quotations/'),
-        apiClient.get('channels/'),
+        apiClient.get('channels/'), // Added fetch for channels
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -90,7 +91,7 @@ const PendingDeliveries = () => {
         workOrders: woRes.data || [],
         purchaseOrders: poRes.data || [],
         quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [],
+        channels: channelsRes.data || [], // Store channels in state
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -105,6 +106,7 @@ const PendingDeliveries = () => {
     fetchData();
   }, []);
 
+  // Helper functions to get related data
   const getWorkOrderByDN = (dn) => {
     return state.workOrders.find(wo => wo.id === dn.work_order_id);
   };
@@ -163,46 +165,28 @@ const PendingDeliveries = () => {
     }));
   };
 
-  const handleViewWO = (dn) => {
-    const workOrder = getWorkOrderByDN(dn);
-    setState((prev) => ({
-      ...prev,
-      isViewWOModalOpen: true,
-      selectedWO: workOrder,
-    }));
-  };
-
-  const handleViewPO = (dn) => {
-    const workOrder = getWorkOrderByDN(dn);
-    const purchaseOrder = getPurchaseOrderByWO(workOrder);
-    if (!purchaseOrder) {
-      toast.error('Purchase order not found.');
-      return;
-    }
-    setState((prev) => ({
-      ...prev,
-      isViewPOModalOpen: true,
-      selectedPO: purchaseOrder,
-    }));
-  };
-
   const handleOpenCompleteModal = (dn) => {
     setState((prev) => ({
       ...prev,
       isCompleteModalOpen: true,
       selectedDNForComplete: dn,
       signedDeliveryNote: null,
+      dueInDays: '',
     }));
   };
 
   const handleCompleteDelivery = async () => {
-    const { selectedDNForComplete, signedDeliveryNote } = state;
+    const { selectedDNForComplete, signedDeliveryNote, dueInDays } = state;
     if (!signedDeliveryNote) {
       toast.error('Please upload a signed delivery note.');
       return;
     }
+    if (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0) {
+      toast.error('Please enter a valid number of days for invoice due date.');
+      return;
+    }
 
-    if (!window.confirm('Are you sure you want to complete this delivery? This will mark the delivery note as Delivered.')) {
+    if (!window.confirm('Are you sure you want to complete this delivery? This will move the work order to Pending Invoices.')) {
       return;
     }
 
@@ -210,37 +194,24 @@ const PendingDeliveries = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('signed_delivery_note', signedDeliveryNote);
+      formData.append('invoice_status', 'Raised');
+      formData.append('due_in_days', parseInt(dueInDays));
       await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      toast.success('Delivery completed successfully.');
+      toast.success('Delivery completed and work order moved to Pending Invoices.');
       setState((prev) => ({
         ...prev,
         isCompleteModalOpen: false,
         selectedDNForComplete: null,
         signedDeliveryNote: null,
+        dueInDays: '',
       }));
       fetchData();
     } catch (error) {
       console.error('Error completing delivery:', error);
       toast.error('Failed to complete delivery.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUpdateInvoiceStatus = async (dn, newStatus) => {
-    const workOrder = getWorkOrderByDN(dn);
-    try {
-      setIsSubmitting(true);
-      const payload = { invoice_status: newStatus };
-      await apiClient.post(`work-orders/${workOrder.id}/update-invoice-status/`, payload);
-      toast.success('Invoice status updated successfully.');
-      fetchData();
-    } catch (error) {
-      console.error('Error updating invoice status:', error);
-      toast.error('Failed to update invoice status.');
     } finally {
       setIsSubmitting(false);
     }
@@ -333,24 +304,6 @@ const PendingDeliveries = () => {
     }
   };
 
-  const isPOFileUploaded = (dn) => {
-    const workOrder = getWorkOrderByDN(dn);
-    const purchaseOrder = getPurchaseOrderByWO(workOrder);
-    return purchaseOrder?.po_file;
-  };
-
-  const isDNFileUploaded = (dn) => {
-    return dn.signed_delivery_note;
-  };
-
-  const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
-    const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
-  };
-
   return (
     <>
       <div className="hidden">
@@ -398,16 +351,14 @@ const PendingDeliveries = () => {
                   <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
                   <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">DN Number</th>
                   <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
-                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
                   <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Delivery Status</th>
-                  <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Invoice Status</th>
                   <th className="whitespace-nowrap border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {currentDNs.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="border p-2 text-center text-gray-500">
+                    <td colSpan="8" className="border p-2 text-center text-gray-500">
                       No delivery notes available.
                     </td>
                   </tr>
@@ -420,55 +371,16 @@ const PendingDeliveries = () => {
                       <td className="whitespace-nowrap border p-2">{getWONumberByDN(dn)}</td>
                       <td className="whitespace-nowrap border p-2">{dn.dn_number || 'N/A'}</td>
                       <td className="whitespace-nowrap border p-2">{new Date(dn.created_at).toLocaleDateString()}</td>
-                      <td className="whitespace-nowrap border p-2">{getAssignedTechnicians(getWorkOrderByDN(dn)?.items || [])}</td>
                       <td className="whitespace-nowrap border p-2">{dn.delivery_status || 'N/A'}</td>
-                      <td className="whitespace-nowrap border p-2">
-                        <select
-                          value={getWorkOrderByDN(dn)?.invoice_status || 'pending'}
-                          onChange={(e) => handleUpdateInvoiceStatus(dn, e.target.value)}
-                          disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
-                          className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
-                            isSubmitting || !hasPermission('pending_deliveries', 'edit')
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                              : ''
-                          }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="raised">Raised</option>
-                          <option value="processed">Processed</option>
-                        </select>
-                      </td>
                       <td className="whitespace-nowrap border p-2">
                         <div className="flex items-center gap-2">
                           <Button
-                            onClick={() => handleViewPO(dn)}
-                            disabled={isSubmitting || !hasPermission('pending_deliveries', 'view') || isPOFileUploaded(dn)}
-                            className={`whitespace-nowrap px-3 py-1 text-sm rounded-md ${
-                              isSubmitting || !hasPermission('pending_deliveries', 'view') || isPOFileUploaded(dn)
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                            }`}
-                          >
-                            View PO
-                          </Button>
-                          <Button
-                            onClick={() => handleViewWO(dn)}
+                            onClick={() => handleViewDN(dn)}
                             disabled={isSubmitting || !hasPermission('pending_deliveries', 'view')}
                             className={`whitespace-nowrap px-3 py-1 text-sm rounded-md ${
                               isSubmitting || !hasPermission('pending_deliveries', 'view')
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
-                          >
-                            View WO
-                          </Button>
-                          <Button
-                            onClick={() => handleViewDN(dn)}
-                            disabled={isSubmitting || !hasPermission('pending_deliveries', 'view') || isDNFileUploaded(dn)}
-                            className={`whitespace-nowrap px-3 py-1 text-sm rounded-md ${
-                              isSubmitting || !hasPermission('pending_deliveries', 'view') || isDNFileUploaded(dn)
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
                             }`}
                           >
                             View DN
@@ -667,196 +579,6 @@ const PendingDeliveries = () => {
           )}
         </Modal>
         <Modal
-          isOpen={state.isViewWOModalOpen}
-          onClose={() => setState((prev) => ({ ...prev, isViewWOModalOpen: false, selectedWO: null }))}
-          title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
-        >
-          {state.selectedWO && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-medium text-black">Company Details</h3>
-                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedDN).series_number}</p>
-                <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedDN).company_name}</p>
-                <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedDN).company_address}</p>
-                <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedDN).company_phone}</p>
-                <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedDN).company_email}</p>
-                <p><strong>Channel:</strong> {getQuotationDetails(state.selectedDN).channel}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Contact Details</h3>
-                <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedDN).contact_name}</p>
-                <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedDN).contact_email}</p>
-                <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedDN).contact_phone}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-                <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-                <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
-                <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
-                <p><strong>Invoice Status:</strong> {state.selectedWO.invoice_status || 'pending'}</p>
-                <p>
-                  <strong>Invoice File:</strong>{' '}
-                  {state.selectedWO.invoice_file ? (
-                    <a href={state.selectedWO.invoice_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                      View File
-                    </a>
-                  ) : (
-                    'N/A'
-                  )}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
-                {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-200">
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {state.selectedWO.items.map((item) => (
-                          <tr key={item.id} className="border">
-                            <td className="border p-2 whitespace-nowrap">
-                              {state.itemsList.find((i) => i.id === item.item)?.name || 'Not Provided'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">{item.quantity || 'Not Provided'}</td>
-                            <td className="border p-2 whitespace-nowrap">
-                              {state.units.find((u) => u.id === item.unit)?.name || 'Not Provided'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">{item.range || 'Not Provided'}</td>
-                            <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'Not Provided'}</td>
-                            <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'Not Provided'}</td>
-                            <td className="border p-2 whitespace-nowrap">
-                              {item.calibration_date
-                                ? new Date(item.calibration_date).toLocaleDateString()
-                                : 'Not Provided'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">
-                              {item.calibration_due_date
-                                ? new Date(item.calibration_due_date).toLocaleDateString()
-                                : 'Not Provided'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'Not Provided'}</td>
-                            <td className="border p-2 whitespace-nowrap">
-                              {item.certificate_file ? (
-                                <a
-                                  href={item.certificate_file}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-indigo-600 hover:underline"
-                                >
-                                  View Certificate
-                                </a>
-                              ) : (
-                                'Not Provided'
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No items available.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </Modal>
-        <Modal
-          isOpen={state.isViewPOModalOpen}
-          onClose={() => setState((prev) => ({ ...prev, isViewPOModalOpen: false, selectedPO: null }))}
-          title={`Purchase Order Details - ${state.selectedPO?.series_number || 'N/A'}`}
-        >
-          {state.selectedPO && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-medium text-black">Company Details</h3>
-                <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedDN).series_number}</p>
-                <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedDN).company_name}</p>
-                <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedDN).company_address}</p>
-                <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedDN).company_phone}</p>
-                <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedDN).company_email}</p>
-                <p><strong>Channel:</strong> {getQuotationDetails(state.selectedDN).channel}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Contact Details</h3>
-                <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedDN).contact_name}</p>
-                <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedDN).contact_email}</p>
-                <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedDN).contact_phone}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-                <p><strong>Series Number:</strong> {state.selectedPO.series_number || 'N/A'}</p>
-                <p><strong>Client PO Number:</strong> {state.selectedPO.client_po_number || 'N/A'}</p>
-                <p><strong>Order Type:</strong> {state.selectedPO.order_type || 'N/A'}</p>
-                <p><strong>Created:</strong> {state.selectedPO.created_at ? new Date(state.selectedPO.created_at).toLocaleDateString() : 'N/A'}</p>
-                <p>
-                  <strong>PO File:</strong>{' '}
-                  {state.selectedPO.po_file ? (
-                    <a href={state.selectedPO.po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                      View File
-                    </a>
-                  ) : (
-                    'N/A'
-                  )}
-                </p>
-                <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedDN).assigned_sales_person}</p>
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-black">Items</h3>
-                {state.selectedPO.items && state.selectedPO.items.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-200">
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                          <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {state.selectedPO.items.map((item) => (
-                          <tr key={item.id} className="border">
-                            <td className="border p-2 whitespace-nowrap">
-                              {state.itemsList.find((i) => i.id === item.item)?.name || item.item_name || 'N/A'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                            <td className="border p-2 whitespace-nowrap">
-                              {state.units.find((u) => u.id === item.unit)?.name || 'N/A'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">
-                              ${item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
-                            </td>
-                            <td className="border p-2 whitespace-nowrap">
-                              ${item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No items available.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </Modal>
-        <Modal
           isOpen={state.isCompleteModalOpen}
           onClose={() =>
             setState((prev) => ({
@@ -864,6 +586,7 @@ const PendingDeliveries = () => {
               isCompleteModalOpen: false,
               selectedDNForComplete: null,
               signedDeliveryNote: null,
+              dueInDays: '',
             }))
           }
           title={`Complete Delivery - ${state.selectedDNForComplete?.dn_number || 'N/A'}`}
@@ -880,6 +603,17 @@ const PendingDeliveries = () => {
                 disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days for Invoice</label>
+              <InputField
+                type="number"
+                value={state.dueInDays}
+                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+                min="1"
+                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button
                 onClick={() =>
@@ -888,6 +622,7 @@ const PendingDeliveries = () => {
                     isCompleteModalOpen: false,
                     selectedDNForComplete: null,
                     signedDeliveryNote: null,
+                    dueInDays: '',
                   }))
                 }
                 disabled={isSubmitting}
