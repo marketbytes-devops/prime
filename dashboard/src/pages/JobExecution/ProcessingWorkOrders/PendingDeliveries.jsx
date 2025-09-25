@@ -582,7 +582,6 @@ const PendingDeliveries = () => {
           title={`Complete Delivery - ${state.selectedDNForComplete?.dn_number || 'N/A'}`}
         >
           <div className="space-y-4">
-            <h2 className="text-lg font-medium text-black">Complete Delivery</h2>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Upload Signed Delivery Note</label>
               <input

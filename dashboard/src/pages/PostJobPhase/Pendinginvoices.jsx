@@ -473,77 +473,77 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (pair, newStatus) => {
-    const workOrder = pair.workOrder;
-    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-      toast.warn(
-        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
+const handleUpdateStatus = (pair, newStatus) => {
+  const workOrder = pair.workOrder;
+  if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+    toast.warn(
+      'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+      {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+      }
+    );
+    return;
+  }
+  setState((prev) => ({
+    ...prev,
+    isStatusModalOpen: true,
+    selectedWorkOrderId: workOrder.id,
+    selectedDNId: pair.deliveryNoteId,
+    newStatus,
+    dueInDays: '',
+    receivedDate: '',
+    originalInvoiceStatus: workOrder?.invoice_status || 'pending',
+    invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
+  }));
+};
+ 
+const handleStatusModalSubmit = () => {
+  const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
+  const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+  const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
+ 
+  if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
+    toast.error(
+      'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
+      {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+      }
+    );
+    return;
+  }
+  if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+    toast.error('Please enter a valid number of days.');
+    return;
+  }
+  if (newStatus === 'processed' && !receivedDate) {
+    toast.error('Please select a received date.');
+    return;
+  }
+  if (newStatus === 'processed') {
     setState((prev) => ({
       ...prev,
-      isStatusModalOpen: true,
-      selectedWorkOrderId: workOrder.id,
-      selectedDNId: pair.deliveryNoteId,
-      newStatus,
-      dueInDays: '',
-      receivedDate: '',
-      originalInvoiceStatus: workOrder?.invoice_status || 'pending',
-      invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
+      isStatusModalOpen: false,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: workOrder,
+      invoiceUpload: { invoiceFile: null },
+      invoiceUploadErrors: { invoiceFile: '' },
     }));
-  };
-
-  const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
-    const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
-    
-    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-      toast.error(
-        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-      toast.error('Please enter a valid number of days.');
-      return;
-    }
-    if (newStatus === 'processed' && !receivedDate) {
-      toast.error('Please select a received date.');
-      return;
-    }
-    if (newStatus === 'raised' || newStatus === 'processed') {
-      setState((prev) => ({
-        ...prev,
-        isStatusModalOpen: false,
-        isUploadInvoiceModalOpen: true,
-        selectedWOForInvoiceUpload: workOrder,
-        invoiceUpload: { invoiceFile: null },
-        invoiceUploadErrors: { invoiceFile: '' },
-      }));
-    } else {
-      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
-    }
-  };
+  } else {
+    confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
+  }
+};
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate, deliveryNoteId) => {
     try {
