@@ -16,7 +16,7 @@ const PendingInvoices = () => {
     itemsList: [],
     units: [],
     quotations: [],
-    channels: [], // Added channels to state
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -89,78 +89,79 @@ const PendingInvoices = () => {
     return perm && perm[`can_${action}`];
   };
 
-  const fetchData = async () => {
-    try {
-      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
-        apiClient.get('work-orders/'),
-        apiClient.get('purchase-orders/'),
-        apiClient.get('delivery-notes/'),
-        apiClient.get('technicians/'),
-        apiClient.get('items/'),
-        apiClient.get('units/'),
-        apiClient.get('quotations/'),
-        apiClient.get('channels/'), // Added fetch for channels
-      ]);
+const fetchData = async () => {
+  try {
+    const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
+      apiClient.get('work-orders/'),
+      apiClient.get('purchase-orders/'),
+      apiClient.get('delivery-notes/'),
+      apiClient.get('technicians/'),
+      apiClient.get('items/'),
+      apiClient.get('units/'),
+      apiClient.get('quotations/'),
+      apiClient.get('channels/'),
+    ]);
 
-      const deliveryNotes = dnRes.data
-        .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
-        .map((dn) => ({
-          ...dn,
-          items: dn.items.map((item) => ({
-            ...item,
-            uom: item.uom ? Number(item.uom) : null,
-            components: item.components || [],
-          })),
-        }));
-
-      const workOrders = woRes.data.map(wo => ({
-        ...wo,
-        invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
-      })) || [];
-
-      const workOrderDeliveryPairs = [];
-      
-      workOrders.forEach(workOrder => {
-        const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
-        
-        if (relatedDNs.length > 0) {
-          relatedDNs.forEach(dn => {
-            workOrderDeliveryPairs.push({
-              id: `${workOrder.id}-${dn.id}`,
-              workOrder: workOrder,
-              deliveryNote: dn,
-              workOrderId: workOrder.id,
-              deliveryNoteId: dn.id,
-            });
-          });
-        } else {
-          workOrderDeliveryPairs.push({
-            id: `${workOrder.id}-no-dn`,
-            workOrder: workOrder,
-            deliveryNote: null,
-            workOrderId: workOrder.id,
-            deliveryNoteId: null,
-          });
-        }
-      });
-
-      setState((prev) => ({
-        ...prev,
-        workOrders: workOrders,
-        purchaseOrders: poRes.data || [],
-        deliveryNotes: deliveryNotes,
-        technicians: techRes.data || [],
-        itemsList: itemsRes.data || [],
-        units: unitsRes.data || [],
-        quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
-        workOrderDeliveryPairs: workOrderDeliveryPairs,
+    const deliveryNotes = dnRes.data
+      .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
+      .map((dn) => ({
+        ...dn,
+        items: dn.items.map((item) => ({
+          ...item,
+          uom: item.uom ? Number(item.uom) : null,
+          components: item.components || [],
+        })),
       }));
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load data.');
-    }
-  };
+
+    const workOrders = woRes.data.map(wo => ({
+      ...wo,
+      invoice_status: wo.invoice_status ? wo.invoice_status.toLowerCase() : 'pending',
+    })) || [];
+
+    const workOrderDeliveryPairs = [];
+
+    workOrders.forEach(workOrder => {
+      const relatedDNs = deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
+
+      if (relatedDNs.length > 0) {
+        relatedDNs.forEach(dn => {
+          workOrderDeliveryPairs.push({
+            id: `${workOrder.id}-${dn.id}`,
+            workOrder: workOrder,
+            deliveryNote: dn,
+            workOrderId: workOrder.id,
+            deliveryNoteId: dn.id,
+          });
+        });
+      } else {
+        workOrderDeliveryPairs.push({
+          id: `${workOrder.id}-no-dn`,
+          workOrder: workOrder,
+          deliveryNote: null,
+          workOrderId: workOrder.id,
+          deliveryNoteId: null,
+        });
+      }
+    });
+
+    setState((prev) => ({
+      ...prev,
+      workOrders: workOrders,
+      purchaseOrders: poRes.data || [],
+      deliveryNotes: deliveryNotes,
+      technicians: techRes.data || [],
+      itemsList: itemsRes.data || [],
+      units: unitsRes.data || [],
+      quotations: quotationsRes.data || [],
+      channels: channelsRes.data || [],
+      workOrderDeliveryPairs: workOrderDeliveryPairs,
+    }));
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    toast.error('Failed to load data.');
+  }
+};
+
 
   useEffect(() => {
     fetchData();
@@ -474,23 +475,12 @@ const PendingInvoices = () => {
   };
 
   const handleUpdateStatus = (pair, newStatus) => {
-    const workOrder = pair.workOrder;
-    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-      toast.warn(
-        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-    setState((prev) => ({
+  const workOrder = pair.workOrder;
+  if (workOrder.invoice_status === 'processed') {
+    toast.error('Once processed, the invoice status cannot be changed.');
+    return;
+  }
+  setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
       selectedWorkOrderId: workOrder.id,
@@ -501,49 +491,41 @@ const PendingInvoices = () => {
       originalInvoiceStatus: workOrder?.invoice_status || 'pending',
       invoiceUploadType: newStatus === 'raised' ? 'Proforma' : newStatus === 'processed' ? 'Final' : '',
     }));
-  };
-  
-  const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
-    const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
-    const pair = state.workOrderDeliveryPairs.find(p => p.workOrderId === selectedWorkOrderId && p.deliveryNoteId === selectedDNId);
-  
-    if (workOrder.invoice_status === 'raised' && newStatus === 'raised') {
-      toast.error(
-        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-      toast.error('Please enter a valid number of days.');
-      return;
-    }
-    if (newStatus === 'processed' && !receivedDate) {
-      toast.error('Please select a received date.');
-      return;
-    }
-    if (newStatus === 'processed') {
-      setState((prev) => ({
-        ...prev,
-        isStatusModalOpen: false,
-        isUploadInvoiceModalOpen: true,
-        selectedWOForInvoiceUpload: workOrder,
-        invoiceUpload: { invoiceFile: null },
-        invoiceUploadErrors: { invoiceFile: '' },
-      }));
-    } else {
-      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
-    }
-  };
+};
+
+const handleStatusModalSubmit = () => {
+  const { selectedWorkOrderId, selectedDNId, newStatus, dueInDays, receivedDate } = state;
+  const workOrder = state.workOrders.find((wo) => wo.id === selectedWorkOrderId);
+
+  if (workOrder.invoice_status === 'processed') {
+    toast.error('Once processed, the invoice status cannot be changed.');
+    return;
+  }
+
+  if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+    toast.error('Please enter a valid number of days.');
+    return;
+  }
+
+  if (newStatus === 'processed' && !receivedDate) {
+    toast.error('Please select a received date.');
+    return;
+  }
+
+  if (newStatus === 'processed') {
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: false,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: workOrder,
+      invoiceUpload: { invoiceFile: null },
+      invoiceUploadErrors: { invoiceFile: '' },
+    }));
+  } else {
+    confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate, selectedDNId);
+  }
+};
+
 
   const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate, deliveryNoteId) => {
     try {
