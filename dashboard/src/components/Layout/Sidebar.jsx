@@ -49,29 +49,37 @@ const Sidebar = ({ toggleSidebar }) => {
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [declinedWOsCount, setDeclinedWOsCount] = useState(0);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndCounts = async () => {
       try {
-        const response = await apiClient.get("/profile/");
-        const user = response.data;
+        const [profileResponse, declinedWOsResponse] = await Promise.all([
+          apiClient.get("/profile/"),
+          apiClient.get("work-orders/", { params: { status: "Declined" } }),
+        ]);
+
+        const user = profileResponse.data;
         setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
         const roleId = user.role?.id;
         if (roleId) {
-          const res = await apiClient.get(`/roles/${roleId}/`);
-          setPermissions(res.data.permissions || []);
+          const roleResponse = await apiClient.get(`/roles/${roleId}/`);
+          setPermissions(roleResponse.data.permissions || []);
         } else {
           setPermissions([]);
         }
+
+        setDeclinedWOsCount(declinedWOsResponse.data?.length || 0);
       } catch (error) {
-        console.error("Unable to fetch user profile:", error);
+        console.error("Unable to fetch user profile or counts:", error);
         setPermissions([]);
         setIsSuperadmin(false);
+        setDeclinedWOsCount(0);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchProfile();
+    fetchProfileAndCounts();
   }, []);
 
   const hasPermission = (page, action) => {
@@ -189,6 +197,7 @@ const Sidebar = ({ toggleSidebar }) => {
               icon: <FileCheck className="w-5 h-5 mr-3" />,
               page: "declined_work_orders",
               action: "view",
+              badge: declinedWOsCount > 0 ? declinedWOsCount : null,
             },
           ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
         },
@@ -460,6 +469,11 @@ const Sidebar = ({ toggleSidebar }) => {
                       >
                         {subItem.icon}
                         {subItem.label}
+                        {subItem.badge && (
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                            {subItem.badge}
+                          </span>
+                        )}
                       </NavLink>
                     )}
                   </li>

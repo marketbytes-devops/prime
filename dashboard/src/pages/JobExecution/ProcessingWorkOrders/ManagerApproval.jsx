@@ -14,7 +14,7 @@ const ManagerApproval = () => {
     technicians: [],
     quotations: [],
     purchaseOrders: [],
-    channels: [], // Added channels to state
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
@@ -74,7 +74,7 @@ const ManagerApproval = () => {
         apiClient.get('quotations/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('series/'),
-        apiClient.get('channels/'), // Added fetch for channels
+        apiClient.get('channels/'),
       ]);
       setState((prev) => ({
         ...prev,
@@ -84,7 +84,7 @@ const ManagerApproval = () => {
         technicians: techRes.data || [],
         quotations: quotationsRes.data || [],
         purchaseOrders: poRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
+        channels: channelsRes.data || [],
       }));
       setSeriesList(seriesRes.data || []);
     } catch (error) {
@@ -106,7 +106,7 @@ const ManagerApproval = () => {
       company_address: quotation?.company_address || 'N/A',
       company_phone: quotation?.company_phone || 'N/A',
       company_email: quotation?.company_email || 'N/A',
-      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A', // Updated to use channels
+      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
       contact_name: quotation?.point_of_contact_name || 'N/A',
       contact_email: quotation?.point_of_contact_email || 'N/A',
       contact_phone: quotation?.point_of_contact_phone || 'N/A',
@@ -115,7 +115,7 @@ const ManagerApproval = () => {
       order_type: purchaseOrder?.order_type || 'N/A',
       created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
       po_file: purchaseOrder?.po_file || null,
-      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A', // Updated to use assigned_sales_person_name
+      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
     };
   };
 
@@ -165,14 +165,15 @@ const ManagerApproval = () => {
       await apiClient.post(`work-orders/${state.selectedWO.id}/decline/`, {
         decline_reason: state.declineReason,
       });
-      toast.success('Work Order declined and returned to Processing Work Orders.');
+      toast.success('Work Order declined and moved to Declined Work Orders.');
       setState((prev) => ({
         ...prev,
         isDeclineModalOpen: false,
         selectedWO: null,
         declineReason: '',
       }));
-      fetchData();
+      await fetchData();
+      navigate('/job-execution/processing-work-orders/declined-work-orders');
     } catch (error) {
       console.error('Error declining work order:', error);
       toast.error(error.response?.data?.error || 'Failed to decline Work Order.');
