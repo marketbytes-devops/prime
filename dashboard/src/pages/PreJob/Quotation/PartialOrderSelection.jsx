@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useLocation, useNavigate, unstable_useBlocker as useBlocker } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
@@ -30,16 +30,19 @@ const useQuantityAssignments = (items, numberOfPartialOrders) => {
       const newAssignments = { ...prev };
       const currentAssignment = newAssignments[itemId];
       
+      // Find existing assignment for this partial order
       const existingIndex = currentAssignment.assignments.findIndex(
         a => a.partialOrderIndex === partialIndex
       );
 
+      // Restore quantity from existing assignment
       if (existingIndex !== -1) {
         const existingQuantity = currentAssignment.assignments[existingIndex].quantity;
         newAssignments[itemId].remainingQuantity += existingQuantity;
         newAssignments[itemId].assignments.splice(existingIndex, 1);
       }
 
+      // Add new assignment if quantity > 0
       if (quantity > 0) {
         newAssignments[itemId].remainingQuantity -= quantity;
         newAssignments[itemId].assignments.push({
@@ -96,6 +99,7 @@ const PartialOrderSelection = () => {
   const [itemsList, setItemsList] = useState([]);
   const [isWorkflowCompleted, setIsWorkflowCompleted] = useState(false);
 
+  // Memoized processed items
   const processedItems = useMemo(() => {
     if (!quotationData?.items) return [];
     
@@ -116,6 +120,7 @@ const PartialOrderSelection = () => {
     initializeAssignments
   } = useQuantityAssignments(processedItems, numberOfPartialOrders);
 
+  // Cleanup function to delete partial orders
   const cleanupPartialOrders = useCallback(async () => {
     if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
       try {
@@ -124,31 +129,60 @@ const PartialOrderSelection = () => {
             apiClient.delete(`/purchase-orders/${order.id}/`)
           )
         );
-        setCreatedPartialOrders([]);
-        setCurrentPartialIndex(0);
-        initializeAssignments();
+        console.log("Cleaned up partial orders on navigation");
       } catch (error) {
         console.error("Error cleaning up partial orders:", error);
-        toast.error("Failed to clean up draft partial orders.");
       }
     }
-  }, [createdPartialOrders, isWorkflowCompleted, initializeAssignments]);
+  }, [createdPartialOrders, isWorkflowCompleted]);
 
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      createdPartialOrders.length > 0 &&
-      !isWorkflowCompleted &&
-      currentLocation.pathname !== nextLocation.pathname
-  );
-
+  // Handle browser navigation events (back button, refresh, close tab)
   useEffect(() => {
-    if (blocker.state === "blocked") {
-      cleanupPartialOrders().then(() => {
-        blocker.proceed();
-      });
-    }
-  }, [blocker, cleanupPartialOrders]);
+    const handleBeforeUnload = (event) => {
+      if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
+        // This will trigger the cleanup in the beforeunload event
+        cleanupPartialOrders();
+        
+        // Standard way to show browser confirmation dialog
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
 
+    const handlePopState = async (event) => {
+      if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
+        // Prevent the default back navigation
+        window.history.pushState(null, '', window.location.pathname);
+        
+        const confirmLeave = window.confirm(
+          "You have unsaved partial orders. If you leave now, they will be deleted. Do you want to continue?"
+        );
+        
+        if (confirmLeave) {
+          await cleanupPartialOrders();
+          // Navigate back after cleanup
+          window.history.back();
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    // Push current state to prevent immediate back navigation
+    if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [createdPartialOrders, isWorkflowCompleted, cleanupPartialOrders]);
+
+  // Navigation guard effect
   useEffect(() => {
     if (!quotationData?.items) {
       console.warn("No quotation data or items found:", quotationData);
@@ -158,6 +192,7 @@ const PartialOrderSelection = () => {
     }
   }, [quotationData, navigate]);
 
+  // Data fetching effect
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -268,7 +303,7 @@ const PartialOrderSelection = () => {
     const formData = new FormData();
     formData.append("quotation", quotationData.id);
     formData.append("order_type", "partial");
-    formData.append("is_draft", "true");
+    formData.append("is_draft", "true"); // Mark as draft - will be finalized only on finish
     formData.append(
       "items",
       JSON.stringify(
@@ -290,7 +325,7 @@ const PartialOrderSelection = () => {
 
       const newPartialOrder = {
         ...response.data,
-        isDraft: true,
+        isDraft: true, // Mark as draft locally
         items: response.data.items.map((item) => ({
           ...item,
           total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
@@ -327,12 +362,14 @@ const PartialOrderSelection = () => {
 
   const handleCancel = async () => {
     try {
+      // Delete all created partial orders
       await Promise.all(
         createdPartialOrders.map(order => 
           apiClient.delete(`/purchase-orders/${order.id}/`)
         )
       );
 
+      // Reset state
       setCreatedPartialOrders([]);
       setCurrentPartialIndex(0);
       setIsWorkflowCompleted(false);
@@ -357,6 +394,7 @@ const PartialOrderSelection = () => {
     }
 
     try {
+      // Finalize all draft partial orders by removing draft status
       const finalizePromises = createdPartialOrders.map(order =>
         apiClient.patch(`/purchase-orders/${order.id}/`, {
           is_draft: false
@@ -365,6 +403,7 @@ const PartialOrderSelection = () => {
 
       await Promise.all(finalizePromises);
 
+      // Update quotation workflow status
       await apiClient.patch(`/quotations/${quotationData.id}/`, {
         partial_order_workflow_completed: true,
       });
@@ -386,8 +425,18 @@ const PartialOrderSelection = () => {
   };
 
   const handlePrevious = async () => {
-    await cleanupPartialOrders();
-    navigate("/view-quotation");
+    if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
+      const confirmLeave = window.confirm(
+        "You have unsaved draft partial orders. If you leave now, they will be deleted. Do you want to continue?"
+      );
+      
+      if (confirmLeave) {
+        await cleanupPartialOrders();
+        navigate("/view-quotation");
+      }
+    } else {
+      navigate("/view-quotation");
+    }
   };
 
   const getItemDisplayName = (item) => {
@@ -406,7 +455,7 @@ const PartialOrderSelection = () => {
   };
 
   if (!quotationData?.items) {
-    return null;
+    return null; // Component will redirect via useEffect
   }
 
   return (
@@ -423,6 +472,7 @@ const PartialOrderSelection = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
+        {/* Number of Partial Orders Input */}
         <div className="mb-6">
           <InputField
             type="number"
@@ -436,6 +486,7 @@ const PartialOrderSelection = () => {
           />
         </div>
 
+        {/* Items Assignment Table */}
         <div className="mb-6">
           <h3 className="text-md font-semibold mb-3 text-black">
             {numberOfPartialOrders
@@ -503,6 +554,7 @@ const PartialOrderSelection = () => {
           </div>
         </div>
 
+        {/* Created Partial Orders Display */}
         {createdPartialOrders.length > 0 && (
           <div className="mb-6">
             <h3 className="text-md font-semibold mb-3 text-black">
@@ -559,6 +611,7 @@ const PartialOrderSelection = () => {
           </div>
         )}
 
+        {/* Action Buttons */}
         <div className="flex justify-end space-x-3">
           <button
             onClick={handleCancel}
@@ -592,6 +645,7 @@ const PartialOrderSelection = () => {
           </button>
         </div>
 
+        {/* Progress Indicator */}
         {numberOfPartialOrders && (
           <div className="mt-4 p-3 bg-gray-50 rounded-lg">
             <div className="flex justify-between text-sm text-gray-600">
