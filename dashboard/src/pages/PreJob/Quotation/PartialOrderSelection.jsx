@@ -2,12 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
- 
+import InputField from "../../../components/InputField";
+
 const PartialOrderSelection = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { quotationData } = location.state || {};
- 
+
   const [state, setState] = useState({
     numberOfPartialOrders: "",
     savedItems: [],
@@ -19,7 +20,7 @@ const PartialOrderSelection = () => {
     currentPartialIndex: 0,
     isWorkflowCompleted: false,
   });
- 
+
   useEffect(() => {
     if (!quotationData?.items) {
       console.warn("No quotation data or items found:", quotationData);
@@ -27,14 +28,14 @@ const PartialOrderSelection = () => {
       navigate("/view-quotation");
       return;
     }
- 
+
     const fetchData = async () => {
       try {
         const [unitsRes, itemsRes] = await Promise.all([
           apiClient.get("/units/"),
           apiClient.get("/items/"),
         ]);
- 
+
         const initialSavedItems = quotationData.items.map((item) => ({
           ...item,
           item_name: item.item_name || (item.item ? item.item.name : null),
@@ -43,7 +44,7 @@ const PartialOrderSelection = () => {
           unit: item.unit || null,
           unit_price: item.unit_price || 0,
         }));
- 
+
         const initialQuantityAssignments = {};
         initialSavedItems.forEach((item) => {
           initialQuantityAssignments[item.id] = {
@@ -51,7 +52,7 @@ const PartialOrderSelection = () => {
             assignments: [],
           };
         });
- 
+
         setState((prev) => ({
           ...prev,
           savedItems: initialSavedItems,
@@ -64,17 +65,17 @@ const PartialOrderSelection = () => {
         toast.error("Failed to load units or items.");
       }
     };
- 
+
     fetchData();
   }, [quotationData, navigate]);
- 
+
   const handleNumberOfPartialOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
     if (value && value < 1) {
       toast.error("Number of partial orders must be at least 1.");
       return;
     }
- 
+
     const initialQuantityAssignments = {};
     state.savedItems.forEach((item) => {
       initialQuantityAssignments[item.id] = {
@@ -82,7 +83,7 @@ const PartialOrderSelection = () => {
         assignments: [],
       };
     });
- 
+
     setState((prev) => ({
       ...prev,
       numberOfPartialOrders: value,
@@ -93,41 +94,41 @@ const PartialOrderSelection = () => {
       isWorkflowCompleted: false,
     }));
   };
- 
+
   const handleQuantityAssignment = (itemId, quantity) => {
     if (!state.numberOfPartialOrders) {
       toast.error("Please enter the number of partial orders first.");
       return;
     }
- 
+
     const assignedQuantity = quantity === "" ? 0 : parseInt(quantity, 10);
     const currentAssignment = state.quantityAssignments[itemId];
- 
+
     if (assignedQuantity < 0) {
       toast.error("Quantity cannot be negative.");
       return;
     }
- 
+
     if (assignedQuantity > currentAssignment.remainingQuantity) {
       toast.error(
         `Cannot assign more than ${currentAssignment.remainingQuantity} remaining quantity.`
       );
       return;
     }
- 
+
     setState((prev) => {
       const newQuantityAssignments = { ...prev.quantityAssignments };
       const existingAssignmentIndex = newQuantityAssignments[itemId].assignments.findIndex(
         (a) => a.partialOrderIndex === prev.currentPartialIndex
       );
- 
+
       if (existingAssignmentIndex !== -1) {
         const existingQuantity =
           newQuantityAssignments[itemId].assignments[existingAssignmentIndex].quantity;
         newQuantityAssignments[itemId].remainingQuantity += existingQuantity;
         newQuantityAssignments[itemId].assignments.splice(existingAssignmentIndex, 1);
       }
- 
+
       if (assignedQuantity > 0) {
         newQuantityAssignments[itemId].remainingQuantity -= assignedQuantity;
         newQuantityAssignments[itemId].assignments.push({
@@ -135,36 +136,36 @@ const PartialOrderSelection = () => {
           partialOrderIndex: prev.currentPartialIndex,
         });
       }
- 
+
       return {
         ...prev,
         quantityAssignments: newQuantityAssignments,
       };
     });
   };
- 
+
   const getCurrentPartialAssignment = (itemId) => {
     const assignment = state.quantityAssignments[itemId]?.assignments.find(
       (a) => a.partialOrderIndex === state.currentPartialIndex
     );
     return assignment?.quantity || "";
   };
- 
+
   const isGenerateDisabled = () => {
     const { numberOfPartialOrders, createdPartialOrders } = state;
     if (!numberOfPartialOrders) return true;
     if (createdPartialOrders.length >= numberOfPartialOrders) return true;
- 
+
     const hasAssignments = Object.values(state.quantityAssignments).some((assignment) =>
       assignment.assignments.some(
         (a) => a.partialOrderIndex === state.currentPartialIndex
       )
     );
- 
+
     if (!hasAssignments) return true;
     return false;
   };
- 
+
   const handleGeneratePartialOrder = async () => {
     let selectedItems = [];
     Object.entries(state.quantityAssignments).forEach(([itemId, assignment]) => {
@@ -179,12 +180,12 @@ const PartialOrderSelection = () => {
         });
       }
     });
- 
+
     if (!selectedItems.length) {
       toast.error("No valid items selected.");
       return;
     }
- 
+
     const formData = new FormData();
     formData.append("quotation", quotationData.id);
     formData.append("order_type", "partial");
@@ -201,12 +202,12 @@ const PartialOrderSelection = () => {
         }))
       )
     );
- 
+
     try {
       const response = await apiClient.post("/purchase-orders/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
- 
+
       setState((prev) => {
         const newCreatedPartialOrders = [
           ...prev.createdPartialOrders,
@@ -218,13 +219,13 @@ const PartialOrderSelection = () => {
             })),
           },
         ];
- 
+
         let isAllPartialsCreated =
           newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
           Object.values(prev.quantityAssignments).every(
             (assignment) => assignment.remainingQuantity === 0
           );
- 
+
         return {
           ...prev,
           createdPartialOrders: newCreatedPartialOrders,
@@ -233,24 +234,24 @@ const PartialOrderSelection = () => {
           isWorkflowCompleted: false,
         };
       });
- 
+
       toast.success(`Partial purchase order ${state.createdPartialOrders.length + 1} created successfully!`);
     } catch (error) {
       console.error("Error creating partial order:", error);
       toast.error("Failed to create partial order.");
     }
   };
- 
+
   const handleCancelPartial = async (index) => {
     const orderToCancel = state.createdPartialOrders[index];
     if (!orderToCancel) return;
- 
+
     try {
       await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`);
       setState((prev) => {
         const newCreatedPartialOrders = prev.createdPartialOrders.filter((_, i) => i !== index);
         const newQuantityAssignments = { ...prev.quantityAssignments };
- 
+
         Object.entries(newQuantityAssignments).forEach(([itemId, assignment]) => {
           const cancelledAssignment = assignment.assignments.find(
             (a) => a.partialOrderIndex === index
@@ -265,13 +266,13 @@ const PartialOrderSelection = () => {
             );
           }
         });
- 
+
         const isAllPartialsCreated =
           newCreatedPartialOrders.length === prev.numberOfPartialOrders &&
           Object.values(newQuantityAssignments).every(
             (assignment) => assignment.remainingQuantity === 0
           );
- 
+
         return {
           ...prev,
           createdPartialOrders: newCreatedPartialOrders,
@@ -281,20 +282,20 @@ const PartialOrderSelection = () => {
           isWorkflowCompleted: false,
         };
       });
- 
+
       toast.success(`Partial order ${index + 1} canceled successfully.`);
     } catch (error) {
       console.error("Error canceling partial order:", error);
       toast.error("Failed to cancel partial order.");
     }
   };
- 
+
   const handleCancel = async () => {
     try {
       for (const order of state.createdPartialOrders) {
         await apiClient.delete(`/purchase-orders/${order.id}/`);
       }
- 
+
       const initialQuantityAssignments = {};
       state.savedItems.forEach((item) => {
         initialQuantityAssignments[item.id] = {
@@ -302,7 +303,7 @@ const PartialOrderSelection = () => {
           assignments: [],
         };
       });
- 
+
       setState((prev) => ({
         ...prev,
         createdPartialOrders: [],
@@ -310,39 +311,39 @@ const PartialOrderSelection = () => {
         currentPartialIndex: 0,
         isWorkflowCompleted: false,
       }));
- 
+
       toast.info("All created partial orders have been reset.");
     } catch (error) {
       console.error("Error deleting partial orders:", error);
       toast.error("Failed to reset partial orders.");
     }
   };
- 
+
   const handleFinish = async () => {
     if (!state.numberOfPartialOrders || state.createdPartialOrders.length !== state.numberOfPartialOrders) {
       toast.error("Please create exactly the specified number of partial orders.");
       return;
     }
- 
+
     const hasRemainingQuantity = Object.values(state.quantityAssignments).some(
       (assignment) => assignment.remainingQuantity > 0
     );
- 
+
     if (hasRemainingQuantity) {
       toast.error("All item quantities must be fully assigned to partial orders.");
       return;
     }
- 
+
     try {
       await apiClient.patch(`/quotations/${quotationData.id}/`, {
         partial_order_workflow_completed: true,
       });
- 
+
       setState((prev) => ({
         ...prev,
         isWorkflowCompleted: true,
       }));
- 
+
       toast.success("Partial order workflow completed successfully!");
       navigate("/view-quotation", {
         state: {
@@ -356,7 +357,7 @@ const PartialOrderSelection = () => {
       toast.error("Failed to complete workflow.");
     }
   };
- 
+
   const handlePrevious = async () => {
     if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
       const confirmLeave = window.confirm(
@@ -377,9 +378,9 @@ const PartialOrderSelection = () => {
       navigate("/view-quotation");
     }
   };
- 
+
   const canCreateMore = state.createdPartialOrders.length < state.numberOfPartialOrders;
- 
+
   return (
     <div className="container mx-auto p-4 bg-transparent min-h-screen">
       <button
@@ -388,26 +389,25 @@ const PartialOrderSelection = () => {
       >
         Go Back
       </button>
- 
+
       <div className="flex justify-start items-center mb-4 mt-4">
         <h2 className="text-xl font-semibold text-black">Partial Order Selection</h2>
       </div>
- 
+
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Number of Partial Orders
-          </label>
-          <input
+          <InputField
             type="number"
+            label="Number of Partial Orders"
             value={state.numberOfPartialOrders}
             onChange={handleNumberOfPartialOrdersChange}
-            className="w-full p-2 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            min="1"
             placeholder="Enter number of partial orders"
+            min="1"
+            required
+            className="w-full"
           />
         </div>
- 
+
         <div className="mb-4">
           <h3 className="text-md font-semibold mb-2 text-black">
             {state.numberOfPartialOrders
@@ -442,14 +442,14 @@ const PartialOrderSelection = () => {
                     </td>
                     {state.numberOfPartialOrders && (
                       <td className="px-4 py-3 text-sm text-black">
-                        <input
+                        <InputField
                           type="number"
                           value={getCurrentPartialAssignment(item.id)}
                           onChange={(e) => handleQuantityAssignment(item.id, e.target.value)}
-                          className="w-full p-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          placeholder="0"
                           min="0"
                           max={state.quantityAssignments[item.id]?.remainingQuantity || 0}
-                          placeholder="0"
+                          className="w-full"
                         />
                       </td>
                     )}
@@ -465,7 +465,7 @@ const PartialOrderSelection = () => {
             </table>
           </div>
         </div>
- 
+
         {state.createdPartialOrders.length > 0 && (
           <div className="mb-6">
             <h3 className="text-md font-semibold mb-2 text-black">Created Partial Orders</h3>
@@ -516,7 +516,7 @@ const PartialOrderSelection = () => {
             ))}
           </div>
         )}
- 
+
         <div className="flex justify-end space-x-2">
           <button
             onClick={handleCancel}
@@ -550,5 +550,5 @@ const PartialOrderSelection = () => {
     </div>
   );
 };
- 
+
 export default PartialOrderSelection;
