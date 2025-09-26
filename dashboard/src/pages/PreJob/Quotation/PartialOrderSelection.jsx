@@ -69,6 +69,28 @@ const PartialOrderSelection = () => {
     fetchData();
   }, [quotationData, navigate]);
 
+  // Cleanup partial orders on navigation away (e.g., browser back button)
+  useEffect(() => {
+    const handleBeforeUnload = async (event) => {
+      if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
+        event.preventDefault();
+        try {
+          for (const order of state.createdPartialOrders) {
+            await apiClient.delete(`/purchase-orders/${order.id}/`);
+          }
+        } catch (error) {
+          console.error("Error cleaning up partial orders on unload:", error);
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [state.createdPartialOrders, state.isWorkflowCompleted]);
+
   const handleNumberOfPartialOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
     if (value && value < 1) {
@@ -360,23 +382,16 @@ const PartialOrderSelection = () => {
 
   const handlePrevious = async () => {
     if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
-      const confirmLeave = window.confirm(
-        "You have created partial orders but haven't completed the workflow. " +
-        "If you leave now, these partial orders will be deleted. Do you want to continue?"
-      );
-      if (confirmLeave) {
-        try {
-          for (const order of state.createdPartialOrders) {
-            await apiClient.delete(`/purchase-orders/${order.id}/`);
-          }
-        } catch (error) {
-          console.error("Error cleaning up partial orders:", error);
+      try {
+        for (const order of state.createdPartialOrders) {
+          await apiClient.delete(`/purchase-orders/${order.id}/`);
         }
-        navigate("/view-quotation");
+      } catch (error) {
+        console.error("Error cleaning up partial orders:", error);
+        toast.error("Failed to clean up partial orders.");
       }
-    } else {
-      navigate("/view-quotation");
     }
+    navigate("/view-quotation");
   };
 
   const canCreateMore = state.createdPartialOrders.length < state.numberOfPartialOrders;
