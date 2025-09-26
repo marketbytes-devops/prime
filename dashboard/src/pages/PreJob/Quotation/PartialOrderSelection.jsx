@@ -432,7 +432,7 @@ const PartialOrderSelection = () => {
             placeholder="Enter number of partial orders"
             min="1"
             required
-            className="w-full max-w-xs"
+            className="w-full"
           />
         </div>
 
