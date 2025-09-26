@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, unstable_useBlocker as useBlocker } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
@@ -69,27 +69,50 @@ const PartialOrderSelection = () => {
     fetchData();
   }, [quotationData, navigate]);
 
-  // Cleanup partial orders on navigation away (e.g., browser back button)
-  useEffect(() => {
-    const handleBeforeUnload = async (event) => {
-      if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
-        event.preventDefault();
-        try {
-          for (const order of state.createdPartialOrders) {
-            await apiClient.delete(`/purchase-orders/${order.id}/`);
-          }
-        } catch (error) {
-          console.error("Error cleaning up partial orders on unload:", error);
-        }
+  // Cleanup partial orders on navigation away
+  const cleanupPartialOrders = async () => {
+    if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
+      try {
+        await Promise.all(
+          state.createdPartialOrders.map((order) =>
+            apiClient.delete(`/purchase-orders/${order.id}/`)
+          )
+        );
+        setState((prev) => ({
+          ...prev,
+          createdPartialOrders: [],
+          currentPartialIndex: 0,
+          isAllPartialsCreated: false,
+          quantityAssignments: Object.keys(prev.quantityAssignments).reduce((acc, itemId) => {
+            acc[itemId] = {
+              remainingQuantity: prev.savedItems.find((item) => item.id === parseInt(itemId)).quantity,
+              assignments: [],
+            };
+            return acc;
+          }, {}),
+        }));
+      } catch (error) {
+        console.error("Error cleaning up partial orders:", error);
+        toast.error("Failed to clean up partial orders.");
       }
-    };
+    }
+  };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+  // Block navigation and clean up partial orders
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      state.createdPartialOrders.length > 0 &&
+      !state.isWorkflowCompleted &&
+      currentLocation.pathname !== nextLocation.pathname
+  );
 
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [state.createdPartialOrders, state.isWorkflowCompleted]);
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      cleanupPartialOrders().then(() => {
+        blocker.proceed();
+      });
+    }
+  }, [blocker]);
 
   const handleNumberOfPartialOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
@@ -314,9 +337,11 @@ const PartialOrderSelection = () => {
 
   const handleCancel = async () => {
     try {
-      for (const order of state.createdPartialOrders) {
-        await apiClient.delete(`/purchase-orders/${order.id}/`);
-      }
+      await Promise.all(
+        state.createdPartialOrders.map((order) =>
+          apiClient.delete(`/purchase-orders/${order.id}/`)
+        )
+      );
 
       const initialQuantityAssignments = {};
       state.savedItems.forEach((item) => {
@@ -331,6 +356,7 @@ const PartialOrderSelection = () => {
         createdPartialOrders: [],
         quantityAssignments: initialQuantityAssignments,
         currentPartialIndex: 0,
+        isAllPartialsCreated: false,
         isWorkflowCompleted: false,
       }));
 
@@ -381,16 +407,7 @@ const PartialOrderSelection = () => {
   };
 
   const handlePrevious = async () => {
-    if (state.createdPartialOrders.length > 0 && !state.isWorkflowCompleted) {
-      try {
-        for (const order of state.createdPartialOrders) {
-          await apiClient.delete(`/purchase-orders/${order.id}/`);
-        }
-      } catch (error) {
-        console.error("Error cleaning up partial orders:", error);
-        toast.error("Failed to clean up partial orders.");
-      }
-    }
+    await cleanupPartialOrders();
     navigate("/view-quotation");
   };
 
@@ -555,8 +572,9 @@ const PartialOrderSelection = () => {
             className={`px-3 py-2 rounded transition-colors duration-200 ${
               state.isAllPartialsCreated
                 ? "bg-green-500 text-white hover:bg-green-600"
-                : "bg-gray-200 text-black hover:bg-gray-300"
+                : "bg-gray-200 text-black hover:bg-gray-300 cursor-not-allowed"
             }`}
+            disabled={!state.isAllPartialsCreated}
           >
             Finish
           </button>
