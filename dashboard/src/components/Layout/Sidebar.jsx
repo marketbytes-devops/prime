@@ -49,7 +49,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [declinedWOsCount, setDeclinedWOsCount] = useState(0);
+  const [declinedWOsCount, setDeclinedWOsCount] = useState(null); // Initialize as null to indicate loading
 
   useEffect(() => {
     const fetchProfileAndCounts = async () => {
@@ -74,13 +74,29 @@ const Sidebar = ({ toggleSidebar }) => {
         console.error("Unable to fetch user profile or counts:", error);
         setPermissions([]);
         setIsSuperadmin(false);
-        setDeclinedWOsCount(0);
+        setDeclinedWOsCount(0); // Set to 0 only after confirming error
       } finally {
         setIsLoading(false);
       }
     };
     fetchProfileAndCounts();
   }, []);
+
+  // Refetch declined work orders count when navigating to relevant pages
+  useEffect(() => {
+    if (location.pathname.includes("/job-execution/processing-work-orders")) {
+      const fetchDeclinedWOsCount = async () => {
+        try {
+          const response = await apiClient.get("work-orders/", { params: { status: "Declined" } });
+          setDeclinedWOsCount(response.data?.length || 0);
+        } catch (error) {
+          console.error("Error fetching declined work orders count:", error);
+          setDeclinedWOsCount(0);
+        }
+      };
+      fetchDeclinedWOsCount();
+    }
+  }, [location.pathname]);
 
   const hasPermission = (page, action) => {
     if (isSuperadmin) return true;
@@ -362,8 +378,8 @@ const Sidebar = ({ toggleSidebar }) => {
     if (isLoading) {
       return (
         <div className="flex items-center px-3 py-3 rounded-lg text-sm font-medium text-gray-700">
-          {item.icon}
-          {item.label}
+          <span className="animate-pulse w-5 h-5 mr-3 bg-gray-200 rounded-full"></span>
+          <span className="animate-pulse w-24 h-4 bg-gray-200 rounded"></span>
         </div>
       );
     }
@@ -516,11 +532,17 @@ const Sidebar = ({ toggleSidebar }) => {
         <img src={logo} className="w-24" alt="Prime Logo" />
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {menuItems.map((item, index) => (
-            <li key={index}>{renderMenuItem(item)}</li>
-          ))}
-        </ul>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <span className="animate-pulse w-24 h-4 bg-gray-200 rounded"></span>
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {menuItems.map((item, index) => (
+              <li key={index}>{renderMenuItem(item)}</li>
+            ))}
+          </ul>
+        )}
       </nav>
     </motion.div>
   );
