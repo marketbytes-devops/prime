@@ -443,8 +443,9 @@ const PendingInvoices = () => {
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      const itemIds = state.selectedDNForInvoiceUpload.items.map(item => item.id);
-      formData.append('delivery_note_item_ids', JSON.stringify(itemIds));
+      // Use is_multiple_dns=true to update all items in the delivery note
+      formData.append('is_multiple_dns', 'true');
+      formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
       await apiClient.patch(
@@ -513,6 +514,48 @@ const PendingInvoices = () => {
     }));
   };
 
+  const confirmStatusUpdate = async (deliveryNoteId, newStatus, dueInDays) => {
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('invoice_status', newStatus);
+      if (newStatus === 'raised' && dueInDays) {
+        formData.append('due_in_days', parseInt(dueInDays));
+      }
+      // Use is_multiple_dns=true to update all items in the delivery note
+      formData.append('is_multiple_dns', 'true');
+      formData.append('delivery_note_id', deliveryNoteId);
+
+      const workOrderId = state.workOrderDeliveryPairs.find(
+        pair => pair.deliveryNoteId === deliveryNoteId
+      ).workOrderId;
+
+      await apiClient.patch(
+        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      toast.success('Delivery note invoice status updated successfully for all items.');
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        selectedWorkOrderId: null,
+        selectedDNId: null,
+        newStatus: '',
+        dueInDays: '',
+        receivedDate: '',
+        invoiceUploadType: '',
+      }));
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating delivery note invoice status:', error);
+      toast.error('Failed to update delivery note invoice status.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStatusModalSubmit = () => {
     const { selectedDNId, newStatus, dueInDays, receivedDate } = state;
 
@@ -563,48 +606,6 @@ const PendingInvoices = () => {
       }));
     } else {
       confirmStatusUpdate(selectedDNId, newStatus, dueInDays);
-    }
-  };
-
-  const confirmStatusUpdate = async (deliveryNoteId, newStatus, dueInDays) => {
-    try {
-      setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append('invoice_status', newStatus);
-      if (newStatus === 'raised' && dueInDays) {
-        formData.append('due_in_days', parseInt(dueInDays));
-      }
-      const deliveryNote = state.deliveryNotes.find(dn => dn.id === deliveryNoteId);
-      const itemIds = deliveryNote.items.map(item => item.id);
-      formData.append('delivery_note_item_ids', JSON.stringify(itemIds));
-
-      const workOrderId = state.workOrderDeliveryPairs.find(
-        pair => pair.deliveryNoteId === deliveryNoteId
-      ).workOrderId;
-
-      await apiClient.patch(
-        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      toast.success('Delivery note invoice status updated successfully for all items.');
-      setState((prev) => ({
-        ...prev,
-        isStatusModalOpen: false,
-        selectedWorkOrderId: null,
-        selectedDNId: null,
-        newStatus: '',
-        dueInDays: '',
-        receivedDate: '',
-        invoiceUploadType: '',
-      }));
-      await fetchData();
-    } catch (error) {
-      console.error('Error updating delivery note invoice status:', error);
-      toast.error('Failed to update delivery note invoice status.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
