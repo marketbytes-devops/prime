@@ -478,25 +478,18 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', state.newStatus);
-      
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      
-      const isMultipleDNs = state.workOrderDeliveryPairs.find(
+      if (state.selectedDNItemForInvoiceUpload && !state.workOrderDeliveryPairs.find(
         (pair) => pair.workOrderId === state.selectedWOForInvoiceUpload.id
-      )?.isMultipleDNs;
-      
-      if (isMultipleDNs) {
-        formData.append('is_multiple_dns', 'true');
-      } else {
-        if (state.selectedDNItemForInvoiceUpload) {
-          formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
-        }
-        formData.append('is_multiple_dns', 'false');
+      ).isMultipleDNs) {
+        formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
       }
-      
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
+      formData.append('is_multiple_dns', state.workOrderDeliveryPairs.find(
+        (pair) => pair.workOrderId === state.selectedWOForInvoiceUpload.id
+      ).isMultipleDNs);
 
       await apiClient.patch(
         `work-orders/${state.selectedWOForInvoiceUpload.id}/update-delivery-note-item-invoice-status/`,
@@ -589,16 +582,21 @@ const PendingInvoices = () => {
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
 
+    const selectedPair = state.workOrderDeliveryPairs.find(
+      (pair) => pair.workOrderId === selectedWorkOrderId
+    );
+
     let deliveryNoteItem = null;
-    if (!state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === selectedWorkOrderId).isMultipleDNs) {
-      for (const pair of state.workOrderDeliveryPairs) {
-        if (pair.deliveryNote && pair.deliveryNote.items) {
-          deliveryNoteItem = pair.deliveryNote.items.find((item) => item.id === selectedDNItemId);
-          if (deliveryNoteItem) break;
-        }
+    if (!selectedPair.isMultipleDNs) {
+      if (!selectedPair.deliveryNote || !selectedPair.deliveryNote.items) {
+        toast.error('No delivery note items found.');
+        return;
       }
+      deliveryNoteItem = selectedPair.deliveryNote.items.find(
+        (item) => item.invoice_status !== 'processed'
+      ) || selectedPair.deliveryNote.items[0];
       if (!deliveryNoteItem) {
-        toast.error('Delivery note item not found.');
+        toast.error('No valid delivery note item found.');
         return;
       }
     }
@@ -650,15 +648,14 @@ const PendingInvoices = () => {
         ...prev,
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
-        selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-          (pair) => pair.workOrderId === selectedWorkOrderId
-        ).workOrder,
+        selectedWOForInvoiceUpload: selectedPair.workOrder,
         selectedDNItemForInvoiceUpload: deliveryNoteItem,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUploadType: selectedPair.isMultipleDNs ? 'Unified' : 'Final',
       }));
     } else {
-      confirmStatusUpdate(selectedWorkOrderId, selectedDNItemId, newStatus, dueInDays, receivedDate);
+      confirmStatusUpdate(selectedWorkOrderId, deliveryNoteItem?.id || null, newStatus, dueInDays, receivedDate);
     }
   };
 
@@ -667,24 +664,19 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', newStatus);
-      
       if (newStatus === 'raised' && dueInDays) {
         formData.append('due_in_days', parseInt(dueInDays));
       }
       if (newStatus === 'processed' && receivedDate) {
         formData.append('received_date', receivedDate);
       }
-      
-      const isMultipleDNs = state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId)?.isMultipleDNs;
-      
-      if (isMultipleDNs) {
-        formData.append('is_multiple_dns', 'true');
-      } else {
-        if (deliveryNoteItemId) {
-          formData.append('delivery_note_item_id', deliveryNoteItemId);
-        }
-        formData.append('is_multiple_dns', 'false');
+      if (deliveryNoteItemId) {
+        formData.append('delivery_note_item_id', deliveryNoteItemId);
       }
+      formData.append(
+        'is_multiple_dns',
+        state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId).isMultipleDNs
+      );
 
       await apiClient.patch(
         `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
@@ -1006,7 +998,7 @@ const PendingInvoices = () => {
                               <div key={item.id} className="flex items-center gap-2">
                                 <select
                                   value={item.invoice_status || 'pending'}
-                                  onChange={(e) => handleUpdateStatus(pair, e.target.value, item)}
+                                  onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                                   disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
                                   className={`p-1 border rounded focus:outline-indigo-500 text-xs ${
                                     isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
