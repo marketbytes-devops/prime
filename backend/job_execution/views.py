@@ -199,15 +199,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         delivery_note_items = []
         if is_multiple_dns:
-            # Only update items in the relevant DN
-            delivery_note_id = request.data.get('delivery_note_id')
-            if not delivery_note_id:
-                return Response(
-                    {'error': 'delivery_note_id is required when is_multiple_dns is true'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
             delivery_note_items = DeliveryNoteItem.objects.filter(
-                delivery_note_id=delivery_note_id,
+                delivery_note__work_order=work_order,
                 invoice_status__in=['pending', 'raised']
             ).exclude(invoice_status='processed')
         elif delivery_note_item_id:
@@ -237,6 +230,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         {'error': "Cannot change invoice status from 'processed' to another status."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+
                 if new_status == 'raised':
                     if not due_in_days or int(due_in_days) <= 0:
                         return Response(
@@ -244,6 +238,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     delivery_note_item.due_in_days = int(due_in_days)
+
                 if new_status == 'processed':
                     if not received_date:
                         return Response(
@@ -251,10 +246,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     delivery_note_item.received_date = received_date
+
                 delivery_note_item.invoice_status = new_status
                 if invoice_file:
                     delivery_note_item.invoice_file = invoice_file
                 delivery_note_item.save()
+
                 previous_invoice_status = delivery_note_item.invoice_status
                 if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
                     serializer = WorkOrderSerializer()
@@ -263,7 +260,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         serializer = DeliveryNoteItemSerializer(delivery_note_items[0] if delivery_note_items else None)
         return Response(serializer.data)
-
 
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
