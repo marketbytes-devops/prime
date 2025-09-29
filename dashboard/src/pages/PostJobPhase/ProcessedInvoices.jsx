@@ -78,7 +78,7 @@ const ProcessedInvoices = () => {
       const deliveryNotes = dnRes.data
         .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
         .map((dn) => ({
-          ...dn,
+          ...cls
           items: dn.items.map((item) => ({
             ...item,
             uom: item.uom ? Number(item.uom) : null,
@@ -312,7 +312,9 @@ const ProcessedInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
-                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem ? getItemName(pair.deliveryNoteItem.item) : 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {pair.deliveryNoteItem ? `${getItemName(pair.deliveryNoteItem.item)} ${pair.deliveryNoteItem.range ? `(${pair.deliveryNoteItem.range})` : ''}` : 'N/A'}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.workOrder.created_at
                         ? new Date(pair.workOrder.created_at).toLocaleDateString()
@@ -424,18 +426,18 @@ const ProcessedInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).contact_phone}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
@@ -453,7 +455,7 @@ const ProcessedInvoices = () => {
                   'N/A'
                 )}
               </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.purchase_order === state.selectedPO.id)).assigned_sales_person}</p>
+              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.purchase_order === state.selectedPO.id)).assigned_sales_person}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -557,7 +559,7 @@ const ProcessedInvoices = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">{item.range || 'Not Provided'}</td>
                           <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'Not Provided'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'Not Provided'}</td>
+                          <td className="border p-2 text-left whitespace-nowrap">{item.certificate_number || 'Not Provided'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_date
                               ? new Date(item.calibration_date).toLocaleDateString()
@@ -605,18 +607,18 @@ const ProcessedInvoices = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).channel}</p>
+              <p><strong>Series Number:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).series_number}</p>
+              <p><strong>Company Name:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).company_name}</p>
+              <p><strong>Company Address:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).company_address}</p>
+              <p><strong>Company Phone:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).company_phone}</p>
+              <p><strong>Company Email:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).company_email}</p>
+              <p><strong>Channel:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).channel}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find(wo => wo.id === state.selectedDN.work_order_id)).contact_phone}</p>
+              <p><strong>Contact Name:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).contact_name}</p>
+              <p><strong>Contact Email:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).contact_email}</p>
+              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.workOrders.find((wo) => wo.id === state.selectedDN.work_order_id)).contact_phone}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Delivery Note Details</h3>
@@ -683,7 +685,7 @@ const ProcessedInvoices = () => {
                               'No components'
                             )}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">{item.invoice_status || 'Pending'}</td>
+                          <td className="border p-2 whitespace-nowrap">{item.invoice_status || 'Processed'}</td>
                         </tr>
                       ))}
                     </tbody>
