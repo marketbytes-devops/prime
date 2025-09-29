@@ -478,16 +478,25 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', state.newStatus);
+      
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      if (state.selectedDNItemForInvoiceUpload) {
-        formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
-      }
-      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
-      formData.append('is_multiple_dns', state.workOrderDeliveryPairs.find(
+      
+      const isMultipleDNs = state.workOrderDeliveryPairs.find(
         (pair) => pair.workOrderId === state.selectedWOForInvoiceUpload.id
-      ).isMultipleDNs);
+      )?.isMultipleDNs;
+      
+      if (isMultipleDNs) {
+        formData.append('is_multiple_dns', 'true');
+      } else {
+        if (state.selectedDNItemForInvoiceUpload) {
+          formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
+        }
+        formData.append('is_multiple_dns', 'false');
+      }
+      
+      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
       await apiClient.patch(
         `work-orders/${state.selectedWOForInvoiceUpload.id}/update-delivery-note-item-invoice-status/`,
@@ -658,19 +667,24 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', newStatus);
+      
       if (newStatus === 'raised' && dueInDays) {
         formData.append('due_in_days', parseInt(dueInDays));
       }
       if (newStatus === 'processed' && receivedDate) {
         formData.append('received_date', receivedDate);
       }
-      if (deliveryNoteItemId) {
-        formData.append('delivery_note_item_id', deliveryNoteItemId);
+      
+      const isMultipleDNs = state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId)?.isMultipleDNs;
+      
+      if (isMultipleDNs) {
+        formData.append('is_multiple_dns', 'true');
+      } else {
+        if (deliveryNoteItemId) {
+          formData.append('delivery_note_item_id', deliveryNoteItemId);
+        }
+        formData.append('is_multiple_dns', 'false');
       }
-      formData.append(
-        'is_multiple_dns',
-        state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId).isMultipleDNs
-      );
 
       await apiClient.patch(
         `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,

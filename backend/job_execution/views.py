@@ -182,61 +182,120 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
         invoice_file = request.FILES.get('invoice_file')
+        is_multiple_dns = request.data.get('is_multiple_dns', 'false').lower() == 'true'
 
-        if not delivery_note_item_id:
-            return Response(
-                {'error': 'Delivery note item ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         if not new_status:
             return Response(
                 {'error': 'Invoice status is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            delivery_note_item = DeliveryNoteItem.objects.get(id=delivery_note_item_id)
-        except DeliveryNoteItem.DoesNotExist:
-            return Response(
-                {'error': 'Delivery note item not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Handle unified invoice case (multiple delivery notes)
+        if is_multiple_dns:
+            try:
+                work_order = WorkOrder.objects.get(id=pk)
+                # Get all delivery notes for this work order
+                delivery_notes = work_order.delivery_notes.all()
+                delivery_note_items = []
+                
+                for dn in delivery_notes:
+                    for item in dn.items.all():
+                        if item.invoice_status != 'processed':  # Only update non-processed items
+                            delivery_note_items.append(item)
+                
+                if not delivery_note_items:
+                    return Response(
+                        {'error': 'No eligible delivery note items found for unified invoice update'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+            except WorkOrder.DoesNotExist:
+                return Response(
+                    {'error': 'Work order not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Handle single delivery note item case
+            if not delivery_note_item_id:
+                return Response(
+                    {'error': 'Delivery note item ID is required for single item update'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                delivery_note_item = DeliveryNoteItem.objects.get(id=delivery_note_item_id)
+                delivery_note_items = [delivery_note_item]
+            except DeliveryNoteItem.DoesNotExist:
+                return Response(
+                    {'error': 'Delivery note item not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
+        # Validation for status changes
+        for item in delivery_note_items:
+            if item.invoice_status == 'processed' and new_status != 'processed':
+                return Response(
+                    {'error': "Cannot change invoice status from 'processed' to another status."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Validation for raised status
         if new_status == 'raised':
             if not due_in_days or int(due_in_days) <= 0:
                 return Response(
                     {'error': 'Due in days is required and must be a positive integer for Raised status'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            delivery_note_item.due_in_days = int(due_in_days)
 
+        # Validation for processed status
         if new_status == 'processed':
             if not received_date:
                 return Response(
                     {'error': 'Received date is required for Processed status'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            delivery_note_item.received_date = received_date
+            if not invoice_file:
+                return Response(
+                    {'error': 'Invoice file is required for Processed status'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        if delivery_note_item.invoice_status == 'processed' and new_status != 'processed':
-            return Response(
-                {'error': "Cannot change invoice status from 'processed' to another status."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Update all items
+        updated_items = []
+        with transaction.atomic():
+            for item in delivery_note_items:
+                previous_status = item.invoice_status
+                item.invoice_status = new_status
+                
+                if new_status == 'raised' and due_in_days:
+                    item.due_in_days = int(due_in_days)
+                
+                if new_status == 'processed' and received_date:
+                    item.received_date = received_date
+                
+                if invoice_file:
+                    # For multiple items, save the same file reference
+                    item.invoice_file = invoice_file
+                
+                item.save()
+                updated_items.append(item)
+                
+                # Send email notification if status changed
+                if new_status != previous_status and new_status in ['raised', 'processed']:
+                    serializer = WorkOrderSerializer()
+                    email_sent = serializer.send_invoice_status_change_email(item, new_status)
+                    logger.info(f"Email sent status for DeliveryNoteItem {item.id}: {email_sent}")
 
-        previous_invoice_status = delivery_note_item.invoice_status
-        delivery_note_item.invoice_status = new_status
-        if invoice_file:
-            delivery_note_item.invoice_file = invoice_file
-        delivery_note_item.save()
-
-        if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
-            serializer = WorkOrderSerializer()
-            email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
-            logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
-
-        serializer = DeliveryNoteItemSerializer(delivery_note_item)
-        return Response(serializer.data)
+        # Return serialized data
+        if is_multiple_dns:
+            return Response({
+                'status': f'Updated {len(updated_items)} delivery note items to {new_status}',
+                'updated_items_count': len(updated_items),
+                'is_multiple_dns': True
+            })
+        else:
+            serializer = DeliveryNoteItemSerializer(updated_items[0])
+            return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
     def initiate_delivery(self, request, pk=None):
