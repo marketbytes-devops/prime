@@ -228,12 +228,12 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-  if (pair.deliveryNoteItem?.invoice_file) {
-    window.open(pair.deliveryNoteItem.invoice_file, '_blank');
-  } else {
-    toast.error('No invoice file available.');
-  }
-}
+      if (pair.deliveryNoteItem?.invoice_file) {
+        window.open(pair.deliveryNoteItem.invoice_file, '_blank');
+      } else {
+        toast.error('No invoice file available.');
+      }
+    }
   };
 
   const handleUploadPO = (pair) => {
@@ -487,88 +487,88 @@ const PendingInvoices = () => {
     }
   };
 
-const handleUpdateStatus = (pair, newStatus) => {
-  const deliveryNoteItem = pair.deliveryNoteItem;
-  if (!deliveryNoteItem) {
-    toast.error('Delivery note item not found.');
-    return;
-  }
-
-  // Check if this is part of a group
-  const workOrder = pair.workOrder;
-  const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
-  
-  // Identify grouped DNs (you'll need to implement your grouping logic here)
-  const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, pair.deliveryNote);
-  
-  if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
-    toast.warn(
-      'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-      {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      }
-    );
-    return;
-  }
-  
-  if (deliveryNoteItem.invoice_status === 'processed') {
-    toast.warn(
-      'The invoice status is already set to "Processed." It cannot be changed once processed.',
-      {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      }
-    );
-    return;
-  }
-
-  setState((prev) => ({
-    ...prev,
-    isStatusModalOpen: true,
-    selectedWorkOrderId: pair.workOrderId,
-    selectedDNId: pair.deliveryNoteId,
-    selectedDNItemId: deliveryNoteItem.id,
-    selectedGroupedDNs: groupedDNs, // Store the grouped DN IDs
-    newStatus,
-    dueInDays: '',
-    receivedDate: '',
-    originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
-    invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
-  }));
-};
-
-// Helper function to identify grouped DNs
-const identifyGroupedDNs = (workOrder, allDNs, currentDN) => {
-  // Implement your grouping logic here
-  // This is an example - adjust based on your actual grouping criteria
-  const groupedDNIds = [];
-  
-  // Example: Group DNs created within the same time frame (same day)
-  const currentDNDate = new Date(currentDN.created_at).toDateString();
-  
-  allDNs.forEach(dn => {
-    const dnDate = new Date(dn.created_at).toDateString();
-    if (dnDate === currentDNDate && dn.id !== currentDN.id) {
-      groupedDNIds.push(dn.id);
+  const handleUpdateStatus = (pair, newStatus) => {
+    const deliveryNoteItem = pair.deliveryNoteItem;
+    if (!deliveryNoteItem) {
+      toast.error('Delivery note item not found.');
+      return;
     }
-  });
-  
-  // Always include the current DN
-  groupedDNIds.push(currentDN.id);
-  
-  return groupedDNIds;
-};
+
+    // Check if this is part of a group
+    const workOrder = pair.workOrder;
+    const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
+
+    // Identify grouped DNs (you'll need to implement your grouping logic here)
+    const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, pair.deliveryNote);
+
+    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.warn(
+        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
+
+    if (deliveryNoteItem.invoice_status === 'processed') {
+      toast.warn(
+        'The invoice status is already set to "Processed." It cannot be changed once processed.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: true,
+      selectedWorkOrderId: pair.workOrderId,
+      selectedDNId: pair.deliveryNoteId,
+      selectedDNItemId: deliveryNoteItem.id,
+      selectedGroupedDNs: groupedDNs, // Store the grouped DN IDs
+      newStatus,
+      dueInDays: '',
+      receivedDate: '',
+      originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
+      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
+    }));
+  };
+
+  // Helper function to identify grouped DNs
+  const identifyGroupedDNs = (workOrder, allDNs, currentDN) => {
+    // Implement your grouping logic here
+    // This is an example - adjust based on your actual grouping criteria
+    const groupedDNIds = [];
+
+    // Example: Group DNs created within the same time frame (same day)
+    const currentDNDate = new Date(currentDN.created_at).toDateString();
+
+    allDNs.forEach(dn => {
+      const dnDate = new Date(dn.created_at).toDateString();
+      if (dnDate === currentDNDate && dn.id !== currentDN.id) {
+        groupedDNIds.push(dn.id);
+      }
+    });
+
+    // Always include the current DN
+    groupedDNIds.push(currentDN.id);
+
+    return groupedDNIds;
+  };
 
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
@@ -641,70 +641,70 @@ const identifyGroupedDNs = (workOrder, allDNs, currentDN) => {
   };
 
 
-const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
-  try {
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.append('invoice_status', newStatus);
-    
-    if (newStatus === 'raised' && dueInDays) {
-      formData.append('due_in_days', parseInt(dueInDays));
-    }
-    if (newStatus === 'processed' && receivedDate) {
-      formData.append('received_date', receivedDate);
-    }
-    
-    // Check if we have grouped DNs
-    const hasGroupedDNs = state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1;
-    
-    if (hasGroupedDNs) {
-      // For grouped DNs, send the list of DN IDs
-      formData.append('grouped_dn_ids', state.selectedGroupedDNs.join(','));
-      formData.append('is_multiple_dns', 'true');
-    } else {
-      // For single or non-grouped items
-      const pair = state.workOrderDeliveryPairs.find((p) => p.workOrderId === workOrderId);
-      const isMultipleDNs = pair ? pair.isMultipleDNs : false;
-      formData.append('is_multiple_dns', isMultipleDNs ? 'true' : 'false');
+  const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('invoice_status', newStatus);
 
-      if (!isMultipleDNs && deliveryNoteItemId) {
-        formData.append('delivery_note_item_id', deliveryNoteItemId);
-      } else if (!deliveryNoteItemId && !isMultipleDNs) {
-        toast.error('Delivery note item ID is missing.');
-        setIsSubmitting(false);
-        return;
+      if (newStatus === 'raised' && dueInDays) {
+        formData.append('due_in_days', parseInt(dueInDays));
       }
+      if (newStatus === 'processed' && receivedDate) {
+        formData.append('received_date', receivedDate);
+      }
+
+      // Check if we have grouped DNs
+      const hasGroupedDNs = state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1;
+
+      if (hasGroupedDNs) {
+        // For grouped DNs, send the list of DN IDs
+        formData.append('grouped_dn_ids', state.selectedGroupedDNs.join(','));
+        formData.append('is_multiple_dns', 'true');
+      } else {
+        // For single or non-grouped items
+        const pair = state.workOrderDeliveryPairs.find((p) => p.workOrderId === workOrderId);
+        const isMultipleDNs = pair ? pair.isMultipleDNs : false;
+        formData.append('is_multiple_dns', isMultipleDNs ? 'true' : 'false');
+
+        if (!isMultipleDNs && deliveryNoteItemId) {
+          formData.append('delivery_note_item_id', deliveryNoteItemId);
+        } else if (!deliveryNoteItemId && !isMultipleDNs) {
+          toast.error('Delivery note item ID is missing.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      await apiClient.patch(
+        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      toast.success('Invoice status updated successfully.');
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: false,
+        selectedWorkOrderId: null,
+        selectedDNId: null,
+        selectedDNItemId: null,
+        selectedGroupedDNs: [], // Reset grouped DNs
+        newStatus: '',
+        dueInDays: '',
+        receivedDate: '',
+        originalInvoiceStatus: '',
+        invoiceUploadType: '',
+      }));
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error('Failed to update invoice status.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    await apiClient.patch(
-      `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    );
-
-    toast.success('Invoice status updated successfully.');
-    setState((prev) => ({
-      ...prev,
-      isStatusModalOpen: false,
-      selectedWorkOrderId: null,
-      selectedDNId: null,
-      selectedDNItemId: null,
-      selectedGroupedDNs: [], // Reset grouped DNs
-      newStatus: '',
-      dueInDays: '',
-      receivedDate: '',
-      originalInvoiceStatus: '',
-      invoiceUploadType: '',
-    }));
-    await fetchData();
-  } catch (error) {
-    console.error('Error updating invoice status:', error);
-    console.error('Error response:', error.response?.data);
-    toast.error('Failed to update invoice status.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
 
   const isDUTComplete = (wo) => {
@@ -741,14 +741,14 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
     return deliveryNote && deliveryNote.signed_delivery_note;
   };
 
- const canUploadInvoice = (pair) => {
-  return (
-    isPOComplete(pair.workOrder) &&
-    isDUTComplete(pair.workOrder) &&
-    isDNComplete(pair.deliveryNote) &&
-    pair.deliveryNoteItem
-  );
-};
+  const canUploadInvoice = (pair) => {
+    return (
+      isPOComplete(pair.workOrder) &&
+      isDUTComplete(pair.workOrder) &&
+      isDNComplete(pair.deliveryNote) &&
+      pair.deliveryNoteItem
+    );
+  };
 
 
   const getAssignedTechnicians = (items) => {
@@ -814,12 +814,12 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
   };
 
   const isGroupedDN = (deliveryNote) => {
-  if (!deliveryNote) return false;
-  const workOrder = state.workOrders.find(wo => wo.id === deliveryNote.work_order_id);
-  const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === deliveryNote.work_order_id);
-  const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, deliveryNote);
-  return groupedDNs.length > 1;
-};
+    if (!deliveryNote) return false;
+    const workOrder = state.workOrders.find(wo => wo.id === deliveryNote.work_order_id);
+    const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === deliveryNote.work_order_id);
+    const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, deliveryNote);
+    return groupedDNs.length > 1;
+  };
 
   return (
     <div className="mx-auto p-4">
@@ -879,11 +879,11 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
-  {getDNSeriesNumber(pair.deliveryNote)}
-  {isGroupedDN(pair.deliveryNote) && (
-    <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">Grouped</span>
-  )}
-</td>
+                      {getDNSeriesNumber(pair.deliveryNote)}
+                      {isGroupedDN(pair.deliveryNote) && (
+                        <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">Grouped</span>
+                      )}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem ? getItemName(pair.deliveryNoteItem.item) : 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.workOrder.created_at
@@ -896,53 +896,49 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                         <Button
                           onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : isPOEmpty(pair.workOrder)
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
                         >
                           {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(pair, 'wo')}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-green-600 text-white hover:bg-green-700'
-                          }`}
+                            }`}
                         >
                           {isSubmitting ? 'Submitting...' : 'View WO'}
                         </Button>
                         <Button
                           onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : isDNReadyForUpload(pair.deliveryNote)
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                              : 'bg-purple-600 text-white hover:bg-purple-700'
-                          }`}
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
                         >
                           {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
                         </Button>
                         <Button
-  onClick={() => handleViewDocument(pair, 'invoice')}
-  disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file}
-  className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-    isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file
-      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-      : 'bg-indigo-600 text-white hover:bg-indigo-700'
-  }`}
->
-  {isSubmitting ? 'Submitting...' : pair.deliveryNoteItem?.invoice_file ? 'View Invoice' : 'No Invoice'}
-</Button>
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : pair.deliveryNoteItem?.invoice_file ? 'View Invoice' : 'No Invoice'}
+                        </Button>
 
-                        
+
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -951,11 +947,10 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                           value={pair.deliveryNoteItem.invoice_status || 'pending'}
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                          className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                          className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
                               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                               : ''
-                          }`}
+                            }`}
                         >
                           <option value="pending">Pending</option>
                           <option value="raised">Raised</option>
@@ -993,11 +988,10 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
             <Button
               onClick={handlePrev}
               disabled={state.currentPage === 1 || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === 1 || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === 1 || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Prev'}
             </Button>
@@ -1006,13 +1000,12 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 key={page}
                 onClick={() => handlePageChange(page)}
                 disabled={isSubmitting}
-                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
-                  isSubmitting
+                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${isSubmitting
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 {isSubmitting ? 'Submitting...' : page}
               </Button>
@@ -1020,11 +1013,10 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
             <Button
               onClick={handleNext}
               disabled={state.currentPage === totalPages || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === totalPages || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === totalPages || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Next'}
             </Button>
@@ -1157,7 +1149,7 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                        <th className= "border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
@@ -1416,22 +1408,20 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 poUploadErrors: { clientPoNumber: '', poFile: '' },
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
             </Button>
             <Button
               onClick={handlePOUploadSubmit}
               disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -1479,22 +1469,20 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 woUploadErrors: { certificateFile: '' },
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
             </Button>
             <Button
               onClick={handleWOUploadSubmit}
               disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -1542,22 +1530,20 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 dnUploadErrors: { signedDeliveryNote: '' },
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
             </Button>
             <Button
               onClick={handleUploadDNSubmit}
               disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -1625,22 +1611,20 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 originalInvoiceStatus: '',
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
             </Button>
             <Button
               onClick={handleInvoiceUploadSubmit}
               disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -1648,38 +1632,38 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
         </div>
       </Modal>
 
-<Modal
-  isOpen={state.isStatusModalOpen}
-  onClose={() => setState((prev) => ({
-    ...prev,
-    isStatusModalOpen: false,
-    selectedWorkOrderId: null,
-    selectedDNId: null,
-    selectedDNItemId: null,
-    selectedGroupedDNs: [],
-    newStatus: '',
-    dueInDays: '',
-    receivedDate: '',
-    originalInvoiceStatus: '',
-    invoiceUploadType: '',
-  }))}
-  title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
->
-  <div className="space-y-4">
-    {/* Show grouped DN information */}
-    {state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1 && (
-      <div className="bg-blue-50 p-3 rounded-md">
-        <p className="text-blue-700 text-sm font-medium">
-          This update will apply to {state.selectedGroupedDNs.length} grouped delivery notes
-        </p>
-      </div>
-    )}
-    
-    {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
-      <p className="text-red-500 text-sm">
-        Once submitted, the Proforma invoice cannot be updated to "Raised" again.
-      </p>
-    )}
+      <Modal
+        isOpen={state.isStatusModalOpen}
+        onClose={() => setState((prev) => ({
+          ...prev,
+          isStatusModalOpen: false,
+          selectedWorkOrderId: null,
+          selectedDNId: null,
+          selectedDNItemId: null,
+          selectedGroupedDNs: [],
+          newStatus: '',
+          dueInDays: '',
+          receivedDate: '',
+          originalInvoiceStatus: '',
+          invoiceUploadType: '',
+        }))}
+        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
+      >
+        <div className="space-y-4">
+          {/* Show grouped DN information */}
+          {state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1 && (
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-blue-700 text-sm font-medium">
+                This update will apply to {state.selectedGroupedDNs.length} grouped delivery notes
+              </p>
+            </div>
+          )}
+
+          {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
+            <p className="text-red-500 text-sm">
+              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
+            </p>
+          )}
           {state.newStatus === 'raised' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
@@ -1717,22 +1701,20 @@ const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, d
                 invoiceUploadType: '',
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
             </Button>
             <Button
               onClick={handleStatusModalSubmit}
               disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('pending_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
