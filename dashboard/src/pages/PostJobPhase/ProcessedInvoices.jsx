@@ -78,14 +78,14 @@ const ProcessedInvoices = () => {
       const deliveryNotes = dnRes.data
         .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
         .map((dn) => ({
-          ...cls
+          ...dn, 
           items: dn.items.map((item) => ({
             ...item,
             uom: item.uom ? Number(item.uom) : null,
             components: item.components || [],
             invoice_status: item.invoice_status ? item.invoice_status.toLowerCase() : 'pending',
           })),
-        }));
+      }));
 
       const workOrders = woRes.data || [];
 
