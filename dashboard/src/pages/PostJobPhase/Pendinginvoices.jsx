@@ -91,83 +91,84 @@ const PendingInvoices = () => {
     return perm && perm[`can_${action}`];
   };
 
-  const fetchData = async () => {
-    try {
-      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
-        apiClient.get('work-orders/'),
-        apiClient.get('purchase-orders/'),
-        apiClient.get('delivery-notes/'),
-        apiClient.get('technicians/'),
-        apiClient.get('items/'),
-        apiClient.get('units/'),
-        apiClient.get('quotations/'),
-        apiClient.get('channels/'),
-      ]);
+ const fetchData = async () => {
+  try {
+    const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
+      apiClient.get('work-orders/'),
+      apiClient.get('purchase-orders/'),
+      apiClient.get('delivery-notes/'),
+      apiClient.get('technicians/'),
+      apiClient.get('items/'),
+      apiClient.get('units/'),
+      apiClient.get('quotations/'),
+      apiClient.get('channels/'),
+    ]);
 
-      const deliveryNotes = dnRes.data
-        .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
-        .map((dn) => ({
-          ...dn,
-          items: dn.items.map((item) => ({
-            ...item,
-            uom: item.uom ? Number(item.uom) : null,
-            components: item.components || [],
-            invoice_status: item.invoice_status ? item.invoice_status.toLowerCase() : 'pending',
-          })),
-        }));
+    const deliveryNotes = dnRes.data
+      .filter((dn) => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN'))
+      .map((dn) => ({
+        ...dn,
+        items: dn.items.map((item) => ({
+          ...item,
+          uom: item.uom ? Number(item.uom) : null,
+          components: item.components || [],
+          invoice_status: item.invoice_status ? item.invoice_status.toLowerCase() : 'pending',
+        })),
+      }));
 
-      const workOrders = woRes.data || [];
+    const workOrders = woRes.data || [];
 
-      const workOrderDeliveryPairs = [];
-      workOrders.forEach((workOrder) => {
-        const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
-        const isMultipleDNs = relatedDNs.length > 1;
-        if (relatedDNs.length > 0) {
-          relatedDNs.forEach((dn) => {
-            dn.items.forEach((dnItem) => {
-              workOrderDeliveryPairs.push({
-                id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
-                workOrder,
-                deliveryNote: dn,
-                deliveryNoteItem: dnItem,
-                workOrderId: workOrder.id,
-                deliveryNoteId: dn.id,
-                deliveryNoteItemId: dnItem.id,
-                isMultipleDNs, // Add isMultipleDNs property
-              });
+    const workOrderDeliveryPairs = [];
+    workOrders.forEach((workOrder) => {
+      const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
+      const isMultipleDNs = relatedDNs.length > 1;
+      
+      if (relatedDNs.length > 0) {
+        relatedDNs.forEach((dn) => {
+          dn.items.forEach((dnItem) => {
+            workOrderDeliveryPairs.push({
+              id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
+              workOrder,
+              deliveryNote: dn,
+              deliveryNoteItem: dnItem,
+              workOrderId: workOrder.id,
+              deliveryNoteId: dn.id,
+              deliveryNoteItemId: dnItem.id,
+              isMultipleDNs, // This will be true if there are multiple DNs for this WO
             });
           });
-        } else {
-          workOrderDeliveryPairs.push({
-            id: `${workOrder.id}-no-dn`,
-            workOrder,
-            deliveryNote: null,
-            deliveryNoteItem: null,
-            workOrderId: workOrder.id,
-            deliveryNoteId: null,
-            deliveryNoteItemId: null,
-            isMultipleDNs: false, // Default to false when no delivery notes
-          });
-        }
-      });
+        });
+      } else {
+        workOrderDeliveryPairs.push({
+          id: `${workOrder.id}-no-dn`,
+          workOrder,
+          deliveryNote: null,
+          deliveryNoteItem: null,
+          workOrderId: workOrder.id,
+          deliveryNoteId: null,
+          deliveryNoteItemId: null,
+          isMultipleDNs: false,
+        });
+      }
+    });
 
-      setState((prev) => ({
-        ...prev,
-        workOrders,
-        purchaseOrders: poRes.data || [],
-        deliveryNotes,
-        technicians: techRes.data || [],
-        itemsList: itemsRes.data || [],
-        units: unitsRes.data || [],
-        quotations: quotationsRes.data || [],
-        channels: channelsRes.data || [],
-        workOrderDeliveryPairs,
-      }));
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load data.');
-    }
-  };
+    setState((prev) => ({
+      ...prev,
+      workOrders,
+      purchaseOrders: poRes.data || [],
+      deliveryNotes,
+      technicians: techRes.data || [],
+      itemsList: itemsRes.data || [],
+      units: unitsRes.data || [],
+      quotations: quotationsRes.data || [],
+      channels: channelsRes.data || [],
+      workOrderDeliveryPairs,
+    }));
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    toast.error('Failed to load data.');
+  }
+};
 
   useEffect(() => {
     fetchData();
@@ -606,71 +607,61 @@ const PendingInvoices = () => {
   };
 
 
-  const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
-    try {
-      setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append('invoice_status', newStatus);
-      if (newStatus === 'raised' && dueInDays) {
-        formData.append('due_in_days', parseInt(dueInDays));
-      }
-      if (newStatus === 'processed' && receivedDate) {
-        formData.append('received_date', receivedDate);
-      }
-      // Safely find the pair, defaulting to isMultipleDNs: false if not found
-      const pair = state.workOrderDeliveryPairs.find((p) => p.workOrderId === workOrderId);
-      const isMultipleDNs = pair ? pair.isMultipleDNs : false;
-      formData.append('is_multiple_dns', isMultipleDNs ? 'true' : 'false');
-
-      // Append delivery_note_item_id only for non-multiple DN cases
-      if (!isMultipleDNs && deliveryNoteItemId) {
-        formData.append('delivery_note_item_id', deliveryNoteItemId);
-      } else if (!deliveryNoteItemId && !isMultipleDNs) {
-        toast.error('Delivery note item ID is missing.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Debug logging - remove after testing
-      console.log('=== DEBUG INFO ===');
-      console.log('workOrderId:', workOrderId);
-      console.log('deliveryNoteItemId:', deliveryNoteItemId);
-      console.log('newStatus:', newStatus);
-      console.log('isMultipleDNs:', isMultipleDNs);
-      console.log('FormData contents:');
-      for (let [key, value] of formData.entries()) {
-        console.log(key, ':', value);
-      }
-      console.log('=================');
-
-      await apiClient.patch(
-        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      toast.success('Invoice status updated successfully.');
-      setState((prev) => ({
-        ...prev,
-        isStatusModalOpen: false,
-        selectedWorkOrderId: null,
-        selectedDNId: null,
-        selectedDNItemId: null,
-        newStatus: '',
-        dueInDays: '',
-        receivedDate: '',
-        originalInvoiceStatus: '',
-        invoiceUploadType: '',
-      }));
-      await fetchData();
-    } catch (error) {
-      console.error('Error updating invoice status:', error);
-      console.error('Error response:', error.response?.data);
-      toast.error('Failed to update invoice status.');
-    } finally {
-      setIsSubmitting(false);
+const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+  try {
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append('invoice_status', newStatus);
+    
+    if (newStatus === 'raised' && dueInDays) {
+      formData.append('due_in_days', parseInt(dueInDays));
     }
-  };
+    if (newStatus === 'processed' && receivedDate) {
+      formData.append('received_date', receivedDate);
+    }
+    
+    // Find the pair to determine if it's multiple DNs
+    const pair = state.workOrderDeliveryPairs.find((p) => 
+      p.workOrderId === workOrderId && p.deliveryNoteItemId === deliveryNoteItemId
+    );
+    
+    const isMultipleDNs = pair ? pair.isMultipleDNs : false;
+    formData.append('is_multiple_dns', isMultipleDNs ? 'true' : 'false');
+
+    // For multiple DNs, we don't send delivery_note_item_id
+    // For single DN, we send the specific item ID
+    if (!isMultipleDNs && deliveryNoteItemId) {
+      formData.append('delivery_note_item_id', deliveryNoteItemId);
+    }
+
+    await apiClient.patch(
+      `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    toast.success('Invoice status updated successfully.');
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: false,
+      selectedWorkOrderId: null,
+      selectedDNId: null,
+      selectedDNItemId: null,
+      newStatus: '',
+      dueInDays: '',
+      receivedDate: '',
+      originalInvoiceStatus: '',
+      invoiceUploadType: '',
+    }));
+    await fetchData();
+  } catch (error) {
+    console.error('Error updating invoice status:', error);
+    console.error('Error response:', error.response?.data);
+    toast.error('Failed to update invoice status.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
 
   const isDUTComplete = (wo) => {
