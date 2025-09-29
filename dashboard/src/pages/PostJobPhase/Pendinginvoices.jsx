@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
@@ -29,6 +29,8 @@ const PendingInvoices = () => {
     selectedDN: null,
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
+    selectedDNId: null,
+    selectedDNItemId: null,
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
@@ -43,6 +45,7 @@ const PendingInvoices = () => {
     dnUploadErrors: { signedDeliveryNote: '' },
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
+    selectedDNItemForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
     invoiceUploadType: '',
@@ -116,29 +119,20 @@ const PendingInvoices = () => {
       const workOrders = woRes.data || [];
 
       const workOrderDeliveryPairs = [];
-      const workOrderDNCount = {};
-
-      // Count delivery notes per work order
-      deliveryNotes.forEach((dn) => {
-        workOrderDNCount[dn.work_order_id] = (workOrderDNCount[dn.work_order_id] || 0) + 1;
-      });
 
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
-        const isMultipleDNs = workOrderDNCount[workOrder.id] > 1;
-
         if (relatedDNs.length > 0) {
+          // Create one pair per delivery note, not per item
           relatedDNs.forEach((dn) => {
             workOrderDeliveryPairs.push({
               id: `${workOrder.id}-${dn.id}`,
               workOrder,
               deliveryNote: dn,
-              deliveryNoteItem: null,
+              deliveryNoteItem: null, // Set to null since we're working with the entire DN
               workOrderId: workOrder.id,
               deliveryNoteId: dn.id,
-              deliveryNoteItemId: null,
-              isMultipleDNs,
-              unifiedInvoiceStatus: isMultipleDNs ? dn.items[0]?.invoice_status || 'pending' : null,
+              deliveryNoteItemId: null, // Set to null
             });
           });
         } else {
@@ -150,8 +144,6 @@ const PendingInvoices = () => {
             workOrderId: workOrder.id,
             deliveryNoteId: null,
             deliveryNoteItemId: null,
-            isMultipleDNs: false,
-            unifiedInvoiceStatus: null,
           });
         }
       });
@@ -231,35 +223,22 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      if (pair.isMultipleDNs) {
-        // For multiple DNs, check unified invoice file across related DNs
-        const relatedPairs = state.workOrderDeliveryPairs.filter(
-          (p) => p.workOrderId === pair.workOrderId && p.deliveryNote
-        );
-        const invoiceFiles = relatedPairs
-          .flatMap((p) => p.deliveryNote.items)
-          .filter((item) => item.invoice_file);
-        if (invoiceFiles.length > 0) {
-          window.open(invoiceFiles[0].invoice_file, '_blank');
-        } else {
-          toast.error('No invoice files available.');
-        }
-      } else {
-        // For single DN, check individual items
-        if (pair.deliveryNote && pair.deliveryNote.items) {
-          const itemsWithInvoices = pair.deliveryNote.items.filter((item) => item.invoice_file);
-          if (itemsWithInvoices.length > 0) {
-            if (itemsWithInvoices.length === 1) {
-              window.open(itemsWithInvoices[0].invoice_file, '_blank');
-            } else {
-              window.open(itemsWithInvoices[0].invoice_file, '_blank');
-            }
+      // Show all invoice files for the delivery note
+      if (pair.deliveryNote && pair.deliveryNote.items) {
+        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
+        if (itemsWithInvoices.length > 0) {
+          // If there's only one, open it directly
+          if (itemsWithInvoices.length === 1) {
+            window.open(itemsWithInvoices[0].invoice_file, '_blank');
           } else {
-            toast.error('No invoice files available.');
+            // Show a selection modal or open all (for now, open the first one)
+            window.open(itemsWithInvoices[0].invoice_file, '_blank');
           }
         } else {
           toast.error('No invoice files available.');
         }
+      } else {
+        toast.error('No invoice files available.');
       }
     }
   };
@@ -438,9 +417,17 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (pair) => {
+  const handleUploadInvoice = (pair, deliveryNoteItem = null) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       toast.error('No delivery note items found.');
+      return;
+    }
+
+    // If no specific item is provided, take the first available item that's not processed
+    const targetItem = deliveryNoteItem || pair.deliveryNote.items.find(item => item.invoice_status !== 'processed');
+    
+    if (!targetItem) {
+      toast.error('No available delivery note item found.');
       return;
     }
 
@@ -448,9 +435,10 @@ const PendingInvoices = () => {
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: pair.workOrder,
+      selectedDNItemForInvoiceUpload: targetItem,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
-      invoiceUploadType: pair.isMultipleDNs ? 'Final' : 'Final',
+      invoiceUploadType: 'Final',
       newStatus: 'processed',
     }));
   };
@@ -477,10 +465,11 @@ const PendingInvoices = () => {
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
+      formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
       await apiClient.patch(
-        `work-orders/${state.selectedWOForInvoiceUpload.id}/update-work-order-invoice-status/`,
+        `work-orders/${state.selectedWOForInvoiceUpload.id}/update-delivery-note-item-invoice-status/`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
@@ -490,11 +479,14 @@ const PendingInvoices = () => {
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
+        selectedDNItemForInvoiceUpload: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: '',
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
+        selectedDNId: null,
+        selectedDNItemId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
@@ -509,111 +501,79 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (pair, newStatus) => {
+  const handleUpdateStatus = (pair, newStatus, deliveryNoteItem = null) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       toast.error('No delivery note items found.');
       return;
     }
 
-    // Check unified status for multiple DNs
-    if (pair.isMultipleDNs) {
-      const relatedPairs = state.workOrderDeliveryPairs.filter(
-        (p) => p.workOrderId === pair.workOrderId && p.deliveryNote
+    // If no specific item is provided, take the first available item
+    const targetItem = deliveryNoteItem || pair.deliveryNote.items[0];
+
+    if (targetItem.invoice_status === 'raised' && newStatus === 'raised') {
+      toast.warn(
+        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
       );
-      const unifiedStatus = relatedPairs[0]?.unifiedInvoiceStatus || 'pending';
-      if (unifiedStatus === 'raised' && newStatus === 'raised') {
-        toast.warn(
-          'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            theme: 'colored',
-          }
-        );
-        return;
-      }
-      if (unifiedStatus === 'processed') {
-        toast.warn(
-          'The invoice status is already set to "Processed." It cannot be changed once processed.',
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            theme: 'colored',
-          }
-        );
-        return;
-      }
-    } else {
-      // For single DN, check individual items
-      const targetItem = pair.deliveryNote.items[0];
-      if (targetItem.invoice_status === 'raised' && newStatus === 'raised') {
-        toast.warn(
-          'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            theme: 'colored',
-          }
-        );
-        return;
-      }
-      if (targetItem.invoice_status === 'processed') {
-        toast.warn(
-          'The invoice status is already set to "Processed." It cannot be changed once processed.',
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            theme: 'colored',
-          }
-        );
-        return;
-      }
+      return;
+    }
+
+    if (targetItem.invoice_status === 'processed') {
+      toast.warn(
+        'The invoice status is already set to "Processed." It cannot be changed once processed.',
+        {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: 'colored',
+        }
+      );
+      return;
     }
 
     setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
       selectedWorkOrderId: pair.workOrderId,
+      selectedDNId: pair.deliveryNoteId,
+      selectedDNItemId: targetItem.id,
       newStatus,
       dueInDays: '',
       receivedDate: '',
-      originalInvoiceStatus: pair.isMultipleDNs ? pair.unifiedInvoiceStatus : pair.deliveryNote.items[0]?.invoice_status || 'pending',
+      originalInvoiceStatus: targetItem.invoice_status || 'pending',
       invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
     }));
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, newStatus, dueInDays, receivedDate } = state;
+    const { selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
+    
+    // Find the delivery note item across all pairs
+    let deliveryNoteItem = null;
+    for (const pair of state.workOrderDeliveryPairs) {
+      if (pair.deliveryNote && pair.deliveryNote.items) {
+        deliveryNoteItem = pair.deliveryNote.items.find(item => item.id === selectedDNItemId);
+        if (deliveryNoteItem) break;
+      }
+    }
 
-    const relatedPairs = state.workOrderDeliveryPairs.filter(
-      (p) => p.workOrderId === selectedWorkOrderId && p.deliveryNote
-    );
-
-    if (relatedPairs.length === 0) {
-      toast.error('No delivery notes found for this work order.');
+    if (!deliveryNoteItem) {
+      toast.error('Delivery note item not found.');
       return;
     }
 
-    const isMultipleDNs = relatedPairs[0].isMultipleDNs;
-    let unifiedStatus = isMultipleDNs ? relatedPairs[0].unifiedInvoiceStatus : relatedPairs[0].deliveryNote.items[0]?.invoice_status || 'pending';
-
-    if (unifiedStatus === 'raised' && newStatus === 'raised') {
+    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
       toast.error(
         'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
         {
@@ -629,7 +589,7 @@ const PendingInvoices = () => {
       return;
     }
 
-    if (unifiedStatus === 'processed') {
+    if (deliveryNoteItem.invoice_status === 'processed') {
       toast.error(
         'The invoice status is already "Processed" and cannot be changed.',
         {
@@ -661,17 +621,19 @@ const PendingInvoices = () => {
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
         selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-          (pair) => pair.workOrderId === selectedWorkOrderId
+          pair => pair.deliveryNote && pair.deliveryNote.items && 
+          pair.deliveryNote.items.some(item => item.id === selectedDNItemId)
         ).workOrder,
+        selectedDNItemForInvoiceUpload: deliveryNoteItem,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
       }));
     } else {
-      confirmStatusUpdate(selectedWorkOrderId, newStatus, dueInDays, receivedDate);
+      confirmStatusUpdate(selectedDNItemId, newStatus, dueInDays, receivedDate);
     }
   };
 
-  const confirmStatusUpdate = async (workOrderId, newStatus, dueInDays, receivedDate) => {
+  const confirmStatusUpdate = async (deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
@@ -679,21 +641,26 @@ const PendingInvoices = () => {
       if (newStatus === 'raised' && dueInDays) {
         formData.append('due_in_days', parseInt(dueInDays));
       }
-      if (newStatus === 'processed' && receivedDate) {
-        formData.append('received_date', receivedDate);
-      }
+      formData.append('delivery_note_item_id', deliveryNoteItemId);
+
+      const workOrderId = state.workOrderDeliveryPairs.find(
+        pair => pair.deliveryNote && pair.deliveryNote.items && 
+        pair.deliveryNote.items.some(item => item.id === deliveryNoteItemId)
+      ).workOrderId;
 
       await apiClient.patch(
-        `work-orders/${workOrderId}/update-work-order-invoice-status/`,
+        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      toast.success('Work order invoice status updated successfully.');
+      toast.success('Delivery note item invoice status updated successfully.');
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
+        selectedDNId: null,
+        selectedDNItemId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
@@ -702,8 +669,8 @@ const PendingInvoices = () => {
       }));
       await fetchData();
     } catch (error) {
-      console.error('Error updating work order invoice status:', error);
-      toast.error('Failed to update work order invoice status.');
+      console.error('Error updating delivery note item invoice status:', error);
+      toast.error('Failed to update delivery note item invoice status.');
     } finally {
       setIsSubmitting(false);
     }
@@ -747,7 +714,10 @@ const PendingInvoices = () => {
     return (
       isPOComplete(pair.workOrder) &&
       isDUTComplete(pair.workOrder) &&
-      isDNComplete(pair.deliveryNote)
+      isDNComplete(pair.deliveryNote) &&
+      pair.deliveryNote && 
+      pair.deliveryNote.items && 
+      pair.deliveryNote.items.some(item => item.invoice_status !== 'processed')
     );
   };
 
@@ -774,11 +744,6 @@ const PendingInvoices = () => {
   };
 
   const filteredPairs = state.workOrderDeliveryPairs
-    .filter((pair, index, self) =>
-      pair.isMultipleDNs
-        ? index === self.findIndex((p) => p.workOrderId === pair.workOrderId)
-        : true
-    )
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
@@ -875,27 +840,9 @@ const PendingInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">
-                      {pair.isMultipleDNs
-                        ? state.workOrderDeliveryPairs
-                            .filter((p) => p.workOrderId === pair.workOrderId && p.deliveryNote)
-                            .map((p) => getDNSeriesNumber(p.deliveryNote))
-                            .join(', ')
-                        : getDNSeriesNumber(pair.deliveryNote)}
-                    </td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {pair.isMultipleDNs ? (
-                        <div className="space-y-1 max-w-xs">
-                          {state.workOrderDeliveryPairs
-                            .filter((p) => p.workOrderId === pair.workOrderId && p.deliveryNote)
-                            .flatMap((p) => p.deliveryNote.items)
-                            .map((item, itemIndex) => (
-                              <div key={item.id} className="text-sm">
-                                {getItemName(item.item)} {item.range && `(${item.range})`}
-                              </div>
-                            ))}
-                        </div>
-                      ) : pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                         <div className="space-y-1 max-w-xs">
                           {pair.deliveryNote.items.map((item, itemIndex) => (
                             <div key={item.id} className="text-sm">
@@ -955,58 +902,28 @@ const PendingInvoices = () => {
                         <Button
                           onClick={() => handleViewDocument(pair, 'invoice')}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || 
-                            (pair.isMultipleDNs
-                              ? !state.workOrderDeliveryPairs
-                                  .filter((p) => p.workOrderId === pair.workOrderId && p.deliveryNote)
-                                  .flatMap((p) => p.deliveryNote.items)
-                                  .some((item) => item.invoice_file)
-                              : !(pair.deliveryNote && pair.deliveryNote.items && 
-                                  pair.deliveryNote.items.some((item) => item.invoice_file)))}
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             isSubmitting || !hasPermission('pending_invoices', 'view') || 
-                            (pair.isMultipleDNs
-                              ? !state.workOrderDeliveryPairs
-                                  .filter((p) => p.workOrderId === pair.workOrderId && p.deliveryNote)
-                                  .flatMap((p) => p.deliveryNote.items)
-                                  .some((item) => item.invoice_file)
-                              : !(pair.deliveryNote && pair.deliveryNote.items && 
-                                  pair.deliveryNote.items.some((item) => item.invoice_file)))
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
                           {isSubmitting ? 'Submitting...' : 
-                           (pair.isMultipleDNs
-                            ? state.workOrderDeliveryPairs
-                                .filter((p) => p.workOrderId === pair.workOrderId && p.deliveryNote)
-                                .flatMap((p) => p.deliveryNote.items)
-                                .some((item) => item.invoice_file)
-                            : pair.deliveryNote && pair.deliveryNote.items && 
-                              pair.deliveryNote.items.some((item) => item.invoice_file))
-                              ? 'View Invoice' : 'No Invoice'}
+                           (pair.deliveryNote && pair.deliveryNote.items && 
+                            pair.deliveryNote.items.some(item => item.invoice_file)) ? 'View Invoice' : 'No Invoice'}
                         </Button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {pair.isMultipleDNs ? (
-                        <select
-                          value={pair.unifiedInvoiceStatus || 'pending'}
-                          onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                          className={`p-1 border rounded focus:outline-indigo-500 text-xs ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                              : ''
-                          }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="raised">Raised</option>
-                          <option value="processed">Processed</option>
-                        </select>
-                      ) : pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                         <div className="space-y-1 max-w-xs">
                           {pair.deliveryNote.items.map((item, itemIndex) => (
                             <div key={item.id} className="flex items-center gap-2">
+                              {/* <span className="text-xs text-gray-600">{getItemName(item.item)}:</span> */}
                               <select
                                 value={item.invoice_status || 'pending'}
                                 onChange={(e) => handleUpdateStatus(pair, e.target.value, item)}
@@ -1061,7 +978,7 @@ const PendingInvoices = () => {
                 }`}
               >
                 {isSubmitting ? 'Submitting...' : page}
-            </Button>
+              </Button>
             ))}
             <Button
               onClick={handleNext}
@@ -1617,17 +1534,20 @@ const PendingInvoices = () => {
           ...prev,
           isUploadInvoiceModalOpen: false,
           selectedWOForInvoiceUpload: null,
+          selectedDNItemForInvoiceUpload: null,
           invoiceUpload: { invoiceFile: null },
           invoiceUploadErrors: { invoiceFile: '' },
           invoiceUploadType: '',
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
+          selectedDNId: null,
+          selectedDNItemId: null,
           newStatus: '',
           dueInDays: '',
           receivedDate: '',
           originalInvoiceStatus: '',
         }))}
-        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - Item: ${state.selectedDNItemForInvoiceUpload ? getItemName(state.selectedDNItemForInvoiceUpload.item) : 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
@@ -1654,11 +1574,14 @@ const PendingInvoices = () => {
                 ...prev,
                 isUploadInvoiceModalOpen: false,
                 selectedWOForInvoiceUpload: null,
+                selectedDNItemForInvoiceUpload: null,
                 invoiceUpload: { invoiceFile: null },
                 invoiceUploadErrors: { invoiceFile: '' },
                 invoiceUploadType: '',
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
+                selectedDNId: null,
+                selectedDNItemId: null,
                 newStatus: '',
                 dueInDays: '',
                 receivedDate: '',
