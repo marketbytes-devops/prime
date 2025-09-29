@@ -443,7 +443,6 @@ const PendingInvoices = () => {
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      // Send all item IDs for the delivery note
       const itemIds = state.selectedDNForInvoiceUpload.items.map(item => item.id);
       formData.append('delivery_note_item_ids', JSON.stringify(itemIds));
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
@@ -486,9 +485,9 @@ const PendingInvoices = () => {
     }
 
     const allItemsProcessed = pair.deliveryNote.items.every(item => item.invoice_status === 'processed');
-    if (allItemsProcessed) {
+    if (allItemsProcessed && newStatus !== 'pending') {
       toast.warn(
-        'The invoice status for all items is already set to "Processed." It cannot be changed once processed.',
+        'The invoice status for all items is already set to "Processed." It cannot be changed except to "Pending."',
         {
           position: 'top-right',
           autoClose: 5000,
@@ -508,8 +507,8 @@ const PendingInvoices = () => {
       selectedWorkOrderId: pair.workOrderId,
       selectedDNId: pair.deliveryNoteId,
       newStatus,
-      dueInDays: '',
-      receivedDate: '',
+      dueInDays: newStatus === 'raised' ? prev.dueInDays : '',
+      receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
       invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
     }));
   };
@@ -524,9 +523,9 @@ const PendingInvoices = () => {
     }
 
     const allItemsProcessed = deliveryNote.items.every(item => item.invoice_status === 'processed');
-    if (allItemsProcessed) {
+    if (allItemsProcessed && newStatus !== 'pending') {
       toast.error(
-        'The invoice status for all items is already "Processed" and cannot be changed.',
+        'The invoice status for all items is already "Processed" and cannot be changed except to "Pending."',
         {
           position: 'top-right',
           autoClose: 5000,
@@ -861,17 +860,21 @@ const PendingInvoices = () => {
                       {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-600">{getInvoiceStatusForDN(pair.deliveryNote)}</span>
-                          <Button
-                            onClick={() => handleUpdateStatus(pair, 'processed')}
+                          <select
+                            onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                             disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                            className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            className={`px-3 py-1 rounded-md text-sm border ${
                               isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
                             }`}
+                            value=""
                           >
-                            {isSubmitting ? 'Submitting...' : 'Upload Invoice'}
-                          </Button>
+                            <option value="" disabled>Select Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="raised">Raised</option>
+                            <option value="processed">Processed</option>
+                          </select>
                         </div>
                       ) : (
                         'N/A'
@@ -1577,6 +1580,11 @@ const PendingInvoices = () => {
                 className="w-full p-2 border rounded focus:outline-indigo-500"
               />
             </div>
+          )}
+          {state.newStatus === 'pending' && (
+            <p className="text-sm text-gray-600">
+              Setting status to Pending will clear any due dates or received dates.
+            </p>
           )}
           <div className="flex justify-end gap-2">
             <Button
