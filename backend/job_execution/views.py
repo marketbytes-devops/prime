@@ -191,22 +191,26 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if is_multiple_dns and delivery_note_item_id:
+            return Response(
+                {'error': 'delivery_note_item_id should not be provided when is_multiple_dns is true'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         delivery_note_items = []
-        
         if is_multiple_dns:
-            # For multiple DNs, we need to update ALL items in ALL delivery notes for this work order
+            # Only update items in the relevant DN
+            delivery_note_id = request.data.get('delivery_note_id')
+            if not delivery_note_id:
+                return Response(
+                    {'error': 'delivery_note_id is required when is_multiple_dns is true'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             delivery_note_items = DeliveryNoteItem.objects.filter(
-                delivery_note__work_order=work_order,
+                delivery_note_id=delivery_note_id,
                 invoice_status__in=['pending', 'raised']
             ).exclude(invoice_status='processed')
-            
-            if not delivery_note_items:
-                return Response(
-                    {'error': 'No eligible delivery note items found for update'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
         elif delivery_note_item_id:
-            # For single item update
             try:
                 delivery_note_items = [DeliveryNoteItem.objects.get(id=delivery_note_item_id)]
             except DeliveryNoteItem.DoesNotExist:
@@ -220,6 +224,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not delivery_note_items:
+            return Response(
+                {'error': 'No eligible delivery note items found for update'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         with transaction.atomic():
             for delivery_note_item in delivery_note_items:
                 if delivery_note_item.invoice_status == 'processed' and new_status != 'processed':
@@ -227,7 +237,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         {'error': "Cannot change invoice status from 'processed' to another status."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-
                 if new_status == 'raised':
                     if not due_in_days or int(due_in_days) <= 0:
                         return Response(
@@ -235,7 +244,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     delivery_note_item.due_in_days = int(due_in_days)
-
                 if new_status == 'processed':
                     if not received_date:
                         return Response(
@@ -243,23 +251,19 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     delivery_note_item.received_date = received_date
-
                 delivery_note_item.invoice_status = new_status
                 if invoice_file:
                     delivery_note_item.invoice_file = invoice_file
                 delivery_note_item.save()
-
                 previous_invoice_status = delivery_note_item.invoice_status
                 if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
                     serializer = WorkOrderSerializer()
                     email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
                     logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
 
-        # Return the first item's data for response
-        if delivery_note_items:
-            serializer = DeliveryNoteItemSerializer(delivery_note_items[0])
-            return Response(serializer.data)
-        return Response({'status': 'No items updated'})
+        serializer = DeliveryNoteItemSerializer(delivery_note_items[0] if delivery_note_items else None)
+        return Response(serializer.data)
+
 
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
