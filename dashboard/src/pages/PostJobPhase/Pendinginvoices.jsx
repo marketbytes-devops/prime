@@ -923,7 +923,7 @@ const PendingInvoices = () => {
                         <div className="space-y-1 max-w-xs">
                           {pair.deliveryNote.items.map((item, itemIndex) => (
                             <div key={item.id} className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600">{getItemName(item.item)}:</span>
+                              {/* <span className="text-xs text-gray-600">{getItemName(item.item)}:</span> */}
                               <select
                                 value={item.invoice_status || 'pending'}
                                 onChange={(e) => handleUpdateStatus(pair, e.target.value, item)}
