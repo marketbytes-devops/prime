@@ -54,6 +54,8 @@ const PendingInvoices = () => {
     woUpload: { certificateFile: null },
     woUploadErrors: { certificateFile: '' },
     workOrderDeliveryPairs: [],
+    groupedDeliveryNotes: [], // Track which DNs should be grouped together
+    selectedGroupedDNs: [],
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -485,55 +487,88 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (pair, newStatus) => {
-    const deliveryNoteItem = pair.deliveryNoteItem;
-    if (!deliveryNoteItem) {
-      toast.error('Delivery note item not found.');
-      return;
+const handleUpdateStatus = (pair, newStatus) => {
+  const deliveryNoteItem = pair.deliveryNoteItem;
+  if (!deliveryNoteItem) {
+    toast.error('Delivery note item not found.');
+    return;
+  }
+
+  // Check if this is part of a group
+  const workOrder = pair.workOrder;
+  const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === workOrder.id);
+  
+  // Identify grouped DNs (you'll need to implement your grouping logic here)
+  const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, pair.deliveryNote);
+  
+  if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+    toast.warn(
+      'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
+      {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+      }
+    );
+    return;
+  }
+  
+  if (deliveryNoteItem.invoice_status === 'processed') {
+    toast.warn(
+      'The invoice status is already set to "Processed." It cannot be changed once processed.',
+      {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+      }
+    );
+    return;
+  }
+
+  setState((prev) => ({
+    ...prev,
+    isStatusModalOpen: true,
+    selectedWorkOrderId: pair.workOrderId,
+    selectedDNId: pair.deliveryNoteId,
+    selectedDNItemId: deliveryNoteItem.id,
+    selectedGroupedDNs: groupedDNs, // Store the grouped DN IDs
+    newStatus,
+    dueInDays: '',
+    receivedDate: '',
+    originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
+    invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
+  }));
+};
+
+// Helper function to identify grouped DNs
+const identifyGroupedDNs = (workOrder, allDNs, currentDN) => {
+  // Implement your grouping logic here
+  // This is an example - adjust based on your actual grouping criteria
+  const groupedDNIds = [];
+  
+  // Example: Group DNs created within the same time frame (same day)
+  const currentDNDate = new Date(currentDN.created_at).toDateString();
+  
+  allDNs.forEach(dn => {
+    const dnDate = new Date(dn.created_at).toDateString();
+    if (dnDate === currentDNDate && dn.id !== currentDN.id) {
+      groupedDNIds.push(dn.id);
     }
-    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
-      toast.warn(
-        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-    if (deliveryNoteItem.invoice_status === 'processed') {
-      toast.warn(
-        'The invoice status is already set to "Processed." It cannot be changed once processed.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-    setState((prev) => ({
-      ...prev,
-      isStatusModalOpen: true,
-      selectedWorkOrderId: pair.workOrderId,
-      selectedDNId: pair.deliveryNoteId,
-      selectedDNItemId: deliveryNoteItem.id,
-      newStatus,
-      dueInDays: '',
-      receivedDate: '',
-      originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
-      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
-    }));
-  };
+  });
+  
+  // Always include the current DN
+  groupedDNIds.push(currentDN.id);
+  
+  return groupedDNIds;
+};
 
   const handleStatusModalSubmit = () => {
     const { selectedWorkOrderId, selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
@@ -606,23 +641,32 @@ const PendingInvoices = () => {
   };
 
 
-  const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
-    try {
-      setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append('invoice_status', newStatus);
-      if (newStatus === 'raised' && dueInDays) {
-        formData.append('due_in_days', parseInt(dueInDays));
-      }
-      if (newStatus === 'processed' && receivedDate) {
-        formData.append('received_date', receivedDate);
-      }
-      // Safely find the pair, defaulting to isMultipleDNs: false if not found
+const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+  try {
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append('invoice_status', newStatus);
+    
+    if (newStatus === 'raised' && dueInDays) {
+      formData.append('due_in_days', parseInt(dueInDays));
+    }
+    if (newStatus === 'processed' && receivedDate) {
+      formData.append('received_date', receivedDate);
+    }
+    
+    // Check if we have grouped DNs
+    const hasGroupedDNs = state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1;
+    
+    if (hasGroupedDNs) {
+      // For grouped DNs, send the list of DN IDs
+      formData.append('grouped_dn_ids', state.selectedGroupedDNs.join(','));
+      formData.append('is_multiple_dns', 'true');
+    } else {
+      // For single or non-grouped items
       const pair = state.workOrderDeliveryPairs.find((p) => p.workOrderId === workOrderId);
       const isMultipleDNs = pair ? pair.isMultipleDNs : false;
       formData.append('is_multiple_dns', isMultipleDNs ? 'true' : 'false');
 
-      // Append delivery_note_item_id only for non-multiple DN cases
       if (!isMultipleDNs && deliveryNoteItemId) {
         formData.append('delivery_note_item_id', deliveryNoteItemId);
       } else if (!deliveryNoteItemId && !isMultipleDNs) {
@@ -630,47 +674,37 @@ const PendingInvoices = () => {
         setIsSubmitting(false);
         return;
       }
-
-      // Debug logging - remove after testing
-      console.log('=== DEBUG INFO ===');
-      console.log('workOrderId:', workOrderId);
-      console.log('deliveryNoteItemId:', deliveryNoteItemId);
-      console.log('newStatus:', newStatus);
-      console.log('isMultipleDNs:', isMultipleDNs);
-      console.log('FormData contents:');
-      for (let [key, value] of formData.entries()) {
-        console.log(key, ':', value);
-      }
-      console.log('=================');
-
-      await apiClient.patch(
-        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-
-      toast.success('Invoice status updated successfully.');
-      setState((prev) => ({
-        ...prev,
-        isStatusModalOpen: false,
-        selectedWorkOrderId: null,
-        selectedDNId: null,
-        selectedDNItemId: null,
-        newStatus: '',
-        dueInDays: '',
-        receivedDate: '',
-        originalInvoiceStatus: '',
-        invoiceUploadType: '',
-      }));
-      await fetchData();
-    } catch (error) {
-      console.error('Error updating invoice status:', error);
-      console.error('Error response:', error.response?.data);
-      toast.error('Failed to update invoice status.');
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+
+    await apiClient.patch(
+      `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    toast.success('Invoice status updated successfully.');
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: false,
+      selectedWorkOrderId: null,
+      selectedDNId: null,
+      selectedDNItemId: null,
+      selectedGroupedDNs: [], // Reset grouped DNs
+      newStatus: '',
+      dueInDays: '',
+      receivedDate: '',
+      originalInvoiceStatus: '',
+      invoiceUploadType: '',
+    }));
+    await fetchData();
+  } catch (error) {
+    console.error('Error updating invoice status:', error);
+    console.error('Error response:', error.response?.data);
+    toast.error('Failed to update invoice status.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
 
   const isDUTComplete = (wo) => {
@@ -779,6 +813,14 @@ const PendingInvoices = () => {
     }
   };
 
+  const isGroupedDN = (deliveryNote) => {
+  if (!deliveryNote) return false;
+  const workOrder = state.workOrders.find(wo => wo.id === deliveryNote.work_order_id);
+  const allDNsForWO = state.deliveryNotes.filter(dn => dn.work_order_id === deliveryNote.work_order_id);
+  const groupedDNs = identifyGroupedDNs(workOrder, allDNsForWO, deliveryNote);
+  return groupedDNs.length > 1;
+};
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Pending Invoices</h1>
@@ -836,7 +878,12 @@ const PendingInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
-                    <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
+                    <td className="border p-2 whitespace-nowrap">
+  {getDNSeriesNumber(pair.deliveryNote)}
+  {isGroupedDN(pair.deliveryNote) && (
+    <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">Grouped</span>
+  )}
+</td>
                     <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem ? getItemName(pair.deliveryNoteItem.item) : 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.workOrder.created_at
@@ -1601,28 +1648,38 @@ const PendingInvoices = () => {
         </div>
       </Modal>
 
-      <Modal
-        isOpen={state.isStatusModalOpen}
-        onClose={() => setState((prev) => ({
-          ...prev,
-          isStatusModalOpen: false,
-          selectedWorkOrderId: null,
-          selectedDNId: null,
-          selectedDNItemId: null,
-          newStatus: '',
-          dueInDays: '',
-          receivedDate: '',
-          originalInvoiceStatus: '',
-          invoiceUploadType: '',
-        }))}
-        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
-      >
-        <div className="space-y-4">
-          {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
-            <p className="text-red-500 text-sm">
-              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
-            </p>
-          )}
+<Modal
+  isOpen={state.isStatusModalOpen}
+  onClose={() => setState((prev) => ({
+    ...prev,
+    isStatusModalOpen: false,
+    selectedWorkOrderId: null,
+    selectedDNId: null,
+    selectedDNItemId: null,
+    selectedGroupedDNs: [],
+    newStatus: '',
+    dueInDays: '',
+    receivedDate: '',
+    originalInvoiceStatus: '',
+    invoiceUploadType: '',
+  }))}
+  title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
+>
+  <div className="space-y-4">
+    {/* Show grouped DN information */}
+    {state.selectedGroupedDNs && state.selectedGroupedDNs.length > 1 && (
+      <div className="bg-blue-50 p-3 rounded-md">
+        <p className="text-blue-700 text-sm font-medium">
+          This update will apply to {state.selectedGroupedDNs.length} grouped delivery notes
+        </p>
+      </div>
+    )}
+    
+    {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
+      <p className="text-red-500 text-sm">
+        Once submitted, the Proforma invoice cannot be updated to "Raised" again.
+      </p>
+    )}
           {state.newStatus === 'raised' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>

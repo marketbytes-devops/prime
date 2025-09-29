@@ -184,6 +184,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         received_date = request.data.get('received_date')
         invoice_file = request.FILES.get('invoice_file')
         is_multiple_dns = request.data.get('is_multiple_dns', 'false').lower() == 'true'
+        grouped_dn_ids = request.data.get('grouped_dn_ids', [])  # New parameter for grouped DNs
 
         if not new_status:
             return Response(
@@ -191,14 +192,28 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if is_multiple_dns and delivery_note_item_id:
+        delivery_note_items = []
+        
+        # Handle grouped delivery notes
+        if grouped_dn_ids:
+            try:
+                grouped_dn_ids = [int(id) for id in grouped_dn_ids.split(',')] if isinstance(grouped_dn_ids, str) else grouped_dn_ids
+                delivery_note_items = DeliveryNoteItem.objects.filter(
+                    delivery_note__id__in=grouped_dn_ids,
+                    delivery_note__work_order=work_order,
+                    invoice_status__in=['pending', 'raised']
+                ).exclude(invoice_status='processed')
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid grouped_dn_ids format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif is_multiple_dns and delivery_note_item_id:
             return Response(
                 {'error': 'delivery_note_item_id should not be provided when is_multiple_dns is true'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        delivery_note_items = []
-        if is_multiple_dns:
+        elif is_multiple_dns:
             delivery_note_items = DeliveryNoteItem.objects.filter(
                 delivery_note__work_order=work_order,
                 invoice_status__in=['pending', 'raised']
@@ -213,7 +228,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 )
         else:
             return Response(
-                {'error': 'Delivery note item ID is required when is_multiple_dns is false'},
+                {'error': 'Either delivery_note_item_id or is_multiple_dns must be provided'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -258,9 +273,9 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
                     logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
 
+        # Return the first item's data
         serializer = DeliveryNoteItemSerializer(delivery_note_items[0] if delivery_note_items else None)
         return Response(serializer.data)
-
 
     @action(detail=True, methods=['post'], url_path='initiate-delivery')
     def initiate_delivery(self, request, pk=None):
