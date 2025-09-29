@@ -30,11 +30,9 @@ const PendingInvoices = () => {
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
     selectedDNId: null,
-    selectedDNItemId: null,
     newStatus: '',
     dueInDays: '',
     receivedDate: '',
-    originalInvoiceStatus: '',
     isUploadPOModalOpen: false,
     selectedPOForUpload: null,
     poUpload: { clientPoNumber: '', poFile: null, poStatus: 'not_available' },
@@ -45,7 +43,7 @@ const PendingInvoices = () => {
     dnUploadErrors: { signedDeliveryNote: '' },
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
-    selectedDNItemForInvoiceUpload: null,
+    selectedDNForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
     invoiceUploadType: '',
@@ -123,16 +121,13 @@ const PendingInvoices = () => {
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
         if (relatedDNs.length > 0) {
-          // Create one pair per delivery note, not per item
           relatedDNs.forEach((dn) => {
             workOrderDeliveryPairs.push({
               id: `${workOrder.id}-${dn.id}`,
               workOrder,
               deliveryNote: dn,
-              deliveryNoteItem: null, // Set to null since we're working with the entire DN
               workOrderId: workOrder.id,
               deliveryNoteId: dn.id,
-              deliveryNoteItemId: null, // Set to null
             });
           });
         } else {
@@ -140,10 +135,8 @@ const PendingInvoices = () => {
             id: `${workOrder.id}-no-dn`,
             workOrder,
             deliveryNote: null,
-            deliveryNoteItem: null,
             workOrderId: workOrder.id,
             deliveryNoteId: null,
-            deliveryNoteItemId: null,
           });
         }
       });
@@ -223,17 +216,10 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      // Show all invoice files for the delivery note
       if (pair.deliveryNote && pair.deliveryNote.items) {
         const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
         if (itemsWithInvoices.length > 0) {
-          // If there's only one, open it directly
-          if (itemsWithInvoices.length === 1) {
-            window.open(itemsWithInvoices[0].invoice_file, '_blank');
-          } else {
-            // Show a selection modal or open all (for now, open the first one)
-            window.open(itemsWithInvoices[0].invoice_file, '_blank');
-          }
+          window.open(itemsWithInvoices[0].invoice_file, '_blank');
         } else {
           toast.error('No invoice files available.');
         }
@@ -417,17 +403,9 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (pair, deliveryNoteItem = null) => {
+  const handleUploadInvoice = (pair) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       toast.error('No delivery note items found.');
-      return;
-    }
-
-    // If no specific item is provided, take the first available item that's not processed
-    const targetItem = deliveryNoteItem || pair.deliveryNote.items.find(item => item.invoice_status !== 'processed');
-    
-    if (!targetItem) {
-      toast.error('No available delivery note item found.');
       return;
     }
 
@@ -435,7 +413,7 @@ const PendingInvoices = () => {
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: pair.workOrder,
-      selectedDNItemForInvoiceUpload: targetItem,
+      selectedDNForInvoiceUpload: pair.deliveryNote,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
       invoiceUploadType: 'Final',
@@ -465,7 +443,9 @@ const PendingInvoices = () => {
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
+      // Send all item IDs for the delivery note
+      const itemIds = state.selectedDNForInvoiceUpload.items.map(item => item.id);
+      formData.append('delivery_note_item_ids', JSON.stringify(itemIds));
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
       await apiClient.patch(
@@ -474,23 +454,21 @@ const PendingInvoices = () => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
+      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully for all items.`);
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
-        selectedDNItemForInvoiceUpload: null,
+        selectedDNForInvoiceUpload: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: '',
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
         selectedDNId: null,
-        selectedDNItemId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
-        originalInvoiceStatus: '',
       }));
       await fetchData();
     } catch (error) {
@@ -501,34 +479,16 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (pair, newStatus, deliveryNoteItem = null) => {
+  const handleUpdateStatus = (pair, newStatus) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       toast.error('No delivery note items found.');
       return;
     }
 
-    // If no specific item is provided, take the first available item
-    const targetItem = deliveryNoteItem || pair.deliveryNote.items[0];
-
-    if (targetItem.invoice_status === 'raised' && newStatus === 'raised') {
+    const allItemsProcessed = pair.deliveryNote.items.every(item => item.invoice_status === 'processed');
+    if (allItemsProcessed) {
       toast.warn(
-        'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-
-    if (targetItem.invoice_status === 'processed') {
-      toast.warn(
-        'The invoice status is already set to "Processed." It cannot be changed once processed.',
+        'The invoice status for all items is already set to "Processed." It cannot be changed once processed.',
         {
           position: 'top-right',
           autoClose: 5000,
@@ -547,51 +507,26 @@ const PendingInvoices = () => {
       isStatusModalOpen: true,
       selectedWorkOrderId: pair.workOrderId,
       selectedDNId: pair.deliveryNoteId,
-      selectedDNItemId: targetItem.id,
       newStatus,
       dueInDays: '',
       receivedDate: '',
-      originalInvoiceStatus: targetItem.invoice_status || 'pending',
       invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
     }));
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
-    
-    // Find the delivery note item across all pairs
-    let deliveryNoteItem = null;
-    for (const pair of state.workOrderDeliveryPairs) {
-      if (pair.deliveryNote && pair.deliveryNote.items) {
-        deliveryNoteItem = pair.deliveryNote.items.find(item => item.id === selectedDNItemId);
-        if (deliveryNoteItem) break;
-      }
-    }
+    const { selectedDNId, newStatus, dueInDays, receivedDate } = state;
 
-    if (!deliveryNoteItem) {
-      toast.error('Delivery note item not found.');
+    const deliveryNote = state.deliveryNotes.find(dn => dn.id === selectedDNId);
+    if (!deliveryNote) {
+      toast.error('Delivery note not found.');
       return;
     }
 
-    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+    const allItemsProcessed = deliveryNote.items.every(item => item.invoice_status === 'processed');
+    if (allItemsProcessed) {
       toast.error(
-        'Once submitted, the Proforma invoice cannot be updated to "Raised" again.',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
-
-    if (deliveryNoteItem.invoice_status === 'processed') {
-      toast.error(
-        'The invoice status is already "Processed" and cannot be changed.',
+        'The invoice status for all items is already "Processed" and cannot be changed.',
         {
           position: 'top-right',
           autoClose: 5000,
@@ -621,19 +556,18 @@ const PendingInvoices = () => {
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
         selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-          pair => pair.deliveryNote && pair.deliveryNote.items && 
-          pair.deliveryNote.items.some(item => item.id === selectedDNItemId)
+          pair => pair.deliveryNoteId === selectedDNId
         ).workOrder,
-        selectedDNItemForInvoiceUpload: deliveryNoteItem,
+        selectedDNForInvoiceUpload: deliveryNote,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
       }));
     } else {
-      confirmStatusUpdate(selectedDNItemId, newStatus, dueInDays, receivedDate);
+      confirmStatusUpdate(selectedDNId, newStatus, dueInDays);
     }
   };
 
-  const confirmStatusUpdate = async (deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+  const confirmStatusUpdate = async (deliveryNoteId, newStatus, dueInDays) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
@@ -641,11 +575,12 @@ const PendingInvoices = () => {
       if (newStatus === 'raised' && dueInDays) {
         formData.append('due_in_days', parseInt(dueInDays));
       }
-      formData.append('delivery_note_item_id', deliveryNoteItemId);
+      const deliveryNote = state.deliveryNotes.find(dn => dn.id === deliveryNoteId);
+      const itemIds = deliveryNote.items.map(item => item.id);
+      formData.append('delivery_note_item_ids', JSON.stringify(itemIds));
 
       const workOrderId = state.workOrderDeliveryPairs.find(
-        pair => pair.deliveryNote && pair.deliveryNote.items && 
-        pair.deliveryNote.items.some(item => item.id === deliveryNoteItemId)
+        pair => pair.deliveryNoteId === deliveryNoteId
       ).workOrderId;
 
       await apiClient.patch(
@@ -654,23 +589,21 @@ const PendingInvoices = () => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      toast.success('Delivery note item invoice status updated successfully.');
+      toast.success('Delivery note invoice status updated successfully for all items.');
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
         selectedDNId: null,
-        selectedDNItemId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
-        originalInvoiceStatus: '',
         invoiceUploadType: '',
       }));
       await fetchData();
     } catch (error) {
-      console.error('Error updating delivery note item invoice status:', error);
-      toast.error('Failed to update delivery note item invoice status.');
+      console.error('Error updating delivery note invoice status:', error);
+      toast.error('Failed to update delivery note invoice status.');
     } finally {
       setIsSubmitting(false);
     }
@@ -715,9 +648,9 @@ const PendingInvoices = () => {
       isPOComplete(pair.workOrder) &&
       isDUTComplete(pair.workOrder) &&
       isDNComplete(pair.deliveryNote) &&
-      pair.deliveryNote && 
-      pair.deliveryNote.items && 
-      pair.deliveryNote.items.some(item => item.invoice_status !== 'processed')
+      pair.deliveryNote &&
+      pair.deliveryNote.items &&
+      !pair.deliveryNote.items.every(item => item.invoice_status === 'processed')
     );
   };
 
@@ -743,13 +676,19 @@ const PendingInvoices = () => {
     return item ? item.name : 'N/A';
   };
 
+  const getInvoiceStatusForDN = (deliveryNote) => {
+    if (!deliveryNote || !deliveryNote.items || deliveryNote.items.length === 0) return 'N/A';
+    const statuses = [...new Set(deliveryNote.items.map(item => item.invoice_status || 'pending'))];
+    return statuses.length === 1 ? statuses[0] : 'Mixed';
+  };
+
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      (pair.deliveryNote && pair.deliveryNote.items && 
+      (pair.deliveryNote && pair.deliveryNote.items &&
        pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
@@ -920,26 +859,19 @@ const PendingInvoices = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
-                        <div className="space-y-1 max-w-xs">
-                          {pair.deliveryNote.items.map((item, itemIndex) => (
-                            <div key={item.id} className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600">{getItemName(item.item)}:</span>
-                              <select
-                                value={item.invoice_status || 'pending'}
-                                onChange={(e) => handleUpdateStatus(pair, e.target.value, item)}
-                                disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                                className={`p-1 border rounded focus:outline-indigo-500 text-xs ${
-                                  isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
-                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                    : ''
-                                }`}
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="raised">Raised</option>
-                                <option value="processed">Processed</option>
-                              </select>
-                            </div>
-                          ))}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">{getInvoiceStatusForDN(pair.deliveryNote)}</span>
+                          <Button
+                            onClick={() => handleUpdateStatus(pair, 'processed')}
+                            disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
+                            className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                              isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            {isSubmitting ? 'Submitting...' : 'Upload Invoice'}
+                          </Button>
                         </div>
                       ) : (
                         'N/A'
@@ -1120,7 +1052,7 @@ const PendingInvoices = () => {
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                        <th className= "border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
                         <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
                       </tr>
@@ -1534,20 +1466,18 @@ const PendingInvoices = () => {
           ...prev,
           isUploadInvoiceModalOpen: false,
           selectedWOForInvoiceUpload: null,
-          selectedDNItemForInvoiceUpload: null,
+          selectedDNForInvoiceUpload: null,
           invoiceUpload: { invoiceFile: null },
           invoiceUploadErrors: { invoiceFile: '' },
           invoiceUploadType: '',
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
           selectedDNId: null,
-          selectedDNItemId: null,
           newStatus: '',
           dueInDays: '',
           receivedDate: '',
-          originalInvoiceStatus: '',
         }))}
-        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - Item: ${state.selectedDNItemForInvoiceUpload ? getItemName(state.selectedDNItemForInvoiceUpload.item) : 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
@@ -1574,18 +1504,16 @@ const PendingInvoices = () => {
                 ...prev,
                 isUploadInvoiceModalOpen: false,
                 selectedWOForInvoiceUpload: null,
-                selectedDNItemForInvoiceUpload: null,
+                selectedDNForInvoiceUpload: null,
                 invoiceUpload: { invoiceFile: null },
                 invoiceUploadErrors: { invoiceFile: '' },
                 invoiceUploadType: '',
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
                 selectedDNId: null,
-                selectedDNItemId: null,
                 newStatus: '',
                 dueInDays: '',
                 receivedDate: '',
-                originalInvoiceStatus: '',
               }))}
               disabled={isSubmitting}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -1618,21 +1546,14 @@ const PendingInvoices = () => {
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
           selectedDNId: null,
-          selectedDNItemId: null,
           newStatus: '',
           dueInDays: '',
           receivedDate: '',
-          originalInvoiceStatus: '',
           invoiceUploadType: '',
         }))}
         title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
       >
         <div className="space-y-4">
-          {state.newStatus === 'raised' && state.originalInvoiceStatus === 'raised' && (
-            <p className="text-red-500 text-sm">
-              Once submitted, the Proforma invoice cannot be updated to "Raised" again.
-            </p>
-          )}
           {state.newStatus === 'raised' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
@@ -1666,7 +1587,6 @@ const PendingInvoices = () => {
                 newStatus: '',
                 dueInDays: '',
                 receivedDate: '',
-                originalInvoiceStatus: '',
                 invoiceUploadType: '',
               }))}
               disabled={isSubmitting}
