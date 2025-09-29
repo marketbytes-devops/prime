@@ -46,6 +46,7 @@ const PendingInvoices = () => {
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
     selectedDNItemForInvoiceUpload: null,
+    selectedDNForInvoiceUpload: null, // New state for selected delivery note in multiple DN case
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
     invoiceUploadType: '',
@@ -245,11 +246,7 @@ const PendingInvoices = () => {
         if (pair.deliveryNote && pair.deliveryNote.items) {
           const itemsWithInvoices = pair.deliveryNote.items.filter((item) => item.invoice_file);
           if (itemsWithInvoices.length > 0) {
-            if (itemsWithInvoices.length === 1) {
-              window.open(itemsWithInvoices[0].invoice_file, '_blank');
-            } else {
-              window.open(itemsWithInvoices[0].invoice_file, '_blank');
-            }
+            window.open(itemsWithInvoices[0].invoice_file, '_blank');
           } else {
             toast.error('No invoice files available.');
           }
@@ -440,23 +437,36 @@ const PendingInvoices = () => {
       return;
     }
 
-    const targetItem = pair.isMultipleDNs ? null : pair.deliveryNote.items.find((item) => item.invoice_status !== 'processed');
-
-    if (!pair.isMultipleDNs && !targetItem) {
-      toast.error('No available delivery note item found.');
-      return;
+    if (pair.isMultipleDNs) {
+      setState((prev) => ({
+        ...prev,
+        isUploadInvoiceModalOpen: true,
+        selectedWOForInvoiceUpload: pair.workOrder,
+        selectedDNForInvoiceUpload: pair.deliveryNote, // Set the delivery note for multiple DNs
+        selectedDNItemForInvoiceUpload: null,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUploadType: 'Unified',
+        newStatus: 'processed',
+      }));
+    } else {
+      const targetItem = pair.deliveryNote.items.find((item) => item.invoice_status !== 'processed');
+      if (!targetItem) {
+        toast.error('No available delivery note item found.');
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        isUploadInvoiceModalOpen: true,
+        selectedWOForInvoiceUpload: pair.workOrder,
+        selectedDNForInvoiceUpload: pair.deliveryNote,
+        selectedDNItemForInvoiceUpload: targetItem,
+        invoiceUpload: { invoiceFile: null },
+        invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUploadType: 'Final',
+        newStatus: 'processed',
+      }));
     }
-
-    setState((prev) => ({
-      ...prev,
-      isUploadInvoiceModalOpen: true,
-      selectedWOForInvoiceUpload: pair.workOrder,
-      selectedDNItemForInvoiceUpload: targetItem,
-      invoiceUpload: { invoiceFile: null },
-      invoiceUploadErrors: { invoiceFile: '' },
-      invoiceUploadType: pair.isMultipleDNs ? 'Unified' : 'Final',
-      newStatus: 'processed',
-    }));
   };
 
   const validateInvoiceUpload = () => {
@@ -486,6 +496,11 @@ const PendingInvoices = () => {
       ).isMultipleDNs) {
         formData.append('delivery_note_item_id', state.selectedDNItemForInvoiceUpload.id);
       }
+      if (state.selectedDNForInvoiceUpload && state.workOrderDeliveryPairs.find(
+        (pair) => pair.workOrderId === state.selectedWOForInvoiceUpload.id
+      ).isMultipleDNs) {
+        formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
+      }
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
       formData.append('is_multiple_dns', state.workOrderDeliveryPairs.find(
         (pair) => pair.workOrderId === state.selectedWOForInvoiceUpload.id
@@ -502,6 +517,7 @@ const PendingInvoices = () => {
         ...prev,
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
+        selectedDNForInvoiceUpload: null,
         selectedDNItemForInvoiceUpload: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
@@ -531,7 +547,7 @@ const PendingInvoices = () => {
     }
 
     const targetItem = pair.isMultipleDNs ? null : pair.deliveryNote.items[0];
-    const currentStatus = pair.isMultipleDNs ? pair.unifiedInvoiceStatus : targetItem.invoice_status;
+    const currentStatus = pair.isMultipleDNs ? pair.unifiedInvoiceStatus : targetItem?.invoice_status;
 
     if (currentStatus === 'raised' && newStatus === 'raised') {
       toast.warn(
@@ -576,11 +592,12 @@ const PendingInvoices = () => {
       receivedDate: '',
       originalInvoiceStatus: currentStatus || 'pending',
       invoiceUploadType: newStatus === 'processed' ? (pair.isMultipleDNs ? 'Unified' : 'Final') : '',
+      selectedDNForInvoiceUpload: pair.isMultipleDNs ? pair.deliveryNote : null,
     }));
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
+    const { selectedWorkOrderId, selectedDNId, selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
 
     const selectedPair = state.workOrderDeliveryPairs.find(
       (pair) => pair.workOrderId === selectedWorkOrderId
@@ -649,17 +666,18 @@ const PendingInvoices = () => {
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
         selectedWOForInvoiceUpload: selectedPair.workOrder,
+        selectedDNForInvoiceUpload: selectedPair.isMultipleDNs ? selectedPair.deliveryNote : selectedPair.deliveryNote,
         selectedDNItemForInvoiceUpload: deliveryNoteItem,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: selectedPair.isMultipleDNs ? 'Unified' : 'Final',
       }));
     } else {
-      confirmStatusUpdate(selectedWorkOrderId, deliveryNoteItem?.id || null, newStatus, dueInDays, receivedDate);
+      confirmStatusUpdate(selectedWorkOrderId, selectedDNId, deliveryNoteItem?.id || null, newStatus, dueInDays, receivedDate);
     }
   };
 
-  const confirmStatusUpdate = async (workOrderId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
+  const confirmStatusUpdate = async (workOrderId, deliveryNoteId, deliveryNoteItemId, newStatus, dueInDays, receivedDate) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
@@ -670,8 +688,11 @@ const PendingInvoices = () => {
       if (newStatus === 'processed' && receivedDate) {
         formData.append('received_date', receivedDate);
       }
-      if (deliveryNoteItemId) {
+      if (deliveryNoteItemId && !state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId).isMultipleDNs) {
         formData.append('delivery_note_item_id', deliveryNoteItemId);
+      }
+      if (deliveryNoteId && state.workOrderDeliveryPairs.find((pair) => pair.workOrderId === workOrderId).isMultipleDNs) {
+        formData.append('delivery_note_id', deliveryNoteId);
       }
       formData.append(
         'is_multiple_dns',
@@ -696,6 +717,7 @@ const PendingInvoices = () => {
         receivedDate: '',
         originalInvoiceStatus: '',
         invoiceUploadType: '',
+        selectedDNForInvoiceUpload: null,
       }));
       await fetchData();
     } catch (error) {
@@ -1607,6 +1629,7 @@ const PendingInvoices = () => {
           ...prev,
           isUploadInvoiceModalOpen: false,
           selectedWOForInvoiceUpload: null,
+          selectedDNForInvoiceUpload: null,
           selectedDNItemForInvoiceUpload: null,
           invoiceUpload: { invoiceFile: null },
           invoiceUploadErrors: { invoiceFile: '' },
@@ -1622,7 +1645,7 @@ const PendingInvoices = () => {
         }))}
         title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'}${
           state.selectedDNItemForInvoiceUpload ? ` - Item: ${getItemName(state.selectedDNItemForInvoiceUpload.item)}` : ''
-        }`}
+        }${state.selectedDNForInvoiceUpload ? ` - DN: ${state.selectedDNForInvoiceUpload.dn_number}` : ''}`}
       >
         <div className="space-y-4">
           <div>
