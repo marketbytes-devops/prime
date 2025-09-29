@@ -123,17 +123,16 @@ const PendingInvoices = () => {
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
         if (relatedDNs.length > 0) {
+          // Create one pair per delivery note, not per item
           relatedDNs.forEach((dn) => {
-            dn.items.forEach((dnItem) => {
-              workOrderDeliveryPairs.push({
-                id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
-                workOrder,
-                deliveryNote: dn,
-                deliveryNoteItem: dnItem,
-                workOrderId: workOrder.id,
-                deliveryNoteId: dn.id,
-                deliveryNoteItemId: dnItem.id,
-              });
+            workOrderDeliveryPairs.push({
+              id: `${workOrder.id}-${dn.id}`,
+              workOrder,
+              deliveryNote: dn,
+              deliveryNoteItem: null, // Set to null since we're working with the entire DN
+              workOrderId: workOrder.id,
+              deliveryNoteId: dn.id,
+              deliveryNoteItemId: null, // Set to null
             });
           });
         } else {
@@ -224,10 +223,22 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      if (pair.deliveryNoteItem?.invoice_file) {
-        window.open(pair.deliveryNoteItem.invoice_file, '_blank');
+      // Show all invoice files for the delivery note
+      if (pair.deliveryNote && pair.deliveryNote.items) {
+        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
+        if (itemsWithInvoices.length > 0) {
+          // If there's only one, open it directly
+          if (itemsWithInvoices.length === 1) {
+            window.open(itemsWithInvoices[0].invoice_file, '_blank');
+          } else {
+            // Show a selection modal or open all (for now, open the first one)
+            window.open(itemsWithInvoices[0].invoice_file, '_blank');
+          }
+        } else {
+          toast.error('No invoice files available.');
+        }
       } else {
-        toast.error('No invoice file available.');
+        toast.error('No invoice files available.');
       }
     }
   };
@@ -406,17 +417,25 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (pair) => {
-    const deliveryNoteItem = pair.deliveryNoteItem;
-    if (!deliveryNoteItem) {
-      toast.error('Delivery note item not found.');
+  const handleUploadInvoice = (pair, deliveryNoteItem = null) => {
+    if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
+      toast.error('No delivery note items found.');
       return;
     }
+
+    // If no specific item is provided, take the first available item that's not processed
+    const targetItem = deliveryNoteItem || pair.deliveryNote.items.find(item => item.invoice_status !== 'processed');
+    
+    if (!targetItem) {
+      toast.error('No available delivery note item found.');
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
       isUploadInvoiceModalOpen: true,
       selectedWOForInvoiceUpload: pair.workOrder,
-      selectedDNItemForInvoiceUpload: deliveryNoteItem,
+      selectedDNItemForInvoiceUpload: targetItem,
       invoiceUpload: { invoiceFile: null },
       invoiceUploadErrors: { invoiceFile: '' },
       invoiceUploadType: 'Final',
@@ -482,13 +501,16 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUpdateStatus = (pair, newStatus) => {
-    const deliveryNoteItem = pair.deliveryNoteItem;
-    if (!deliveryNoteItem) {
-      toast.error('Delivery note item not found.');
+  const handleUpdateStatus = (pair, newStatus, deliveryNoteItem = null) => {
+    if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
+      toast.error('No delivery note items found.');
       return;
     }
-    if (deliveryNoteItem.invoice_status === 'raised' && newStatus === 'raised') {
+
+    // If no specific item is provided, take the first available item
+    const targetItem = deliveryNoteItem || pair.deliveryNote.items[0];
+
+    if (targetItem.invoice_status === 'raised' && newStatus === 'raised') {
       toast.warn(
         'The invoice status is already set to "Raised." Once a Proforma invoice is submitted, it cannot be updated to "Raised" again.',
         {
@@ -503,7 +525,8 @@ const PendingInvoices = () => {
       );
       return;
     }
-    if (deliveryNoteItem.invoice_status === 'processed') {
+
+    if (targetItem.invoice_status === 'processed') {
       toast.warn(
         'The invoice status is already set to "Processed." It cannot be changed once processed.',
         {
@@ -518,25 +541,32 @@ const PendingInvoices = () => {
       );
       return;
     }
+
     setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
       selectedWorkOrderId: pair.workOrderId,
       selectedDNId: pair.deliveryNoteId,
-      selectedDNItemId: deliveryNoteItem.id,
+      selectedDNItemId: targetItem.id,
       newStatus,
       dueInDays: '',
       receivedDate: '',
-      originalInvoiceStatus: deliveryNoteItem.invoice_status || 'pending',
+      originalInvoiceStatus: targetItem.invoice_status || 'pending',
       invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
     }));
   };
 
   const handleStatusModalSubmit = () => {
     const { selectedDNItemId, newStatus, dueInDays, receivedDate } = state;
-    const deliveryNoteItem = state.workOrderDeliveryPairs
-      .find((pair) => pair.deliveryNoteItemId === selectedDNItemId)
-      ?.deliveryNoteItem;
+    
+    // Find the delivery note item across all pairs
+    let deliveryNoteItem = null;
+    for (const pair of state.workOrderDeliveryPairs) {
+      if (pair.deliveryNote && pair.deliveryNote.items) {
+        deliveryNoteItem = pair.deliveryNote.items.find(item => item.id === selectedDNItemId);
+        if (deliveryNoteItem) break;
+      }
+    }
 
     if (!deliveryNoteItem) {
       toast.error('Delivery note item not found.');
@@ -591,7 +621,8 @@ const PendingInvoices = () => {
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
         selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-          (pair) => pair.deliveryNoteItemId === selectedDNItemId
+          pair => pair.deliveryNote && pair.deliveryNote.items && 
+          pair.deliveryNote.items.some(item => item.id === selectedDNItemId)
         ).workOrder,
         selectedDNItemForInvoiceUpload: deliveryNoteItem,
         invoiceUpload: { invoiceFile: null },
@@ -613,7 +644,8 @@ const PendingInvoices = () => {
       formData.append('delivery_note_item_id', deliveryNoteItemId);
 
       const workOrderId = state.workOrderDeliveryPairs.find(
-        (pair) => pair.deliveryNoteItemId === deliveryNoteItemId
+        pair => pair.deliveryNote && pair.deliveryNote.items && 
+        pair.deliveryNote.items.some(item => item.id === deliveryNoteItemId)
       ).workOrderId;
 
       await apiClient.patch(
@@ -683,8 +715,9 @@ const PendingInvoices = () => {
       isPOComplete(pair.workOrder) &&
       isDUTComplete(pair.workOrder) &&
       isDNComplete(pair.deliveryNote) &&
-      pair.deliveryNoteItem &&
-      pair.deliveryNoteItem.invoice_status !== 'processed'
+      pair.deliveryNote && 
+      pair.deliveryNote.items && 
+      pair.deliveryNote.items.some(item => item.invoice_status !== 'processed')
     );
   };
 
@@ -716,7 +749,8 @@ const PendingInvoices = () => {
       getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      (pair.deliveryNoteItem && getItemName(pair.deliveryNoteItem.item).toLowerCase().includes(state.searchTerm.toLowerCase()))
+      (pair.deliveryNote && pair.deliveryNote.items && 
+       pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -785,18 +819,17 @@ const PendingInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-                {/* <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Actions</th> */}
               </tr>
             </thead>
             <tbody>
               {currentPairs.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="border p-2 text-center text-gray-500">
+                  <td colSpan="10" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
@@ -808,7 +841,19 @@ const PendingInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
-                    <td className="border p-2 whitespace-nowrap">{pair.deliveryNoteItem ? getItemName(pair.deliveryNoteItem.item) : 'N/A'}</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                        <div className="space-y-1 max-w-xs">
+                          {pair.deliveryNote.items.map((item, itemIndex) => (
+                            <div key={item.id} className="text-sm">
+                              {getItemName(item.item)} {item.range && `(${item.range})`}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        'N/A'
+                      )}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.workOrder.created_at
                         ? new Date(pair.workOrder.created_at).toLocaleDateString()
@@ -856,54 +901,50 @@ const PendingInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(pair, 'invoice')}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || 
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file
+                            isSubmitting || !hasPermission('pending_invoices', 'view') || 
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : pair.deliveryNoteItem?.invoice_file ? 'View Invoice' : 'No Invoice'}
+                          {isSubmitting ? 'Submitting...' : 
+                           (pair.deliveryNote && pair.deliveryNote.items && 
+                            pair.deliveryNote.items.some(item => item.invoice_file)) ? 'View Invoice' : 'No Invoice'}
                         </Button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {pair.deliveryNoteItem ? (
-                        <select
-                          value={pair.deliveryNoteItem.invoice_status || 'pending'}
-                          onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                          className={`w-full p-2 border rounded focus:outline-indigo-500 text-sm ${
-                            isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                              : ''
-                          }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="raised">Raised</option>
-                          <option value="processed">Processed</option>
-                        </select>
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                        <div className="space-y-1 max-w-xs">
+                          {pair.deliveryNote.items.map((item, itemIndex) => (
+                            <div key={item.id} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">{getItemName(item.item)}:</span>
+                              <select
+                                value={item.invoice_status || 'pending'}
+                                onChange={(e) => handleUpdateStatus(pair, e.target.value, item)}
+                                disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
+                                className={`p-1 border rounded focus:outline-indigo-500 text-xs ${
+                                  isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    : ''
+                                }`}
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="raised">Raised</option>
+                                <option value="processed">Processed</option>
+                              </select>
+                            </div>
+                          ))}
+                        </div>
                       ) : (
                         'N/A'
                       )}
                     </td>
-                    {/* <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {hasPermission('pending_invoices', 'edit') && isDNReadyForUpload(pair.deliveryNote) && (
-                          <Button
-                            onClick={() => handleUploadDN(pair)}
-                            disabled={isSubmitting}
-                            className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                              isSubmitting
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-orange-600 text-white hover:bg-orange-700'
-                            }`}
-                          >
-                            {isSubmitting ? 'Submitting...' : 'Upload DN'}
-                          </Button>
-                        )}
-                      </div>
-                    </td> */}
                   </tr>
                 ))
               )}
