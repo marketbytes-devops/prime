@@ -243,10 +243,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
         received_date = data.get('received_date')
         invoice_file = data.get('invoice_file')
 
-        if invoice_status == 'raised' and (not due_in_days or due_in_days <= 0):
-            raise serializers.ValidationError({
-                'due_in_days': "Due in days is required and must be a positive integer for 'raised' status."
-            })
+        # Ensure due_in_days is included in the request for 'raised' status
+        if invoice_status == 'raised':
+            if 'due_in_days' not in data:
+                raise serializers.ValidationError({
+                    'due_in_days': "Due in days field must be included for 'raised' status."
+                })
+            if due_in_days is not None and due_in_days <= 0:
+                raise serializers.ValidationError({
+                    'due_in_days': "Due in days must be a positive integer or null for 'raised' status."
+                })
         if invoice_status == 'processed':
             if not received_date:
                 raise serializers.ValidationError({
