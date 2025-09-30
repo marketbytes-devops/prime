@@ -621,18 +621,6 @@ const PendingDeliveries = () => {
                 disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
-              <InputField
-                type="number"
-                placeholder="Enter number of days"
-                value={state.dueInDays}
-                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
-                className="w-full"
-                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
-                min="1"
-              />
-            </div>
             <div className="flex justify-end gap-2">
               <Button
                 onClick={() =>
