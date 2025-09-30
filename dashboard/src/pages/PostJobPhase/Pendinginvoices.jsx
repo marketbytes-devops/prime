@@ -215,21 +215,15 @@ const PendingInvoices = () => {
         isDNModalOpen: true,
         selectedDN: pair.deliveryNote,
       }));
-    const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://backend.primearabiagroup.com';
     } else if (type === 'invoice') {
       if (pair.deliveryNote && pair.deliveryNote.items) {
         const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
         if (itemsWithInvoices.length > 0) {
-          const fileUrl = `${baseUrl}${itemsWithInvoices[0].invoice_file.startsWith('/') ? '' : '/'}${itemsWithInvoices[0].invoice_file}`;
-          fetch(fileUrl, { method: 'HEAD' })
-            .then(response => {
-              if (response.ok) {
-                window.open(fileUrl, '_blank');
-              } else {
-                toast.error('Invoice file not found on server.');
-              }
-            })
-            .catch(() => toast.error('Error checking invoice file.'));
+          const invoiceUrl = itemsWithInvoices[0].invoice_file;
+          const fullUrl = invoiceUrl.startsWith('http') 
+            ? invoiceUrl 
+            : `${window.location.origin}${invoiceUrl}`;
+          window.open(fullUrl, '_blank');
         } else {
           toast.error('No invoice files available.');
         }
