@@ -28,6 +28,7 @@ const PendingDeliveries = () => {
     isCompleteModalOpen: false,
     selectedDNForComplete: null,
     signedDeliveryNote: null,
+    dueInDays: '', // New state for due_in_days
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -169,13 +170,18 @@ const PendingDeliveries = () => {
       isCompleteModalOpen: true,
       selectedDNForComplete: dn,
       signedDeliveryNote: null,
+      dueInDays: '', // Reset dueInDays when opening modal
     }));
   };
 
   const handleCompleteDelivery = async () => {
-    const { selectedDNForComplete, signedDeliveryNote } = state;
+    const { selectedDNForComplete, signedDeliveryNote, dueInDays } = state;
     if (!signedDeliveryNote) {
       toast.warn('Please upload a signed delivery note before submitting.');
+      return;
+    }
+    if (!dueInDays || isNaN(dueInDays) || dueInDays <= 0) {
+      toast.warn('Please enter a valid number of days for due in days.');
       return;
     }
 
@@ -195,8 +201,9 @@ const PendingDeliveries = () => {
 
       // Step 2: Create a new invoice with status 'raised'
       const invoiceFormData = new FormData();
-      invoiceFormData.append('delivery_note_id', selectedDNForComplete.id);
+      invoiceFormData.append('delivery_note', selectedDNForComplete.id); // Use 'delivery_note' to match serializer
       invoiceFormData.append('invoice_status', 'raised');
+      invoiceFormData.append('due_in_days', dueInDays);
       await apiClient.post('/invoices/', invoiceFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -207,11 +214,23 @@ const PendingDeliveries = () => {
         isCompleteModalOpen: false,
         selectedDNForComplete: null,
         signedDeliveryNote: null,
+        dueInDays: '',
       }));
       fetchData();
     } catch (error) {
       console.error('Error completing delivery:', error);
-      toast.error('Failed to complete delivery or create invoice.');
+      if (error.response && error.response.data) {
+        const errors = error.response.data;
+        if (errors.delivery_note) {
+          toast.error(`Invoice creation failed: ${errors.delivery_note.join(', ')}`);
+        } else if (errors.due_in_days) {
+          toast.error(`Invoice creation failed: ${errors.due_in_days.join(', ')}`);
+        } else {
+          toast.error('Failed to complete delivery or create invoice.');
+        }
+      } else {
+        toast.error('Failed to complete delivery or create invoice.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -586,6 +605,7 @@ const PendingDeliveries = () => {
               isCompleteModalOpen: false,
               selectedDNForComplete: null,
               signedDeliveryNote: null,
+              dueInDays: '',
             }))
           }
           title={`Complete Delivery - ${state.selectedDNForComplete?.dn_number || 'N/A'}`}
@@ -601,6 +621,18 @@ const PendingDeliveries = () => {
                 disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
             </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
+              <InputField
+                type="number"
+                placeholder="Enter number of days"
+                value={state.dueInDays}
+                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
+                className="w-full"
+                disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
+                min="1"
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button
                 onClick={() =>
@@ -609,6 +641,7 @@ const PendingDeliveries = () => {
                     isCompleteModalOpen: false,
                     selectedDNForComplete: null,
                     signedDeliveryNote: null,
+                    dueInDays: '',
                   }))
                 }
                 disabled={isSubmitting}
