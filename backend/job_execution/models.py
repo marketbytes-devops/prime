@@ -7,6 +7,12 @@ from unit.models import Unit
 from team.models import Technician
 from series.models import NumberSeries
 
+def sanitize_filename(instance, filename):
+    ext = filename.split('.')[-1]
+    filename_without_ext = os.path.splitext(filename)[0]
+    clean_filename = slugify(filename_without_ext)
+    return f'invoices/{clean_filename}.{ext}'
+
 class WorkOrder(models.Model):
     invoice_delivery_note = models.ForeignKey(
         'DeliveryNote',
@@ -84,12 +90,6 @@ class DeliveryNote(models.Model):
     def __str__(self):
         return f"DN {self.dn_number} - {self.work_order.wo_number}"
 
-def sanitize_filename(instance, filename):
-    ext = filename.split('.')[-1]
-    filename_without_ext = os.path.splitext(filename)[0]
-    clean_filename = slugify(filename_without_ext)
-    return f'invoices/{clean_filename}.{ext}'
-
 class DeliveryNoteItem(models.Model):
     delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.CASCADE, related_name='items')
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
@@ -98,7 +98,7 @@ class DeliveryNoteItem(models.Model):
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
     uom = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     invoice_file = models.FileField(
-        upload_to=sanitize_filename,
+        upload_to=sanitize_filename,  
         null=True,
         blank=True
     )
