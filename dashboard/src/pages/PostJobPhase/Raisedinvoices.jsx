@@ -1036,7 +1036,7 @@ const RaisedInvoices = () => {
         <div className="space-y-4">
           <div>
             <InputField
-              label={`${state.invoiceUploadType} Invoice File (Upload 1 MB)`}
+              label={`${state.invoiceUploadType}`}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) =>
