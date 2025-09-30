@@ -216,17 +216,27 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-    if (pair.deliveryNote && pair.deliveryNote.items) {
-      const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
-      if (itemsWithInvoices.length > 0) {
-        if (itemsWithInvoices.length === 1) {
-          window.open(itemsWithInvoices[0].invoice_file, '_blank');
+      if (pair.deliveryNote && pair.deliveryNote.items) {
+        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
+        if (itemsWithInvoices.length > 0) {
+          const invoiceFile = itemsWithInvoices[0].invoice_file;
+          
+          let fileUrl = invoiceFile;
+          if (invoiceFile && !invoiceFile.startsWith('http')) {
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://backend.primearabiagroup.com';
+            const mediaBaseUrl = baseUrl.replace('/api', '');
+            fileUrl = `${mediaBaseUrl}${invoiceFile.startsWith('/') ? '' : '/'}${invoiceFile}`;
+          }
+          
+          console.log('Opening invoice file:', fileUrl);
+
+          const newWindow = window.open(fileUrl, '_blank');
+          if (!newWindow) {
+            toast.error('Please allow popups to view the invoice file.');
+          }
         } else {
-          window.open(itemsWithInvoices[0].invoice_file, '_blank');
+          toast.error('No invoice files available.');
         }
-      } else {
-        toast.error('No invoice files available.');
-      }
       } else {
         toast.error('No invoice files available.');
       }
