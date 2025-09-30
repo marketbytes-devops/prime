@@ -906,7 +906,7 @@ const PendingInvoices = () => {
                           </select>
                         </div>
                       ) : (
-                        'N/A'
+                        'Fill all the details'
                       )}
                     </td>
                   </tr>

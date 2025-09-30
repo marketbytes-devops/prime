@@ -185,14 +185,23 @@ const PendingDeliveries = () => {
 
     try {
       setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append('signed_delivery_note', signedDeliveryNote);
-      formData.append('invoice_status', 'Raised');
-      await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, formData, {
+
+      // Step 1: Upload signed delivery note to update delivery note status
+      const deliveryFormData = new FormData();
+      deliveryFormData.append('signed_delivery_note', signedDeliveryNote);
+      await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, deliveryFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      toast.success('Delivery completed and work order moved to Pending Invoices.');
+      // Step 2: Create a new invoice with status 'raised'
+      const invoiceFormData = new FormData();
+      invoiceFormData.append('delivery_note_id', selectedDNForComplete.id);
+      invoiceFormData.append('invoice_status', 'raised');
+      await apiClient.post('/invoices/', invoiceFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.success('Delivery completed and invoice created. Work order moved to Pending Invoices.');
       setState((prev) => ({
         ...prev,
         isCompleteModalOpen: false,
@@ -202,7 +211,7 @@ const PendingDeliveries = () => {
       fetchData();
     } catch (error) {
       console.error('Error completing delivery:', error);
-      toast.error('Failed to complete delivery.');
+      toast.error('Failed to complete delivery or create invoice.');
     } finally {
       setIsSubmitting(false);
     }
