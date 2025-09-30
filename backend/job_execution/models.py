@@ -89,7 +89,7 @@ class DeliveryNoteItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
     uom = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
-    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
+    final_invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
     invoice_status = models.CharField(
         max_length=20,
         choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
