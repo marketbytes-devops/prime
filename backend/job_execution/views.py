@@ -182,7 +182,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         received_date = request.data.get('received_date')
         invoice_file = request.FILES.get('invoice_file')
         is_multiple_dns = request.data.get('is_multiple_dns', 'false') == 'true'
-        delivery_note_id = request.data.get('delivery_note_id')
+        delivery_note_id = request.data.get('delivery_note_id')  # New field to specify the delivery note for multiple DNs
 
         if not new_status:
             return Response(
@@ -244,21 +244,28 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
 
-                # Update all items individually to properly handle file uploads
-                for item in all_items:
-                    item.invoice_status = new_status
-                    if new_status == 'raised' and due_in_days:
-                        item.due_in_days = int(due_in_days)
-                    if new_status == 'processed' and received_date:
-                        item.received_date = received_date
-                    if new_status == 'processed' and invoice_file:
-                        # Save the same invoice file to all items
-                        item.invoice_file = invoice_file
-                    item.save()
+                # Update all items in the specified delivery note
+                update_fields = {'invoice_status': new_status}
+                if new_status == 'raised' and due_in_days:
+                    update_fields['due_in_days'] = int(due_in_days)
+                if new_status == 'processed' and received_date:
+                    update_fields['received_date'] = received_date
+                if new_status == 'processed' and invoice_file:
+                    update_fields['invoice_file'] = invoice_file
 
-                    # Send email for status change
-                    if new_status in ['raised', 'processed']:
-                        serializer = WorkOrderSerializer()
+                all_items.update(**update_fields)
+
+                # For 'processed' status, attach invoice_file to the first item if not already set
+                if new_status == 'processed' and invoice_file:
+                    first_item = all_items.first()
+                    if not first_item.invoice_file:
+                        first_item.invoice_file = invoice_file
+                        first_item.save()
+
+                # Send email for status change
+                if new_status in ['raised', 'processed']:
+                    serializer = WorkOrderSerializer()
+                    for item in all_items:
                         email_sent = serializer.send_invoice_status_change_email(item, new_status)
                         logger.info(f"Email sent status for DeliveryNoteItem {item.id}: {email_sent}")
 
