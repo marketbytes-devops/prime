@@ -221,15 +221,22 @@ const PendingInvoices = () => {
         if (itemsWithInvoices.length > 0) {
           const invoiceFile = itemsWithInvoices[0].invoice_file;
           
-          let fileUrl = invoiceFile;
-          if (invoiceFile && !invoiceFile.startsWith('http')) {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://backend.primearabiagroup.com';
-            const mediaBaseUrl = baseUrl.replace('/api', '');
-            fileUrl = `${mediaBaseUrl}${invoiceFile.startsWith('/') ? '' : '/'}${invoiceFile}`;
+          console.log('Original invoice_file:', invoiceFile);
+          
+          let fileUrl;
+          
+          if (invoiceFile.startsWith('http')) {
+            fileUrl = invoiceFile;
+          } else if (invoiceFile.startsWith('/media/')) {
+            fileUrl = `https://backend.primearabiagroup.com${invoiceFile}`;
+          } else if (invoiceFile.startsWith('invoices/')) {
+            fileUrl = `https://backend.primearabiagroup.com/media/${invoiceFile}`;
+          } else {
+            fileUrl = `https://backend.primearabiagroup.com/media/invoices/${invoiceFile}`;
           }
           
-          console.log('Opening invoice file:', fileUrl);
-
+          console.log('Final URL:', fileUrl);
+          
           const newWindow = window.open(fileUrl, '_blank');
           if (!newWindow) {
             toast.error('Please allow popups to view the invoice file.');
