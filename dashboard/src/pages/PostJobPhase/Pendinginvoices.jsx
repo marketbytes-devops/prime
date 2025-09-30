@@ -218,7 +218,7 @@ const PendingInvoices = () => {
     } else if (type === 'invoice') {
       if (pair.deliveryNote && pair.deliveryNote.items) {
         const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
-        if (itemsWithInvoices.length > 0) {
+        if (itemsWithInvoices.length === 1) {
           window.open(itemsWithInvoices[0].invoice_file, '_blank');
         } else {
           toast.error('No invoice files available.');
@@ -228,6 +228,7 @@ const PendingInvoices = () => {
       }
     }
   };
+
 
   const handleUploadPO = (pair) => {
     const workOrder = pair.workOrder;
@@ -838,23 +839,23 @@ const PendingInvoices = () => {
                         >
                           {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
                         </Button>
-                      <Button
-                        onClick={() => handleViewDocument(pair, 'invoice')}
-                        disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || 
-                          !(pair.deliveryNote && pair.deliveryNote.items && 
-                            pair.deliveryNote.items.some(item => item.invoice_file))}
-                        className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                          isSubmitting || !hasPermission('pending_invoices', 'view') || 
-                          !(pair.deliveryNote && pair.deliveryNote.items && 
-                            pair.deliveryNote.items.some(item => item.invoice_file))
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                        }`}
-                      >
-                        {isSubmitting ? 'Submitting...' : 
-                        (pair.deliveryNote && pair.deliveryNote.items && 
-                          pair.deliveryNote.items.some(item => item.invoice_file)) ? 'View Invoice' : 'No Invoice'}
-                      </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || 
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'view') || 
+                            !(pair.deliveryNote && pair.deliveryNote.items && 
+                              pair.deliveryNote.items.some(item => item.invoice_file))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 
+                           (pair.deliveryNote && pair.deliveryNote.items && 
+                            pair.deliveryNote.items.some(item => item.invoice_file)) ? 'View Invoice' : 'No Invoice'}
+                        </Button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
