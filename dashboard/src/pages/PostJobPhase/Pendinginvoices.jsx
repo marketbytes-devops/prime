@@ -225,22 +225,43 @@ const PendingInvoices = () => {
           
           let fileUrl;
           
+          // Handle different file path formats
           if (invoiceFile.startsWith('http')) {
             fileUrl = invoiceFile;
           } else if (invoiceFile.startsWith('/media/')) {
-            fileUrl = `https://backend.primearabiagroup.com${invoiceFile}`;
+            // Remove the leading /media/ and use the backend URL
+            const relativePath = invoiceFile.replace('/media/', '');
+            fileUrl = `https://backend.primearabiagroup.com/media/${relativePath}`;
+          } else if (invoiceFile.startsWith('media/')) {
+            // Handle case where path starts with media/
+            const relativePath = invoiceFile.replace('media/', '');
+            fileUrl = `https://backend.primearabiagroup.com/media/${relativePath}`;
           } else if (invoiceFile.startsWith('invoices/')) {
             fileUrl = `https://backend.primearabiagroup.com/media/${invoiceFile}`;
           } else {
-            fileUrl = `https://backend.primearabiagroup.com/media/invoices/${invoiceFile}`;
+            // Assume it's a relative path from media root
+            fileUrl = `https://backend.primearabiagroup.com/media/${invoiceFile}`;
           }
           
           console.log('Final URL:', fileUrl);
           
-          const newWindow = window.open(fileUrl, '_blank');
-          if (!newWindow) {
-            toast.error('Please allow popups to view the invoice file.');
-          }
+          // Test if the file exists before opening
+          fetch(fileUrl, { method: 'HEAD' })
+            .then(response => {
+              if (response.ok) {
+                const newWindow = window.open(fileUrl, '_blank');
+                if (!newWindow) {
+                  toast.error('Please allow popups to view the invoice file.');
+                }
+              } else {
+                toast.error('Invoice file not found on server.');
+                console.error('File not found:', fileUrl);
+              }
+            })
+            .catch(error => {
+              console.error('Error checking file:', error);
+              toast.error('Error accessing invoice file.');
+            });
         } else {
           toast.error('No invoice files available.');
         }

@@ -252,6 +252,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     update_fields['received_date'] = received_date
                 if new_status == 'processed' and invoice_file:
                     update_fields['invoice_file'] = invoice_file
+                    
+                print(f"Invoice file name: {invoice_file.name}")
+                print(f"Media root: {settings.MEDIA_ROOT}")
+                print(f"Full path: {os.path.join(settings.MEDIA_ROOT, 'invoices', invoice_file.name)}")
 
                 all_items.update(**update_fields)
 
