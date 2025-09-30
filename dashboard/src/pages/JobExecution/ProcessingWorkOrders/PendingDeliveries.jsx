@@ -195,7 +195,7 @@ const PendingDeliveries = () => {
 
       // Step 2: Create a new invoice with status 'raised'
       const invoiceFormData = new FormData();
-      invoiceFormData.append('delivery_note', selectedDNForComplete.id); // Use 'delivery_note' to match serializer
+      invoiceFormData.append('delivery_note_id', selectedDNForComplete.id); // Use 'delivery_note_id' to match serializer
       invoiceFormData.append('invoice_status', 'raised');
       await apiClient.post('/invoices/', invoiceFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -213,8 +213,8 @@ const PendingDeliveries = () => {
       console.error('Error completing delivery:', error);
       if (error.response && error.response.data) {
         const errors = error.response.data;
-        if (errors.delivery_note) {
-          toast.error(`Invoice creation failed: ${errors.delivery_note.join(', ')}`);
+        if (errors.delivery_note_id) {
+          toast.error(`Invoice creation failed: ${errors.delivery_note_id.join(', ')}`);
         } else {
           toast.error('Failed to complete delivery or create invoice.');
         }
