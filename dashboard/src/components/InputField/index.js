@@ -17,7 +17,42 @@ const InputField = ({
   step,
   required,
   label,
+  accept,
 }) => {
+  if (type === 'file') {
+    const handleFileChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const maxSize = 1 * 1024 * 1024; 
+        if (file.size > maxSize) {
+          alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+          e.target.value = ''; 
+          onChange({ target: { files: null } }); 
+          return;
+        }
+      }
+      onChange(e); 
+    };
+
+    return (
+      <div className="flex flex-col">
+        {label && (
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {label} (Upload 1 MB)
+          </label>
+        )}
+        <input
+          type="file"
+          accept={accept || '.pdf,.jpg,.jpeg,.png'} 
+          onChange={handleFileChange}
+          className={`w-full px-2 py-2 placeholder:text-sm text-md border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-200 transition-colors ${className || ''}`}
+          readOnly={readOnly}
+          required={required}
+        />
+      </div>
+    );
+  }
+
   if (type === 'date') {
     let selectedDate = null;
     if (value) {
@@ -46,7 +81,7 @@ const InputField = ({
           selected={selectedDate}
           onChange={(date) => {
             if (date && isValid(date)) {
-              const formattedDate = format(date, 'yyyy-MM-dd'); 
+              const formattedDate = format(date, 'yyyy-MM-dd');
               onChange({ target: { value: formattedDate } });
             } else {
               onChange({ target: { value: '' } });
@@ -54,7 +89,7 @@ const InputField = ({
           }}
           placeholderText={placeholder}
           className={`w-full px-2 py-2 placeholder:text-sm text-md border rounded focus:outline-indigo-500 focus:ring focus:ring-indigo-200 transition-colors ${className || ''}`}
-          dateFormat="dd-MM-yyyy" 
+          dateFormat="dd-MM-yyyy"
           readOnly={readOnly}
           minDate={min ? (isValid(parse(min, 'dd-MM-yyyy', new Date())) ? parse(min, 'dd-MM-yyyy', new Date()) : parse(min, 'yyyy-MM-dd', new Date())) : null}
           required={required}
@@ -108,6 +143,7 @@ InputField.propTypes = {
   step: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   required: PropTypes.bool,
   label: PropTypes.string,
+  accept: PropTypes.string, 
 };
 
 InputField.defaultProps = {
@@ -122,6 +158,7 @@ InputField.defaultProps = {
   step: undefined,
   required: false,
   label: '',
+  accept: undefined, 
 };
 
 export default InputField;
