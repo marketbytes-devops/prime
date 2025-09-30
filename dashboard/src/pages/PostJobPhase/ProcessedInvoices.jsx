@@ -247,7 +247,6 @@ const ProcessedInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', state.newStatus);
-      formData.append('from_processed_invoices', true); // Add context flag
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
@@ -299,7 +298,6 @@ const ProcessedInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', newStatus);
-      formData.append('from_processed_invoices', true); // Add context flag
       if (newStatus === 'processed' && receivedDate) {
         formData.append('received_date', receivedDate);
       }
