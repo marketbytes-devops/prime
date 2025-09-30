@@ -104,15 +104,25 @@ const RaisedInvoices = () => {
       const workOrders = woRes.data || [];
       const invoices = invoiceRes.data || [];
 
+      // Log invoices to check for duplicates
+      console.log('Fetched Invoices:', invoices.map(invoice => ({
+        id: invoice.id,
+        delivery_note: invoice.delivery_note,
+        invoice_status: invoice.invoice_status,
+      })));
+
       const workOrderDeliveryPairs = [];
+      const seenInvoiceIds = new Set(); // Track unique invoice IDs
+
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
         relatedDNs.forEach((dn) => {
           const relatedInvoices = invoices.filter(
             (invoice) => invoice.delivery_note === dn.id && invoice.invoice_status === 'raised'
           );
-          if (relatedInvoices.length > 0) {
-            relatedInvoices.forEach((invoice) => {
+          relatedInvoices.forEach((invoice) => {
+            if (!seenInvoiceIds.has(invoice.id)) {
+              seenInvoiceIds.add(invoice.id);
               workOrderDeliveryPairs.push({
                 id: `${workOrder.id}-${dn.id}-${invoice.id}`,
                 workOrder,
@@ -122,10 +132,17 @@ const RaisedInvoices = () => {
                 deliveryNoteId: dn.id,
                 invoiceId: invoice.id,
               });
-            });
-          }
+            }
+          });
         });
       });
+
+      // Log pairs to verify deduplication
+      console.log('WorkOrderDeliveryPairs:', workOrderDeliveryPairs.map(pair => ({
+        id: pair.id,
+        invoiceId: pair.invoiceId,
+        invoiceStatus: pair.invoice?.invoice_status,
+      })));
 
       setState((prev) => ({
         ...prev,
@@ -421,15 +438,12 @@ const RaisedInvoices = () => {
 
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
-      pair.invoice?.invoice_status === 'raised' && // Explicitly ensure only "raised" invoices
-      (
-        (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        (pair.deliveryNote && pair.deliveryNote.items &&
-         pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
-      )
+      (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      (pair.deliveryNote && pair.deliveryNote.items &&
+       pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -469,12 +483,13 @@ const RaisedInvoices = () => {
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
             <InputField
               type="text"
               placeholder="Search by WO Number, Quotation, DN Number, Company Name, or Item..."
               value={state.searchTerm}
               onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
-              label="Search Work Orders"
+              className="w-full p-2 border rounded focus:outline-indigo-500"
             />
           </div>
           <div className="flex-1 min-w-[150px]">
@@ -576,7 +591,7 @@ const RaisedInvoices = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600">{pair.invoice?.invoice_status}</span>
+                        <span className="text-xs text-gray-600">{pair.invoice?.invoice_status || 'Raised'}</span>
                         <select
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
@@ -949,11 +964,12 @@ const RaisedInvoices = () => {
         <div className="space-y-4">
           {state.newStatus === 'processed' && (
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
               <InputField
                 type="date"
                 value={state.receivedDate}
                 onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
-                label="Received Date"
+                className="w-full p-2 border rounded focus:outline-indigo-500"
               />
             </div>
           )}
@@ -1020,6 +1036,7 @@ const RaisedInvoices = () => {
         <div className="space-y-4">
           <div>
             <InputField
+              label={`${state.invoiceUploadType} Invoice File (Upload 1 MB)`}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) =>
@@ -1029,7 +1046,7 @@ const RaisedInvoices = () => {
                   invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
                 }))
               }
-              label={`${state.invoiceUploadType} Invoice File (Upload 1 MB)`}
+              className="w-full p-2 border rounded focus:outline-indigo-500"
             />
             {state.invoiceUploadErrors.invoiceFile && (
               <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
