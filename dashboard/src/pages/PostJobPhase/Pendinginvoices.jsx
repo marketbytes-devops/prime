@@ -906,7 +906,7 @@ const PendingInvoices = () => {
                           </select>
                         </div>
                       ) : (
-                        'Fill all the details'
+                        <span className="text-sm">Fill all the details</span>
                       )}
                     </td>
                   </tr>
