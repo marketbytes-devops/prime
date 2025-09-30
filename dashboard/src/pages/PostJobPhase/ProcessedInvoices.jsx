@@ -570,7 +570,6 @@ const ProcessedInvoices = () => {
                           value=""
                         >
                           <option value="" disabled>Select Status</option>
-                          <option value="pending">Pending</option>
                           <option value="processed">Re-upload Invoice</option>
                         </select>
                       </div>
@@ -939,11 +938,6 @@ const ProcessedInvoices = () => {
                 className="w-full p-2 border rounded focus:outline-indigo-500"
               />
             </div>
-          )}
-          {state.newStatus === 'pending' && (
-            <p className="text-sm text-gray-600">
-              Setting status to Pending will clear any invoice files or received dates.
-            </p>
           )}
           <div className="flex justify-end gap-2">
             <Button
