@@ -341,11 +341,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         previous_status = instance.invoice_status
         new_status = validated_data.get('invoice_status', instance.invoice_status)
-        request = self.context.get('request')
-        from_processed_invoices = request and request.data.get('from_processed_invoices', False)
 
-        # Allow status change from 'processed' to 'pending' only if from_processed_invoices is True
-        if instance.invoice_status == 'processed' and new_status != 'processed' and not from_processed_invoices:
+        if instance.invoice_status == 'processed' and new_status != 'processed':
             raise serializers.ValidationError({
                 'invoice_status': "Cannot change invoice status from 'processed' to another status."
             })
