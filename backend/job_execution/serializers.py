@@ -22,7 +22,6 @@ from authapp.models import CustomUser, Role
 logger = logging.getLogger(__name__)
 
 class DeliveryNoteItemComponentSerializer(serializers.ModelSerializer):
-    invoice_file_url = serializers.SerializerMethodField()
     class Meta:
         model = DeliveryNoteItemComponent
         fields = ["id", "component", "value"]
@@ -59,20 +58,11 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "uom",
             "components",
             "invoice_file",
-            "invoice_file_url",
             "invoice_status",
             "due_in_days",
             "received_date",
             "payment_reference_number",
         ]
-        
-    def get_invoice_file_url(self, obj):
-        if obj.invoice_file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.invoice_file.url)
-            return obj.invoice_file.url
-        return None
 
     def validate(self, data):
         if data.get("quantity") != data.get("delivered_quantity"):
