@@ -5,6 +5,7 @@ from .models import (
     DeliveryNote,
     DeliveryNoteItem,
     DeliveryNoteItemComponent,
+    Invoice
 )
 from pre_job.models import PurchaseOrder, Quotation
 from item.models import Item
@@ -34,18 +35,6 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
         queryset=Unit.objects.all(), allow_null=True
     )
     components = DeliveryNoteItemComponentSerializer(many=True, required=False)
-    invoice_file = serializers.FileField(required=False, allow_null=True)
-    invoice_status = serializers.ChoiceField(
-        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
-        required=False
-    )
-    due_in_days = serializers.IntegerField(required=False, allow_null=True)
-    received_date = serializers.DateField(
-        required=False, allow_null=True, input_formats=["%Y-%m-%d", "%d-%m-%Y"]
-    )
-    payment_reference_number = serializers.CharField(
-        max_length=100, required=False, allow_null=True
-    )
 
     class Meta:
         model = DeliveryNoteItem
@@ -57,11 +46,6 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity",
             "uom",
             "components",
-            "invoice_file",
-            "invoice_status",
-            "due_in_days",
-            "received_date",
-            "payment_reference_number",
         ]
 
     def validate(self, data):
@@ -69,18 +53,6 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"delivered_quantity": "Delivered quantity must equal quantity."}
             )
-        new_invoice_status = data.get("invoice_status")
-        due_in_days = data.get("due_in_days")
-        received_date = data.get("received_date")
-        if new_invoice_status:
-            if new_invoice_status == "raised" and (not due_in_days or due_in_days <= 0):
-                raise serializers.ValidationError(
-                    "Due in days is required and must be a positive integer for 'raised' status."
-                )
-            if new_invoice_status == "processed" and not received_date:
-                raise serializers.ValidationError(
-                    "Received date is required for 'processed' status."
-                )
         return data
 
     def create(self, validated_data):
@@ -101,13 +73,6 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity", instance.delivered_quantity
         )
         instance.uom = validated_data.get("uom", instance.uom)
-        instance.invoice_file = validated_data.get("invoice_file", instance.invoice_file)
-        instance.invoice_status = validated_data.get("invoice_status", instance.invoice_status)
-        instance.due_in_days = validated_data.get("due_in_days", instance.due_in_days)
-        instance.received_date = validated_data.get("received_date", instance.received_date)
-        instance.payment_reference_number = validated_data.get(
-            "payment_reference_number", instance.payment_reference_number
-        )
         instance.save()
         instance.components.all().delete()
         for component_data in components_data:
@@ -165,11 +130,6 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
                     quantity=item_data.get("quantity"),
                     delivered_quantity=item_data.get("delivered_quantity"),
                     uom=item_data.get("uom"),
-                    invoice_file=item_data.get("invoice_file"),
-                    invoice_status=item_data.get("invoice_status", "pending"),
-                    due_in_days=item_data.get("due_in_days"),
-                    received_date=item_data.get("received_date"),
-                    payment_reference_number=item_data.get("payment_reference_number"),
                 )
                 for component_data in components_data:
                     DeliveryNoteItemComponent.objects.create(
@@ -248,6 +208,154 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
             )
         return data
 
+class InvoiceSerializer(serializers.ModelSerializer):
+    delivery_note_id = serializers.PrimaryKeyRelatedField(
+        source='delivery_note',
+        queryset=DeliveryNote.objects.all()
+    )
+    delivery_note_item_id = serializers.PrimaryKeyRelatedField(
+        source='delivery_note_item',
+        queryset=DeliveryNoteItem.objects.all(),
+        allow_null=True,
+        required=False
+    )
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id',
+            'delivery_note',
+            'delivery_note_id',
+            'delivery_note_item',
+            'delivery_note_item_id',
+            'invoice_file',
+            'invoice_status',
+            'due_in_days',
+            'received_date',
+            'payment_reference_number',
+            'created_at',
+            'updated_at'
+        ]
+
+    def validate(self, data):
+        invoice_status = data.get('invoice_status')
+        due_in_days = data.get('due_in_days')
+        received_date = data.get('received_date')
+        invoice_file = data.get('invoice_file')
+
+        if invoice_status == 'raised' and (not due_in_days or due_in_days <= 0):
+            raise serializers.ValidationError({
+                'due_in_days': "Due in days is required and must be a positive integer for 'raised' status."
+            })
+        if invoice_status == 'processed':
+            if not received_date:
+                raise serializers.ValidationError({
+                    'received_date': "Received date is required for 'processed' status."
+                })
+            if not invoice_file:
+                raise serializers.ValidationError({
+                    'invoice_file': "Invoice file is required for 'processed' status."
+                })
+        return data
+
+    def send_invoice_status_change_email(self, invoice, new_status):
+        email_sent = False
+        recipient_list = []
+        work_order = invoice.delivery_note.work_order
+        if (
+            work_order.quotation
+            and work_order.quotation.assigned_sales_person
+            and work_order.quotation.assigned_sales_person.email
+        ):
+            recipient_list.append(
+                (
+                    work_order.quotation.assigned_sales_person.email,
+                    work_order.quotation.assigned_sales_person.name,
+                )
+            )
+        if settings.ADMIN_EMAIL:
+            recipient_list.append((settings.ADMIN_EMAIL, None))
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
+            for user in superadmin_users:
+                if user.email:
+                    recipient_list.append((user.email, user.name or user.username))
+        recipient_dict = {email: name for email, name in recipient_list}
+        recipient_list = [(email, name) for email, name in recipient_dict.items()]
+
+        if recipient_list:
+            for email, name in recipient_list:
+                salutation = (
+                    "Dear Admin" if email == settings.ADMIN_EMAIL
+                    else f"Dear {name}" if name and (
+                        superadmin_role and CustomUser.objects.filter(email=email, role=superadmin_role).exists()
+                        or work_order.quotation and email == (
+                            work_order.quotation.assigned_sales_person.email
+                            if work_order.quotation.assigned_sales_person
+                            else None
+                        )
+                    )
+                    else "Dear Recipient"
+                )
+                subject = f"Invoice #{invoice.id} Status Changed to {new_status}"
+                message = (
+                    f"{salutation},\n\n"
+                    f"The invoice status for the following Delivery Note has been updated:\n"
+                    f"------------------------------------------------------------\n"
+                    f"🔹 Work Order Number: {work_order.wo_number}\n"
+                    f"🔹 Delivery Note Number: {invoice.delivery_note.dn_number}\n"
+                    f"🔹 Invoice ID: {invoice.id}\n"
+                    f"🔹 Project: {work_order.quotation.company_name or 'Unnamed'}\n"
+                    f"🔹 New Invoice Status: {new_status}\n"
+                    f"🔹 Due in Days: {invoice.due_in_days or 'Not specified'}\n"
+                    f"🔹 Received Date: {invoice.received_date or 'Not specified'}\n"
+                    f"------------------------------------------------------------\n"
+                    f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
+                    f"Best regards,\n"
+                    f"PrimeCRM Team\n"
+                    f"---\n"
+                    f"This is an automated message. Please do not reply to this email."
+                )
+                try:
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.EMAIL_HOST_USER,
+                        recipient_list=[email],
+                        fail_silently=True,
+                    )
+                    email_sent = True
+                    logger.info(f"Invoice status change email sent to {email} for Invoice #{invoice.id}")
+                except Exception as e:
+                    logger.error(f"Failed to send invoice status change email to {email} for Invoice #{invoice.id}: {str(e)}")
+        return email_sent
+
+    def create(self, validated_data):
+        invoice = Invoice.objects.create(**validated_data)
+        new_status = validated_data.get('invoice_status')
+        if new_status in ['raised', 'processed']:
+            self.send_invoice_status_change_email(invoice, new_status)
+        return invoice
+
+    def update(self, instance, validated_data):
+        previous_status = instance.invoice_status
+        new_status = validated_data.get('invoice_status', instance.invoice_status)
+
+        if instance.invoice_status == 'processed' and new_status != 'processed':
+            raise serializers.ValidationError({
+                'invoice_status': "Cannot change invoice status from 'processed' to another status."
+            })
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if new_status != previous_status and new_status in ['raised', 'processed']:
+            self.send_invoice_status_change_email(instance, new_status)
+
+        return instance
+
 class WorkOrderSerializer(serializers.ModelSerializer):
     purchase_order = serializers.PrimaryKeyRelatedField(
         queryset=PurchaseOrder.objects.all(), allow_null=True
@@ -302,96 +410,6 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "application_status",
             "invoice_delivery_note",
         ]
-
-    def send_invoice_status_change_email(self, delivery_note_item, new_status):
-        email_sent = False
-        recipient_list = []
-
-        work_order = delivery_note_item.delivery_note.work_order
-        if (
-            work_order.quotation
-            and work_order.quotation.assigned_sales_person
-            and work_order.quotation.assigned_sales_person.email
-        ):
-            recipient_list.append(
-                (
-                    work_order.quotation.assigned_sales_person.email,
-                    work_order.quotation.assigned_sales_person.name,
-                )
-            )
-        if settings.ADMIN_EMAIL:
-            recipient_list.append((settings.ADMIN_EMAIL, None))
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
-            for user in superadmin_users:
-                if user.email:
-                    recipient_list.append((user.email, user.name or user.username))
-
-        recipient_dict = {email: name for email, name in recipient_list}
-        recipient_list = [(email, name) for email, name in recipient_dict.items()]
-
-        if recipient_list:
-            for email, name in recipient_list:
-                if email == settings.ADMIN_EMAIL:
-                    salutation = "Dear Admin"
-                elif (
-                    superadmin_role
-                    and CustomUser.objects.filter(
-                        email=email, role=superadmin_role
-                    ).exists()
-                ):
-                    salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif (
-                    work_order.quotation
-                    and email
-                    == (
-                        work_order.quotation.assigned_sales_person.email
-                        if work_order.quotation.assigned_sales_person
-                        else None
-                    )
-                    and name
-                ):
-                    salutation = f"Dear {name}"
-                else:
-                    salutation = "Dear Recipient"
-
-                subject = f"Delivery Note Item #{delivery_note_item.id} Invoice Status Changed to {new_status}"
-                message = (
-                    f"{salutation},\n\n"
-                    f"The invoice status for the following Delivery Note Item has been updated:\n"
-                    f"------------------------------------------------------------\n"
-                    f"🔹 Work Order Number: {work_order.wo_number}\n"
-                    f"🔹 Delivery Note Number: {delivery_note_item.delivery_note.dn_number}\n"
-                    f"🔹 Item ID: {delivery_note_item.id}\n"
-                    f"🔹 Project: {work_order.quotation.company_name or 'Unnamed'}\n"
-                    f"🔹 New Invoice Status: {new_status}\n"
-                    f"🔹 Due in Days: {delivery_note_item.due_in_days or 'Not specified'}\n"
-                    f"🔹 Received Date: {delivery_note_item.received_date or 'Not specified'}\n"
-                    f"------------------------------------------------------------\n"
-                    f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
-                    f"Best regards,\n"
-                    f"PrimeCRM Team\n"
-                    f"---\n"
-                    f"This is an automated message. Please do not reply to this email."
-                )
-                try:
-                    send_mail(
-                        subject=subject,
-                        message=message,
-                        from_email=settings.EMAIL_HOST_USER,
-                        recipient_list=[email],
-                        fail_silently=True,
-                    )
-                    email_sent = True
-                    logger.info(
-                        f"Invoice status change email sent to {email} for Delivery Note Item #{delivery_note_item.id}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to send invoice status change email to {email} for Delivery Note Item #{delivery_note_item.id}: {str(e)}"
-                    )
-        return email_sent
 
     def parse_formdata_items(self, request_data):
         items_data = []

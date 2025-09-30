@@ -2,13 +2,14 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent
+from .models import WorkOrder, DeliveryNote, DeliveryNoteItem, DeliveryNoteItemComponent, Invoice
 from .serializers import (
     WorkOrderSerializer,
     DeliveryNoteSerializer,
     InitiateDeliverySerializer,
     DeliveryNoteItemSerializer,
-    DeliveryNoteItemComponentSerializer
+    DeliveryNoteItemComponentSerializer,
+    InvoiceSerializer
 )
 from django.db.models import Max
 from series.models import NumberSeries
@@ -120,13 +121,18 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     delivery_status='Delivery Pending'
                 )
                 for item in work_order.items.all():
-                    DeliveryNoteItem.objects.create(
+                    delivery_note_item = DeliveryNoteItem.objects.create(
                         delivery_note=delivery_note,
                         item=item.item,
                         range=item.range,
                         quantity=item.quantity,
                         delivered_quantity=item.quantity,
                         uom=item.unit,
+                    )
+                    # Create an Invoice for each DeliveryNoteItem with default status
+                    Invoice.objects.create(
+                        delivery_note=delivery_note,
+                        delivery_note_item=delivery_note_item,
                         invoice_status='pending'
                     )
                 logger.info(f"Created new Delivery Note with temp DN for WorkOrder {pk}")
@@ -182,7 +188,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         received_date = request.data.get('received_date')
         invoice_file = request.FILES.get('invoice_file')
         is_multiple_dns = request.data.get('is_multiple_dns', 'false') == 'true'
-        delivery_note_id = request.data.get('delivery_note_id')  # New field to specify the delivery note for multiple DNs
+        delivery_note_id = request.data.get('delivery_note_id')
 
         if not new_status:
             return Response(
@@ -194,7 +200,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             work_order = self.get_object()
 
             if is_multiple_dns:
-                # For multiple delivery notes, update items for a specific delivery note
                 if not delivery_note_id:
                     return Response(
                         {'error': 'Delivery note ID is required for multiple delivery notes'},
@@ -209,29 +214,20 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-                all_items = DeliveryNoteItem.objects.filter(delivery_note=delivery_note)
-
-                if not all_items.exists():
-                    return Response(
-                        {'error': 'No delivery note items found for this delivery note'},
-                        status=status.HTTP_404_NOT_FOUND
+                # Check if an invoice exists for the delivery note
+                invoice = Invoice.objects.filter(delivery_note=delivery_note, delivery_note_item__isnull=True).first()
+                if not invoice:
+                    invoice = Invoice.objects.create(
+                        delivery_note=delivery_note,
+                        invoice_status='pending'
                     )
 
-                # Check if any item is already processed
-                if all_items.filter(invoice_status='processed').exists() and new_status != 'processed':
+                # Validate requirements
+                if new_status == 'raised' and (not due_in_days or int(due_in_days) <= 0):
                     return Response(
-                        {'error': "Cannot change invoice status from 'processed' to another status."},
+                        {'error': 'Due in days is required and must be a positive integer for Raised status'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-
-                # Validate requirements based on new status
-                if new_status == 'raised':
-                    if not due_in_days or int(due_in_days) <= 0:
-                        return Response(
-                            {'error': 'Due in days is required and must be a positive integer for Raised status'},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
-
                 if new_status == 'processed':
                     if not received_date:
                         return Response(
@@ -244,7 +240,14 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST
                         )
 
-                # Update all items in the specified delivery note
+                # Check if invoice is already processed
+                if invoice.invoice_status == 'processed' and new_status != 'processed':
+                    return Response(
+                        {'error': "Cannot change invoice status from 'processed' to another status."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Update invoice
                 update_fields = {'invoice_status': new_status}
                 if new_status == 'raised' and due_in_days:
                     update_fields['due_in_days'] = int(due_in_days)
@@ -253,30 +256,23 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 if new_status == 'processed' and invoice_file:
                     update_fields['invoice_file'] = invoice_file
 
-                all_items.update(**update_fields)
-
-                # For 'processed' status, attach invoice_file to the first item if not already set
-                if new_status == 'processed' and invoice_file:
-                    first_item = all_items.first()
-                    if not first_item.invoice_file:
-                        first_item.invoice_file = invoice_file
-                        first_item.save()
+                for field, value in update_fields.items():
+                    setattr(invoice, field, value)
+                invoice.save()
 
                 # Send email for status change
                 if new_status in ['raised', 'processed']:
-                    serializer = WorkOrderSerializer()
-                    for item in all_items:
-                        email_sent = serializer.send_invoice_status_change_email(item, new_status)
-                        logger.info(f"Email sent status for DeliveryNoteItem {item.id}: {email_sent}")
+                    serializer = InvoiceSerializer()
+                    email_sent = serializer.send_invoice_status_change_email(invoice, new_status)
+                    logger.info(f"Email sent status for Invoice {invoice.id}: {email_sent}")
 
-                logger.info(f"Updated {all_items.count()} delivery note items for WorkOrder {pk}, DeliveryNote {delivery_note_id}")
+                logger.info(f"Updated Invoice {invoice.id} for DeliveryNote {delivery_note_id}")
                 return Response({
                     'status': 'success',
-                    'message': f'Updated {all_items.count()} delivery note items for delivery note {delivery_note_id}',
+                    'message': f'Updated invoice for delivery note {delivery_note_id}',
                     'invoice_status': new_status
                 })
             else:
-                # For single delivery note, update a specific item
                 delivery_note_item_id = request.data.get('delivery_note_item_id')
                 if not delivery_note_item_id:
                     return Response(
@@ -292,14 +288,21 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-                if new_status == 'raised':
-                    if not due_in_days or int(due_in_days) <= 0:
-                        return Response(
-                            {'error': 'Due in days is required and must be a positive integer for Raised status'},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
-                    delivery_note_item.due_in_days = int(due_in_days)
+                # Check if an invoice exists for the delivery note item
+                invoice = Invoice.objects.filter(delivery_note=delivery_note_item.delivery_note, delivery_note_item=delivery_note_item).first()
+                if not invoice:
+                    invoice = Invoice.objects.create(
+                        delivery_note=delivery_note_item.delivery_note,
+                        delivery_note_item=delivery_note_item,
+                        invoice_status='pending'
+                    )
 
+                # Validate requirements
+                if new_status == 'raised' and (not due_in_days or int(due_in_days) <= 0):
+                    return Response(
+                        {'error': 'Due in days is required and must be a positive integer for Raised status'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 if new_status == 'processed':
                     if not received_date:
                         return Response(
@@ -311,26 +314,29 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             {'error': 'Invoice file is required for Processed status'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    delivery_note_item.received_date = received_date
 
-                if delivery_note_item.invoice_status == 'processed' and new_status != 'processed':
+                if invoice.invoice_status == 'processed' and new_status != 'processed':
                     return Response(
                         {'error': "Cannot change invoice status from 'processed' to another status."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-                previous_invoice_status = delivery_note_item.invoice_status
-                delivery_note_item.invoice_status = new_status
+                # Update invoice
+                invoice.invoice_status = new_status
+                if due_in_days:
+                    invoice.due_in_days = int(due_in_days)
+                if received_date:
+                    invoice.received_date = received_date
                 if invoice_file:
-                    delivery_note_item.invoice_file = invoice_file
-                delivery_note_item.save()
+                    invoice.invoice_file = invoice_file
+                invoice.save()
 
-                if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
-                    serializer = WorkOrderSerializer()
-                    email_sent = serializer.send_invoice_status_change_email(delivery_note_item, new_status)
-                    logger.info(f"Email sent status for DeliveryNoteItem {delivery_note_item.id}: {email_sent}")
+                if new_status in ['raised', 'processed']:
+                    serializer = InvoiceSerializer()
+                    email_sent = serializer.send_invoice_status_change_email(invoice, new_status)
+                    logger.info(f"Email sent status for Invoice {invoice.id}: {email_sent}")
 
-                serializer = DeliveryNoteItemSerializer(delivery_note_item)
+                serializer = InvoiceSerializer(invoice)
                 return Response(serializer.data)
 
         except Exception as e:
@@ -411,6 +417,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             quantity=item_data.get('quantity'),
                             delivered_quantity=item_data.get('delivered_quantity'),
                             uom=item_data.get('uom'),
+                        )
+                        Invoice.objects.create(
+                            delivery_note=delivery_note,
+                            delivery_note_item=delivery_note_item,
                             invoice_status='pending'
                         )
                         for component_data in components_data:
@@ -437,6 +447,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             quantity=item_data.get('quantity'),
                             delivered_quantity=item_data.get('delivered_quantity'),
                             uom=item_data.get('uom'),
+                        )
+                        Invoice.objects.create(
+                            delivery_note=delivery_note,
+                            delivery_note_item=delivery_note_item,
                             invoice_status='pending'
                         )
                         for component_data in components_data:
@@ -462,6 +476,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         quantity=item_data.get('quantity'),
                         delivered_quantity=item_data.get('delivered_quantity'),
                         uom=item_data.get('uom'),
+                    )
+                    Invoice.objects.create(
+                        delivery_note=delivery_note,
+                        delivery_note_item=delivery_note_item,
                         invoice_status='pending'
                     )
                     for component_data in components_data:
@@ -526,3 +544,54 @@ class DeliveryNoteItemComponentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         logger.error(f"Create failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        delivery_note_id = self.request.query_params.get('delivery_note_id')
+        invoice_status = self.request.query_params.get('invoice_status')
+        if delivery_note_id:
+            queryset = queryset.filter(delivery_note_id=delivery_note_id)
+        if invoice_status:
+            if isinstance(invoice_status, str) and ',' in invoice_status:
+                statuses = invoice_status.split(',')
+                queryset = queryset.filter(invoice_status__in=statuses)
+            else:
+                queryset = queryset.filter(invoice_status=invoice_status)
+        logger.info(f"Queryset filtered: delivery_note_id={delivery_note_id}, invoice_status={invoice_status}, count={queryset.count()}")
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            logger.info(f"Invoice created: {serializer.data['id']}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Create failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            self.perform_update(serializer)
+            logger.info(f"Invoice {instance.id} updated")
+            return Response(serializer.data)
+        logger.error(f"Update failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.invoice_status == 'processed':
+            logger.warning(f"Invoice {instance.id} cannot be deleted: status is processed")
+            return Response(
+                {'error': "Cannot delete an invoice with 'processed' status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        self.perform_destroy(instance)
+        logger.info(f"Invoice {instance.id} deleted")
+        return Response(status=status.HTTP_204_NO_CONTENT)

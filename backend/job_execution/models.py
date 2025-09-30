@@ -46,7 +46,7 @@ class WorkOrder(models.Model):
     created_by = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
     wo_type = models.CharField(max_length=10, choices=[('Single', 'Single'), ('Split', 'Split')], blank=True, null=True)
     application_status = models.CharField(max_length=20, null=True, blank=True)
-
+    
     def __str__(self):
         return f"WO {self.wo_number} - {self.quotation.company_name or 'Unnamed'}"
 
@@ -64,7 +64,7 @@ class WorkOrderItem(models.Model):
     uuc_serial_number = models.CharField(max_length=100, null=True, blank=True)
     certificate_file = models.FileField(upload_to='certificates/', null=True, blank=True)
     assigned_to = models.ForeignKey(Technician, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_order_items')
-
+    
     def __str__(self):
         return f"{self.item} - {self.work_order}"
 
@@ -78,7 +78,7 @@ class DeliveryNote(models.Model):
     )
     series = models.ForeignKey(NumberSeries, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     def __str__(self):
         return f"DN {self.dn_number} - {self.work_order.wo_number}"
 
@@ -89,18 +89,7 @@ class DeliveryNoteItem(models.Model):
     quantity = models.PositiveIntegerField(null=True, blank=True)
     delivered_quantity = models.PositiveIntegerField(null=True, blank=True)
     uom = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
-    invoice_file = models.FileField(upload_to='invoices/', null=True, blank=True)
-    invoice_status = models.CharField(
-        max_length=20,
-        choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
-        default='pending',
-        null=True,
-        blank=True
-    )
-    due_in_days = models.IntegerField(null=True, blank=True)
-    received_date = models.DateField(null=True, blank=True)
-    payment_reference_number = models.CharField(max_length=100, null=True, blank=True)
-
+    
     def __str__(self):
         return f"{self.item} - {self.delivery_note}"
 
@@ -108,6 +97,44 @@ class DeliveryNoteItemComponent(models.Model):
     delivery_note_item = models.ForeignKey(DeliveryNoteItem, on_delete=models.CASCADE, related_name='components')
     component = models.CharField(max_length=100)
     value = models.CharField(max_length=200)
-
+    
     def __str__(self):
         return f"{self.component}: {self.value} - {self.delivery_note_item}"
+
+class Invoice(models.Model):
+    delivery_note = models.ForeignKey(
+        DeliveryNote, 
+        on_delete=models.CASCADE, 
+        related_name='invoices'
+    )
+    delivery_note_item = models.ForeignKey(
+        DeliveryNoteItem, 
+        on_delete=models.CASCADE, 
+        related_name='invoices',
+        null=True, 
+        blank=True
+    )
+    invoice_file = models.FileField(
+        upload_to='invoices-files/', 
+        null=True, 
+        blank=True
+    )
+    invoice_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('raised', 'Raised'),
+            ('processed', 'Processed')
+        ],
+        default='pending',
+        null=True,
+        blank=True
+    )
+    due_in_days = models.IntegerField(null=True, blank=True)
+    received_date = models.DateField(null=True, blank=True)
+    payment_reference_number = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Invoice for DN {self.delivery_note.dn_number} - Status: {self.invoice_status}"
