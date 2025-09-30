@@ -10,6 +10,7 @@ const RaisedInvoices = () => {
     workOrders: [],
     purchaseOrders: [],
     deliveryNotes: [],
+    invoices: [],
     technicians: [],
     itemsList: [],
     units: [],
@@ -28,13 +29,12 @@ const RaisedInvoices = () => {
     isStatusModalOpen: false,
     selectedWorkOrderId: null,
     selectedDNId: null,
-    selectedDNItemId: null,
+    selectedInvoiceId: null,
     newStatus: '',
     receivedDate: '',
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
     selectedDNForInvoiceUpload: null,
-    selectedDNItemForInvoiceUpload: null,
     invoiceUpload: { invoiceFile: null },
     invoiceUploadErrors: { invoiceFile: '' },
     invoiceUploadType: '',
@@ -78,10 +78,11 @@ const RaisedInvoices = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, poRes, dnRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
+      const [woRes, poRes, dnRes, invoiceRes, techRes, itemsRes, unitsRes, quotationsRes, channelsRes] = await Promise.all([
         apiClient.get('work-orders/'),
         apiClient.get('purchase-orders/'),
         apiClient.get('delivery-notes/'),
+        apiClient.get('invoices/'),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
         apiClient.get('units/'),
@@ -97,30 +98,32 @@ const RaisedInvoices = () => {
             ...item,
             uom: item.uom ? Number(item.uom) : null,
             components: item.components || [],
-            invoice_status: item.invoice_status ? item.invoice_status.toLowerCase() : 'pending',
           })),
         }));
 
       const workOrders = woRes.data || [];
+      const invoices = invoiceRes.data || [];
 
       const workOrderDeliveryPairs = [];
-
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
         relatedDNs.forEach((dn) => {
-          dn.items.forEach((dnItem) => {
-            if (dnItem.invoice_status === 'raised') {
+          const relatedInvoices = invoices.filter(
+            (invoice) => invoice.delivery_note === dn.id && invoice.invoice_status === 'raised'
+          );
+          if (relatedInvoices.length > 0) {
+            relatedInvoices.forEach((invoice) => {
               workOrderDeliveryPairs.push({
-                id: `${workOrder.id}-${dn.id}-${dnItem.id}`,
+                id: `${workOrder.id}-${dn.id}-${invoice.id}`,
                 workOrder,
                 deliveryNote: dn,
-                deliveryNoteItem: dnItem,
+                invoice,
                 workOrderId: workOrder.id,
                 deliveryNoteId: dn.id,
-                deliveryNoteItemId: dnItem.id,
+                invoiceId: invoice.id,
               });
-            }
-          });
+            });
+          }
         });
       });
 
@@ -129,6 +132,7 @@ const RaisedInvoices = () => {
         workOrders,
         purchaseOrders: poRes.data || [],
         deliveryNotes,
+        invoices,
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -170,7 +174,6 @@ const RaisedInvoices = () => {
 
   const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
-
     if (type === 'wo') {
       setState((prev) => ({
         ...prev,
@@ -199,8 +202,8 @@ const RaisedInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      if (pair.deliveryNoteItem?.invoice_file) {
-        window.open(pair.deliveryNoteItem.invoice_file, '_blank');
+      if (pair.invoice?.invoice_file) {
+        window.open(pair.invoice.invoice_file, '_blank');
       } else {
         toast.error('No invoice file available.');
       }
@@ -208,12 +211,12 @@ const RaisedInvoices = () => {
   };
 
   const handleUpdateStatus = (pair, newStatus) => {
-    if (!pair.deliveryNoteItem) {
-      toast.error('No delivery note item found.');
+    if (!pair.invoice) {
+      toast.error('No invoice found.');
       return;
     }
 
-    if (pair.deliveryNoteItem.invoice_status === 'processed' && newStatus !== 'pending') {
+    if (pair.invoice.invoice_status === 'processed' && newStatus !== 'pending') {
       toast.warn(
         'The invoice status is already "Processed" and cannot be changed except to "Pending."',
         {
@@ -234,7 +237,7 @@ const RaisedInvoices = () => {
       isStatusModalOpen: true,
       selectedWorkOrderId: pair.workOrderId,
       selectedDNId: pair.deliveryNoteId,
-      selectedDNItemId: pair.deliveryNoteItemId,
+      selectedInvoiceId: pair.invoiceId,
       newStatus,
       receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
       invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
@@ -263,16 +266,23 @@ const RaisedInvoices = () => {
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      formData.append('delivery_note_item_id', state.selectedDNItemId);
-      formData.append('delivery_note_id', state.selectedDNId);
-      formData.append('is_multiple_dns', 'false');
+      formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
-      await apiClient.patch(
-        `work-orders/${state.selectedWOForInvoiceUpload.id}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
+      let response;
+      if (state.selectedInvoiceId) {
+        response = await apiClient.patch(
+          `/invoices/${state.selectedInvoiceId}/`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      } else {
+        response = await apiClient.post(
+          `/invoices/`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      }
 
       toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
@@ -280,14 +290,13 @@ const RaisedInvoices = () => {
         isUploadInvoiceModalOpen: false,
         selectedWOForInvoiceUpload: null,
         selectedDNForInvoiceUpload: null,
-        selectedDNItemForInvoiceUpload: null,
+        selectedInvoiceId: null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
         invoiceUploadType: '',
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
         selectedDNId: null,
-        selectedDNItemId: null,
         newStatus: '',
         receivedDate: '',
       }));
@@ -300,7 +309,7 @@ const RaisedInvoices = () => {
     }
   };
 
-  const confirmStatusUpdate = async (workOrderId, deliveryNoteId, deliveryNoteItemId, newStatus, receivedDate) => {
+  const confirmStatusUpdate = async (invoiceId, newStatus, receivedDate) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
@@ -308,41 +317,48 @@ const RaisedInvoices = () => {
       if (newStatus === 'processed' && receivedDate) {
         formData.append('received_date', receivedDate);
       }
-      formData.append('delivery_note_item_id', deliveryNoteItemId);
-      formData.append('delivery_note_id', deliveryNoteId);
-      formData.append('is_multiple_dns', 'false');
+      formData.append('delivery_note_id', state.selectedDNId);
 
-      await apiClient.patch(
-        `work-orders/${workOrderId}/update-delivery-note-item-invoice-status/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
+      let response;
+      if (invoiceId) {
+        response = await apiClient.patch(
+          `/invoices/${invoiceId}/`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      } else {
+        response = await apiClient.post(
+          `/invoices/`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      }
 
-      toast.success('Delivery note item invoice status updated successfully.');
+      toast.success('Invoice status updated successfully.');
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
         selectedDNId: null,
-        selectedDNItemId: null,
+        selectedInvoiceId: null,
         newStatus: '',
         receivedDate: '',
         invoiceUploadType: '',
       }));
       await fetchData();
     } catch (error) {
-      console.error('Error updating delivery note item invoice status:', error);
-      toast.error('Failed to update delivery note item invoice status.');
+      console.error('Error updating invoice status:', error);
+      toast.error('Failed to update invoice status.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleStatusModalSubmit = () => {
-    const { selectedWorkOrderId, selectedDNId, selectedDNItemId, newStatus, receivedDate } = state;
+    const { selectedWorkOrderId, selectedDNId, selectedInvoiceId, newStatus, receivedDate } = state;
 
-    if (!selectedDNItemId) {
-      toast.error('Delivery note item not found.');
+    if (!selectedDNId) {
+      toast.error('Delivery note not found.');
       return;
     }
 
@@ -353,19 +369,18 @@ const RaisedInvoices = () => {
 
     if (newStatus === 'processed') {
       const deliveryNote = state.deliveryNotes.find((dn) => dn.id === selectedDNId);
-      const deliveryNoteItem = deliveryNote?.items.find((item) => item.id === selectedDNItemId);
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
         isUploadInvoiceModalOpen: true,
         selectedWOForInvoiceUpload: state.workOrders.find((wo) => wo.id === selectedWorkOrderId),
         selectedDNForInvoiceUpload: deliveryNote,
-        selectedDNItemForInvoiceUpload: deliveryNoteItem,
+        selectedInvoiceId,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
       }));
     } else {
-      confirmStatusUpdate(selectedWorkOrderId, selectedDNId, selectedDNItemId, newStatus, receivedDate);
+      confirmStatusUpdate(selectedInvoiceId, newStatus, receivedDate);
     }
   };
 
@@ -391,13 +406,27 @@ const RaisedInvoices = () => {
     return item ? item.name : 'N/A';
   };
 
+  const getInvoiceItems = (deliveryNote) => {
+    if (!deliveryNote || !deliveryNote.items || deliveryNote.items.length === 0) return 'N/A';
+    return (
+      <div className="space-y-1 max-w-xs">
+        {deliveryNote.items.map((item, itemIndex) => (
+          <div key={item.id} className="text-sm">
+            {getItemName(item.item)} {item.range && `(${item.range})`}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).series_number.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      (pair.deliveryNoteItem && getItemName(pair.deliveryNoteItem.item).toLowerCase().includes(state.searchTerm.toLowerCase()))
+      (pair.deliveryNote && pair.deliveryNote.items &&
+       pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -466,7 +495,7 @@ const RaisedInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
@@ -488,9 +517,7 @@ const RaisedInvoices = () => {
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
-                    <td className="border p-2 whitespace-nowrap">
-                      {pair.deliveryNoteItem ? `${getItemName(pair.deliveryNoteItem.item)} ${pair.deliveryNoteItem.range ? `(${pair.deliveryNoteItem.range})` : ''}` : 'N/A'}
-                    </td>
+                    <td className="border p-2 whitespace-nowrap">{getInvoiceItems(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.workOrder.created_at
                         ? new Date(pair.workOrder.created_at).toLocaleDateString()
@@ -534,20 +561,20 @@ const RaisedInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(pair, 'invoice')}
-                          disabled={isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file}
+                          disabled={isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.invoice_file}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.deliveryNoteItem?.invoice_file
+                            isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.invoice_file
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : pair.deliveryNoteItem?.invoice_file ? 'View Invoice' : 'No Invoice'}
+                          {isSubmitting ? 'Submitting...' : pair.invoice?.invoice_file ? 'View Invoice' : 'No Invoice'}
                         </Button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600">{pair.deliveryNoteItem?.invoice_status || 'Raised'}</span>
+                        <span className="text-xs text-gray-600">{pair.invoice?.invoice_status || 'Raised'}</span>
                         <select
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
@@ -854,37 +881,44 @@ const RaisedInvoices = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {state.selectedDN.items.map((item) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap bg-gray-100">
-                            {item.components && item.components.length > 0 ? (
-                              <div className="space-y-2">
-                                {item.components.map((comp, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center gap-2 p-2 border border-gray-300 rounded-md bg-white"
-                                  >
-                                    <span className="font-medium text-gray-700">{comp.component || 'N/A'} :</span>
-                                    <span className="text-gray-600">{comp.value || 'N/A'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              'No components'
-                            )}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">{item.invoice_status || 'Pending'}</td>
-                        </tr>
-                      ))}
+                      {state.selectedDN.items.map((item) => {
+                        const relatedInvoice = state.invoices.find(
+                          (invoice) => invoice.delivery_note === state.selectedDN.id
+                        );
+                        return (
+                          <tr key={item.id} className="border">
+                            <td className="border p-2 whitespace-nowrap">
+                              {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
+                            </td>
+                            <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
+                            <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                            <td className="border p-2 whitespace-nowrap">{item.delivered_quantity || 'N/A'}</td>
+                            <td className="border p-2 whitespace-nowrap">
+                              {state.units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
+                            </td>
+                            <td className="border p-2 whitespace-nowrap bg-gray-100">
+                              {item.components && item.components.length > 0 ? (
+                                <div className="space-y-2">
+                                  {item.components.map((comp, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-center gap-2 p-2 border border-gray-300 rounded-md bg-white"
+                                    >
+                                      <span className="font-medium text-gray-700">{comp.component || 'N/A'} :</span>
+                                      <span className="text-gray-600">{comp.value || 'N/A'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                'No components'
+                              )}
+                            </td>
+                            <td className="border p-2 whitespace-nowrap">
+                              {relatedInvoice ? relatedInvoice.invoice_status : 'Pending'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -903,7 +937,7 @@ const RaisedInvoices = () => {
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
           selectedDNId: null,
-          selectedDNItemId: null,
+          selectedInvoiceId: null,
           newStatus: '',
           receivedDate: '',
           invoiceUploadType: '',
@@ -934,7 +968,7 @@ const RaisedInvoices = () => {
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
                 selectedDNId: null,
-                selectedDNItemId: null,
+                selectedInvoiceId: null,
                 newStatus: '',
                 receivedDate: '',
                 invoiceUploadType: '',
@@ -970,18 +1004,17 @@ const RaisedInvoices = () => {
           isUploadInvoiceModalOpen: false,
           selectedWOForInvoiceUpload: null,
           selectedDNForInvoiceUpload: null,
-          selectedDNItemForInvoiceUpload: null,
+          selectedInvoiceId: null,
           invoiceUpload: { invoiceFile: null },
           invoiceUploadErrors: { invoiceFile: '' },
           invoiceUploadType: '',
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
           selectedDNId: null,
-          selectedDNItemId: null,
           newStatus: '',
           receivedDate: '',
         }))}
-        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'} - Item: ${state.selectedDNItemForInvoiceUpload ? getItemName(state.selectedDNItemForInvoiceUpload.item) : 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
@@ -1009,14 +1042,13 @@ const RaisedInvoices = () => {
                 isUploadInvoiceModalOpen: false,
                 selectedWOForInvoiceUpload: null,
                 selectedDNForInvoiceUpload: null,
-                selectedDNItemForInvoiceUpload: null,
+                selectedInvoiceId: null,
                 invoiceUpload: { invoiceFile: null },
                 invoiceUploadErrors: { invoiceFile: '' },
                 invoiceUploadType: '',
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
                 selectedDNId: null,
-                selectedDNItemId: null,
                 newStatus: '',
                 receivedDate: '',
               }))}
