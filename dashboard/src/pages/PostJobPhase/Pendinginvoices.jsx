@@ -216,13 +216,17 @@ const PendingInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      if (pair.deliveryNote && pair.deliveryNote.items) {
-        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
-        if (itemsWithInvoices.length > 0) {
+    if (pair.deliveryNote && pair.deliveryNote.items) {
+      const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
+      if (itemsWithInvoices.length > 0) {
+        if (itemsWithInvoices.length === 1) {
           window.open(itemsWithInvoices[0].invoice_file, '_blank');
         } else {
-          toast.error('No invoice files available.');
+          window.open(itemsWithInvoices[0].invoice_file, '_blank');
         }
+      } else {
+        toast.error('No invoice files available.');
+      }
       } else {
         toast.error('No invoice files available.');
       }
