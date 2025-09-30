@@ -704,13 +704,23 @@ const PendingInvoices = () => {
 
   const getInvoiceStatusForDN = (deliveryNote) => {
     if (!deliveryNote || !deliveryNote.items || deliveryNote.items.length === 0) return 'N/A';
+    
     const relatedInvoices = state.invoices.filter(
       (invoice) => invoice.delivery_note === deliveryNote.id
     );
+    
     if (relatedInvoices.length === 0) return 'pending';
-    const statuses = [...new Set(relatedInvoices.map(invoice => invoice.invoice_status || 'pending'))];
-    if (statuses.length === 1) return statuses[0];
-    return 'pending'; 
+    
+    const allProcessed = relatedInvoices.every(invoice => invoice.invoice_status === 'processed');
+    if (allProcessed) return 'processed';
+    
+    const anyRaised = relatedInvoices.some(invoice => invoice.invoice_status === 'raised');
+    if (anyRaised) return 'raised';
+    
+    const anyPending = relatedInvoices.some(invoice => invoice.invoice_status === 'pending');
+    if (anyPending) return 'pending';
+
+    return 'pending';
   };
 
   const filteredPairs = state.workOrderDeliveryPairs
