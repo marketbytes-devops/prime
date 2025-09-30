@@ -55,6 +55,7 @@ const PendingInvoices = () => {
     woUploadErrors: { certificateFile: '' },
     workOrderDeliveryPairs: [],
   });
+
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -450,24 +451,20 @@ const PendingInvoices = () => {
       }
       formData.append('invoice_file', state.invoiceUpload.invoiceFile);
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
-
       let response;
       if (state.selectedInvoiceId) {
-        // Update existing invoice
         response = await apiClient.patch(
           `/invoices/${state.selectedInvoiceId}/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       } else {
-        // Create new invoice
         response = await apiClient.post(
           `/invoices/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       }
-
       toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
       setState((prev) => ({
         ...prev,
@@ -502,22 +499,6 @@ const PendingInvoices = () => {
     const relatedInvoices = state.invoices.filter(
       (invoice) => invoice.delivery_note === pair.deliveryNote.id
     );
-    const allInvoicesProcessed = relatedInvoices.every(invoice => invoice.invoice_status === 'processed');
-    if (allInvoicesProcessed && newStatus !== 'pending') {
-      toast.warn(
-        'The invoice status for all items is already set to "Processed." It cannot be changed except to "Pending."',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
     setState((prev) => ({
       ...prev,
       isStatusModalOpen: true,
@@ -540,24 +521,20 @@ const PendingInvoices = () => {
         formData.append('due_in_days', parseInt(dueInDays));
       }
       formData.append('delivery_note_id', state.selectedDNId);
-
       let response;
       if (invoiceId) {
-        // Update existing invoice
         response = await apiClient.patch(
           `/invoices/${invoiceId}/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       } else {
-        // Create new invoice
         response = await apiClient.post(
           `/invoices/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       }
-
       toast.success('Invoice status updated successfully.');
       setState((prev) => ({
         ...prev,
@@ -586,25 +563,6 @@ const PendingInvoices = () => {
       toast.error('Delivery note not found.');
       return;
     }
-    const relatedInvoices = state.invoices.filter(
-      (invoice) => invoice.delivery_note === selectedDNId
-    );
-    const allInvoicesProcessed = relatedInvoices.every(invoice => invoice.invoice_status === 'processed');
-    if (allInvoicesProcessed && newStatus !== 'pending') {
-      toast.error(
-        'The invoice status for all items is already "Processed" and cannot be changed except to "Pending."',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
-      );
-      return;
-    }
     if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
       toast.error('Please enter a valid number of days.');
       return;
@@ -622,7 +580,7 @@ const PendingInvoices = () => {
           pair => pair.deliveryNoteId === selectedDNId
         ).workOrder,
         selectedDNForInvoiceUpload: deliveryNote,
-        selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
+        selectedInvoiceId: state.invoices.find(invoice => invoice.delivery_note === selectedDNId)?.id || null,
         invoiceUpload: { invoiceFile: null },
         invoiceUploadErrors: { invoiceFile: '' },
       }));
@@ -669,14 +627,10 @@ const PendingInvoices = () => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       return false;
     }
-    const relatedInvoices = state.invoices.filter(
-      (invoice) => invoice.delivery_note === pair.deliveryNote.id
-    );
     return (
       isPOComplete(pair.workOrder) &&
       isDUTComplete(pair.workOrder) &&
-      isDNComplete(pair.deliveryNote) &&
-      !relatedInvoices.every(invoice => invoice.invoice_status === 'processed')
+      isDNComplete(pair.deliveryNote)
     );
   };
 
@@ -709,7 +663,8 @@ const PendingInvoices = () => {
     );
     if (relatedInvoices.length === 0) return 'pending';
     const statuses = [...new Set(relatedInvoices.map(invoice => invoice.invoice_status || 'pending'))];
-    return statuses.length === 1 ? statuses[0] : 'Mixed';
+    if (statuses.length === 1) return statuses[0];
+    return 'pending'; // Default to 'pending' instead of 'Mixed' to allow status updates
   };
 
   const filteredPairs = state.workOrderDeliveryPairs
@@ -1584,7 +1539,7 @@ const PendingInvoices = () => {
           receivedDate: '',
           invoiceUploadType: '',
         }))}
-        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
+        title={`Update Invoice Status to ${state.newStatus === 'raised' ? 'Raised' : state.newStatus === 'processed' ? 'Processed' : 'Pending'}`}
       >
         <div className="space-y-4">
           {state.newStatus === 'raised' && (
