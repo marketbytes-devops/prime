@@ -105,7 +105,9 @@ class Invoice(models.Model):
     delivery_note = models.ForeignKey(
         DeliveryNote, 
         on_delete=models.CASCADE, 
-        related_name='invoices'
+        related_name='invoices',
+        null=True, 
+        blank=True
     )
     delivery_note_item = models.ForeignKey(
         DeliveryNoteItem, 
