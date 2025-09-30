@@ -218,7 +218,7 @@ const PendingInvoices = () => {
     } else if (type === 'invoice') {
       if (pair.deliveryNote && pair.deliveryNote.items) {
         const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
-        if (itemsWithInvoices.length === 1) {
+        if (itemsWithInvoices.length > 0) {
           window.open(itemsWithInvoices[0].invoice_file, '_blank');
         } else {
           toast.error('No invoice files available.');
@@ -228,7 +228,6 @@ const PendingInvoices = () => {
       }
     }
   };
-
 
   const handleUploadPO = (pair) => {
     const workOrder = pair.workOrder;
