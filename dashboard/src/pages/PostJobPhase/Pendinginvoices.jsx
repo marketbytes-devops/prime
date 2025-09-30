@@ -217,11 +217,11 @@ const PendingInvoices = () => {
       }));
     } else if (type === 'invoice') {
       if (pair.deliveryNote && pair.deliveryNote.items) {
-        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.final_invoice_file);
+        const itemsWithInvoices = pair.deliveryNote.items.filter(item => item.invoice_file);
         if (itemsWithInvoices.length > 0) {
-          const invoiceFile = itemsWithInvoices[0].final_invoice_file;
+          const invoiceFile = itemsWithInvoices[0].invoice_file;
           
-          console.log('Original final_invoice_file:', invoiceFile);
+          console.log('Original invoice_file:', invoiceFile);
           
           let fileUrl;
           
@@ -467,7 +467,7 @@ const PendingInvoices = () => {
       // Use is_multiple_dns=true to update all items in the delivery note
       formData.append('is_multiple_dns', 'true');
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
-      formData.append('final_invoice_file', state.invoiceUpload.invoiceFile);
+      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
 
       await apiClient.patch(
         `work-orders/${state.selectedWOForInvoiceUpload.id}/update-delivery-note-item-invoice-status/`,
@@ -863,18 +863,18 @@ const PendingInvoices = () => {
                           onClick={() => handleViewDocument(pair, 'invoice')}
                           disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || 
                             !(pair.deliveryNote && pair.deliveryNote.items && 
-                              pair.deliveryNote.items.some(item => item.final_invoice_file))}
+                              pair.deliveryNote.items.some(item => item.invoice_file))}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
                             isSubmitting || !hasPermission('pending_invoices', 'view') || 
                             !(pair.deliveryNote && pair.deliveryNote.items && 
-                              pair.deliveryNote.items.some(item => item.final_invoice_file))
+                              pair.deliveryNote.items.some(item => item.invoice_file))
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
                           {isSubmitting ? 'Submitting...' : 
                            (pair.deliveryNote && pair.deliveryNote.items && 
-                            pair.deliveryNote.items.some(item => item.final_invoice_file)) ? 'View Invoice' : 'No Invoice'}
+                            pair.deliveryNote.items.some(item => item.invoice_file)) ? 'View Invoice' : 'No Invoice'}
                         </Button>
                       </div>
                     </td>

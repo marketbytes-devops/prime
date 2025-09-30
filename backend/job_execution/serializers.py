@@ -34,7 +34,7 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
         queryset=Unit.objects.all(), allow_null=True
     )
     components = DeliveryNoteItemComponentSerializer(many=True, required=False)
-    final_final_invoice_file = serializers.FileField(required=False, allow_null=True)
+    invoice_file = serializers.FileField(required=False, allow_null=True)
     invoice_status = serializers.ChoiceField(
         choices=[('pending', 'Pending'), ('raised', 'Raised'), ('processed', 'Processed')],
         required=False
@@ -57,7 +57,7 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity",
             "uom",
             "components",
-            "final_invoice_file",
+            "invoice_file",
             "invoice_status",
             "due_in_days",
             "received_date",
@@ -101,7 +101,7 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
             "delivered_quantity", instance.delivered_quantity
         )
         instance.uom = validated_data.get("uom", instance.uom)
-        instance.final_invoice_file = validated_data.get("final_invoice_file", instance.final_invoice_file)
+        instance.invoice_file = validated_data.get("invoice_file", instance.invoice_file)
         instance.invoice_status = validated_data.get("invoice_status", instance.invoice_status)
         instance.due_in_days = validated_data.get("due_in_days", instance.due_in_days)
         instance.received_date = validated_data.get("received_date", instance.received_date)
@@ -165,7 +165,7 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
                     quantity=item_data.get("quantity"),
                     delivered_quantity=item_data.get("delivered_quantity"),
                     uom=item_data.get("uom"),
-                    final_invoice_file=item_data.get("final_invoice_file"),
+                    invoice_file=item_data.get("invoice_file"),
                     invoice_status=item_data.get("invoice_status", "pending"),
                     due_in_days=item_data.get("due_in_days"),
                     received_date=item_data.get("received_date"),

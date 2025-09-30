@@ -180,7 +180,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         new_status = request.data.get('invoice_status')
         due_in_days = request.data.get('due_in_days')
         received_date = request.data.get('received_date')
-        final_invoice_file = request.FILES.get('final_invoice_file')
+        invoice_file = request.FILES.get('invoice_file')
         is_multiple_dns = request.data.get('is_multiple_dns', 'false') == 'true'
         delivery_note_id = request.data.get('delivery_note_id')  # New field to specify the delivery note for multiple DNs
 
@@ -238,7 +238,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             {'error': 'Received date is required for Processed status'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    if not final_invoice_file:
+                    if not invoice_file:
                         return Response(
                             {'error': 'Invoice file is required for Processed status'},
                             status=status.HTTP_400_BAD_REQUEST
@@ -250,16 +250,16 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     update_fields['due_in_days'] = int(due_in_days)
                 if new_status == 'processed' and received_date:
                     update_fields['received_date'] = received_date
-                if new_status == 'processed' and final_invoice_file:
-                    update_fields['final_invoice_file'] = final_invoice_file
+                if new_status == 'processed' and invoice_file:
+                    update_fields['invoice_file'] = invoice_file
 
                 all_items.update(**update_fields)
 
-                # For 'processed' status, attach final_invoice_file to the first item if not already set
-                if new_status == 'processed' and final_invoice_file:
+                # For 'processed' status, attach invoice_file to the first item if not already set
+                if new_status == 'processed' and invoice_file:
                     first_item = all_items.first()
-                    if not first_item.final_invoice_file:
-                        first_item.final_invoice_file = final_invoice_file
+                    if not first_item.invoice_file:
+                        first_item.invoice_file = invoice_file
                         first_item.save()
 
                 # Send email for status change
@@ -306,7 +306,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                             {'error': 'Received date is required for Processed status'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    if not final_invoice_file:
+                    if not invoice_file:
                         return Response(
                             {'error': 'Invoice file is required for Processed status'},
                             status=status.HTTP_400_BAD_REQUEST
@@ -321,8 +321,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
                 previous_invoice_status = delivery_note_item.invoice_status
                 delivery_note_item.invoice_status = new_status
-                if final_invoice_file:
-                    delivery_note_item.final_invoice_file = final_invoice_file
+                if invoice_file:
+                    delivery_note_item.invoice_file = invoice_file
                 delivery_note_item.save()
 
                 if new_status != previous_invoice_status and new_status in ['raised', 'processed']:
