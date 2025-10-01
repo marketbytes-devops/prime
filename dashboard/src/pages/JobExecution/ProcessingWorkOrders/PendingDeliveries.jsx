@@ -178,30 +178,27 @@ const PendingDeliveries = () => {
       toast.warn('Please upload a signed delivery note before submitting.');
       return;
     }
-
+ 
     if (!window.confirm('Are you sure you want to complete this delivery? This will move the work order to Pending Invoices.')) {
       return;
     }
-
+ 
     try {
       setIsSubmitting(true);
 
-      // Step 1: Upload signed delivery note to update delivery note status
       const deliveryFormData = new FormData();
       deliveryFormData.append('signed_delivery_note', signedDeliveryNote);
       await apiClient.post(`delivery-notes/${selectedDNForComplete.id}/upload-signed-note/`, deliveryFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
-      // Step 2: Create a new invoice with status 'raised'
+ 
       const invoiceFormData = new FormData();
       invoiceFormData.append('delivery_note_id', selectedDNForComplete.id);
-      invoiceFormData.append('invoice_status', 'raised');
-      invoiceFormData.append('due_in_days', ''); // Send empty string to represent null
+      invoiceFormData.append('invoice_status', 'pending');  
       await apiClient.post('/invoices/', invoiceFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
+ 
       toast.success('Delivery completed and invoice created. Work order moved to Pending Invoices.');
       setState((prev) => ({
         ...prev,
@@ -214,9 +211,7 @@ const PendingDeliveries = () => {
       console.error('Error completing delivery:', error);
       if (error.response && error.response.data) {
         const errors = error.response.data;
-        if (errors.due_in_days) {
-          toast.error(`Invoice creation failed: ${errors.due_in_days.join(', ')}`);
-        } else if (errors.delivery_note_id) {
+        if (errors.delivery_note_id) {
           toast.error(`Invoice creation failed: ${errors.delivery_note_id.join(', ')}`);
         } else {
           toast.error('Failed to complete delivery or create invoice.');
