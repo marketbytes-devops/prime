@@ -78,7 +78,7 @@ const ResetPassword = () => {
             Enter your email to receive an OTP, then set your new password securely.
           </p>
         </div>
-        <h2 className="text-2xl font-semibold mb-4 text-center opacity-90">
+        <h2 className="text-2xl text-indigo-500 font-semibold mb-4 text-center opacity-90">
           {step === 'request_otp' ? 'Request OTP' : 'Reset Password'}
         </h2>
         {error && <p className="text-red-600 mb-4 text-center">{error}</p>}
@@ -93,7 +93,7 @@ const ResetPassword = () => {
             />
             <Button
               onClick={handleRequestOTP}
-              className="bg-gray-900 text-white hover:bg-gray-800"
+              className="bg-indigo-500 text-white hover:bg-indigo-600"
             >
               Send OTP
             </Button>
