@@ -309,7 +309,9 @@ const EditDeclinedWorkOrders = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Certificate</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Upload Certificate (Upload 1 MB file)
+                </label>
                 {item.certificate_file && (
                   <div className="mb-2">
                     <span className="text-sm text-gray-600">
