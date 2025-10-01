@@ -40,6 +40,8 @@ class CustomUser(AbstractUser):
     role = models.ForeignKey(
         "Role", on_delete=models.SET_NULL, null=True, blank=True, related_name="users"
     )
+    otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

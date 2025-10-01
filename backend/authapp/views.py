@@ -23,6 +23,8 @@ from .serializers import (
     UserCreateSerializer,
     CustomTokenObtainPairSerializer,
 )
+from django.utils import timezone
+from datetime import timedelta
 
 class HasPermission(BasePermission):
     def has_permission(self, request, view):
@@ -90,6 +92,7 @@ class RequestOTPView(APIView):
                 user = CustomUser.objects.get(email=email)
                 otp = "".join(random.choices(string.digits, k=6))
                 user.otp = otp
+                user.otp_created_at = timezone.now() 
                 user.save()
                 send_mail(
                     subject="Your OTP for Password Reset",
@@ -119,9 +122,19 @@ class ResetPasswordView(APIView):
             new_password = serializer.validated_data["new_password"]
             try:
                 user = CustomUser.objects.get(email=email)
+                
+                if user.otp and user.otp_created_at:
+                    time_diff = timezone.now() - user.otp_created_at
+                    if time_diff > timedelta(minutes=10):
+                        return Response(
+                            {"error": "OTP has expired"}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                
                 if user.otp == otp:
                     user.set_password(new_password)
                     user.otp = None
+                    user.otp_created_at = None  
                     user.save()
                     return Response(
                         {"message": "Password reset successfully"},
