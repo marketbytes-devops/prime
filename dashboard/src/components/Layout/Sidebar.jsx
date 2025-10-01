@@ -475,7 +475,7 @@ const Sidebar = ({ toggleSidebar }) => {
                       <NavLink
                         to={subItem.to}
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                          `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
                             isActive
                               ? "bg-indigo-500 text-white"
                               : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
@@ -506,7 +506,7 @@ const Sidebar = ({ toggleSidebar }) => {
         <NavLink
           to={item.to}
           className={({ isActive }) =>
-            `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+            `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
               isActive
                 ? "bg-indigo-500 text-white"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
