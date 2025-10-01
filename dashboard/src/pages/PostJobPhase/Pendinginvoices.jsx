@@ -711,15 +711,12 @@ const PendingInvoices = () => {
     
     if (relatedInvoices.length === 0) return 'pending';
     
-    const allProcessed = relatedInvoices.every(invoice => invoice.invoice_status === 'processed');
-    if (allProcessed) return 'processed';
-    
+    const anyProcessed = relatedInvoices.some(invoice => invoice.invoice_status === 'processed');
+    if (anyProcessed) return 'processed';
+
     const anyRaised = relatedInvoices.some(invoice => invoice.invoice_status === 'raised');
     if (anyRaised) return 'raised';
-    
-    const anyPending = relatedInvoices.some(invoice => invoice.invoice_status === 'pending');
-    if (anyPending) return 'pending';
-
+ 
     return 'pending';
   };
 
