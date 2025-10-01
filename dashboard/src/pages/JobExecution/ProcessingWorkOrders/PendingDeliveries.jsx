@@ -314,8 +314,15 @@ const PendingDeliveries = () => {
   return (
     <>
       <div className="hidden">
-        <div ref={templateRef}>
-          <Template1 deliveryNote={state.selectedDN} itemsList={state.itemsList} units={state.units} />
+      <div ref={templateRef}>
+          <Template1
+            deliveryNote={state.selectedDN}
+            itemsList={state.itemsList}
+            units={state.units}
+            quotationDetails={
+              state.selectedDN ? getQuotationDetails(state.selectedDN) : null
+            }
+          />
         </div>
       </div>
       <div className="mx-auto p-4">

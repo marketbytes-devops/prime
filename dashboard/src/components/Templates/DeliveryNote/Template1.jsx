@@ -1,9 +1,9 @@
 import React from 'react';
 import logo from '../../../assets/images/img-logo.webp';
-
-const Template1 = ({ deliveryNote, itemsList, units }) => {
+ 
+const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
   if (!deliveryNote) return null;
-
+ 
   return (
     <div
       className="p-4 bg-white relative"
@@ -71,7 +71,7 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
           }
         }
       `}</style>
-
+ 
       {/* Content Wrapper */}
       <div className="content background-container">
         {/* Header Section */}
@@ -84,11 +84,11 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
             <img src={logo} alt="Prime" style={{ width: '120px', height: '100px' }} />
           </div>
         </div>
-
+ 
         <h2 className="font-bold text-center mb-4" style={{ fontSize: '18px', marginTop: '60px' }}>
           DELIVERY NOTE/JOB COMPLETION
         </h2>
-
+ 
         {/* Delivery Note Details Table */}
         <table className="w-full mb-4">
           <tbody>
@@ -98,11 +98,19 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
             </tr>
             <tr>
               <td className="font-bold pr-4">CUSTOMER</td>
-              <td>{deliveryNote.work_order?.customer?.name || 'N/A'}</td>
+              <td>{quotationDetails?.contact_name || 'N/A'}</td>
             </tr>
             <tr>
               <td className="font-bold pr-4">CONTACT INFORMATION</td>
-              <td>{deliveryNote.work_order?.customer_contact || 'N/A'}</td>
+              <td>
+                {quotationDetails ? (
+                  <>
+                    {quotationDetails.contact_email || 'N/A'}
+                  </>
+                ) : (
+                  'N/A'
+                )}
+              </td>
             </tr>
             <tr>
               <td className="font-bold pr-4">DELIVERY NOTE</td>
@@ -110,7 +118,7 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
             </tr>
           </tbody>
         </table>
-
+ 
         {/* Items Table */}
         <table className="w-full border-collapse border border-gray-800 mb-4">
           <thead>
@@ -156,12 +164,12 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
               ))}
           </tbody>
         </table>
-
+ 
         {/* Remarks Section */}
         <div className="mb-4">
           <p className="font-bold">REMARKS:</p>
         </div>
-
+ 
         {/* Delivered By and Received By Table */}
         <table className="w-full mb-4 border-collapse border border-gray-800">
           <tbody>
@@ -188,10 +196,10 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
           </tbody>
         </table>
       </div>
-
+ 
       {/* Spacer to Push Footer to Bottom for On-Screen */}
       <div style={{ flexGrow: 1 }}></div>
-
+ 
       {/* Footer Section */}
       <footer className="footer flex items-center justify-between text-xs mt-8 pt-4">
         <div>
@@ -207,5 +215,5 @@ const Template1 = ({ deliveryNote, itemsList, units }) => {
     </div>
   );
 };
-
+ 
 export default Template1;
