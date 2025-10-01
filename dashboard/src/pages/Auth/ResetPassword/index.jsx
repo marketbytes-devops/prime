@@ -71,7 +71,7 @@ const ResetPassword = () => {
     >
       <div className="bg-white bg-opacity-90 p-6 rounded-lg shadow-md w-full max-w-sm">
         <div className="flex flex-col justify-center items-center mb-4">
-          <h3 className="text-xl font-semibold text-black mb-2 opacity-90">
+          <h3 className="text-2xl text-indigo-500 font-semibold mb-2 text-center">
             Reset Your Password
           </h3>
           <p className="text-gray-600 text-center opacity-75">
@@ -117,7 +117,7 @@ const ResetPassword = () => {
             />
             <Button
               onClick={handleResetPassword}
-              className="bg-gray-900 text-white hover:bg-gray-800"
+              className="bg-indigo-500 text-white hover:bg-indigo-600"
             >
               Reset Password
             </Button>
@@ -125,7 +125,7 @@ const ResetPassword = () => {
         )}
         <Button
           onClick={() => navigate('/login')}
-          className="text-gray-600 hover:text-black mt-4"
+          className="text-gray-600 hover:text-indigo-600 mt-4"
         >
           Back to Login
         </Button>
