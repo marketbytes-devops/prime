@@ -894,26 +894,30 @@ const PendingInvoices = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">{getInvoiceStatusForDN(pair.deliveryNote)}</span>
-                          <select
-                            onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                            disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
-                            className={`px-3 py-1 rounded-md text-sm border ${
-                              isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                            }`}
-                            value=""
-                          >
-                            <option value="" disabled>Select Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="raised">Raised</option>
-                            <option value="processed">Processed</option>
-                          </select>
-                        </div>
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value !== getInvoiceStatusForDN(pair.deliveryNote)) {
+                              handleUpdateStatus(pair, e.target.value);
+                            }
+                          }}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)}
+                          value={getInvoiceStatusForDN(pair.deliveryNote)}
+                          className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : getInvoiceStatusForDN(pair.deliveryNote) === 'pending'
+                              ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                              : getInvoiceStatusForDN(pair.deliveryNote) === 'raised'
+                              ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
+                              : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="raised">Raised</option>
+                          <option value="processed">Processed</option>
+                        </select>
                       ) : (
-                        <span className="text-sm">Fill all the details</span>
+                        <span className="text-sm text-gray-500">Fill all the details</span>
                       )}
                     </td>
                   </tr>
