@@ -31,6 +31,7 @@ const ViewQuotation = () => {
       clientPoNumber: "",
       poFile: null,
       poStatus: "not_available",
+      fileName: "", // Added to track file name
     },
     fullOrderErrors: { clientPoNumber: "", poFile: "" },
     isNotApprovedModalOpen: false,
@@ -186,6 +187,7 @@ const ViewQuotation = () => {
             poFile: null,
             poStatus:
               po.client_po_number || po.po_file ? "available" : "not_available",
+            fileName: "", // Added to track file name
             errors: { clientPoNumber: "", poFile: "" },
           },
         }),
@@ -255,6 +257,7 @@ const ViewQuotation = () => {
           clientPoNumber: "",
           poFile: null,
           poStatus: "not_available",
+          fileName: "", // Reset file name
         },
         fullOrderErrors: { clientPoNumber: "", poFile: "" },
       }));
@@ -450,6 +453,7 @@ const ViewQuotation = () => {
         clientPoNumber: "",
         poFile: null,
         poStatus: "not_available",
+        fileName: "", // Reset file name
       },
       fullOrderErrors: { clientPoNumber: "", poFile: "" },
     }));
@@ -607,7 +611,6 @@ const ViewQuotation = () => {
 
     return hasNilOrder;
   };
-
 
   return (
     <div className="mx-auto p-4">
@@ -1191,6 +1194,7 @@ const ViewQuotation = () => {
                       poStatus: "available",
                       clientPoNumber: "",
                       poFile: null,
+                      fileName: "",
                     },
                     fullOrderErrors: { clientPoNumber: "", poFile: "" },
                   }))
@@ -1211,6 +1215,7 @@ const ViewQuotation = () => {
                       poStatus: "not_available",
                       clientPoNumber: "",
                       poFile: null,
+                      fileName: "",
                     },
                     fullOrderErrors: { clientPoNumber: "", poFile: "" },
                   }))
@@ -1251,15 +1256,20 @@ const ViewQuotation = () => {
                 <InputField
                   label="Upload PO File"
                   type="file"
+                  value={state.fullOrderPo.fileName} // Display file name
                   onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      fullOrderPo: {
-                        ...prev.fullOrderPo,
-                        poFile: e.target.files[0],
-                      },
-                      fullOrderErrors: { ...prev.fullOrderErrors, poFile: "" },
-                    }))
+                    setState((prev) => {
+                      const file = e.target.files[0];
+                      return {
+                        ...prev,
+                        fullOrderPo: {
+                          ...prev.fullOrderPo,
+                          poFile: file,
+                          fileName: file ? file.name : "", // Update file name
+                        },
+                        fullOrderErrors: { ...prev.fullOrderErrors, poFile: "" },
+                      };
+                    })
                   }
                 />
                 {state.fullOrderErrors.poFile && (
@@ -1306,6 +1316,7 @@ const ViewQuotation = () => {
                             clientPoNumber:
                               prev.poUploads[po.id]?.clientPoNumber || "",
                             poFile: null,
+                            fileName: "",
                             errors: { clientPoNumber: "", poFile: "" },
                           },
                         },
@@ -1331,6 +1342,7 @@ const ViewQuotation = () => {
                             poStatus: "not_available",
                             clientPoNumber: "",
                             poFile: null,
+                            fileName: "",
                             errors: { clientPoNumber: "", poFile: "" },
                           },
                         },
@@ -1375,21 +1387,26 @@ const ViewQuotation = () => {
                     <InputField
                       label="Upload PO File"
                       type="file"
+                      value={state.poUploads[po.id]?.fileName || ""} 
                       onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          poUploads: {
-                            ...prev.poUploads,
-                            [po.id]: {
-                              ...prev.poUploads[po.id],
-                              poFile: e.target.files[0],
-                              errors: {
-                                ...prev.poUploads[po.id].errors,
-                                poFile: "",
+                        setState((prev) => {
+                          const file = e.target.files[0];
+                          return {
+                            ...prev,
+                            poUploads: {
+                              ...prev.poUploads,
+                              [po.id]: {
+                                ...prev.poUploads[po.id],
+                                poFile: file,
+                                fileName: file ? file.name : "", 
+                                errors: {
+                                  ...prev.poUploads[po.id].errors,
+                                  poFile: "",
+                                },
                               },
                             },
-                          },
-                        }))
+                          };
+                        })
                       }
                     />
                     {state.poUploads[po.id]?.errors.poFile && (
