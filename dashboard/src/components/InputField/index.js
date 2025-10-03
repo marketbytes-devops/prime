@@ -20,6 +20,8 @@ const InputField = ({
   accept,
 }) => {
   if (type === 'file') {
+    let fileName = value || ''; 
+
     const handleFileChange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -28,9 +30,12 @@ const InputField = ({
           alert('File size exceeds 1 MB limit. Please upload a smaller file.');
           e.target.value = '';
           e.target.focus(); 
-          onChange({ target: { files: [] } }); 
+          onChange({ target: { files: [], value: '' } }); 
           return;
         }
+        fileName = file.name; 
+      } else {
+        fileName = ''; 
       }
       onChange(e); 
     };
@@ -50,6 +55,11 @@ const InputField = ({
           readOnly={readOnly}
           required={required}
         />
+        {fileName && (
+          <span className="text-sm text-gray-600 mt-1">
+            Selected file: {fileName}
+          </span>
+        )}
       </div>
     );
   }
