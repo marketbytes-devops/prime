@@ -239,6 +239,25 @@ const ProcessedInvoices = () => {
     return isValid;
   };
 
+  const handleInvoiceFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        invoiceUpload: { ...prev.invoiceUpload, invoiceFile: file },
+        invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
+      }));
+    }
+  };
+
   const handleInvoiceUploadSubmit = async () => {
     if (!validateInvoiceUpload()) {
       return;
@@ -1000,13 +1019,7 @@ const ProcessedInvoices = () => {
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  invoiceUpload: { ...prev.invoiceUpload, invoiceFile: e.target.files[0] },
-                  invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
-                }))
-              }
+              onChange={(e) => handleInvoiceFileChange(e)}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
             {state.invoiceUploadErrors.invoiceFile && (
