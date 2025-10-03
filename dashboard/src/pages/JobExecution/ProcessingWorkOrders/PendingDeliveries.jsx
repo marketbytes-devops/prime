@@ -311,10 +311,27 @@ const PendingDeliveries = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; 
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; 
+        e.target.focus(); 
+        setState((prev) => ({ ...prev, signedDeliveryNote: null })); 
+        return;
+      }
+      setState((prev) => ({ ...prev, signedDeliveryNote: file }));
+    } else {
+      setState((prev) => ({ ...prev, signedDeliveryNote: null }));
+    }
+  };
+
   return (
     <>
       <div className="hidden">
-      <div ref={templateRef}>
+        <div ref={templateRef}>
           <Template1
             deliveryNote={state.selectedDN}
             itemsList={state.itemsList}
@@ -610,7 +627,7 @@ const PendingDeliveries = () => {
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setState((prev) => ({ ...prev, signedDeliveryNote: e.target.files[0] }))}
+                onChange={(e) => handleFileChange(e)}
                 className="w-full p-2 border rounded focus:outline-indigo-500"
                 disabled={isSubmitting || !hasPermission('pending_deliveries', 'edit')}
               />
