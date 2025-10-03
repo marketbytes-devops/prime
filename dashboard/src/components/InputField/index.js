@@ -26,9 +26,9 @@ const InputField = ({
         const maxSize = 1 * 1024 * 1024; 
         if (file.size > maxSize) {
           alert('File size exceeds 1 MB limit. Please upload a smaller file.');
-          e.target.value = ''; 
-          onChange({ target: { files: null } }); 
+          e.target.value = '';
           e.target.focus(); 
+          onChange({ target: { files: [] } }); 
           return;
         }
       }
