@@ -99,14 +99,39 @@ const EditDeclinedWorkOrders = () => {
     }));
   };
 
-  const handleFileChange = (index, file) => {
-    setState((prev) => ({
-      ...prev,
-      fileChanges: {
-        ...prev.fileChanges,
-        [index]: file,
-      },
-    }));
+  const handleFileChange = (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; 
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({
+          ...prev,
+          fileChanges: {
+            ...prev.fileChanges,
+            [index]: null, // Clear the file change
+          },
+        }));
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        fileChanges: {
+          ...prev.fileChanges,
+          [index]: file,
+        },
+      }));
+    } else {
+      setState((prev) => ({
+        ...prev,
+        fileChanges: {
+          ...prev.fileChanges,
+          [index]: null,
+        },
+      }));
+    }
   };
 
   const isFormValid = () => {
@@ -329,7 +354,7 @@ const EditDeclinedWorkOrders = () => {
                 )}
                 <input
                   type="file"
-                  onChange={(e) => handleFileChange(index, e.target.files[0])}
+                  onChange={(e) => handleFileChange(index, e)}
                   className="w-full p-2 border rounded"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   required={!item.certificate_file}
