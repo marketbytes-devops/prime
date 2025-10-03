@@ -269,6 +269,25 @@ const PendingInvoices = () => {
     return isValid;
   };
 
+  const handlePOFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, poUpload: { ...prev.poUpload, poFile: null } })); // Clear the file
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        poUpload: { ...prev.poUpload, poFile: file },
+        poUploadErrors: { ...prev.poUploadErrors, poFile: '' },
+      }));
+    }
+  };
+
   const handlePOUploadSubmit = async () => {
     if (state.poUpload.poStatus === 'available' && !validatePOUpload()) {
       return;
@@ -324,6 +343,25 @@ const PendingInvoices = () => {
     return isValid;
   };
 
+  const handleWOFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, woUpload: { ...prev.woUpload, certificateFile: null } })); // Clear the file
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        woUpload: { ...prev.woUpload, certificateFile: file },
+        woUploadErrors: { ...prev.woUploadErrors, certificateFile: '' },
+      }));
+    }
+  };
+
   const handleWOUploadSubmit = async () => {
     if (!validateWOUpload()) {
       return;
@@ -375,6 +413,25 @@ const PendingInvoices = () => {
     }
     setState((prev) => ({ ...prev, dnUploadErrors: errors }));
     return isValid;
+  };
+
+  const handleDNFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, dnUpload: { ...prev.dnUpload, signedDeliveryNote: null } })); // Clear the file
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        dnUpload: { ...prev.dnUpload, signedDeliveryNote: file },
+        dnUploadErrors: { ...prev.dnUploadErrors, signedDeliveryNote: '' },
+      }));
+    }
   };
 
   const handleUploadDNSubmit = async () => {
@@ -435,6 +492,25 @@ const PendingInvoices = () => {
     }
     setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
     return isValid;
+  };
+
+  const handleInvoiceFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      if (file.size > maxSize) {
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        invoiceUpload: { ...prev.invoiceUpload, invoiceFile: file },
+        invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
+      }));
+    }
   };
 
   const handleInvoiceUploadSubmit = async () => {
@@ -1333,13 +1409,7 @@ const PendingInvoices = () => {
                   label="Upload PO File"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      poUpload: { ...prev.poUpload, poFile: e.target.files[0] },
-                      poUploadErrors: { ...prev.poUploadErrors, poFile: '' },
-                    }))
-                  }
+                  onChange={(e) => handlePOFileChange(e)}
                 />
                 {state.poUploadErrors.poFile && (
                   <p className="text-red-500 text-sm mt-1">{state.poUploadErrors.poFile}</p>
@@ -1396,13 +1466,7 @@ const PendingInvoices = () => {
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  woUpload: { ...prev.woUpload, certificateFile: e.target.files[0] },
-                  woUploadErrors: { ...prev.woUploadErrors, certificateFile: '' },
-                }))
-              }
+              onChange={(e) => handleWOFileChange(e)}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
             {state.woUploadErrors.certificateFile && (
@@ -1458,13 +1522,7 @@ const PendingInvoices = () => {
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  dnUpload: { ...prev.dnUpload, signedDeliveryNote: e.target.files[0] },
-                  dnUploadErrors: { ...prev.dnUploadErrors, signedDeliveryNote: '' },
-                }))
-              }
+              onChange={(e) => handleDNFileChange(e)}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
             {state.dnUploadErrors.signedDeliveryNote && (
@@ -1529,13 +1587,7 @@ const PendingInvoices = () => {
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  invoiceUpload: { ...prev.invoiceUpload, invoiceFile: e.target.files[0] },
-                  invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
-                }))
-              }
+              onChange={(e) => handleInvoiceFileChange(e)}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
             {state.invoiceUploadErrors.invoiceFile && (
