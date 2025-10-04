@@ -386,7 +386,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const renderMenuItem = (item) => {
     if (isLoading) {
       return (
-        <div className="flex items-center px-3 py-3 rounded-lg text-sm font-medium text-gray-700">
+        <div className="flex items-center px-3 py-3 rounded-lg text-[13px] font-medium text-gray-700">
           <span className="animate-pulse w-5 h-5 mr-3 bg-gray-200 rounded-full"></span>
           <span className="animate-pulse w-24 h-4 bg-gray-200 rounded"></span>
         </div>
@@ -437,7 +437,7 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Delivery") toggleForDeliveryPending();
               else if (item.label === "Invoices") toggleInvoices();
             }}
-            className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+            className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 ${
               isMenuOpen || isActiveSubmenu(item.subItems)
                 ? "bg-indigo-100 text-indigo-600"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
@@ -484,7 +484,7 @@ const Sidebar = ({ toggleSidebar }) => {
                       <NavLink
                         to={subItem.to}
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
+                          `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${
                             isActive
                               ? "bg-indigo-500 text-white"
                               : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
@@ -515,7 +515,7 @@ const Sidebar = ({ toggleSidebar }) => {
         <NavLink
           to={item.to}
           className={({ isActive }) =>
-            `flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
+            `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${
               isActive
                 ? "bg-indigo-500 text-white"
                 : "text-gray-700 hover:bg-indigo-500 hover:text-white"
@@ -532,7 +532,7 @@ const Sidebar = ({ toggleSidebar }) => {
 
   return (
     <motion.div
-      className="fixed top-0 left-0 w-80 h-screen bg-white shadow-lg flex flex-col z-50"
+      className="fixed top-0 left-0 w-72 h-screen bg-white shadow-lg flex flex-col z-50"
       initial={{ opacity: 0, x: "-100%" }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
