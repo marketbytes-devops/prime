@@ -302,6 +302,7 @@ const ViewRFQ = () => {
                     <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
                         value={rfq.rfq_status || 'Pending'}
+                        disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
                         onChange={(e) => handleStatusChange(rfq.id, e.target.value)}
                         className="p-1 border rounded focus:outline-indigo-500 w-full"
                       >

@@ -717,6 +717,10 @@ const ViewQuotation = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
+                          disabled={
+                            isPoComplete(quotation) ||
+                            !hasPermission("quotation", "edit")
+                          }
                         value={quotation.quotation_status || "Pending"}
                         onChange={(e) =>
                           handleStatusChange(quotation.id, e.target.value)

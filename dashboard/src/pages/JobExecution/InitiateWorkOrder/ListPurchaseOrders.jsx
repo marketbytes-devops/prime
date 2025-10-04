@@ -16,7 +16,7 @@ const ListPurchaseOrders = () => {
     units: [],
     quotations: [],
     series: [],
-    channels: [], // Added channels to state
+    channels: [], 
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -86,7 +86,7 @@ const ListPurchaseOrders = () => {
           apiClient.get("units/"),
           apiClient.get("quotations/"),
           apiClient.get("series/"),
-          apiClient.get("channels/"), // Added fetch for channels
+          apiClient.get("channels/"), 
         ]);
       const purchaseOrders = poRes.data || [];
       const workOrdersPromises = purchaseOrders.map((po) =>
@@ -115,7 +115,7 @@ const ListPurchaseOrders = () => {
         units: unitsRes.data || [],
         quotations: quotationsRes.data || [],
         series: seriesRes.data || [],
-        channels: channelsRes.data || [], // Store channels in state
+        channels: channelsRes.data || [], 
         workOrderStatusMap,
       }));
     } catch (error) {
@@ -755,6 +755,7 @@ const ListPurchaseOrders = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <select
+                        disabled={!hasPermission("purchase_orders", "edit")}
                         value={po.status || "Collection Pending"}
                         onChange={(e) =>
                           handleUpdateStatus(po.id, e.target.value)

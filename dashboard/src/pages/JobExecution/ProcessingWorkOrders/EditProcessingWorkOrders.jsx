@@ -264,7 +264,8 @@ const EditProcessingWorkOrders = () => {
                 <select
                   value={item.assigned_to || ""}
                   onChange={(e) => handleItemChange(index, "assigned_to", e.target.value)}
-                  className="p-2 border rounded w-full"
+                  className="p-2 border rounded w-full bg-gray-100 cursor-not-allowed"
+                  disabled={true}
                 >
                   <option value="">Select Technician</option>
                   {state.technicians.map((technician) => (

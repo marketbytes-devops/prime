@@ -478,7 +478,7 @@ const ListProcessingWorkOrders = () => {
                                   : "bg-blue-600 text-white hover:bg-blue-700"
                               }`}
                             >
-                              Edit
+                              Update
                             </Button>
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
