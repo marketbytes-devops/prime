@@ -55,7 +55,7 @@ const Layout = ({ isAuthenticated, setIsAuthenticated }) => {
   return (
     <div className="flex min-h-screen">
       <motion.div
-        className={`fixed inset-y-0 left-0 z-30 w-72 bg-gray-900 text-white transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-30 w-80 bg-gray-900 text-white transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:translate-x-0 transition-transform duration-300 ease-in-out`}
         initial={{ opacity: 0, x: "-100%" }}
         animate={{ opacity: 1, x: isSidebarOpen ? 0 : "-100%" }}
@@ -71,7 +71,7 @@ const Layout = ({ isAuthenticated, setIsAuthenticated }) => {
       )}
       <div className="flex-1 flex flex-col">
         <div
-          className={`fixed top-0 left-0 right-0 z-10 ${isSidebarOpen ? "md:left-72" : "left-0"
+          className={`fixed top-0 left-0 right-0 z-10 ${isSidebarOpen ? "md:left-80" : "left-0"
             } bg-white shadow-md`}
         >
           <Topbar

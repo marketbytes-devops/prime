@@ -532,7 +532,7 @@ const Sidebar = ({ toggleSidebar }) => {
 
   return (
     <motion.div
-      className="fixed top-0 left-0 w-72 h-screen bg-white shadow-lg flex flex-col z-50"
+      className="fixed top-0 left-0 w-80 h-screen bg-white shadow-lg flex flex-col z-50"
       initial={{ opacity: 0, x: "-100%" }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
