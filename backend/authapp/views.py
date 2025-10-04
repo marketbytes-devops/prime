@@ -33,7 +33,7 @@ class HasPermission(BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        # Superadmin role can access everything
+
         if request.user.role and request.user.role.name == "Superadmin":
             return True
 
@@ -58,10 +58,12 @@ def has_permission(user, page, action):
     """
     Custom function to check if a user has permission for a given page and action.
     """
+    # Superadmin always has permission
     if user.role and user.role.name == "Superadmin":
         return True
     if not user.role:
         return False
+
     return Permission.objects.filter(
         role=user.role, page=page, **{f"can_{action}": True}
     ).exists()
