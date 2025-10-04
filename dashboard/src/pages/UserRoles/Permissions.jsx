@@ -24,7 +24,7 @@ const Permissions = () => {
     quotation: { apiName: "quotation", displayName: "Quotation" },
     purchase_orders: { apiName: "purchase_orders", displayName: "Purchase Orders" },
     // work_orders: { apiName: "work_orders", displayName: "Work Orders" },
-    processing_work_orders: { apiName: "processing_work_orders", displayName: "Processing Work Orders" },
+    processing_work_orders: { apiName: "processing_work_orders", displayName: "List Processing WO" },
     manager_approval: { apiName: "manager_approval", displayName: "Manager Approval" },
     declined_work_orders: { apiName: "declined_work_orders", displayName: "Declined Work Orders" },
     delivery: { apiName: "delivery", displayName: "Delivery" },
@@ -115,6 +115,17 @@ const Permissions = () => {
           };
         }
       });
+      if (role.name === "Superadmin") {
+        Object.keys(permissionsMap).forEach((page) => {
+          permissionsMap[page] = {
+            id: permissionsMap[page].id,
+            view: true,
+            add: true,
+            edit: true,
+            delete: true,
+          };
+        });
+      }
       setPermissions(permissionsMap);
     } catch (error) {
       setError("Failed to fetch permissions. Please try again.");
@@ -122,6 +133,7 @@ const Permissions = () => {
   };
 
   const handlePermissionChange = (page, action) => {
+    if (selectedRole?.name === "Superadmin") return; 
     setPermissions((prev) => ({
       ...prev,
       [page]: {
@@ -134,6 +146,11 @@ const Permissions = () => {
   const handleSavePermissions = async () => {
     if (!hasPermission("permissions", "edit")) {
       setError("You do not have permission to edit permissions.");
+      return;
+    }
+    if (selectedRole?.name === "Superadmin") {
+      setError("Superadmin permissions cannot be modified.");
+      setSelectedRole(null);
       return;
     }
     setIsSaving(true);
@@ -229,9 +246,9 @@ const Permissions = () => {
                   <td className="px-4 py-2">
                     <Button
                       onClick={() => openPermissionsModal(role)}
-                      disabled={!hasPermission("permissions", "edit")}
+                      disabled={!hasPermission("permissions", "edit") || role.name === "Superadmin"}
                       className={`flex items-center justify-start ${
-                        hasPermission("permissions", "edit")
+                        hasPermission("permissions", "edit") && role.name !== "Superadmin"
                           ? "text-indigo-600 hover:text-indigo-800"
                           : "text-gray-400 cursor-not-allowed"
                       }`}
@@ -273,7 +290,7 @@ const Permissions = () => {
                           checked={permissions[page]?.view || false}
                           onChange={() => handlePermissionChange(page, "view")}
                           className="h-5 w-5"
-                          disabled={!hasPermission("permissions", "edit")}
+                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -282,7 +299,7 @@ const Permissions = () => {
                           checked={permissions[page]?.add || false}
                           onChange={() => handlePermissionChange(page, "add")}
                           className="h-5 w-5"
-                          disabled={!hasPermission("permissions", "edit")}
+                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -291,7 +308,7 @@ const Permissions = () => {
                           checked={permissions[page]?.edit || false}
                           onChange={() => handlePermissionChange(page, "edit")}
                           className="h-5 w-5"
-                          disabled={!hasPermission("permissions", "edit")}
+                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -300,7 +317,7 @@ const Permissions = () => {
                           checked={permissions[page]?.delete || false}
                           onChange={() => handlePermissionChange(page, "delete")}
                           className="h-5 w-5"
-                          disabled={!hasPermission("permissions", "edit")}
+                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
                         />
                       </td>
                     </tr>
@@ -317,9 +334,9 @@ const Permissions = () => {
               </Button>
               <Button
                 onClick={handleSavePermissions}
-                disabled={isSaving || !hasPermission("permissions", "edit")}
+                disabled={isSaving || !hasPermission("permissions", "edit") || selectedRole?.name === "Superadmin"}
                 className={`px-4 py-2 rounded-lg ${
-                  isSaving || !hasPermission("permissions", "edit")
+                  isSaving || !hasPermission("permissions", "edit") || selectedRole?.name === "Superadmin"
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-indigo-500 text-white hover:bg-indigo-600"
                 }`}

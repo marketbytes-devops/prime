@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import apiClient from "../../helpers/apiClient";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, Edit } from "lucide-react";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
+import Modal from "../../components/Modal";
 import Loading from "../../components/Loading";
 
 const Roles = () => {
   const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({ name: "", description: "" });
+  const [editRole, setEditRole] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -86,9 +88,39 @@ const Roles = () => {
     }
   };
 
+  const handleEditRole = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    if (!hasPermission("roles", "edit")) {
+      setError("You do not have permission to edit a role.");
+      return;
+    }
+    if (!editRole.name) {
+      setError("Role name is required");
+      return;
+    }
+    try {
+      const response = await apiClient.put(`roles/${editRole.id}/`, {
+        name: editRole.name,
+        description: editRole.description,
+      });
+      setRoles(roles.map((role) => (role.id === editRole.id ? response.data : role)));
+      setMessage("Role updated successfully");
+      setEditRole(null);
+    } catch (error) {
+      setError(error.response?.data?.detail || "Failed to update role. Please try again.");
+    }
+  };
+
   const handleDeleteRole = async (id) => {
     if (!hasPermission("roles", "delete")) {
       setError("You do not have permission to delete a role.");
+      return;
+    }
+    const role = roles.find((r) => r.id === id);
+    if (role.name === "Superadmin") {
+      setError("Superadmin role cannot be deleted.");
       return;
     }
     if (window.confirm("Are you sure you want to delete this role?")) {
@@ -100,6 +132,22 @@ const Roles = () => {
         setError("Failed to delete role. Please try again.");
       }
     }
+  };
+
+  const openEditModal = (role) => {
+    if (!hasPermission("roles", "edit")) {
+      setError("You do not have permission to edit a role.");
+      return;
+    }
+    if (role.name === "Superadmin") {
+      setError("Superadmin role cannot be edited.");
+      return;
+    }
+    setEditRole({
+      id: role.id,
+      name: role.name,
+      description: role.description || "",
+    });
   };
 
   const filteredRoles = roles.filter((role) =>
@@ -216,12 +264,23 @@ const Roles = () => {
                   <tr key={role.id} className="border-b">
                     <td className="px-4 py-2">{role.name}</td>
                     <td className="px-4 py-2">{role.description || "-"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 flex space-x-2">
+                      <Button
+                        onClick={() => openEditModal(role)}
+                        disabled={!hasPermission("roles", "edit") || role.name === "Superadmin"}
+                        className={`flex items-center justify-center ${
+                          hasPermission("roles", "edit") && role.name !== "Superadmin"
+                            ? "text-blue-600 hover:text-blue-800"
+                            : "text-gray-400 cursor-not-allowed"
+                        }`}
+                      >
+                        <Edit className="w-5 h-5 mr-2" /> Edit
+                      </Button>
                       <Button
                         onClick={() => handleDeleteRole(role.id)}
-                        disabled={!hasPermission("roles", "delete")}
+                        disabled={!hasPermission("roles", "delete") || role.name === "Superadmin"}
                         className={`flex items-center justify-center ${
-                          hasPermission("roles", "delete")
+                          hasPermission("roles", "delete") && role.name !== "Superadmin"
                             ? "text-red-600 hover:text-red-800"
                             : "text-gray-400 cursor-not-allowed"
                         }`}
@@ -236,6 +295,50 @@ const Roles = () => {
           </div>
         </motion.div>
       </div>
+      <AnimatePresence>
+        {editRole && (
+          <Modal isOpen={!!editRole} onClose={() => setEditRole(null)} title="Edit Role">
+            <form onSubmit={handleEditRole} className="space-y-4">
+              <InputField
+                type="text"
+                label="Role Name"
+                value={editRole.name}
+                onChange={(e) => setEditRole({ ...editRole, name: e.target.value })}
+                required
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  value={editRole.description}
+                  onChange={(e) => setEditRole({ ...editRole, description: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  rows="4"
+                />
+              </div>
+              <div className="flex justify-end space-x-4">
+                <Button
+                  type="button"
+                  onClick={() => setEditRole(null)}
+                  className="p-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!hasPermission("roles", "edit")}
+                  className={`p-3 rounded-lg ${
+                    hasPermission("roles", "edit")
+                      ? "bg-indigo-500 text-white hover:bg-indigo-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  Save
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
