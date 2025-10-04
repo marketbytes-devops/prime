@@ -49,14 +49,16 @@ const Sidebar = ({ toggleSidebar }) => {
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [declinedWOsCount, setDeclinedWOsCount] = useState(null); // Initialize as null to indicate loading
+  const [declinedWOsCount, setDeclinedWOsCount] = useState(0);
+  const [managerApprovalWOsCount, setManagerApprovalWOsCount] = useState(0);
 
   useEffect(() => {
     const fetchProfileAndCounts = async () => {
       try {
-        const [profileResponse, declinedWOsResponse] = await Promise.all([
+        const [profileResponse, declinedWOsResponse, managerApprovalWOsResponse] = await Promise.all([
           apiClient.get("/profile/"),
           apiClient.get("work-orders/", { params: { status: "Declined" } }),
+          apiClient.get("work-orders/", { params: { status: "Manager Approval" } }),
         ]);
 
         const user = profileResponse.data;
@@ -70,11 +72,13 @@ const Sidebar = ({ toggleSidebar }) => {
         }
 
         setDeclinedWOsCount(declinedWOsResponse.data?.length || 0);
+        setManagerApprovalWOsCount(managerApprovalWOsResponse.data?.length || 0);
       } catch (error) {
         console.error("Unable to fetch user profile or counts:", error);
         setPermissions([]);
         setIsSuperadmin(false);
-        setDeclinedWOsCount(0); // Set to 0 only after confirming error
+        setDeclinedWOsCount(0);
+        setManagerApprovalWOsCount(0);
       } finally {
         setIsLoading(false);
       }
@@ -82,19 +86,23 @@ const Sidebar = ({ toggleSidebar }) => {
     fetchProfileAndCounts();
   }, []);
 
-  // Refetch declined work orders count when navigating to relevant pages
   useEffect(() => {
     if (location.pathname.includes("/job-execution/processing-work-orders")) {
-      const fetchDeclinedWOsCount = async () => {
+      const fetchCounts = async () => {
         try {
-          const response = await apiClient.get("work-orders/", { params: { status: "Declined" } });
-          setDeclinedWOsCount(response.data?.length || 0);
+          const [declinedWOsResponse, managerApprovalWOsResponse] = await Promise.all([
+            apiClient.get("work-orders/", { params: { status: "Declined" } }),
+            apiClient.get("work-orders/", { params: { status: "Manager Approval" } }),
+          ]);
+          setDeclinedWOsCount(declinedWOsResponse.data?.length || 0);
+          setManagerApprovalWOsCount(managerApprovalWOsResponse.data?.length || 0);
         } catch (error) {
-          console.error("Error fetching declined work orders count:", error);
+          console.error("Error fetching work order counts:", error);
           setDeclinedWOsCount(0);
+          setManagerApprovalWOsCount(0);
         }
       };
-      fetchDeclinedWOsCount();
+      fetchCounts();
     }
   }, [location.pathname]);
 
@@ -206,6 +214,7 @@ const Sidebar = ({ toggleSidebar }) => {
               icon: <CheckCircle className="w-5 h-5 mr-3" />,
               page: "manager_approval",
               action: "view",
+              badge: managerApprovalWOsCount > 0 ? managerApprovalWOsCount : null,
             },
             {
               to: "/job-execution/processing-work-orders/declined-work-orders",

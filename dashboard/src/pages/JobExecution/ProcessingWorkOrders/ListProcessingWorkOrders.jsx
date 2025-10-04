@@ -7,6 +7,7 @@ import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 import Template1 from "../../../components/Templates/WorkOrder/Template1";
 import ReactDOMServer from "react-dom/server";
+import Loading from "../../../components/Loading";
 
 const ListProcessingWorkOrders = () => {
   const navigate = useNavigate();
@@ -355,7 +356,7 @@ const ListProcessingWorkOrders = () => {
   return (
     <div className="mx-auto p-4">
       {isLoadingPermissions ? (
-        <div>Loading permissions...</div>
+        <div><Loading/></div>
       ) : !hasPermission("processing_work_orders", "view") ? (
         <div className="text-red-600">You do not have permission to view this page.</div>
       ) : (

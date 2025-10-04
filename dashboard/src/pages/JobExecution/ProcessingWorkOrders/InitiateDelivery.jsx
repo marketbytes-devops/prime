@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
 import Button from '../../../components/Button';
+import Loading from '../../../components/Loading';
 
 const InitiateDelivery = () => {
   const { id } = useParams();
@@ -521,7 +522,7 @@ const InitiateDelivery = () => {
   const totalQuantity = state.deliveryItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
 
   if (state.isLoading || isLoadingPermissions) {
-    return <div className="text-center p-4">Loading...</div>;
+    return <div className="text-center p-4"><Loading/></div>;
   }
 
   return (
