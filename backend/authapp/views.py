@@ -26,40 +26,52 @@ from .serializers import (
 from django.utils import timezone
 from datetime import timedelta
 
+
+# ------------------ Custom Permission ------------------
+
 class HasPermission(BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        if request.user.is_superuser:
+        # Superadmin role can access everything
+        if request.user.role and request.user.role.name == "Superadmin":
             return True
+
         page = getattr(view, 'page_name', view.__class__.__name__.lower().replace('view', ''))
-        action = 'can_view' if request.method == 'GET' else 'can_add' if request.method == 'POST' else 'can_edit' if request.method in ['PUT', 'PATCH'] else 'can_delete' if request.method == 'DELETE' else None
+        action = (
+            'can_view' if request.method == 'GET' else
+            'can_add' if request.method == 'POST' else
+            'can_edit' if request.method in ['PUT', 'PATCH'] else
+            'can_delete' if request.method == 'DELETE' else None
+        )
         if not action:
             return False
+
         return Permission.objects.filter(
             role=request.user.role,
             page=page,
             **{action: True}
         ).exists()
 
+
 def has_permission(user, page, action):
     """
     Custom function to check if a user has permission for a given page and action.
     """
-    if user.is_superuser or (user.role and user.role.name == "Superadmin"):
+    if user.role and user.role.name == "Superadmin":
         return True
     if not user.role:
         return False
-    try:
-        permission = Permission.objects.filter(
-            role=user.role, page=page, **{f"can_{action}": True}
-        ).exists()
-        return permission
-    except Permission.DoesNotExist:
-        return False
+    return Permission.objects.filter(
+        role=user.role, page=page, **{f"can_{action}": True}
+    ).exists()
+
+
+# ------------------ Auth Views ------------------
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -81,6 +93,7 @@ class LoginView(APIView):
                 return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class RequestOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -92,7 +105,7 @@ class RequestOTPView(APIView):
                 user = CustomUser.objects.get(email=email)
                 otp = "".join(random.choices(string.digits, k=6))
                 user.otp = otp
-                user.otp_created_at = timezone.now() 
+                user.otp_created_at = timezone.now()
                 user.save()
                 send_mail(
                     subject="Your OTP for Password Reset",
@@ -101,15 +114,11 @@ class RequestOTPView(APIView):
                     recipient_list=[email],
                     fail_silently=False,
                 )
-                return Response(
-                    {"message": "OTP sent to your email"}, status=status.HTTP_200_OK
-                )
+                return Response({"message": "OTP sent to your email"}, status=status.HTTP_200_OK)
             except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User with this email does not exist"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
@@ -122,40 +131,30 @@ class ResetPasswordView(APIView):
             new_password = serializer.validated_data["new_password"]
             try:
                 user = CustomUser.objects.get(email=email)
-                
                 if user.otp and user.otp_created_at:
                     time_diff = timezone.now() - user.otp_created_at
                     if time_diff > timedelta(minutes=10):
-                        return Response(
-                            {"error": "OTP has expired"}, 
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
-                
+                        return Response({"error": "OTP has expired"}, status=status.HTTP_400_BAD_REQUEST)
+
                 if user.otp == otp:
                     user.set_password(new_password)
                     user.otp = None
-                    user.otp_created_at = None  
+                    user.otp_created_at = None
                     user.save()
-                    return Response(
-                        {"message": "Password reset successfully"},
-                        status=status.HTTP_200_OK,
-                    )
-                return Response(
-                    {"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST
-                )
+                    return Response({"message": "Password reset successfully"}, status=status.HTTP_200_OK)
+                return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
             except CustomUser.DoesNotExist:
-                return Response(
-                    {"error": "User with this email does not exist"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ------------------ Profile ------------------
 
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        serializer = ProfileSerializer(user)
+        serializer = ProfileSerializer(request.user)
         return Response(serializer.data)
 
     def put(self, request):
@@ -164,6 +163,7 @@ class ProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
@@ -177,6 +177,9 @@ class ChangePasswordView(APIView):
             return Response({"message": "Password changed successfully"})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+# ------------------ Role Views ------------------
+
 class RoleView(APIView):
     permission_classes = [HasPermission]
     page_name = 'roles'
@@ -187,11 +190,15 @@ class RoleView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
+        if not (request.user.role and request.user.role.name == "Superadmin"):
+            return Response({'error': 'Only Superadmin can create roles'}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = RoleCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class RoleDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -199,7 +206,7 @@ class RoleDetailView(APIView):
     def get(self, request, pk):
         try:
             role = Role.objects.get(pk=pk)
-            if role != request.user.role and not request.user.is_superuser:
+            if role != request.user.role and request.user.role.name != "Superadmin":
                 return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             serializer = RoleSerializer(role)
             return Response(serializer.data)
@@ -229,16 +236,22 @@ class RoleDetailView(APIView):
         except Role.DoesNotExist:
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
+
+# ------------------ Permission Views ------------------
+
 class PermissionView(APIView):
     permission_classes = [HasPermission]
     page_name = 'permissions'
 
     def post(self, request):
+        if not (request.user.role and request.user.role.name == "Superadmin"):
+            return Response({'error': 'Only Superadmin can create permissions'}, status=status.HTTP_403_FORBIDDEN)
         serializer = PermissionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PermissionListView(APIView):
     permission_classes = [HasPermission]
@@ -249,11 +262,14 @@ class PermissionListView(APIView):
         serializer = PermissionSerializer(permissions, many=True)
         return Response(serializer.data)
 
+
 class PermissionDetailView(APIView):
     permission_classes = [HasPermission]
     page_name = 'permissions'
 
     def put(self, request, pk):
+        if not (request.user.role and request.user.role.name == "Superadmin"):
+            return Response({'error': 'Only Superadmin can edit permissions'}, status=status.HTTP_403_FORBIDDEN)
         try:
             permission = Permission.objects.get(pk=pk)
             serializer = PermissionSerializer(permission, data=request.data, partial=True)
@@ -265,12 +281,17 @@ class PermissionDetailView(APIView):
             return Response({'error': 'Permission not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request, pk):
+        if not (request.user.role and request.user.role.name == "Superadmin"):
+            return Response({'error': 'Only Superadmin can delete permissions'}, status=status.HTTP_403_FORBIDDEN)
         try:
             permission = Permission.objects.get(pk=pk)
             permission.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Permission.DoesNotExist:
             return Response({'error': 'Permission not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ------------------ User Management Views ------------------
 
 class UserManagementView(APIView):
     permission_classes = [HasPermission]
@@ -282,13 +303,14 @@ class UserManagementView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        if not request.user.is_superuser:
-            return Response({'error': 'Only superadmin can create users'}, status=status.HTTP_403_FORBIDDEN)
+        if not (request.user.role and request.user.role.name == "Superadmin"):
+            return Response({'error': 'Only Superadmin can create users'}, status=status.HTTP_403_FORBIDDEN)
         serializer = UserCreateSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UserDetailView(APIView):
     permission_classes = [HasPermission]
