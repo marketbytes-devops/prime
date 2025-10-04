@@ -540,7 +540,7 @@ const Sidebar = ({ toggleSidebar }) => {
       <div className="p-4 flex items-center justify-center border-b border-gray-200">
         <img src={logo} className="w-24" alt="Prime Logo" />
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 hide-scrollbar">
         {isLoading ? (
           <div className="flex justify-center items-center h-full">
             <span className="animate-pulse w-24 h-4 bg-gray-200 rounded"></span>
