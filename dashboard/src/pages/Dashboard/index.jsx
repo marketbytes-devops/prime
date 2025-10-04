@@ -21,7 +21,7 @@ const Dashboard = () => {
   const chartRef = useRef(null);
 
   const chartData = {
-    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices'], 
+    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices'],
     datasets: [
       {
         label: 'Counts',
@@ -31,23 +31,23 @@ const Dashboard = () => {
           counts.purchaseOrders,
           counts.workOrders,
           counts.deliveryNotes,
-          counts.invoices, 
+          counts.invoices,
         ],
         backgroundColor: [
-          'rgba(79, 70, 229, 0.2)', 
-          'rgba(16, 185, 129, 0.2)', 
-          'rgba(59, 130, 246, 0.2)', 
+          'rgba(79, 70, 229, 0.2)',
+          'rgba(16, 185, 129, 0.2)',
+          'rgba(59, 130, 246, 0.2)',
           'rgba(147, 51, 234, 0.2)',
-          'rgba(245, 158, 11, 0.2)', 
-          'rgba(236, 72, 153, 0.2)', 
+          'rgba(245, 158, 11, 0.2)',
+          'rgba(236, 72, 153, 0.2)',
         ],
         borderColor: [
-          'rgba(79, 70, 229, 1)', 
-          'rgba(16, 185, 129, 1)', 
-          'rgba(59, 130, 246, 1)', 
+          'rgba(79, 70, 229, 1)',
+          'rgba(16, 185, 129, 1)',
+          'rgba(59, 130, 246, 1)',
           'rgba(147, 51, 234, 1)',
-          'rgba(245, 158, 11, 1)', 
-          'rgba(236, 72, 153, 1)', 
+          'rgba(245, 158, 11, 1)',
+          'rgba(236, 72, 153, 1)',
         ],
         borderWidth: 1,
       },
@@ -70,17 +70,18 @@ const Dashboard = () => {
           apiClient.get('/rfqs/'),
           apiClient.get('/quotations/'),
           apiClient.get('/purchase-orders/'),
-          apiClient.get('/work-orders/'),
+          apiClient.get('/work-orders/?status=Submitted'),
           apiClient.get('/delivery-notes/'),
           apiClient.get('/work-orders/?status=Completed'),
           apiClient.get('/invoices/?status=processed'),
         ]);
-        console.log('Invoices Response:', invoicesRes.data); 
+        console.log('Work Orders Response:', woRes.data);
+        console.log('Invoices Response:', invoicesRes.data);
         setCounts({
           rfqs: rfqsRes.data?.length || 0,
           quotations: quotationsRes.data?.length || 0,
           purchaseOrders: poRes.data?.length || 0,
-          workOrders: woRes.data?.length || 0,
+          workOrders: woRes.data?.filter(wo => wo.status === 'Submitted')?.length || 0,
           deliveryNotes: dnRes.data?.length || 0,
           closedWorkOrders: closedWoRes.data?.length || 0,
           overdueWorkOrders: woRes.data?.filter(wo => wo.isOverdue)?.length || 0,
@@ -177,7 +178,7 @@ const Dashboard = () => {
           </div>
         </Link>
 
-        <Link to="/job-execution/processing-work-orders/delivery" className="block">
+        <Link to="/job-execution/processing-work-orders/pending-deliveries" className="block">
           <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
             <div className="p-3 bg-yellow-100 rounded-full">
               <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
