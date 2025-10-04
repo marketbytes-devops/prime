@@ -15,13 +15,13 @@ const Dashboard = () => {
     deliveryNotes: 0,
     closedWorkOrders: 0,
     overdueWorkOrders: 0,
-    invoices: 0, // Added for processed invoices
+    invoices: 0,
   });
   const [loading, setLoading] = useState(true);
   const chartRef = useRef(null);
 
   const chartData = {
-    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices'], // Added Invoices
+    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices'], 
     datasets: [
       {
         label: 'Counts',
@@ -31,23 +31,23 @@ const Dashboard = () => {
           counts.purchaseOrders,
           counts.workOrders,
           counts.deliveryNotes,
-          counts.invoices, // Added Invoices
+          counts.invoices, 
         ],
         backgroundColor: [
-          'rgba(79, 70, 229, 0.2)', // RFQ
-          'rgba(16, 185, 129, 0.2)', // Quotation
-          'rgba(59, 130, 246, 0.2)', // PO
-          'rgba(147, 51, 234, 0.2)', // WO
-          'rgba(245, 158, 11, 0.2)', // Delivery Notes
-          'rgba(236, 72, 153, 0.2)', // Invoices (new color)
+          'rgba(79, 70, 229, 0.2)', 
+          'rgba(16, 185, 129, 0.2)', 
+          'rgba(59, 130, 246, 0.2)', 
+          'rgba(147, 51, 234, 0.2)',
+          'rgba(245, 158, 11, 0.2)', 
+          'rgba(236, 72, 153, 0.2)', 
         ],
         borderColor: [
-          'rgba(79, 70, 229, 1)', // RFQ
-          'rgba(16, 185, 129, 1)', // Quotation
-          'rgba(59, 130, 246, 1)', // PO
-          'rgba(147, 51, 234, 1)', // WO
-          'rgba(245, 158, 11, 1)', // Delivery Notes
-          'rgba(236, 72, 153, 1)', // Invoices (new color)
+          'rgba(79, 70, 229, 1)', 
+          'rgba(16, 185, 129, 1)', 
+          'rgba(59, 130, 246, 1)', 
+          'rgba(147, 51, 234, 1)',
+          'rgba(245, 158, 11, 1)', 
+          'rgba(236, 72, 153, 1)', 
         ],
         borderWidth: 1,
       },
@@ -65,7 +65,7 @@ const Dashboard = () => {
           woRes,
           dnRes,
           closedWoRes,
-          invoicesRes, // Added for processed invoices
+          invoicesRes,
         ] = await Promise.all([
           apiClient.get('/rfqs/'),
           apiClient.get('/quotations/'),
@@ -73,8 +73,9 @@ const Dashboard = () => {
           apiClient.get('/work-orders/'),
           apiClient.get('/delivery-notes/'),
           apiClient.get('/work-orders/?status=Completed'),
-          apiClient.get('/invoices/?status=processed'), // Fetch processed invoices
+          apiClient.get('/invoices/?status=processed'),
         ]);
+        console.log('Invoices Response:', invoicesRes.data); 
         setCounts({
           rfqs: rfqsRes.data?.length || 0,
           quotations: quotationsRes.data?.length || 0,
@@ -83,7 +84,7 @@ const Dashboard = () => {
           deliveryNotes: dnRes.data?.length || 0,
           closedWorkOrders: closedWoRes.data?.length || 0,
           overdueWorkOrders: woRes.data?.filter(wo => wo.isOverdue)?.length || 0,
-          invoices: invoicesRes.data?.length || 0, // Set processed invoices count
+          invoices: invoicesRes.data?.filter(invoice => invoice.invoice_status === 'processed')?.length || 0,
         });
       } catch (err) {
         console.error('Error fetching counts:', err);
@@ -192,7 +193,7 @@ const Dashboard = () => {
           </div>
         </Link>
 
-        <Link to="/processed-invoices" className="block">
+        <Link to="/post-job-phase/processed-invoices" className="block">
           <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
             <div className="p-3 bg-pink-100 rounded-full">
               <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
