@@ -16,6 +16,7 @@ const Permissions = () => {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [permissionsData, setPermissionsData] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+  const [selectAll, setSelectAll] = useState(false);
 
   const pageNameMap = {
     Dashboard: { apiName: "Dashboard", displayName: "Dashboard" },
@@ -23,17 +24,14 @@ const Permissions = () => {
     rfq: { apiName: "rfq", displayName: "RFQ" },
     quotation: { apiName: "quotation", displayName: "Quotation" },
     purchase_orders: { apiName: "purchase_orders", displayName: "Purchase Orders" },
-    // work_orders: { apiName: "work_orders", displayName: "Work Orders" },
     processing_work_orders: { apiName: "processing_work_orders", displayName: "List Processing WO" },
     manager_approval: { apiName: "manager_approval", displayName: "Manager Approval" },
     declined_work_orders: { apiName: "declined_work_orders", displayName: "Declined Work Orders" },
     delivery: { apiName: "delivery", displayName: "Delivery" },
     pending_deliveries: { apiName: "pending_deliveries", displayName: "Pending Deliveries" },
-    // close_work_orders: { apiName: "close_work_orders", displayName: "Close Work Orders" },
     pending_invoices: { apiName: "pending_invoices", displayName: "Pending Invoices" },
     raised_invoices: { apiName: "raised_invoices", displayName: "Raised Invoices" },
     processed_invoices: { apiName: "processed_invoices", displayName: "Processed Invoices" },
-    // completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
     series: { apiName: "series", displayName: "Series" },
     rfq_channel: { apiName: "rfq_channel", displayName: "RFQ Channel" },
     item: { apiName: "item", displayName: "Item" },
@@ -42,10 +40,6 @@ const Permissions = () => {
     users: { apiName: "users", displayName: "Users" },
     roles: { apiName: "roles", displayName: "Roles" },
     permissions: { apiName: "permissions", displayName: "Permissions" },
-    // pre_job_phase: { apiName: "pre_job_phase", displayName: "Pre Job Phase" },
-    // job_execution: { apiName: "job_execution", displayName: "Job Execution" },
-    // post_job_phase: { apiName: "post_job_phase", displayName: "Post Job Phase" },
-    // additional_settings: { apiName: "additional_settings", displayName: "Additional Settings" },
   };
 
   useEffect(() => {
@@ -125,6 +119,13 @@ const Permissions = () => {
             delete: true,
           };
         });
+        setSelectAll(true);
+      } else {
+        // Check if all permissions are selected for non-Superadmin roles
+        const allSelected = Object.values(permissionsMap).every(
+          (perm) => perm.view && perm.add && perm.edit && perm.delete
+        );
+        setSelectAll(allSelected);
       }
       setPermissions(permissionsMap);
     } catch (error) {
@@ -133,7 +134,6 @@ const Permissions = () => {
   };
 
   const handlePermissionChange = (page, action) => {
-    if (selectedRole?.name === "Superadmin") return; 
     setPermissions((prev) => ({
       ...prev,
       [page]: {
@@ -141,16 +141,39 @@ const Permissions = () => {
         [action]: !prev[page][action],
       },
     }));
+    // Update selectAll state based on whether all checkboxes are checked
+    setTimeout(() => {
+      setPermissions((prev) => {
+        const allSelected = Object.values(prev).every(
+          (perm) => perm.view && perm.add && perm.edit && perm.delete
+        );
+        setSelectAll(allSelected);
+        return prev;
+      });
+    }, 0);
+  };
+
+  const handleSelectAllChange = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
+    setPermissions((prev) => {
+      const updatedPermissions = { ...prev };
+      Object.keys(updatedPermissions).forEach((page) => {
+        updatedPermissions[page] = {
+          ...updatedPermissions[page],
+          view: newSelectAll,
+          add: newSelectAll,
+          edit: newSelectAll,
+          delete: newSelectAll,
+        };
+      });
+      return updatedPermissions;
+    });
   };
 
   const handleSavePermissions = async () => {
     if (!hasPermission("permissions", "edit")) {
       setError("You do not have permission to edit permissions.");
-      return;
-    }
-    if (selectedRole?.name === "Superadmin") {
-      setError("Superadmin permissions cannot be modified.");
-      setSelectedRole(null);
       return;
     }
     setIsSaving(true);
@@ -246,9 +269,9 @@ const Permissions = () => {
                   <td className="px-4 py-2">
                     <Button
                       onClick={() => openPermissionsModal(role)}
-                      disabled={!hasPermission("permissions", "edit") || role.name === "Superadmin"}
+                      disabled={!hasPermission("permissions", "edit")}
                       className={`flex items-center justify-start ${
-                        hasPermission("permissions", "edit") && role.name !== "Superadmin"
+                        hasPermission("permissions", "edit")
                           ? "text-indigo-600 hover:text-indigo-800"
                           : "text-gray-400 cursor-not-allowed"
                       }`}
@@ -269,6 +292,18 @@ const Permissions = () => {
             onClose={() => setSelectedRole(null)}
             title={`Permissions for ${selectedRole.name}`}
           >
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={handleSelectAllChange}
+                  className="h-5 w-5 mr-2"
+                  disabled={!hasPermission("permissions", "edit")}
+                />
+                <span className="text-sm font-medium text-gray-700">Select All</span>
+              </label>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full table-auto">
                 <thead>
@@ -290,7 +325,7 @@ const Permissions = () => {
                           checked={permissions[page]?.view || false}
                           onChange={() => handlePermissionChange(page, "view")}
                           className="h-5 w-5"
-                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -299,7 +334,7 @@ const Permissions = () => {
                           checked={permissions[page]?.add || false}
                           onChange={() => handlePermissionChange(page, "add")}
                           className="h-5 w-5"
-                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -308,7 +343,7 @@ const Permissions = () => {
                           checked={permissions[page]?.edit || false}
                           onChange={() => handlePermissionChange(page, "edit")}
                           className="h-5 w-5"
-                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -317,7 +352,7 @@ const Permissions = () => {
                           checked={permissions[page]?.delete || false}
                           onChange={() => handlePermissionChange(page, "delete")}
                           className="h-5 w-5"
-                          disabled={selectedRole?.name === "Superadmin" || !hasPermission("permissions", "edit")}
+                          disabled={!hasPermission("permissions", "edit")}
                         />
                       </td>
                     </tr>
@@ -334,9 +369,9 @@ const Permissions = () => {
               </Button>
               <Button
                 onClick={handleSavePermissions}
-                disabled={isSaving || !hasPermission("permissions", "edit") || selectedRole?.name === "Superadmin"}
+                disabled={isSaving || !hasPermission("permissions", "edit")}
                 className={`px-4 py-2 rounded-lg ${
-                  isSaving || !hasPermission("permissions", "edit") || selectedRole?.name === "Superadmin"
+                  isSaving || !hasPermission("permissions", "edit")
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-indigo-500 text-white hover:bg-indigo-600"
                 }`}
