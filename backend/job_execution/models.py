@@ -116,10 +116,17 @@ class Invoice(models.Model):
         null=True, 
         blank=True
     )
-    invoice_file = models.FileField(
-        upload_to='invoices-files/', 
+    final_invoice_file = models.FileField(
+        upload_to='invoices-final/', 
         null=True, 
-        blank=True
+        blank=True,
+        help_text='Final invoice file for raised status'
+    )
+    processed_certificate_file = models.FileField(
+        upload_to='invoices-processed/', 
+        null=True, 
+        blank=True,
+        help_text='Processed certificate file for processed status'
     )
     invoice_status = models.CharField(
         max_length=20,

@@ -228,7 +228,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'delivery_note_id',
             'delivery_note_item',
             'delivery_note_item_id',
-            'invoice_file',
+            'final_invoice_file',
+            'processed_certificate_file',
             'invoice_status',
             'due_in_days',
             'received_date',
@@ -241,9 +242,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         invoice_status = data.get('invoice_status')
         due_in_days = data.get('due_in_days')
         received_date = data.get('received_date')
-        invoice_file = data.get('invoice_file')
+        final_invoice_file = data.get('final_invoice_file')
+        processed_certificate_file = data.get('processed_certificate_file')
 
-        # Ensure due_in_days is included in the request for 'raised' status
         if invoice_status == 'raised':
             if 'due_in_days' not in data:
                 raise serializers.ValidationError({
@@ -251,23 +252,30 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 })
             if due_in_days is not None and due_in_days <= 0:
                 raise serializers.ValidationError({
-                    'due_in_days': "Due in days must be a positive integer or null for 'raised' status."
+                    'due_in_days': "Due in days must be a positive integer for 'raised' status."
                 })
+            if not final_invoice_file:
+                raise serializers.ValidationError({
+                    'final_invoice_file': "Final invoice file is required for 'raised' status."
+                })
+                
         if invoice_status == 'processed':
             if not received_date:
                 raise serializers.ValidationError({
                     'received_date': "Received date is required for 'processed' status."
                 })
-            if not invoice_file:
+            if not processed_certificate_file:
                 raise serializers.ValidationError({
-                    'invoice_file': "Invoice file is required for 'processed' status."
+                    'processed_certificate_file': "Processed certificate file is required for 'processed' status."
                 })
+                
         return data
 
     def send_invoice_status_change_email(self, invoice, new_status):
         email_sent = False
         recipient_list = []
         work_order = invoice.delivery_note.work_order
+        
         if (
             work_order.quotation
             and work_order.quotation.assigned_sales_person
@@ -279,14 +287,17 @@ class InvoiceSerializer(serializers.ModelSerializer):
                     work_order.quotation.assigned_sales_person.name,
                 )
             )
+        
         if settings.ADMIN_EMAIL:
             recipient_list.append((settings.ADMIN_EMAIL, None))
+        
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
             superadmin_users = CustomUser.objects.filter(role=superadmin_role)
             for user in superadmin_users:
                 if user.email:
                     recipient_list.append((user.email, user.name or user.username))
+        
         recipient_dict = {email: name for email, name in recipient_list}
         recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
@@ -294,28 +305,43 @@ class InvoiceSerializer(serializers.ModelSerializer):
             for email, name in recipient_list:
                 salutation = (
                     "Dear Admin" if email == settings.ADMIN_EMAIL
-                    else f"Dear {name}" if name and (
-                        superadmin_role and CustomUser.objects.filter(email=email, role=superadmin_role).exists()
-                        or work_order.quotation and email == (
-                            work_order.quotation.assigned_sales_person.email
-                            if work_order.quotation.assigned_sales_person
-                            else None
-                        )
-                    )
-                    else "Dear Recipient"
+                    else f"Dear {name}" if name else "Dear Recipient"
                 )
-                subject = f"Invoice #{invoice.id} Status Changed to {new_status}"
+                
+                if new_status == 'raised':
+                    subject = f"Invoice #{invoice.id} Raised - Action Required"
+                    file_info = f"📄 Final Invoice File: {'Uploaded' if invoice.final_invoice_file else 'Not uploaded'}"
+                    due_info = f"⏰ Due in Days: {invoice.due_in_days or 'Not specified'}"
+                    action_message = "The invoice has been raised and requires your attention."
+                elif new_status == 'processed':
+                    subject = f"Invoice #{invoice.id} Processed - Payment Received"
+                    file_info = f"📄 Processed Certificate File: {'Uploaded' if invoice.processed_certificate_file else 'Not uploaded'}"
+                    due_info = f"📅 Received Date: {invoice.received_date or 'Not specified'}"
+                    action_message = "The invoice has been marked as processed. Payment has been received."
+                else:
+                    subject = f"Invoice #{invoice.id} Status Changed to {new_status}"
+                    file_info = ""
+                    due_info = ""
+                    action_message = f"The invoice status has been updated to {new_status}."
+                
                 message = (
                     f"{salutation},\n\n"
-                    f"The invoice status for the following Delivery Note has been updated:\n"
+                    f"{action_message}\n\n"
+                    f"Invoice Details:\n"
                     f"------------------------------------------------------------\n"
                     f"🔹 Work Order Number: {work_order.wo_number}\n"
                     f"🔹 Delivery Note Number: {invoice.delivery_note.dn_number}\n"
                     f"🔹 Invoice ID: {invoice.id}\n"
-                    f"🔹 Project: {work_order.quotation.company_name or 'Unnamed'}\n"
-                    f"🔹 New Invoice Status: {new_status}\n"
-                    f"🔹 Due in Days: {invoice.due_in_days or 'Not specified'}\n"
-                    f"🔹 Received Date: {invoice.received_date or 'Not specified'}\n"
+                    f"🔹 Project: {work_order.quotation.company_name if work_order.quotation else 'Unnamed'}\n"
+                    f"🔹 New Invoice Status: {new_status.upper()}\n"
+                )
+                
+                if due_info:
+                    message += f"{due_info}\n"
+                if file_info:
+                    message += f"{file_info}\n"
+                
+                message += (
                     f"------------------------------------------------------------\n"
                     f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
                     f"Best regards,\n"
@@ -323,25 +349,29 @@ class InvoiceSerializer(serializers.ModelSerializer):
                     f"---\n"
                     f"This is an automated message. Please do not reply to this email."
                 )
+                
                 try:
                     send_mail(
                         subject=subject,
                         message=message,
                         from_email=settings.EMAIL_HOST_USER,
                         recipient_list=[email],
-                        fail_silently=True,
+                        fail_silently=False,
                     )
                     email_sent = True
                     logger.info(f"Invoice status change email sent to {email} for Invoice #{invoice.id}")
                 except Exception as e:
                     logger.error(f"Failed to send invoice status change email to {email} for Invoice #{invoice.id}: {str(e)}")
+        
         return email_sent
 
     def create(self, validated_data):
         invoice = Invoice.objects.create(**validated_data)
         new_status = validated_data.get('invoice_status')
+        
         if new_status in ['raised', 'processed']:
             self.send_invoice_status_change_email(invoice, new_status)
+        
         return invoice
 
     def update(self, instance, validated_data):

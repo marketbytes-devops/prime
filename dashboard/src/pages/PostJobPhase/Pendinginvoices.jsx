@@ -46,8 +46,8 @@ const PendingInvoices = () => {
     isUploadInvoiceModalOpen: false,
     selectedWOForInvoiceUpload: null,
     selectedDNForInvoiceUpload: null,
-    invoiceUpload: { invoiceFile: null },
-    invoiceUploadErrors: { invoiceFile: '' },
+    invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+    invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
     invoiceUploadType: '',
     isUploadWOModalOpen: false,
     selectedWOForUpload: null,
@@ -186,7 +186,7 @@ const PendingInvoices = () => {
     };
   };
 
-  const handleViewDocument = (pair, type) => {
+const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
     if (type === 'wo') {
       setState((prev) => ({
@@ -218,10 +218,21 @@ const PendingInvoices = () => {
     } else if (type === 'invoice') {
       if (pair.deliveryNote) {
         const relatedInvoices = state.invoices.filter(
-          (invoice) => invoice.delivery_note === pair.deliveryNote.id && invoice.invoice_file
+          (invoice) => invoice.delivery_note === pair.deliveryNote.id
         );
         if (relatedInvoices.length > 0) {
-          window.open(relatedInvoices[0].invoice_file, '_blank');
+          const invoice = relatedInvoices[0];
+          const fileToOpen =
+            invoice.invoice_status === 'raised'
+              ? invoice.final_invoice_file
+              : invoice.invoice_status === 'processed'
+              ? invoice.processed_certificate_file
+              : null;
+          if (fileToOpen) {
+            window.open(fileToOpen, '_blank');
+          } else {
+            toast.error('No invoice file available.');
+          }
         } else {
           toast.error('No invoice files available.');
         }
@@ -462,7 +473,7 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleUploadInvoice = (pair) => {
+const handleUploadInvoice = (pair) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
       toast.error('No delivery note items found.');
       return;
@@ -476,39 +487,58 @@ const PendingInvoices = () => {
       selectedWOForInvoiceUpload: pair.workOrder,
       selectedDNForInvoiceUpload: pair.deliveryNote,
       selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
-      invoiceUpload: { invoiceFile: null },
-      invoiceUploadErrors: { invoiceFile: '' },
+      invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+      invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
       invoiceUploadType: 'Final',
       newStatus: 'processed',
     }));
   };
 
   const validateInvoiceUpload = () => {
-    let isValid = true;
-    const errors = { invoiceFile: '' };
-    if (!state.invoiceUpload.invoiceFile) {
-      errors.invoiceFile = `${state.invoiceUploadType} Invoice File is required`;
-      isValid = false;
-    }
-    setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
-    return isValid;
+      let isValid = true;
+      const errors = { finalInvoiceFile: '', processedCertificateFile: '' };
+      if (state.newStatus === 'raised' && !state.invoiceUpload.finalInvoiceFile) {
+        errors.finalInvoiceFile = 'Final Invoice File is required';
+        isValid = false;
+      }
+      if (state.newStatus === 'processed' && !state.invoiceUpload.processedCertificateFile) {
+        errors.processedCertificateFile = 'Processed Certificate File is required';
+        isValid = false;
+      }
+      setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
+      return isValid;
   };
 
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 1 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
-        e.target.value = ''; // Clear the input
-        e.target.focus(); // Focus back on the input
-        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
+        e.target.value = ''; 
+        e.target.focus(); 
+        setState((prev) => ({
+          ...prev,
+          invoiceUpload: {
+            ...prev.invoiceUpload,
+            finalInvoiceFile: state.newStatus === 'raised' ? null : prev.invoiceUpload.finalInvoiceFile,
+            processedCertificateFile: state.newStatus === 'processed' ? null : prev.invoiceUpload.processedCertificateFile,
+          },
+        }));
         return;
       }
       setState((prev) => ({
         ...prev,
-        invoiceUpload: { ...prev.invoiceUpload, invoiceFile: file },
-        invoiceUploadErrors: { ...prev.invoiceUploadErrors, invoiceFile: '' },
+        invoiceUpload: {
+          ...prev.invoiceUpload,
+          finalInvoiceFile: state.newStatus === 'raised' ? file : prev.invoiceUpload.finalInvoiceFile,
+          processedCertificateFile: state.newStatus === 'processed' ? file : prev.invoiceUpload.processedCertificateFile,
+        },
+        invoiceUploadErrors: {
+          ...prev.invoiceUploadErrors,
+          finalInvoiceFile: state.newStatus === 'raised' ? '' : prev.invoiceUploadErrors.finalInvoiceFile,
+          processedCertificateFile: state.newStatus === 'processed' ? '' : prev.invoiceUploadErrors.processedCertificateFile,
+        },
       }));
     }
   };
@@ -521,22 +551,28 @@ const PendingInvoices = () => {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', state.newStatus);
+      if (state.newStatus === 'raised' && state.dueInDays) {
+        formData.append('due_in_days', parseInt(state.dueInDays));
+      }
       if (state.newStatus === 'processed' && state.receivedDate) {
         formData.append('received_date', state.receivedDate);
       }
-      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
+      if (state.newStatus === 'raised' && state.invoiceUpload.finalInvoiceFile) {
+        formData.append('final_invoice_file', state.invoiceUpload.finalInvoiceFile);
+      }
+      if (state.newStatus === 'processed' && state.invoiceUpload.processedCertificateFile) {
+        formData.append('processed_certificate_file', state.invoiceUpload.processedCertificateFile);
+      }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
 
       let response;
       if (state.selectedInvoiceId) {
-        // Update existing invoice
         response = await apiClient.patch(
           `/invoices/${state.selectedInvoiceId}/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       } else {
-        // Create new invoice
         response = await apiClient.post(
           `/invoices/`,
           formData,
@@ -551,8 +587,8 @@ const PendingInvoices = () => {
         selectedWOForInvoiceUpload: null,
         selectedDNForInvoiceUpload: null,
         selectedInvoiceId: null,
-        invoiceUpload: { invoiceFile: null },
-        invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+        invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
         invoiceUploadType: '',
         isStatusModalOpen: false,
         selectedWorkOrderId: null,
@@ -603,7 +639,7 @@ const PendingInvoices = () => {
       newStatus,
       dueInDays: newStatus === 'raised' ? prev.dueInDays : '',
       receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
-      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
+      invoiceUploadType: newStatus === 'raised' ? 'Final' : newStatus === 'processed' ? 'Processed' : '',
     }));
   };
 
@@ -689,7 +725,7 @@ const PendingInvoices = () => {
       toast.error('Please select a received date.');
       return;
     }
-    if (newStatus === 'processed') {
+    if (newStatus === 'raised' || newStatus === 'processed') {
       setState((prev) => ({
         ...prev,
         isStatusModalOpen: false,
@@ -699,8 +735,9 @@ const PendingInvoices = () => {
         ).workOrder,
         selectedDNForInvoiceUpload: deliveryNote,
         selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
-        invoiceUpload: { invoiceFile: null },
-        invoiceUploadErrors: { invoiceFile: '' },
+        invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+        invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+        invoiceUploadType: newStatus === 'raised' ? 'Final' : 'Processed',
       }));
     } else {
       confirmStatusUpdate(selectedInvoiceId, newStatus, dueInDays);
@@ -1569,8 +1606,8 @@ const PendingInvoices = () => {
           selectedWOForInvoiceUpload: null,
           selectedDNForInvoiceUpload: null,
           selectedInvoiceId: null,
-          invoiceUpload: { invoiceFile: null },
-          invoiceUploadErrors: { invoiceFile: '' },
+          invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+          invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
           invoiceUploadType: '',
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
@@ -1583,15 +1620,20 @@ const PendingInvoices = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{state.invoiceUploadType} Invoice File</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {state.invoiceUploadType} {state.newStatus === 'raised' ? 'Invoice' : 'Certificate'} File
+            </label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => handleInvoiceFileChange(e)}
               className="w-full p-2 border rounded focus:outline-indigo-500"
             />
-            {state.invoiceUploadErrors.invoiceFile && (
-              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
+            {state.invoiceUploadErrors.finalInvoiceFile && state.newStatus === 'raised' && (
+              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.finalInvoiceFile}</p>
+            )}
+            {state.invoiceUploadErrors.processedCertificateFile && state.newStatus === 'processed' && (
+              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.processedCertificateFile}</p>
             )}
           </div>
           <div className="flex justify-end gap-2">
@@ -1602,8 +1644,8 @@ const PendingInvoices = () => {
                 selectedWOForInvoiceUpload: null,
                 selectedDNForInvoiceUpload: null,
                 selectedInvoiceId: null,
-                invoiceUpload: { invoiceFile: null },
-                invoiceUploadErrors: { invoiceFile: '' },
+                invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+                invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
                 invoiceUploadType: '',
                 isStatusModalOpen: false,
                 selectedWorkOrderId: null,
