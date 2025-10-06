@@ -314,9 +314,9 @@ const PendingDeliveries = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; 
         e.target.focus(); 
         setState((prev) => ({ ...prev, signedDeliveryNote: null })); 

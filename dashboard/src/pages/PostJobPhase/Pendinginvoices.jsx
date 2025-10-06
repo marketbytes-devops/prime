@@ -283,9 +283,9 @@ const handleViewDocument = (pair, type) => {
   const handlePOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, poUpload: { ...prev.poUpload, poFile: null } })); // Clear the file
@@ -357,9 +357,9 @@ const handleViewDocument = (pair, type) => {
   const handleWOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, woUpload: { ...prev.woUpload, certificateFile: null } })); // Clear the file
@@ -429,9 +429,9 @@ const handleViewDocument = (pair, type) => {
   const handleDNFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, dnUpload: { ...prev.dnUpload, signedDeliveryNote: null } })); // Clear the file
@@ -512,9 +512,9 @@ const handleUploadInvoice = (pair) => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024;
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; 
         e.target.focus(); 
         setState((prev) => ({

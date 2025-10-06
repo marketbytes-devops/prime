@@ -398,7 +398,7 @@ const CloseWorkOrder = () => {
         <div className="space-y-4 p-4">
           <input
             type="file"
-            onChange={handleFileUpload}
+            onChange={handleFileUpload} 
             className="p-2 border rounded focus:outline-indigo-500 w-full"
           />
           <div className="flex justify-end gap-4">

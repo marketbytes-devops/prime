@@ -183,3 +183,6 @@ AUTH_USER_MODEL = 'authapp.CustomUser'
 # WhiteNoise configuration
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 WHITENOISE_AUTOREFRESH = DEBUG
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB in bytes

@@ -102,9 +102,9 @@ const EditDeclinedWorkOrders = () => {
   const handleFileChange = (index, e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({
@@ -335,7 +335,7 @@ const EditDeclinedWorkOrders = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Upload Certificate (Upload 1 MB file)
+                  Upload Certificate (Upload 5 MB file)
                 </label>
                 {item.certificate_file && (
                   <div className="mb-2">
