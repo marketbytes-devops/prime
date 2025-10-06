@@ -623,7 +623,7 @@ const PendingDeliveries = () => {
         >
           <div className="space-y-4">
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Signed Delivery Note</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Signed Delivery Note (Upload 5 MB file)</label>
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
