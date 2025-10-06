@@ -129,13 +129,21 @@ const PartialOrderSelection = () => {
     if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
       try {
         await Promise.all(
-          createdPartialOrders.map(order => 
-            apiClient.delete(`/purchase-orders/${order.id}/`)
+          createdPartialOrders.map(order =>
+            apiClient.delete(`/purchase-orders/${order.id}/`).catch(error => {
+              if (error.response?.status === 404) {
+                console.warn(`Order ${order.id} not found, skipping deletion.`);
+              } else {
+                console.error(`Error deleting order ${order.id}:`, error);
+              }
+            })
           )
         );
+        setCreatedPartialOrders([]); // Clear local state after cleanup
         console.log("Cleaned up partial orders on navigation");
       } catch (error) {
-        console.error("Error cleaning up partial orders:", error);
+        console.error("Error during cleanup of partial orders:", error);
+        toast.error("Failed to clean up partial orders.");
       }
     }
   }, [createdPartialOrders, isWorkflowCompleted]);
@@ -144,29 +152,27 @@ const PartialOrderSelection = () => {
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-        // This will trigger the cleanup in the beforeunload event
-        cleanupPartialOrders();
-        
-        // Standard way to show browser confirmation dialog
         event.preventDefault();
-        event.returnValue = '';
+        event.returnValue = 'You have unsaved draft partial orders. If you leave, they will be deleted. Continue?';
       }
     };
 
     const handlePopState = async (event) => {
+      event.preventDefault(); // Prevent default navigation
       if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-        // Prevent the default back navigation
-        window.history.pushState(null, '', window.location.pathname);
-        
         const confirmLeave = window.confirm(
-          "You have unsaved partial orders. If you leave now, they will be deleted. Do you want to continue?"
+          "You have unsaved draft partial orders. If you leave now, they will be deleted. Do you want to continue?"
         );
         
         if (confirmLeave) {
           await cleanupPartialOrders();
-          // Navigate back after cleanup
-          window.history.back();
+          navigate("/view-quotation");
+        } else {
+          // Push state to keep user on current page
+          window.history.pushState(null, '', window.location.pathname);
         }
+      } else {
+        navigate("/view-quotation");
       }
     };
 
@@ -174,27 +180,21 @@ const PartialOrderSelection = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('popstate', handlePopState);
 
-    // Push current state to prevent immediate back navigation
-    if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-      window.history.pushState(null, '', window.location.pathname);
-    }
-
     // Cleanup event listeners
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [createdPartialOrders, isWorkflowCompleted, cleanupPartialOrders]);
+  }, [createdPartialOrders, isWorkflowCompleted, cleanupPartialOrders, navigate]);
 
   // Navigation guard effect
   useEffect(() => {
-    if (!quotationData?.items) {
+    if (!location.state?.quotationData?.items && !createdPartialOrders.length) {
       console.warn("No quotation data or items found:", quotationData);
       toast.error("No quotation data or items found.");
       navigate("/view-quotation");
-      return;
     }
-  }, [quotationData, navigate]);
+  }, [quotationData, navigate, location.state, createdPartialOrders.length]);
 
   // Data fetching effect
   useEffect(() => {
@@ -296,7 +296,7 @@ const PartialOrderSelection = () => {
     const formData = new FormData();
     formData.append("quotation", quotationData.id);
     formData.append("order_type", "partial");
-    formData.append("is_draft", "true"); // Mark as draft - will be finalized only on finish
+    formData.append("is_draft", "true");
     formData.append(
       "items",
       JSON.stringify(
@@ -316,19 +316,22 @@ const PartialOrderSelection = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const newPartialOrder = {
-        ...response.data,
-        isDraft: true, // Mark as draft locally
-        items: response.data.items.map((item) => ({
-          ...item,
-          total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
-        })),
-      };
+      if (response.data?.id) {
+        const newPartialOrder = {
+          ...response.data,
+          isDraft: true,
+          items: response.data.items.map((item) => ({
+            ...item,
+            total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
+          })),
+        };
 
-      setCreatedPartialOrders(prev => [...prev, newPartialOrder]);
-      setCurrentPartialIndex(prev => prev + 1);
-
-      toast.success(`Draft partial order ${createdPartialOrders.length + 1} created successfully!`);
+        setCreatedPartialOrders(prev => [...prev, newPartialOrder]);
+        setCurrentPartialIndex(prev => prev + 1);
+        toast.success(`Draft partial order ${createdPartialOrders.length + 1} created successfully!`);
+      } else {
+        throw new Error("Invalid response from server: Missing order ID");
+      }
     } catch (error) {
       console.error("Error creating partial order:", error);
       toast.error("Failed to create partial order.");
@@ -340,7 +343,13 @@ const PartialOrderSelection = () => {
     if (!orderToCancel) return;
 
     try {
-      await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`);
+      await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`).catch(error => {
+        if (error.response?.status === 404) {
+          console.warn(`Order ${orderToCancel.id} not found, skipping deletion.`);
+        } else {
+          throw error;
+        }
+      });
       
       setCreatedPartialOrders(prev => prev.filter((_, i) => i !== index));
       removeAssignmentsForPartial(index);
@@ -355,19 +364,11 @@ const PartialOrderSelection = () => {
 
   const handleCancel = async () => {
     try {
-      // Delete all created partial orders
-      await Promise.all(
-        createdPartialOrders.map(order => 
-          apiClient.delete(`/purchase-orders/${order.id}/`)
-        )
-      );
-
-      // Reset state
+      await cleanupPartialOrders();
       setCreatedPartialOrders([]);
       setCurrentPartialIndex(0);
       setIsWorkflowCompleted(false);
       initializeAssignments();
-
       toast.info("All draft partial orders have been canceled.");
     } catch (error) {
       console.error("Error deleting partial orders:", error);
@@ -382,16 +383,20 @@ const PartialOrderSelection = () => {
     }
 
     try {
-      // Finalize all draft partial orders by removing draft status
       const finalizePromises = createdPartialOrders.map(order =>
         apiClient.patch(`/purchase-orders/${order.id}/`, {
           is_draft: false
+        }).catch(error => {
+          if (error.response?.status === 404) {
+            console.warn(`Order ${order.id} not found, skipping finalization.`);
+          } else {
+            throw error;
+          }
         })
       );
 
       await Promise.all(finalizePromises);
 
-      // Update quotation workflow status
       await apiClient.patch(`/quotations/${quotationData.id}/`, {
         partial_order_workflow_completed: true,
       });
@@ -442,7 +447,7 @@ const PartialOrderSelection = () => {
     return `SAR ${price != null ? Number(price).toFixed(2) : "0.00"}`;
   };
 
-  if (!quotationData?.items) {
+  if (!quotationData?.items && !createdPartialOrders.length) {
     return null; // Component will redirect via useEffect
   }
 
