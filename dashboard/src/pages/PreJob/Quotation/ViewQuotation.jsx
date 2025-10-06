@@ -600,14 +600,12 @@ const ViewQuotation = () => {
       return false;
     }
 
-    // Check if at least one partial order has "Nil" status (missing both client_po_number and po_file)
     const hasNilOrder = partialOrders.some(
       (po) => !po.client_po_number && !po.po_file
     );
 
     return hasNilOrder;
   };
-
 
   return (
     <div className="mx-auto p-4">
@@ -717,10 +715,10 @@ const ViewQuotation = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap min-w-[150px]">
                       <select
-                          disabled={
-                            isPoComplete(quotation) ||
-                            !hasPermission("quotation", "edit")
-                          }
+                        disabled={
+                          isPoComplete(quotation) ||
+                          !hasPermission("quotation", "edit")
+                        }
                         value={quotation.quotation_status || "Pending"}
                         onChange={(e) =>
                           handleStatusChange(quotation.id, e.target.value)
@@ -762,7 +760,9 @@ const ViewQuotation = () => {
                               : "bg-green-600 text-white hover:bg-green-700"
                             }`}
                         >
-                          {state.isEditingRemark[quotation.id] ? "Update" : "Edit"}
+                          {state.isEditingRemark[quotation.id]
+                            ? "Update"
+                            : "Edit"}
                         </Button>
                       </div>
                     </td>
@@ -800,38 +800,36 @@ const ViewQuotation = () => {
                         >
                           Print
                         </Button>
-                          {hasBothOrderTypes(quotation) ||
+                        {hasBothOrderTypes(quotation) ||
                           isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
-                            <Button
-                              onClick={() => handleUploadPO(quotation.id)}
-                              disabled={!shouldEnableUploadPO(quotation)}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                shouldEnableUploadPO(quotation)
-                                  ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          <Button
+                            onClick={() => handleUploadPO(quotation.id)}
+                            disabled={!shouldEnableUploadPO(quotation)}
+                            className={`px-3 py-1 rounded-md text-sm ${shouldEnableUploadPO(quotation)
+                                ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
                               }`}
-                            >
-                              Upload PO
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={() => handleConvertToPO(quotation.id)}
-                              disabled={
-                                quotation.quotation_status !== "Approved" ||
-                                isPoComplete(quotation)
-                              }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                quotation.quotation_status === "Approved" &&
+                          >
+                            Upload PO
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleConvertToPO(quotation.id)}
+                            disabled={
+                              quotation.quotation_status !== "Approved" ||
+                              isPoComplete(quotation)
+                            }
+                            className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved" &&
                                 !isPoComplete(quotation)
-                                  ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
                               }`}
-                            >
-                              Convert to PO
-                            </Button>
-                          )}
+                          >
+                            Convert to PO
+                          </Button>
+                        )}
                         <Button
                           onClick={() => handleDelete(quotation.id)}
                           disabled={!hasPermission("quotation", "delete")}
@@ -884,14 +882,12 @@ const ViewQuotation = () => {
       <Modal
         isOpen={state.isModalOpen}
         onClose={closeModal}
-        title={`Quotation Details - ID ${state.selectedQuotation?.id || "N/A"}`}
+        title={`Quotation Details - ${state.selectedQuotation?.series_number || "N/A"}`}
       >
         {state.selectedQuotation && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Company Details
-              </h3>
+              <h3 className="text-lg font-medium text-black">Company Details</h3>
               <p>
                 <strong>Series Number:</strong>{" "}
                 {state.selectedQuotation.series_number || "N/A"}
@@ -920,9 +916,7 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Contact Details
-              </h3>
+              <h3 className="text-lg font-medium text-black">Contact Details</h3>
               <p>
                 <strong>Contact Name:</strong>{" "}
                 {state.selectedQuotation.point_of_contact_name || "N/A"}
@@ -937,9 +931,7 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">
-                Assignment & Status
-              </h3>
+              <h3 className="text-lg font-medium text-black">Assignment & Status</h3>
               <p>
                 <strong>Assigned Sales Person:</strong>{" "}
                 {state.teamMembers.find(
@@ -956,9 +948,7 @@ const ViewQuotation = () => {
               </p>
               <p>
                 <strong>Created:</strong>{" "}
-                {new Date(
-                  state.selectedQuotation.created_at
-                ).toLocaleDateString()}
+                {new Date(state.selectedQuotation.created_at).toLocaleDateString()}
               </p>
               <p>
                 <strong>Quotation Status:</strong>{" "}
@@ -981,6 +971,10 @@ const ViewQuotation = () => {
               <p>
                 <strong>Remarks:</strong>{" "}
                 {state.selectedQuotation.remarks || "N/A"}
+              </p>
+              <p>
+                <strong>VAT Applicable:</strong>{" "}
+                {state.selectedQuotation.vat_applicable ? "Yes" : "No"}
               </p>
             </div>
             <div>
@@ -1013,31 +1007,75 @@ const ViewQuotation = () => {
                       {state.selectedQuotation.items.map((item) => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)
-                              ?.name || "N/A"}
+                            {state.itemsList.find((i) => i.id === item.item)?.name ||
+                              "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.quantity || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)
-                              ?.name || "N/A"}
+                            {state.units.find((u) => u.id === item.unit)?.name ||
+                              "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            SAR {item.unit_price
+                            SAR{" "}
+                            {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            SAR {item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(
-                                2
-                              )
+                            SAR{" "}
+                            {item.quantity && item.unit_price
+                              ? Number(item.quantity * item.unit_price).toFixed(2)
                               : "0.00"}
                           </td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="border">
+                        <td
+                          colSpan="4"
+                          className="border p-2 text-right font-semibold"
+                        >
+                          Subtotal:
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
+                          SAR{" "}
+                          {state.selectedQuotation.subtotal
+                            ? Number(state.selectedQuotation.subtotal).toFixed(2)
+                            : "0.00"}
+                        </td>
+                      </tr>
+                      <tr className="border">
+                        <td
+                          colSpan="4"
+                          className="border p-2 text-right font-semibold"
+                        >
+                          VAT (15%):
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
+                          SAR{" "}
+                          {state.selectedQuotation.vat_applicable
+                            ? Number(state.selectedQuotation.vat_amount).toFixed(2)
+                            : "0.00"}
+                        </td>
+                      </tr>
+                      <tr className="border">
+                        <td
+                          colSpan="4"
+                          className="border p-2 text-right font-semibold"
+                        >
+                          Grand Total:
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
+                          SAR{" "}
+                          {state.selectedQuotation.grand_total
+                            ? Number(state.selectedQuotation.grand_total).toFixed(2)
+                            : "0.00"}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               ) : (
@@ -1053,8 +1091,7 @@ const ViewQuotation = () => {
                   {state.selectedQuotation.purchase_orders.map((po, index) => (
                     <div key={po.id} className="mb-4 p-2 border rounded">
                       <h4 className="text-md font-medium">
-                        Purchase Order - {index + 1} (ID: {po.id}, Type:{" "}
-                        {po.order_type})
+                        Purchase Order - {index + 1} (ID: {po.id}, Type: {po.order_type})
                       </h4>
                       <p>
                         <strong>Client PO Number:</strong>{" "}
@@ -1105,9 +1142,7 @@ const ViewQuotation = () => {
                               po.items.map((item) => (
                                 <tr key={item.id} className="border">
                                   <td className="border p-2 whitespace-nowrap">
-                                    {state.itemsList.find(
-                                      (i) => i.id === item.item
-                                    )?.name ||
+                                    {state.itemsList.find((i) => i.id === item.item)?.name ||
                                       item.item_name ||
                                       "N/A"}
                                   </td>
@@ -1115,19 +1150,19 @@ const ViewQuotation = () => {
                                     {item.quantity || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    {state.units.find((u) => u.id === item.unit)
-                                      ?.name || "N/A"}
+                                    {state.units.find((u) => u.id === item.unit)?.name ||
+                                      "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.unit_price
+                                    SAR{" "}
+                                    {item.unit_price
                                       ? Number(item.unit_price).toFixed(2)
                                       : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.quantity && item.unit_price
-                                      ? Number(
-                                        item.quantity * item.unit_price
-                                      ).toFixed(2)
+                                    SAR{" "}
+                                    {item.quantity && item.unit_price
+                                      ? Number(item.quantity * item.unit_price).toFixed(2)
                                       : "0.00"}
                                   </td>
                                 </tr>
@@ -1155,7 +1190,7 @@ const ViewQuotation = () => {
       <Modal
         isOpen={state.isPoModalOpen}
         onClose={closePoModal}
-        title={`Convert Quotation ${state.selectedQuotation?.id} to PO`}
+        title={`Convert Quotation ${state.selectedQuotation?.series_number} to PO`}
       >
         <div className="space-y-4">
           <p>Select PO Type:</p>
@@ -1178,7 +1213,7 @@ const ViewQuotation = () => {
       <Modal
         isOpen={state.isFullOrderModalOpen}
         onClose={closeFullOrderModal}
-        title={`Create Full PO for Quotation ${state.selectedQuotation?.id}`}
+        title={`Create Full PO for Quotation ${state.selectedQuotation?.series_number}`}
       >
         <div className="space-y-4">
           <h3 className="text-lg font-medium text-black">PO Status</h3>
@@ -1287,7 +1322,7 @@ const ViewQuotation = () => {
       <Modal
         isOpen={state.isUploadPoModalOpen}
         onClose={closeUploadPoModal}
-        title={`Upload PO Details for Quotation ${state.selectedQuotation?.id}`}
+        title={`Upload PO Details for Quotation ${state.selectedQuotation?.series_number}`}
       >
         <div className="space-y-4">
           {state.partialOrders.map((po) => (
@@ -1322,9 +1357,7 @@ const ViewQuotation = () => {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={
-                      state.poUploads[po.id]?.poStatus === "not_available"
-                    }
+                    checked={state.poUploads[po.id]?.poStatus === "not_available"}
                     onChange={() =>
                       setState((prev) => ({
                         ...prev,

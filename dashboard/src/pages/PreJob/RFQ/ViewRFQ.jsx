@@ -117,6 +117,7 @@ const ViewRFQ = () => {
       const payload = {
         rfq_status: newStatus,
         items: currentRfq.items || [],
+        vat_applicable: currentRfq.vat_applicable || false,
       };
       await apiClient.patch(`rfqs/${id}/`, payload);
       await fetchRFQs();
@@ -142,6 +143,7 @@ const ViewRFQ = () => {
       const payload = {
         rfq_status: 'Completed',
         items: currentRfq.items || [],
+        vat_applicable: currentRfq.vat_applicable || false,
       };
       await apiClient.patch(`rfqs/${rfq.id}/`, payload);
       toast.success('RFQ status updated to Completed!');
@@ -420,6 +422,7 @@ const ViewRFQ = () => {
               <p><strong>Due Date:</strong> {state.selectedRfq.due_date_for_quotation ? new Date(state.selectedRfq.due_date_for_quotation).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Status:</strong> {state.selectedRfq.rfq_status || 'Pending'}</p>
               <p><strong>Created:</strong> {new Date(state.selectedRfq.created_at).toLocaleDateString()}</p>
+              <p><strong>VAT Applicable:</strong> {state.selectedRfq.vat_applicable ? 'Yes' : 'No'}</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -448,6 +451,20 @@ const ViewRFQ = () => {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="border">
+                        <td colSpan="4" className="border p-2 text-right font-semibold">Subtotal:</td>
+                        <td className="border p-2 whitespace-nowrap">SAR {state.selectedRfq.subtotal ? Number(state.selectedRfq.subtotal).toFixed(2) : '0.00'}</td>
+                      </tr>
+                      <tr className="border">
+                        <td colSpan="4" className="border p-2 text-right font-semibold">VAT (15%):</td>
+                        <td className="border p-2 whitespace-nowrap">SAR {state.selectedRfq.vat_amount ? Number(state.selectedRfq.vat_amount).toFixed(2) : '0.00'}</td>
+                      </tr>
+                      <tr className="border">
+                        <td colSpan="4" className="border p-2 text-right font-semibold">Grand Total:</td>
+                        <td className="border p-2 whitespace-nowrap">SAR {state.selectedRfq.grand_total ? Number(state.selectedRfq.grand_total).toFixed(2) : '0.00'}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               ) : (

@@ -32,6 +32,7 @@ const EditQuotation = () => {
     followup_frequency: '',
     next_followup_date: '',
     remarks: '',
+    vat_applicable: false, // Added vat_applicable to state
     items: [{ item: '', quantity: '', unit: '', unit_price: '' }],
     channels: [],
     teamMembers: [],
@@ -68,13 +69,14 @@ const EditQuotation = () => {
           followup_frequency: quotationRes.data.followup_frequency || '24_hours',
           next_followup_date: quotationRes.data.next_followup_date || '',
           remarks: quotationRes.data.remarks || '',
+          vat_applicable: quotationRes.data.vat_applicable || false, // Initialize vat_applicable
           items: quotationRes.data.items && quotationRes.data.items.length
             ? quotationRes.data.items.map(item => ({
-                item: item.item || '',
-                quantity: item.quantity || '',
-                unit: item.unit || '',
-                unit_price: item.unit_price || '',
-              }))
+              item: item.item || '',
+              quantity: item.quantity || '',
+              unit: item.unit || '',
+              unit_price: item.unit_price || '',
+            }))
             : [{ item: '', quantity: '', unit: '', unit_price: '' }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
@@ -108,6 +110,7 @@ const EditQuotation = () => {
     quotation_status: state.quotation_status || null,
     followup_frequency: state.followup_frequency || null,
     remarks: state.remarks || null,
+    vat_applicable: state.vat_applicable, // Include vat_applicable in payload
     items: state.items.map(item => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -128,6 +131,7 @@ const EditQuotation = () => {
     state.quotation_status,
     state.followup_frequency,
     state.remarks,
+    state.vat_applicable, // Added to dependencies
     state.items,
   ]);
 
@@ -163,6 +167,7 @@ const EditQuotation = () => {
     state.quotation_status,
     state.followup_frequency,
     state.remarks,
+    state.vat_applicable, 
     state.items,
     autosave,
     state.loading,
@@ -566,11 +571,29 @@ const EditQuotation = () => {
           Add Item
         </Button>
       </div>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className='flex items-center'>
+            <label className="flex items-center text-sm font-medium text-gray-700">
+              VAT Applicable (15%)
+            </label>
+            <input
+              type="checkbox"
+              checked={state.vat_applicable}
+              onChange={e =>
+                setState(prev => ({ ...prev, vat_applicable: e.target.checked }))
+              }
+              className="ml-2"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 
   if (state.loading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loading/></div>;
+    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
   }
 
   return (
@@ -586,9 +609,8 @@ const EditQuotation = () => {
           <Button
             type="submit"
             disabled={!isFormValid()}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              !isFormValid() ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${!isFormValid() ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
           >
             Update Quotation
           </Button>

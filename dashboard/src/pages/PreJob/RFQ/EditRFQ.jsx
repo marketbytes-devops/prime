@@ -33,6 +33,7 @@ const EditRFQ = () => {
     assigned_sales_person: '',
     due_date_for_quotation: '',
     rfq_status: '',
+    vat_applicable: false,
     items: [{ item: '', quantity: '', unit: '', unit_price: '' }],
     channels: [],
     teamMembers: [],
@@ -66,13 +67,14 @@ const EditRFQ = () => {
           assigned_sales_person: rfqRes.data.assigned_sales_person || '',
           due_date_for_quotation: rfqRes.data.due_date_for_quotation || '',
           rfq_status: rfqRes.data.rfq_status || 'Processing',
+          vat_applicable: rfqRes.data.vat_applicable || false,
           items: rfqRes.data.items && rfqRes.data.items.length
             ? rfqRes.data.items.map((item) => ({
-                item: item.item || '',
-                quantity: item.quantity || '',
-                unit: item.unit || '',
-                unit_price: item.unit_price || '',
-              }))
+              item: item.item || '',
+              quantity: item.quantity || '',
+              unit: item.unit || '',
+              unit_price: item.unit_price || '',
+            }))
             : [{ item: '', quantity: '', unit: '', unit_price: '' }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
@@ -105,6 +107,7 @@ const EditRFQ = () => {
     assigned_sales_person: state.assigned_sales_person || null,
     due_date_for_quotation: state.due_date_for_quotation || null,
     rfq_status: state.rfq_status || null,
+    vat_applicable: state.vat_applicable,
     items: state.items.map((item) => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -123,6 +126,7 @@ const EditRFQ = () => {
     state.assigned_sales_person,
     state.due_date_for_quotation,
     state.rfq_status,
+    state.vat_applicable,
     state.items,
   ]);
 
@@ -141,6 +145,7 @@ const EditRFQ = () => {
     quotation_status: 'Pending',
     followup_frequency: '24_hours',
     remarks: '',
+    vat_applicable: state.vat_applicable,
     items: state.items.map((item) => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -159,6 +164,7 @@ const EditRFQ = () => {
     state.point_of_contact_phone,
     state.assigned_sales_person,
     state.due_date_for_quotation,
+    state.vat_applicable,
     state.items,
   ]);
 
@@ -198,6 +204,7 @@ const EditRFQ = () => {
     state.assigned_sales_person,
     state.due_date_for_quotation,
     state.rfq_status,
+    state.vat_applicable,
     state.items,
     autosave,
     state.loading,
@@ -466,22 +473,24 @@ const EditRFQ = () => {
 
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">RFQ Status</h3>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            RFQ Status
-          </label>
-          <select
-            value={state.rfq_status || ''}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, rfq_status: e.target.value }))
-            }
-            className="w-full p-2 border rounded-md focus:outline-indigo-600"
-            required
-          >
-            <option value="">Select Status</option>
-            <option value="Processing">Processing</option>
-            <option value="Completed">Completed</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              RFQ Status
+            </label>
+            <select
+              value={state.rfq_status || ''}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, rfq_status: e.target.value }))
+              }
+              className="w-full p-2 border rounded-md focus:outline-indigo-600"
+              required
+            >
+              <option value="">Select Status</option>
+              <option value="Processing">Processing</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -574,6 +583,23 @@ const EditRFQ = () => {
           Add Item
         </Button>
       </div>
+
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          <div className="flex items-center">
+            <label className="flex items-center text-sm font-medium text-gray-700">VAT Applicable (15%)</label>
+            <input
+              type="checkbox"
+              checked={state.vat_applicable}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, vat_applicable: e.target.checked }))
+              }
+              className="ml-2"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -596,9 +622,8 @@ const EditRFQ = () => {
           <Button
             type="submit"
             disabled={!isFormValid() || state.submitting}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              (!isFormValid() || state.submitting) ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${(!isFormValid() || state.submitting) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
           >
             {state.submitting ? 'Submitting...' : (isQuotation ? 'Submit Quotation' : 'Update RFQ')}
           </Button>
