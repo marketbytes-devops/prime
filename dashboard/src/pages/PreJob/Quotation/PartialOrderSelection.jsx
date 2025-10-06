@@ -49,6 +49,10 @@ const useQuantityAssignments = (items, numberOfPartialOrders) => {
           quantity,
           partialOrderIndex: partialIndex,
         });
+        // Warn if remaining quantity becomes negative
+        if (newAssignments[itemId].remainingQuantity < 0) {
+          toast.warn(`Warning: Assigned quantity exceeds original quantity for item ${itemId}.`);
+        }
       }
 
       return newAssignments;
@@ -234,17 +238,9 @@ const PartialOrderSelection = () => {
     }
 
     const assignedQuantity = quantity === "" ? 0 : parseInt(quantity, 10);
-    const currentAssignment = quantityAssignments[itemId];
 
     if (assignedQuantity < 0) {
       toast.error("Quantity cannot be negative.");
-      return;
-    }
-
-    if (assignedQuantity > currentAssignment?.remainingQuantity) {
-      toast.error(
-        `Cannot assign more than ${currentAssignment.remainingQuantity} remaining quantity.`
-      );
       return;
     }
 
@@ -272,11 +268,8 @@ const PartialOrderSelection = () => {
   }, [numberOfPartialOrders, createdPartialOrders.length, quantityAssignments, currentPartialIndex]);
 
   const isAllPartialsCreated = useMemo(() => {
-    return createdPartialOrders.length === numberOfPartialOrders &&
-      Object.values(quantityAssignments).every(
-        (assignment) => assignment.remainingQuantity === 0
-      );
-  }, [createdPartialOrders.length, numberOfPartialOrders, quantityAssignments]);
+    return createdPartialOrders.length === numberOfPartialOrders;
+  }, [createdPartialOrders.length, numberOfPartialOrders]);
 
   const handleGeneratePartialOrder = async () => {
     const selectedItems = [];
@@ -385,11 +378,6 @@ const PartialOrderSelection = () => {
   const handleFinish = async () => {
     if (!numberOfPartialOrders || createdPartialOrders.length !== numberOfPartialOrders) {
       toast.error("Please create exactly the specified number of partial orders.");
-      return;
-    }
-
-    if (!isAllPartialsCreated) {
-      toast.error("All item quantities must be fully assigned to partial orders.");
       return;
     }
 
@@ -527,6 +515,9 @@ const PartialOrderSelection = () => {
                       {numberOfPartialOrders
                         ? quantityAssignments[item.id]?.remainingQuantity || 0
                         : item.quantity || 0}
+                      {quantityAssignments[item.id]?.remainingQuantity < 0 && (
+                        <span className="text-red-500 ml-2">(Over-assigned)</span>
+                      )}
                     </td>
                     {numberOfPartialOrders && (
                       <td className="px-4 py-3 text-sm text-black">
@@ -536,7 +527,6 @@ const PartialOrderSelection = () => {
                           onChange={(e) => handleQuantityAssignment(item.id, e.target.value)}
                           placeholder="0"
                           min="0"
-                          max={quantityAssignments[item.id]?.remainingQuantity || 0}
                           className="w-24"
                         />
                       </td>
@@ -653,7 +643,7 @@ const PartialOrderSelection = () => {
               <span>
                 {isAllPartialsCreated ? 
                   "Ready to finish and save" : 
-                  "Some quantities remain unassigned"
+                  "Create remaining partial orders"
                 }
               </span>
             </div>
