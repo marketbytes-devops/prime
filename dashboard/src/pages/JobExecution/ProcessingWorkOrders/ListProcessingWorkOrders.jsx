@@ -72,7 +72,7 @@ const ListProcessingWorkOrders = () => {
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes, quotationsRes, channelsRes, poRes] = await Promise.all([
-        apiClient.get("/work-orders/?status=Submitted"),
+        apiClient.get("/work-orders/?status=Submitted,Manager Approval"),
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -80,6 +80,7 @@ const ListProcessingWorkOrders = () => {
         apiClient.get("channels/"),
         apiClient.get("purchase-orders/"),
       ]);
+      console.log("Work Orders API Response:", woRes.data); // Debug API response
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
@@ -146,6 +147,11 @@ const ListProcessingWorkOrders = () => {
       toast.error("Work order not found.");
       return;
     }
+    console.log("Work Order Status:", wo.status); // Debug status
+    if (wo.status === "Manager Approval") {
+      toast.info("Work order is already in Manager Approval.");
+      return;
+    }
     if (!isDUTComplete(wo)) {
       navigate(
         `/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`
@@ -195,7 +201,6 @@ const ListProcessingWorkOrders = () => {
   const handlePrint = async (wo) => {
     try {
       console.log("Work Order Object:", wo);
-
       let rfqDetails = null;
       let teamMembers = [];
 
@@ -304,6 +309,10 @@ const ListProcessingWorkOrders = () => {
         "Failed to generate print. Please try again or contact support."
       );
     }
+  };
+
+  const getDisplayStatus = (status) => {
+    return status === "Manager Approval" ? "Manager Approved" : status || "Submitted";
   };
 
   const filteredWOs = state.workOrders
@@ -454,7 +463,7 @@ const ListProcessingWorkOrders = () => {
                             .join(", ")}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
-                          {wo.status || "Submitted"}
+                          {getDisplayStatus(wo.status)}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -493,20 +502,22 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleAction(wo.id)}
-                              disabled={!hasPermission("processing_work_orders", "edit")}
+                              disabled={
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval"
+                              }
                               className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit")
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval"
                                   ? "bg-gray-300 cursor-not-allowed"
-                                  : isDUTComplete(
-                                      state.workOrders.find((w) => w.id === wo.id)
-                                    )
+                                  : isDUTComplete(wo)
                                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
                                   : "bg-yellow-600 text-white hover:bg-yellow-700"
                               }`}
                             >
-                              {isDUTComplete(
-                                state.workOrders.find((w) => w.id === wo.id)
-                              )
+                              {wo.status === "Manager Approval"
+                                ? "Manager Approved"
+                                : isDUTComplete(wo)
                                 ? "Move to Manager Approval"
                                 : "Update Device Test Details"}
                             </Button>
@@ -615,6 +626,7 @@ const ListProcessingWorkOrders = () => {
                   <p><strong>Onsite or Lab:</strong> {state.selectedWO.onsite_or_lab || "Not Provided"}</p>
                   <p><strong>Site Location:</strong> {state.selectedWO.site_location || "Not Provided"}</p>
                   <p><strong>Remarks:</strong> {state.selectedWO.remarks || "Not Provided"}</p>
+                  <p><strong>Status:</strong> {getDisplayStatus(state.selectedWO.status)}</p>
                 </div>
                 <div>
                   <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
