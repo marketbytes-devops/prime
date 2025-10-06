@@ -2,8 +2,30 @@ import React from 'react';
 import logo from '../../../assets/images/img-logo.webp';
 
 const Template1 = ({ data }) => {
-  const { series_number, company_name, company_address, company_phone, company_email, channelName, point_of_contact_name, point_of_contact_email, point_of_contact_phone, assigned_sales_person, due_date_for_quotation, created_at, items, quotation_status, not_approved_reason_remark, next_followup_date, remarks, purchase_orders } = data;
-  const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price || 0), 0);
+  const {
+    series_number,
+    company_name,
+    company_address,
+    company_phone,
+    company_email,
+    channelName,
+    point_of_contact_name,
+    point_of_contact_email,
+    point_of_contact_phone,
+    assigned_sales_person,
+    due_date_for_quotation,
+    created_at,
+    items,
+    quotation_status,
+    not_approved_reason_remark,
+    next_followup_date,
+    remarks,
+    purchase_orders,
+    subtotal,
+    vat_applicable,
+    vat_amount,
+    grand_total
+  } = data;
 
   // Function to format date as "24 Aug 2025"
   const formatDate = (dateStr) => {
@@ -128,11 +150,21 @@ const Template1 = ({ data }) => {
                   <td colSpan="6" style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center', backgroundColor: '#ffffff', color: '#000000' }}>No items added.</td>
                 </tr>
               )}
-              <tr>
-                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Total</strong></td>
-                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {totalAmount.toFixed(2)}</td>
-              </tr>
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Subtotal</strong></td>
+                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {subtotal ? Number(subtotal).toFixed(2) : '0.00'}</td>
+              </tr>
+              <tr>
+                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>VAT (15%)</strong></td>
+                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {vat_applicable ? Number(vat_amount).toFixed(2) : '0.00'}</td>
+              </tr>
+              <tr>
+                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Grand Total</strong></td>
+                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {grand_total ? Number(grand_total).toFixed(2) : '0.00'}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <div style={{ marginTop: '20px' }}>
@@ -145,13 +177,13 @@ const Template1 = ({ data }) => {
               Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
             </li>
             <li style={{ marginBottom: '10px' }}>
-              Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to recalibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
+              Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
             </li>
             <li style={{ marginBottom: '10px' }}>
               If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.
             </li>
             <li style={{ marginBottom: '10px' }}>
-              Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed inhouse. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
+              Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
             </li>
             <li style={{ marginBottom: '10px' }}>
               Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.
@@ -175,7 +207,7 @@ const Template1 = ({ data }) => {
               PAYMENT: Payment to be made after 30 days.
             </li>
             <li style={{ marginBottom: '10px' }}>
-              CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law . Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.
+              CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.
             </li>
             <li style={{ marginBottom: '10px' }}>
               VAT is excluded from our quotation and will be charged at 15% extra.

@@ -79,28 +79,19 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
 
 
 class RFQSerializer(serializers.ModelSerializer):
-    rfq_channel = serializers.PrimaryKeyRelatedField(
-        queryset=RFQChannel.objects.all(), allow_null=True
-    )
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(
-        queryset=TeamMember.objects.all(), allow_null=True
-    )
+    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
+    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
     items = RFQItemSerializer(many=True, required=False)
     rfq_status = serializers.ChoiceField(
-        choices=[
-            ("Pending", "Pending"),
-            ("Processing", "Processing"),
-            ("Completed", "Completed"),
-        ],
+        choices=[("Pending", "Pending"), ("Processing", "Processing"), ("Completed", "Completed")],
         allow_null=True,
         required=False,
     )
-    assigned_sales_person_name = serializers.CharField(
-        source="assigned_sales_person.name", read_only=True
-    )
-    assigned_sales_person_email = serializers.CharField(
-        source="assigned_sales_person.email", read_only=True
-    )
+    assigned_sales_person_name = serializers.CharField(source="assigned_sales_person.name", read_only=True)
+    assigned_sales_person_email = serializers.CharField(source="assigned_sales_person.email", read_only=True)
+    subtotal = serializers.SerializerMethodField()
+    vat_amount = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
 
     class Meta:
         model = RFQ
@@ -123,7 +114,20 @@ class RFQSerializer(serializers.ModelSerializer):
             "assigned_sales_person_name",
             "assigned_sales_person_email",
             "email_sent",
+            "vat_applicable",
+            "subtotal",
+            "vat_amount",
+            "grand_total",
         ]
+
+    def get_subtotal(self, obj):
+        return float(obj.get_subtotal())
+
+    def get_vat_amount(self, obj):
+        return float(obj.get_vat_amount())
+
+    def get_grand_total(self, obj):
+        return float(obj.get_grand_total())
 
     def validate_assigned_sales_person(self, value):
         if value and not value.email:
@@ -266,41 +270,24 @@ class RFQSerializer(serializers.ModelSerializer):
 
 class QuotationSerializer(serializers.ModelSerializer):
     rfq = serializers.PrimaryKeyRelatedField(queryset=RFQ.objects.all())
-    rfq_channel = serializers.PrimaryKeyRelatedField(
-        queryset=RFQChannel.objects.all(), allow_null=True
-    )
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(
-        queryset=TeamMember.objects.all(), allow_null=True
-    )
+    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
+    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
     items = QuotationItemSerializer(many=True, required=True)
     quotation_status = serializers.ChoiceField(
-        choices=[
-            ("Pending", "Pending"),
-            ("Approved", "Approved"),
-            ("PO Created", "PO Created"),
-            ("Not Approved", "Not Approved"),
-        ],
+        choices=[("Pending", "Pending"), ("Approved", "Approved"), ("PO Created", "PO Created"), ("Not Approved", "Not Approved")],
         required=False,
     )
     followup_frequency = serializers.ChoiceField(
-        choices=[
-            ("24_hours", "24 Hours"),
-            ("3_days", "3 Days"),
-            ("7_days", "7 Days"),
-            ("every_7th_day", "Every 7th Day"),
-        ],
+        choices=[("24_hours", "24 Hours"), ("3_days", "3 Days"), ("7_days", "7 Days"), ("every_7th_day", "Every 7th Day")],
         required=False,
     )
     purchase_orders = serializers.SerializerMethodField()
-    assigned_sales_person_name = serializers.CharField(
-        source="assigned_sales_person.name", read_only=True
-    )
-    assigned_sales_person_email = serializers.CharField(
-        source="assigned_sales_person.email", read_only=True
-    )
-    not_approved_reason_remark = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True
-    )
+    assigned_sales_person_name = serializers.CharField(source="assigned_sales_person.name", read_only=True)
+    assigned_sales_person_email = serializers.CharField(source="assigned_sales_person.email", read_only=True)
+    not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    subtotal = serializers.SerializerMethodField()
+    vat_amount = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
 
     class Meta:
         model = Quotation
@@ -329,7 +316,20 @@ class QuotationSerializer(serializers.ModelSerializer):
             "assigned_sales_person_email",
             "not_approved_reason_remark",
             "email_sent",
+            "vat_applicable",
+            "subtotal",
+            "vat_amount",
+            "grand_total",
         ]
+
+    def get_subtotal(self, obj):
+        return float(obj.get_subtotal())
+
+    def get_vat_amount(self, obj):
+        return float(obj.get_vat_amount())
+
+    def get_grand_total(self, obj):
+        return float(obj.get_grand_total())
 
     def get_purchase_orders(self, obj):
         pos = PurchaseOrder.objects.filter(quotation=obj)
