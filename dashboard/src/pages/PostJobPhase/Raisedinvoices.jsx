@@ -219,10 +219,11 @@ const RaisedInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
-      if (pair.invoice?.invoice_file) {
-        window.open(pair.invoice.invoice_file, '_blank');
+      // For raised status, use final_invoice_file
+      if (pair.invoice?.final_invoice_file) {
+        window.open(pair.invoice.final_invoice_file, '_blank');
       } else {
-        toast.error('No invoice file available.');
+        toast.error('No final invoice file available.');
       }
     }
   };
@@ -257,7 +258,7 @@ const RaisedInvoices = () => {
       selectedInvoiceId: pair.invoiceId,
       newStatus,
       receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
-      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
+      invoiceUploadType: newStatus === 'processed' ? 'Processed' : '',
     }));
   };
 
@@ -275,9 +276,9 @@ const RaisedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
@@ -303,7 +304,13 @@ const RaisedInvoices = () => {
         formData.append('received_date', state.receivedDate);
       }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
-      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
+
+      // Conditional file upload based on status
+      if (state.newStatus === 'raised') {
+        formData.append('final_invoice_file', state.invoiceUpload.invoiceFile);
+      } else if (state.newStatus === 'processed') {
+        formData.append('processed_certificate_file', state.invoiceUpload.invoiceFile);
+      }
 
       let response;
       if (state.selectedInvoiceId) {
@@ -524,26 +531,27 @@ const RaisedInvoices = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-              </tr>
-            </thead>
+<thead>
+  <tr className="bg-gray-100">
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Due Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+  </tr>
+</thead>
             <tbody>
               {currentPairs.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="border p-2 text-center text-gray-500">
-                    No raised invoices found.
-                  </td>
+                <td colSpan="11" className="border p-2 text-center text-gray-500">
+  No raised invoices found.
+</td>
                 </tr>
               ) : (
                 currentPairs.map((pair, index) => (
@@ -559,6 +567,9 @@ const RaisedInvoices = () => {
                         ? new Date(pair.workOrder.created_at).toLocaleDateString()
                         : 'N/A'}
                     </td>
+                    <td className="border p-2 whitespace-nowrap">
+  {pair.invoice?.due_in_days ? `${pair.invoice.due_in_days} days` : 'N/A'}
+</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -597,14 +608,14 @@ const RaisedInvoices = () => {
                         </Button>
                         <Button
                           onClick={() => handleViewDocument(pair, 'invoice')}
-                          disabled={isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.invoice_file}
+                          disabled={isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.final_invoice_file}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.invoice_file
+                            isSubmitting || !hasPermission('raised_invoices', 'view') || !pair.invoice?.final_invoice_file
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-indigo-600 text-white hover:bg-indigo-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : pair.invoice?.invoice_file ? 'View Invoice' : 'No Invoice'}
+                          {isSubmitting ? 'Submitting...' : pair.invoice?.final_invoice_file ? 'View Final Invoice' : 'No Final Invoice'}
                         </Button>
                       </div>
                     </td>

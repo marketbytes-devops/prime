@@ -13,6 +13,7 @@ const Delivery = () => {
     technicians: [],
     itemsList: [],
     units: [],
+    deliveryNotes: [],
     quotations: [], // Added quotations to state
     purchaseOrders: [], // Added purchaseOrders to state
     channels: [], // Added channels to state
@@ -60,31 +61,38 @@ const Delivery = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, techRes, itemsRes, unitsRes, quotationsRes, poRes, channelsRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'Approved' } }),
+      const [woRes, techRes, itemsRes, dnRes, unitsRes, quotationsRes, poRes, channelsRes] = await Promise.all([
+        apiClient.get('work-orders/', { params: { status: 'approved' } }),
         apiClient.get('technicians/'),
         apiClient.get('items/'),
+        apiClient.get('delivery-notes/'),  // Fetch DNs
         apiClient.get('units/'),
-        apiClient.get('quotations/'), // Added fetch for quotations
-        apiClient.get('purchase-orders/'), // Added fetch for purchase orders
-        apiClient.get('channels/'), // Added fetch for channels
+        apiClient.get('quotations/'),
+        apiClient.get('purchase-orders/'),
+        apiClient.get('channels/'),
       ]);
+      console.log('Fetched WOs in Delivery:', woRes.data);  // Log WOs (remove after testing)
+      const allDNs = dnRes.data || [];  // All DNs including temp
+      const deliveryNotes = allDNs.filter(dn => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN')) || [];  // UPDATED: Filter out temp DNs
+      console.log('Filtered Real DNs in Delivery:', deliveryNotes);  // Log real DNs (remove after testing)
 
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
+        deliveryNotes,  // Store only real DNs
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
-        quotations: quotationsRes.data || [], // Store quotations in state
-        purchaseOrders: poRes.data || [], // Store purchase orders in state
-        channels: channelsRes.data || [], // Store channels in state
+        quotations: quotationsRes.data || [],
+        purchaseOrders: poRes.data || [],
+        channels: channelsRes.data || [],
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load work orders.');
     }
   };
+
 
   useEffect(() => {
     fetchData();
@@ -236,18 +244,18 @@ const Delivery = () => {
                         >
                           View WO & Certificates
                         </Button>
-                        <Button
-                          onClick={() => handleInitiateDelivery(wo)}
-                          disabled={!hasPermission('delivery', 'edit')}
-                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                            hasPermission('delivery', 'edit')
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Initiate Delivery
-                        </Button>
-                      </div>
+<Button
+  onClick={() => handleInitiateDelivery(wo)}
+  disabled={!hasPermission('delivery', 'edit') || state.deliveryNotes.some(dn => dn.work_order_id === wo.id)}  
+  className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+    !hasPermission('delivery', 'edit') || state.deliveryNotes.some(dn => dn.work_order_id === wo.id)  
+      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+  }`}
+>
+  {state.deliveryNotes.some(dn => dn.work_order_id === wo.id) ? 'Delivery Initiated' : 'Initiate Delivery'}  
+</Button>
+          </div>
                     </td>
                   </tr>
                 ))

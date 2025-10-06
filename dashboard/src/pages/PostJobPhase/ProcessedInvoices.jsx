@@ -201,11 +201,12 @@ const ProcessedInvoices = () => {
         isDNModalOpen: true,
         selectedDN: pair.deliveryNote,
       }));
-    } else if (type === 'invoice') {
-      if (pair.invoice?.invoice_file) {
-        window.open(pair.invoice.invoice_file, '_blank');
+    } else if (type === 'slip') {
+      // For processed status, use processed_certificate_file (slip)
+      if (pair.invoice?.processed_certificate_file) {
+        window.open(pair.invoice.processed_certificate_file, '_blank');
       } else {
-        toast.error('No invoice file available.');
+        toast.error('No processed certificate (slip) available.');
       }
     }
   };
@@ -213,6 +214,19 @@ const ProcessedInvoices = () => {
   const handleUpdateStatus = (pair, newStatus) => {
     if (!pair.invoice) {
       toast.error('No invoice found.');
+      return;
+    }
+
+    if (pair.invoice.invoice_status === 'processed' && newStatus !== 'pending') {
+      toast.warn('Invoice is fully processed and cannot be changed.', {
+        position: 'top-right',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+      });
       return;
     }
 
@@ -224,7 +238,7 @@ const ProcessedInvoices = () => {
       selectedInvoiceId: pair.invoiceId,
       newStatus,
       receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
-      invoiceUploadType: newStatus === 'processed' ? 'Final' : '',
+      invoiceUploadType: newStatus === 'processed' ? 'Processed' : '',
     }));
   };
 
@@ -232,7 +246,7 @@ const ProcessedInvoices = () => {
     let isValid = true;
     const errors = { invoiceFile: '' };
     if (!state.invoiceUpload.invoiceFile) {
-      errors.invoiceFile = `${state.invoiceUploadType} Invoice File is required`;
+      errors.invoiceFile = `${state.invoiceUploadType} Slip File is required`;
       isValid = false;
     }
     setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
@@ -242,9 +256,9 @@ const ProcessedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
@@ -270,7 +284,11 @@ const ProcessedInvoices = () => {
         formData.append('received_date', state.receivedDate);
       }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
-      formData.append('invoice_file', state.invoiceUpload.invoiceFile);
+
+      // For processed, upload to processed_certificate_file (slip)
+      if (state.newStatus === 'processed') {
+        formData.append('processed_certificate_file', state.invoiceUpload.invoiceFile);
+      }
 
       let response;
       if (state.selectedInvoiceId) {
@@ -287,7 +305,7 @@ const ProcessedInvoices = () => {
         );
       }
 
-      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
+      toast.success(`${state.invoiceUploadType} Slip file uploaded and status updated successfully.`);
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
@@ -305,8 +323,8 @@ const ProcessedInvoices = () => {
       }));
       await fetchData();
     } catch (error) {
-      console.error(`Error uploading ${state.invoiceUploadType.toLowerCase()} invoice file:`, error);
-      toast.error(`Failed to upload ${state.invoiceUploadType.toLowerCase()} invoice file.`);
+      console.error(`Error uploading ${state.invoiceUploadType.toLowerCase()} slip file:`, error);
+      toast.error(`Failed to upload ${state.invoiceUploadType.toLowerCase()} slip file.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -491,28 +509,29 @@ const ProcessedInvoices = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-              </tr>
-            </thead>
+<thead>
+  <tr className="bg-gray-100">
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Received Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+  </tr>
+</thead>
             <tbody>
-              {currentPairs.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="border p-2 text-center text-gray-500">
-                    No processed invoices found.
-                  </td>
-                </tr>
-              ) : (
+        {currentPairs.length === 0 ? (
+  <tr>
+    <td colSpan="11" className="border p-2 text-center text-gray-500">
+      No processed invoices found.
+    </td>
+  </tr>
+) : (
                 currentPairs.map((pair, index) => (
                   <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
@@ -526,6 +545,11 @@ const ProcessedInvoices = () => {
                         ? new Date(pair.workOrder.created_at).toLocaleDateString()
                         : 'N/A'}
                     </td>
+                    <td className="border p-2 whitespace-nowrap">
+  {pair.workOrder.created_at
+    ? new Date(pair.workOrder.created_at).toLocaleDateString()
+    : 'N/A'}
+</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -563,15 +587,15 @@ const ProcessedInvoices = () => {
                           {isSubmitting ? 'Submitting...' : 'View DN'}
                         </Button>
                         <Button
-                          onClick={() => handleViewDocument(pair, 'invoice')}
-                          disabled={isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.invoice_file}
+                          onClick={() => handleViewDocument(pair, 'slip')}
+                          disabled={isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file}
                           className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.invoice_file
+                            isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                              : 'bg-teal-600 text-white hover:bg-teal-700'
                           }`}
                         >
-                          {isSubmitting ? 'Submitting...' : pair.invoice?.invoice_file ? 'View Invoice' : 'No Invoice'}
+                          {isSubmitting ? 'Submitting...' : pair.invoice?.processed_certificate_file ? 'View Slip' : 'No Slip'}
                         </Button>
                       </div>
                     </td>
@@ -580,16 +604,17 @@ const ProcessedInvoices = () => {
                         <span className="text-xs text-gray-600">{pair.invoice?.invoice_status || 'Processed'}</span>
                         <select
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                          disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
+                          disabled={isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
                           className={`px-3 py-1 rounded-md text-sm border ${
-                            isSubmitting || !hasPermission('processed_invoices', 'edit')
+                            isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'border-gray-300 text-gray-700 hover:bg-gray-100'
                           }`}
                           value=""
                         >
                           <option value="" disabled>Select Status</option>
-                          <option value="processed">Re-upload Invoice</option>
+                          <option value="pending">Pending</option>
+                          <option value="processed">Re-upload Slip</option>
                         </select>
                       </div>
                     </td>
@@ -944,7 +969,7 @@ const ProcessedInvoices = () => {
           receivedDate: '',
           invoiceUploadType: '',
         }))}
-        title={`Update Invoice Status to ${state.newStatus === 'processed' ? 'Re-upload Invoice' : state.newStatus || 'Unknown'}`}
+        title={`Update Invoice Status to ${state.newStatus === 'processed' ? 'Re-upload Slip' : state.newStatus || 'Unknown'}`}
       >
         <div className="space-y-4">
           {state.newStatus === 'processed' && (
@@ -1011,11 +1036,11 @@ const ProcessedInvoices = () => {
           newStatus: '',
           receivedDate: '',
         }))}
-        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
+        title={`Upload ${state.invoiceUploadType} Slip for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{state.invoiceUploadType} Invoice File</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{state.invoiceUploadType} Slip File</label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
