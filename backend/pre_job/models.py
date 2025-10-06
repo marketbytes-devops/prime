@@ -2,6 +2,7 @@ from django.db import models
 from datetime import timedelta
 from django.utils import timezone
 from series.models import NumberSeries 
+from decimal import Decimal
 
 class RFQ(models.Model):
     company_name = models.CharField(max_length=100, null=True, blank=True)
@@ -23,9 +24,21 @@ class RFQ(models.Model):
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     email_sent = models.BooleanField(default=False, blank=True, null=True)
+    vat_applicable = models.BooleanField(default=False, blank=True, null=True)
     
     def __str__(self):
         return f"RFQ {self.id} - {self.company_name or 'Unnamed'}"
+
+    def get_subtotal(self):
+        return sum(item.quantity * item.unit_price for item in self.items.all() if item.quantity and item.unit_price) or 0
+
+    def get_vat_amount(self):
+        if self.vat_applicable:
+            return self.get_subtotal() * Decimal('0.15')
+        return 0
+
+    def get_grand_total(self):
+        return self.get_subtotal() + self.get_vat_amount()
 
 class RFQItem(models.Model):
     rfq = models.ForeignKey(RFQ, related_name='items', on_delete=models.CASCADE)
@@ -65,6 +78,7 @@ class Quotation(models.Model):
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     email_sent = models.BooleanField(default=False, blank=True, null=True)
+    vat_applicable = models.BooleanField(default=False, blank=True, null=True)  
     
     def __str__(self):
         return f"Quotation {self.id} - {self.company_name or 'Unnamed'}"
@@ -81,6 +95,17 @@ class Quotation(models.Model):
             elif self.followup_frequency == 'every_7th_day':
                 self.next_followup_date = today + timedelta(days=7)
         super().save(*args, **kwargs)
+
+    def get_subtotal(self):
+        return sum(item.quantity * item.unit_price for item in self.items.all() if item.quantity and item.unit_price) or 0
+
+    def get_vat_amount(self):
+        if self.vat_applicable:
+            return self.get_subtotal() * Decimal('0.15') 
+        return 0
+
+    def get_grand_total(self):
+        return self.get_subtotal() + self.get_vat_amount()
 
 class QuotationItem(models.Model):
     quotation = models.ForeignKey(Quotation, related_name='items', on_delete=models.CASCADE)
