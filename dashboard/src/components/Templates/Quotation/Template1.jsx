@@ -153,14 +153,6 @@ const Template1 = ({ data }) => {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Subtotal</strong></td>
-                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {subtotal ? Number(subtotal).toFixed(2) : '0.00'}</td>
-              </tr>
-              <tr>
-                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>VAT (15%)</strong></td>
-                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {vat_applicable ? Number(vat_amount).toFixed(2) : '0.00'}</td>
-              </tr>
-              <tr>
                 <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Grand Total</strong></td>
                 <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {grand_total ? Number(grand_total).toFixed(2) : '0.00'}</td>
               </tr>
