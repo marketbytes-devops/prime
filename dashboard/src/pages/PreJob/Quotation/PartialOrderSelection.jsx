@@ -26,13 +26,13 @@ const useQuantityAssignments = (items, numberOfPartialOrders) => {
   }, [items, numberOfPartialOrders, initializeAssignments]);
 
   const updateAssignment = useCallback((itemId, quantity, partialIndex) => {
-    setQuantityAssignments(prev => {
+    setQuantityAssignments((prev) => {
       const newAssignments = { ...prev };
       const currentAssignment = newAssignments[itemId];
-      
+
       // Find existing assignment for this partial order
       const existingIndex = currentAssignment.assignments.findIndex(
-        a => a.partialOrderIndex === partialIndex
+        (a) => a.partialOrderIndex === partialIndex
       );
 
       // Restore quantity from existing assignment
@@ -60,21 +60,22 @@ const useQuantityAssignments = (items, numberOfPartialOrders) => {
   }, []);
 
   const removeAssignmentsForPartial = useCallback((partialIndex) => {
-    setQuantityAssignments(prev => {
+    setQuantityAssignments((prev) => {
       const newAssignments = { ...prev };
-      
+
       Object.entries(newAssignments).forEach(([itemId, assignment]) => {
         const removedAssignment = assignment.assignments.find(
-          a => a.partialOrderIndex === partialIndex
+          (a) => a.partialOrderIndex === partialIndex
         );
-        
+
         if (removedAssignment) {
           newAssignments[itemId].remainingQuantity += removedAssignment.quantity;
           newAssignments[itemId].assignments = assignment.assignments
-            .filter(a => a.partialOrderIndex !== partialIndex)
-            .map(a => a.partialOrderIndex > partialIndex 
-              ? { ...a, partialOrderIndex: a.partialOrderIndex - 1 } 
-              : a
+            .filter((a) => a.partialOrderIndex !== partialIndex)
+            .map((a) =>
+              a.partialOrderIndex > partialIndex
+                ? { ...a, partialOrderIndex: a.partialOrderIndex - 1 }
+                : a
             );
         }
       });
@@ -87,7 +88,7 @@ const useQuantityAssignments = (items, numberOfPartialOrders) => {
     quantityAssignments,
     updateAssignment,
     removeAssignmentsForPartial,
-    initializeAssignments
+    initializeAssignments,
   };
 };
 
@@ -106,7 +107,7 @@ const PartialOrderSelection = () => {
   // Memoized processed items
   const processedItems = useMemo(() => {
     if (!quotationData?.items) return [];
-    
+
     return quotationData.items.map((item) => ({
       ...item,
       item_name: item.item_name || (item.item ? item.item.name : null),
@@ -121,80 +122,17 @@ const PartialOrderSelection = () => {
     quantityAssignments,
     updateAssignment,
     removeAssignmentsForPartial,
-    initializeAssignments
+    initializeAssignments,
   } = useQuantityAssignments(processedItems, numberOfPartialOrders);
-
-  // Cleanup function to delete partial orders
-  const cleanupPartialOrders = useCallback(async () => {
-    if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-      try {
-        await Promise.all(
-          createdPartialOrders.map(order =>
-            apiClient.delete(`/purchase-orders/${order.id}/`).catch(error => {
-              if (error.response?.status === 404) {
-                console.warn(`Order ${order.id} not found, skipping deletion.`);
-              } else {
-                console.error(`Error deleting order ${order.id}:`, error);
-              }
-            })
-          )
-        );
-        setCreatedPartialOrders([]); // Clear local state after cleanup
-        console.log("Cleaned up partial orders on navigation");
-      } catch (error) {
-        console.error("Error during cleanup of partial orders:", error);
-        toast.error("Failed to clean up partial orders.");
-      }
-    }
-  }, [createdPartialOrders, isWorkflowCompleted]);
-
-  // Handle browser navigation events (back button, refresh, close tab)
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-        event.preventDefault();
-        event.returnValue = 'You have unsaved draft partial orders. If you leave, they will be deleted. Continue?';
-      }
-    };
-
-    const handlePopState = async (event) => {
-      event.preventDefault(); // Prevent default navigation
-      if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
-        const confirmLeave = window.confirm(
-          "You have unsaved draft partial orders. If you leave now, they will be deleted. Do you want to continue?"
-        );
-        
-        if (confirmLeave) {
-          await cleanupPartialOrders();
-          navigate("/view-quotation");
-        } else {
-          // Push state to keep user on current page
-          window.history.pushState(null, '', window.location.pathname);
-        }
-      } else {
-        navigate("/view-quotation");
-      }
-    };
-
-    // Add event listeners
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('popstate', handlePopState);
-
-    // Cleanup event listeners
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [createdPartialOrders, isWorkflowCompleted, cleanupPartialOrders, navigate]);
 
   // Navigation guard effect
   useEffect(() => {
-    if (!location.state?.quotationData?.items && !createdPartialOrders.length) {
+    if (!location.state?.quotationData?.items) {
       console.warn("No quotation data or items found:", quotationData);
       toast.error("No quotation data or items found.");
       navigate("/view-quotation");
     }
-  }, [quotationData, navigate, location.state, createdPartialOrders.length]);
+  }, [quotationData, navigate, location.state]);
 
   // Data fetching effect
   useEffect(() => {
@@ -218,7 +156,7 @@ const PartialOrderSelection = () => {
 
   const handleNumberOfPartialOrdersChange = (e) => {
     const value = e.target.value === "" ? "" : parseInt(e.target.value, 10);
-    
+
     if (value && value < 1) {
       toast.error("Number of partial orders must be at least 1.");
       return;
@@ -271,14 +209,14 @@ const PartialOrderSelection = () => {
     return createdPartialOrders.length === numberOfPartialOrders;
   }, [createdPartialOrders.length, numberOfPartialOrders]);
 
-  const handleGeneratePartialOrder = async () => {
+  const handleGeneratePartialOrder = () => {
     const selectedItems = [];
-    
+
     Object.entries(quantityAssignments).forEach(([itemId, assignment]) => {
       const partialAssignment = assignment.assignments.find(
         (a) => a.partialOrderIndex === currentPartialIndex
       );
-      
+
       if (partialAssignment && partialAssignment.quantity > 0) {
         const originalItem = processedItems.find((item) => item.id === parseInt(itemId));
         selectedItems.push({
@@ -293,87 +231,33 @@ const PartialOrderSelection = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("quotation", quotationData.id);
-    formData.append("order_type", "partial");
-    formData.append("is_draft", "true");
-    formData.append(
-      "items",
-      JSON.stringify(
-        selectedItems.map((item) => ({
-          item: item.item || null,
-          item_name: item.item_name || itemsList.find((i) => i.id === item.item)?.name || null,
-          product_name: item.product_name || null,
-          quantity: item.quantity,
-          unit: item.unit || null,
-          unit_price: item.unit_price || null,
-        }))
-      )
-    );
+    const newPartialOrder = {
+      id: `local-${Date.now()}-${currentPartialIndex}`, // Temporary local ID
+      isDraft: true,
+      items: selectedItems.map((item) => ({
+        ...item,
+        total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
+      })),
+    };
 
-    try {
-      const response = await apiClient.post("/purchase-orders/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (response.data?.id) {
-        const newPartialOrder = {
-          ...response.data,
-          isDraft: true,
-          items: response.data.items.map((item) => ({
-            ...item,
-            total_price: item.quantity && item.unit_price ? item.quantity * item.unit_price : 0,
-          })),
-        };
-
-        setCreatedPartialOrders(prev => [...prev, newPartialOrder]);
-        setCurrentPartialIndex(prev => prev + 1);
-        toast.success(`Draft partial order ${createdPartialOrders.length + 1} created successfully!`);
-      } else {
-        throw new Error("Invalid response from server: Missing order ID");
-      }
-    } catch (error) {
-      console.error("Error creating partial order:", error);
-      toast.error("Failed to create partial order.");
-    }
+    setCreatedPartialOrders((prev) => [...prev, newPartialOrder]);
+    setCurrentPartialIndex((prev) => prev + 1);
+    toast.success(`Draft partial order ${createdPartialOrders.length + 1} created successfully!`);
   };
 
-  const handleCancelPartial = async (index) => {
-    const orderToCancel = createdPartialOrders[index];
-    if (!orderToCancel) return;
-
-    try {
-      await apiClient.delete(`/purchase-orders/${orderToCancel.id}/`).catch(error => {
-        if (error.response?.status === 404) {
-          console.warn(`Order ${orderToCancel.id} not found, skipping deletion.`);
-        } else {
-          throw error;
-        }
-      });
-      
-      setCreatedPartialOrders(prev => prev.filter((_, i) => i !== index));
-      removeAssignmentsForPartial(index);
-      setCurrentPartialIndex(prev => Math.max(0, prev - 1));
-
-      toast.success(`Partial order ${index + 1} canceled successfully.`);
-    } catch (error) {
-      console.error("Error canceling partial order:", error);
-      toast.error("Failed to cancel partial order.");
-    }
+  const handleCancelPartial = (index) => {
+    setCreatedPartialOrders((prev) => prev.filter((_, i) => i !== index));
+    removeAssignmentsForPartial(index);
+    setCurrentPartialIndex((prev) => Math.max(0, prev - 1));
+    toast.success(`Partial order ${index + 1} canceled successfully.`);
   };
 
-  const handleCancel = async () => {
-    try {
-      await cleanupPartialOrders();
-      setCreatedPartialOrders([]);
-      setCurrentPartialIndex(0);
-      setIsWorkflowCompleted(false);
-      initializeAssignments();
-      toast.info("All draft partial orders have been canceled.");
-    } catch (error) {
-      console.error("Error deleting partial orders:", error);
-      toast.error("Failed to cancel partial orders.");
-    }
+  const handleCancel = () => {
+    setCreatedPartialOrders([]);
+    setCurrentPartialIndex(0);
+    setIsWorkflowCompleted(false);
+    initializeAssignments();
+    toast.info("All draft partial orders have been canceled.");
   };
 
   const handleFinish = async () => {
@@ -383,19 +267,33 @@ const PartialOrderSelection = () => {
     }
 
     try {
-      const finalizePromises = createdPartialOrders.map(order =>
-        apiClient.patch(`/purchase-orders/${order.id}/`, {
-          is_draft: false
-        }).catch(error => {
-          if (error.response?.status === 404) {
-            console.warn(`Order ${order.id} not found, skipping finalization.`);
-          } else {
-            throw error;
-          }
-        })
-      );
+      const createPromises = createdPartialOrders.map(async (order) => {
+        const formData = new FormData();
+        formData.append("quotation", quotationData.id);
+        formData.append("order_type", "partial");
+        formData.append("is_draft", "false");
+        formData.append(
+          "items",
+          JSON.stringify(
+            order.items.map((item) => ({
+              item: item.item || null,
+              item_name: item.item_name || itemsList.find((i) => i.id === item.item)?.name || null,
+              product_name: item.product_name || null,
+              quantity: item.quantity,
+              unit: item.unit || null,
+              unit_price: item.unit_price || null,
+            }))
+          )
+        );
 
-      await Promise.all(finalizePromises);
+        const response = await apiClient.post("/purchase-orders/", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        return response.data;
+      });
+
+      await Promise.all(createPromises);
 
       await apiClient.patch(`/quotations/${quotationData.id}/`, {
         partial_order_workflow_completed: true,
@@ -407,7 +305,7 @@ const PartialOrderSelection = () => {
       navigate("/view-quotation", {
         state: {
           quotationId: quotationData.id,
-          partialOrders: createdPartialOrders.map(order => ({ ...order, isDraft: false })),
+          partialOrders: createdPartialOrders.map((order) => ({ ...order, isDraft: false })),
           workflowCompleted: true,
         },
       });
@@ -417,14 +315,13 @@ const PartialOrderSelection = () => {
     }
   };
 
-  const handlePrevious = async () => {
+  const handlePrevious = () => {
     if (createdPartialOrders.length > 0 && !isWorkflowCompleted) {
       const confirmLeave = window.confirm(
-        "You have unsaved draft partial orders. If you leave now, they will be deleted. Do you want to continue?"
+        "You have unsaved draft partial orders. If you leave now, they will be discarded. Do you want to continue?"
       );
-      
+
       if (confirmLeave) {
-        await cleanupPartialOrders();
         navigate("/view-quotation");
       }
     } else {
@@ -433,10 +330,12 @@ const PartialOrderSelection = () => {
   };
 
   const getItemDisplayName = (item) => {
-    return itemsList.find((i) => i.id === item.item)?.name || 
-           item.item_name || 
-           item.product_name || 
-           "N/A";
+    return (
+      itemsList.find((i) => i.id === item.item)?.name ||
+      item.item_name ||
+      item.product_name ||
+      "N/A"
+    );
   };
 
   const getUnitName = (unitId) => {
@@ -447,7 +346,7 @@ const PartialOrderSelection = () => {
     return `SAR ${price != null ? Number(price).toFixed(2) : "0.00"}`;
   };
 
-  if (!quotationData?.items && !createdPartialOrders.length) {
+  if (!quotationData?.items) {
     return null; // Component will redirect via useEffect
   }
 
@@ -486,7 +385,7 @@ const PartialOrderSelection = () => {
               ? `Assign Quantities for Partial Order ${currentPartialIndex + 1}`
               : "Items from Quotation"}
           </h3>
-          
+
           <div className="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
             <table className="min-w-full bg-white">
               <thead className="bg-gray-50">
@@ -558,7 +457,7 @@ const PartialOrderSelection = () => {
             <div className="mb-2 p-2 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 text-sm">
               These are draft orders. They will only be saved permanently when you click "Finish".
             </div>
-            
+
             <div className="space-y-4">
               {createdPartialOrders.map((order, index) => (
                 <div key={order.id} className="border border-gray-200 rounded-lg p-4">
@@ -573,7 +472,7 @@ const PartialOrderSelection = () => {
                       Cancel
                     </button>
                   </div>
-                  
+
                   <div className="overflow-x-auto">
                     <table className="min-w-full bg-white border border-gray-200 rounded">
                       <thead className="bg-gray-50">
@@ -614,7 +513,7 @@ const PartialOrderSelection = () => {
           >
             Cancel All Drafts
           </button>
-          
+
           <button
             onClick={handleGeneratePartialOrder}
             className={`px-4 py-2 rounded transition-colors duration-200 ${
@@ -626,7 +525,7 @@ const PartialOrderSelection = () => {
           >
             Generate Draft Partial Order
           </button>
-          
+
           <button
             onClick={handleFinish}
             className={`px-4 py-2 rounded transition-colors duration-200 ${
@@ -646,10 +545,7 @@ const PartialOrderSelection = () => {
             <div className="flex justify-between text-sm text-gray-600">
               <span>Progress: {createdPartialOrders.length} of {numberOfPartialOrders} draft partial orders created</span>
               <span>
-                {isAllPartialsCreated ? 
-                  "Ready to finish and save" : 
-                  "Create remaining partial orders"
-                }
+                {isAllPartialsCreated ? "Ready to finish and save" : "Create remaining partial orders"}
               </span>
             </div>
           </div>
