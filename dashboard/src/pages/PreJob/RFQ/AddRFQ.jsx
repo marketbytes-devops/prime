@@ -207,17 +207,18 @@ const AddRFQ = () => {
             seenCompanies.add(companyKey);
             uniqueClients.push({
               id: rfq.id, // Use RFQ ID as a temporary unique identifier
-              company_name: rfq.company_name,
-              company_address: rfq.company_address,
-              company_phone: rfq.company_phone,
-              company_email: rfq.company_email,
-              rfq_channel: rfq.rfq_channel,
-              point_of_contact_name: rfq.point_of_contact_name,
-              point_of_contact_email: rfq.point_of_contact_email,
-              point_of_contact_phone: rfq.point_of_contact_phone,
+              company_name: rfq.company_name || "",
+              company_address: rfq.company_address || "",
+              company_phone: rfq.company_phone || "",
+              company_email: rfq.company_email || "",
+              rfq_channel: rfq.rfq_channel || "",
+              point_of_contact_name: rfq.point_of_contact_name || "",
+              point_of_contact_email: rfq.point_of_contact_email || "",
+              point_of_contact_phone: rfq.point_of_contact_phone || "",
             });
           }
         });
+        console.log("Fetched clients:", uniqueClients); // Debug clients
         setState((prev) => ({
           ...prev,
           channels: channelsRes.data || [],
@@ -237,6 +238,10 @@ const AddRFQ = () => {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    console.log("Current state:", state); // Debug state changes
+  }, [state]);
 
   const addItem = () => {
     setState((prev) => ({
@@ -304,6 +309,7 @@ const AddRFQ = () => {
 
   const handleExistingClientSelect = (clientId, clients) => {
     const selectedClient = clients.find((client) => client.id === clientId);
+    console.log("Selected client:", selectedClient); // Debug selected client
     if (selectedClient) {
       setState((prev) => ({
         ...prev,
@@ -314,14 +320,14 @@ const AddRFQ = () => {
         company_address: selectedClient.company_address || "",
         company_phone: selectedClient.company_phone || "",
         company_email: selectedClient.company_email || "",
-        rfq_channel: "",
-        point_of_contact_name: "", 
-        point_of_contact_email: "", 
-        point_of_contact_phone: "", 
+        rfq_channel: String(selectedClient.rfq_channel) || "", // Ensure string for select
+        point_of_contact_name: selectedClient.point_of_contact_name || "",
+        point_of_contact_email: selectedClient.point_of_contact_email || "",
+        point_of_contact_phone: selectedClient.point_of_contact_phone || "",
         originalContact: {
-          name: "",
-          email: "",
-          phone: "",
+          name: selectedClient.point_of_contact_name || "",
+          email: selectedClient.point_of_contact_email || "",
+          phone: selectedClient.point_of_contact_phone || "",
         },
       }));
     }
@@ -491,7 +497,7 @@ const AddRFQ = () => {
                 Company Phone
               </label>
               <InputField
-                type="number"
+                type="text" // Changed from number to text
                 placeholder="Enter company phone"
                 value={state.company_phone}
                 onChange={(e) =>
@@ -499,6 +505,8 @@ const AddRFQ = () => {
                   setState((prev) => ({ ...prev, company_phone: e.target.value }))
                 }
                 maxLength={20}
+                pattern="[\d\s-+]*" // Allow digits, spaces, +, -
+                title="Please enter a valid phone number (e.g., +966-555-123456)"
                 disabled={state.isClientSelected}
               />
             </div>
@@ -580,7 +588,7 @@ const AddRFQ = () => {
                 Contact Phone
               </label>
               <InputField
-                type="number"
+                type="text" // Changed from number to text
                 placeholder="Enter contact phone"
                 value={state.point_of_contact_phone}
                 onChange={(e) =>
@@ -590,6 +598,8 @@ const AddRFQ = () => {
                   }))
                 }
                 maxLength={20}
+                pattern="[\d\s-+]*" // Allow digits, spaces, +, -
+                title="Please enter a valid phone number (e.g., +966-555-123456)"
               />
             </div>
           </div>
