@@ -640,6 +640,7 @@ const RaisedInvoices = () => {
                               : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
                           }`}
                         >
+                          <option value="raised">Raised</option>
                           <option value="pending">Pending</option>
                           <option value="processed">Processed</option>
                         </select>
