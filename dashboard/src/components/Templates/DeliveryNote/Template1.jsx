@@ -74,6 +74,13 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
             margin-top: 4px;
             padding-left: 12px;
           }
+          /* Thinner and lighter borders for the items table */
+          .items-table, .items-table th, .items-table td {
+            border: 1px solid #6B7280; /* Lighter gray (equivalent to border-gray-500) */
+          }
+          .items-table {
+            border-collapse: collapse;
+          }
         }
       `}</style>
 
@@ -127,23 +134,23 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
         </table>
 
         {/* Items Table */}
-        <table className="w-full border-collapse border border-gray-800 mb-4">
+        <table className="w-full items-table mb-4">
           <thead>
             <tr>
-              <th className="border border-gray-800 p-2 text-left">SL #</th>
-              <th className="border border-gray-800 p-2 text-left">DESCRIPTION OF ITEM</th>
-              <th className="border border-gray-800 p-2 text-left">Range</th>
-              <th className="border border-gray-800 p-2 text-left">QTY</th>
-              <th className="border border-gray-800 p-2 text-left">UOM</th>
-              <th className="border border-gray-800 p-2 text-left">DELIVERED QTY</th>
+              <th className="p-2 text-left">SL #</th>
+              <th className="p-2 text-left">DESCRIPTION OF ITEM</th>
+              <th className="p-2 text-left">Range</th>
+              <th className="p-2 text-left">QTY</th>
+              <th className="p-2 text-left">UOM</th>
+              <th className="p-2 text-left">DELIVERED QTY</th>
             </tr>
           </thead>
           <tbody>
             {deliveryNote.items &&
               deliveryNote.items.map((item, index) => (
                 <tr key={item.id || index} className={index < deliveryNote.items.length - 1 ? 'item-divider' : ''}>
-                  <td className="border-b border-gray-800 p-2">{index + 1}</td>
-                  <td className="border-b border-gray-800 p-2">
+                  <td className="p-2">{index + 1}</td>
+                  <td className="p-2">
                     <div className="font-bold">
                       {itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
                     </div>
@@ -157,12 +164,12 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
                       </div>
                     )}
                   </td>
-                  <td className="border-b border-gray-800 p-2">{item.range || 'N/A'}</td>
-                  <td className="border-b border-gray-800 p-2">{item.quantity || 'N/A'}</td>
-                  <td className="border border-gray-800 p-2">
+                  <td className="p-2">{item.range || 'N/A'}</td>
+                  <td className="p-2">{item.quantity || 'N/A'}</td>
+                  <td className="p-2">
                     {units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
                   </td>
-                  <td className="border-b border-gray-800 p-2">{item.delivered_quantity || 'N/A'}</td>
+                  <td className="p-2">{item.delivered_quantity || 'N/A'}</td>
                 </tr>
               ))}
           </tbody>
