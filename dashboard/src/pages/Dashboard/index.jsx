@@ -227,7 +227,7 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mt-6">
         <Link to="/job-execution/processing-work-orders/manager-approval" className="block">
           <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
             <div className="p-3 bg-green-100 rounded-full">
@@ -262,14 +262,14 @@ const Dashboard = () => {
       </div>
 
       {counts.overdueWorkOrders > 0 && (
-        <div className="mt-4 p-4 bg-red-50 rounded-lg">
+        <div className="mt-6 p-4 bg-red-50 rounded-lg">
           <p className="text-red-600 font-medium">
             {counts.overdueWorkOrders} Overdue Work Orders
           </p>
         </div>
       )}
 
-      <div className="mt-8 bg-white shadow-md rounded-lg p-6">
+      <div className="mt-6 bg-white shadow-md rounded-lg p-6">
         <h3 className="text-xl font-semibold mb-4">Overview</h3>
         <Bar ref={chartRef} data={chartData} options={{ responsive: true }} />
       </div>
