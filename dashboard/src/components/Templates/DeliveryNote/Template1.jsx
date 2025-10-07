@@ -1,9 +1,9 @@
 import React from 'react';
 import logo from '../../../assets/images/img-logo.webp';
- 
+
 const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
   if (!deliveryNote) return null;
- 
+
   return (
     <div
       className="p-4 bg-white relative"
@@ -71,24 +71,26 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
           }
         }
       `}</style>
- 
+
       {/* Content Wrapper */}
       <div className="content background-container">
         {/* Header Section */}
-        <div className="text-center mb-4" style={{ position:"relative"}}>
+        <div className="text-center mb-4" style={{ position: 'relative' }}>
           <div>
-            <h1 className="font-bold" style={{fontSize:"22px"}}>Prime Innovation Contracting Co.</h1>
+            <h1 className="font-bold" style={{ fontSize: '22px' }}>
+              Prime Innovation Contracting Co.
+            </h1>
             <p className="text-sm">شركائيكار الرئيسية للمقاوالت</p>
           </div>
           <div style={{ position: 'absolute', top: -10, right: 10 }}>
             <img src={logo} alt="Prime" style={{ width: '120px', height: '100px' }} />
           </div>
         </div>
- 
+
         <h2 className="font-bold text-center mb-4" style={{ fontSize: '18px', marginTop: '60px' }}>
           DELIVERY NOTE/JOB COMPLETION
         </h2>
- 
+
         {/* Delivery Note Details Table */}
         <table className="w-full mb-4">
           <tbody>
@@ -118,7 +120,7 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
             </tr>
           </tbody>
         </table>
- 
+
         {/* Items Table */}
         <table className="w-full border-collapse border border-gray-800 mb-4">
           <thead>
@@ -129,29 +131,18 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
               <th className="border border-gray-800 p-2 text-left">QTY</th>
               <th className="border border-gray-800 p-2 text-left">UOM</th>
               <th className="border border-gray-800 p-2 text-left">DELIVERED QTY</th>
+              <th className="border border-gray-800 p-2 text-left">COMPONENTS</th>
             </tr>
           </thead>
           <tbody>
             {deliveryNote.items &&
               deliveryNote.items.map((item, index) => (
                 <React.Fragment key={item.id || index}>
+                  {/* Main Item Row */}
                   <tr className={index < deliveryNote.items.length - 1 ? 'item-divider' : ''}>
-                    <td
-                      className="border border-gray-800 p-2"
-                      rowSpan={item.components ? item.components.length + 1 : 1}
-                    >
-                      {index + 1}
-                    </td>
+                    <td className="border border-gray-800 p-2">{index + 1}</td>
                     <td className="border border-gray-800 p-2">
-                      <div className="font-bold">
-                        {itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
-                      </div>
-                      {item.components &&
-                        item.components.map((comp, compIndex) => (
-                          <div key={compIndex} className="no-border">
-                            <p className="p-2 pl-4 font-normal">{comp.component || 'N/A'} : {comp.value || 'N/A'}</p>
-                          </div>
-                        ))}
+                      {itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
                     </td>
                     <td className="border border-gray-800 p-2">{item.range || 'N/A'}</td>
                     <td className="border border-gray-800 p-2">{item.quantity || 'N/A'}</td>
@@ -159,17 +150,28 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
                       {units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
                     </td>
                     <td className="border border-gray-800 p-2">{item.delivered_quantity || 'N/A'}</td>
+                    <td className="border border-gray-800 p-2">
+                      {item.components && item.components.length > 0 ? (
+                        item.components.map((comp, compIndex) => (
+                          <div key={compIndex} className="text-sm">
+                            {comp.component || 'N/A'}: {comp.value || 'N/A'}
+                          </div>
+                        ))
+                      ) : (
+                        'N/A'
+                      )}
+                    </td>
                   </tr>
                 </React.Fragment>
               ))}
           </tbody>
         </table>
- 
+
         {/* Remarks Section */}
         <div className="mb-4">
           <p className="font-bold">REMARKS:</p>
         </div>
- 
+
         {/* Delivered By and Received By Table */}
         <table className="w-full mb-4 border-collapse border border-gray-800">
           <tbody>
@@ -196,10 +198,10 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
           </tbody>
         </table>
       </div>
- 
+
       {/* Spacer to Push Footer to Bottom for On-Screen */}
       <div style={{ flexGrow: 1 }}></div>
- 
+
       {/* Footer Section */}
       <footer className="footer flex items-center justify-between text-xs mt-8 pt-4">
         <div>
@@ -215,5 +217,5 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
     </div>
   );
 };
- 
+
 export default Template1;
