@@ -72,7 +72,7 @@ const ListProcessingWorkOrders = () => {
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes, quotationsRes, channelsRes, poRes] = await Promise.all([
-        apiClient.get("/work-orders/?status=Submitted,Manager Approval,Approved"), 
+        apiClient.get("/work-orders/?status=Submitted,Manager Approval,Approved"),
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -367,7 +367,7 @@ const ListProcessingWorkOrders = () => {
   return (
     <div className="mx-auto p-4">
       {isLoadingPermissions ? (
-        <div><Loading/></div>
+        <div><Loading /></div>
       ) : !hasPermission("processing_work_orders", "view") ? (
         <div className="text-red-600">You do not have permission to view this page.</div>
       ) : (
@@ -472,33 +472,30 @@ const ListProcessingWorkOrders = () => {
                             <Button
                               onClick={() => handleViewWO(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "view")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-green-600 text-white hover:bg-green-700"
-                              }`}
+                                }`}
                             >
                               View
                             </Button>
                             <Button
                               onClick={() => handleEditWO(wo.id)}
                               disabled={!hasPermission("processing_work_orders", "edit")}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 text-white hover:bg-blue-700"
-                              }`}
+                                }`}
                             >
                               Update
                             </Button>
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
                               disabled={!hasPermission("processing_work_orders", "delete")}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "delete")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "delete")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
-                              }`}
+                                }`}
                             >
                               Delete
                             </Button>
@@ -506,31 +503,33 @@ const ListProcessingWorkOrders = () => {
                               onClick={() => handleAction(wo.id)}
                               disabled={
                                 !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval"
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval"
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
+                                  wo.status === "Manager Approval" ||
+                                  wo.status === "Manager Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
-                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                  : "bg-yellow-600 text-white hover:bg-yellow-700"
-                              }`}
+                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    : "bg-yellow-600 text-white hover:bg-yellow-700"
+                                }`}
                             >
                               {wo.status === "Manager Approval"
                                 ? "Manager Approved"
-                                : isDUTComplete(wo)
-                                ? "Move to Manager Approval"
-                                : "Update Device Test Details"}
+                                : wo.status === "Manager Approved"
+                                  ? "Manager Approved"
+                                  : isDUTComplete(wo)
+                                    ? "Move to Manager Approval"
+                                    : "Update Device Test Details"}
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "view")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-gray-600 text-white hover:bg-gray-700"
-                              }`}
+                                }`}
                             >
                               Print
                             </Button>
@@ -556,11 +555,10 @@ const ListProcessingWorkOrders = () => {
                 <Button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded-md min-w-fit ${
-                    state.currentPage === page
+                  className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
                       ? "bg-blue-600 text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                    }`}
                 >
                   {page}
                 </Button>
@@ -583,9 +581,8 @@ const ListProcessingWorkOrders = () => {
                 selectedWO: null,
               }))
             }
-            title={`Work Order Details - ${
-              state.selectedWO?.wo_number || "Not Provided"
-            }`}
+            title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"
+              }`}
           >
             {state.selectedWO && (
               <div className="space-y-4">
