@@ -621,7 +621,7 @@ const AddRFQ = () => {
                 className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
                 disabled={!isStepValid() || loading}
               >
-                Save Point of Contact
+                Update
               </Button>
             ) : (
               <Button
@@ -630,7 +630,7 @@ const AddRFQ = () => {
                 className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
                 disabled={!isStepValid()}
               >
-                Go to Next Step
+                Next
               </Button>
             )}
           </div>
