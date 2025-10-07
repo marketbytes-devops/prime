@@ -178,20 +178,29 @@ const AddRFQ = () => {
     teamMembers: [],
     itemsList: [],
     units: [],
+    clients: [], // Added for existing clients
+    selectedClientId: null, // Track selected client
     isNewClient: false,
+    originalContact: { // Store original Point of Contact for comparison
+      point_of_contact_name: "",
+      point_of_contact_email: "",
+      point_of_contact_phone: "",
+    },
   });
   const [isModalOpen, setIsModalOpen] = useState(true);
+  const [showClientList, setShowClientList] = useState(false); // Toggle client list modal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
+        const [channelsRes, teamsRes, itemsRes, unitsRes, clientsRes] = await Promise.all([
           apiClient.get("channels/"),
           apiClient.get("teams/"),
           apiClient.get("items/"),
           apiClient.get("units/"),
+          apiClient.get("clients/"), // Fetch clients
         ]);
         setState((prev) => ({
           ...prev,
@@ -199,6 +208,7 @@ const AddRFQ = () => {
           teamMembers: teamsRes.data || [],
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
+          clients: clientsRes.data || [],
         }));
         setError(null);
       } catch (error) {
@@ -270,8 +280,16 @@ const AddRFQ = () => {
     return false;
   };
 
+  const hasContactChanged = () => {
+    return (
+      state.point_of_contact_name !== state.originalContact.point_of_contact_name ||
+      state.point_of_contact_email !== state.originalContact.point_of_contact_email ||
+      state.point_of_contact_phone !== state.originalContact.point_of_contact_phone
+    );
+  };
+
   const handleNext = (e) => {
-    e.preventDefault(); // Prevent form submission
+    e.preventDefault();
     if (isStepValid()) {
       if (step < 3) {
         setStep((prev) => prev + 1);
@@ -282,7 +300,7 @@ const AddRFQ = () => {
   };
 
   const handlePrev = (e) => {
-    e.preventDefault(); // Prevent form submission
+    e.preventDefault();
     if (step > 1) {
       setStep((prev) => prev - 1);
     }
@@ -319,7 +337,7 @@ const AddRFQ = () => {
         point_of_contact_phone: state.point_of_contact_phone || null,
         assigned_sales_person: state.assigned_sales_person || null,
         due_date_for_quotation: state.due_date_for_quotation || null,
-        rfq_status: "Pending", // Set initial status to Pending
+        rfq_status: "Pending",
         items: state.items.map((item) => ({
           item: item.item ? parseInt(item.item) : null,
           quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -340,11 +358,66 @@ const AddRFQ = () => {
   };
 
   const handleClientSelect = (type) => {
-    setIsModalOpen(false);
     if (type === "new") {
       setState((prev) => ({ ...prev, isNewClient: true }));
+      setIsModalOpen(false);
     } else if (type === "existing") {
-      navigate("/existing-client");
+      setShowClientList(true);
+    }
+  };
+
+  const handleClientSelection = (client) => {
+    setState((prev) => ({
+      ...prev,
+      selectedClientId: client.id,
+      company_name: client.company_name || "",
+      company_address: client.company_address || "",
+      company_phone: client.company_phone || "",
+      company_email: client.company_email || "",
+      rfq_channel: client.rfq_channel || "",
+      point_of_contact_name: client.point_of_contact_name || "",
+      point_of_contact_email: client.point_of_contact_email || "",
+      point_of_contact_phone: client.point_of_contact_phone || "",
+      originalContact: {
+        point_of_contact_name: client.point_of_contact_name || "",
+        point_of_contact_email: client.point_of_contact_email || "",
+        point_of_contact_phone: client.point_of_contact_phone || "",
+      },
+      isNewClient: false,
+    }));
+    setShowClientList(false);
+    setIsModalOpen(false);
+  };
+
+  const handleSaveContact = async (e) => {
+    e.preventDefault();
+    if (!state.selectedClientId) {
+      toast.error("No client selected.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await apiClient.put(`/clients/${state.selectedClientId}/`, {
+        point_of_contact_name: state.point_of_contact_name || null,
+        point_of_contact_email: state.point_of_contact_email || null,
+        point_of_contact_phone: state.point_of_contact_phone || null,
+      });
+      toast.success("Point of Contact updated successfully!");
+      setState((prev) => ({
+        ...prev,
+        originalContact: {
+          point_of_contact_name: prev.point_of_contact_name,
+          point_of_contact_email: prev.point_of_contact_email,
+          point_of_contact_phone: prev.point_of_contact_phone,
+        },
+      }));
+      setStep(2); // Proceed to Step 2
+    } catch (error) {
+      console.error("Error updating Point of Contact:", error);
+      toast.error("Failed to update Point of Contact.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -361,9 +434,12 @@ const AddRFQ = () => {
             placeholder="Enter company name"
             value={state.company_name}
             onChange={(e) =>
+              state.isNewClient &&
               setState((prev) => ({ ...prev, company_name: e.target.value }))
             }
             maxLength={100}
+            disabled={!state.isNewClient}
+            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
           />
         </div>
         <div>
@@ -375,8 +451,11 @@ const AddRFQ = () => {
             placeholder="Enter company address"
             value={state.company_address}
             onChange={(e) =>
+              state.isNewClient &&
               setState((prev) => ({ ...prev, company_address: e.target.value }))
             }
+            disabled={!state.isNewClient}
+            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
           />
         </div>
         <div>
@@ -388,9 +467,12 @@ const AddRFQ = () => {
             placeholder="Enter company phone"
             value={state.company_phone}
             onChange={(e) =>
+              state.isNewClient &&
               setState((prev) => ({ ...prev, company_phone: e.target.value }))
             }
             maxLength={20}
+            disabled={!state.isNewClient}
+            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
           />
         </div>
         <div>
@@ -402,8 +484,11 @@ const AddRFQ = () => {
             placeholder="Enter company email"
             value={state.company_email}
             onChange={(e) =>
+              state.isNewClient &&
               setState((prev) => ({ ...prev, company_email: e.target.value }))
             }
+            disabled={!state.isNewClient}
+            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
           />
         </div>
       </div>
@@ -416,9 +501,11 @@ const AddRFQ = () => {
           <select
             value={state.rfq_channel}
             onChange={(e) =>
+              state.isNewClient &&
               setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
             }
-            className="w-full p-2 border rounded focus:outline-indigo-500"
+            className={state.isNewClient ? "w-full p-2 border rounded focus:outline-indigo-500" : "w-full p-2 border rounded bg-gray-100 cursor-not-allowed"}
+            disabled={!state.isNewClient}
           >
             <option value="">Select Channel</option>
             {state.channels.map((channel) => (
@@ -482,6 +569,29 @@ const AddRFQ = () => {
           />
         </div>
       </div>
+      {!state.isNewClient && (
+        <div className="flex justify-end mt-4">
+          {hasContactChanged() ? (
+            <Button
+              type="button"
+              onClick={handleSaveContact}
+              className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save Point of Contact"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleNext}
+              className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+              disabled={!isStepValid()}
+            >
+              Go to Next Step
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -641,42 +751,39 @@ const AddRFQ = () => {
           </Button>
         </div>
       </Modal>
-      {state.isNewClient && (
+      <Modal
+        isOpen={showClientList}
+        onClose={() => {
+          setShowClientList(false);
+          setIsModalOpen(true);
+        }}
+        title="Select Existing Client"
+      >
+        <div className="flex flex-col space-y-2 max-h-60 overflow-y-auto">
+          {state.clients.length > 0 ? (
+            state.clients.map((client) => (
+              <Button
+                key={client.id}
+                onClick={() => handleClientSelection(client)}
+                className="bg-gray-100 text-black p-2 rounded-lg hover:bg-gray-200 transition-colors duration-300"
+              >
+                {client.company_name}
+              </Button>
+            ))
+          ) : (
+            <p className="text-gray-500">No clients found.</p>
+          )}
+        </div>
+      </Modal>
+      {(state.isNewClient || state.selectedClientId) && (
         <form onSubmit={handleSubmit} className="mb-6">
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
-          <div className="mt-6">
-            {step === 1 ? (
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-                >
-                  Next
-                </Button>
-              </div>
-            ) : step === 2 ? (
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  type="button"
-                  onClick={handlePrev}
-                  className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                >
-                  Previous
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-                >
-                  Next
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
+          {step > 1 && (
+            <div className="mt-6">
+              {step === 2 ? (
+                <div className="grid grid-cols-2 gap-4">
                   <Button
                     type="button"
                     onClick={handlePrev}
@@ -684,19 +791,39 @@ const AddRFQ = () => {
                   >
                     Previous
                   </Button>
-                </div>
-                <div className="flex justify-end">
                   <Button
-                    type="submit"
-                    disabled={!isStepValid() || loading}
-                    className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    type="button"
+                    onClick={handleNext}
+                    className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                    disabled={!isStepValid()}
                   >
-                    {loading ? "Submitting..." : "Submit RFQ"}
+                    Next
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <Button
+                      type="button"
+                      onClick={handlePrev}
+                      className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                      Previous
+                    </Button>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!isStepValid() || loading}
+                      className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {loading ? "Submitting..." : "Submit RFQ"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </form>
       )}
     </div>
