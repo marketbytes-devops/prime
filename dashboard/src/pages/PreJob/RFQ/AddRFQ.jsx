@@ -307,8 +307,8 @@ const AddRFQ = () => {
     }
   };
 
-  const handleExistingClientSelect = (clientId, clients) => {
-    const selectedClient = clients.find((client) => client.id === clientId);
+  const handleExistingClientSelect = (clientId) => {
+    const selectedClient = state.clients.find((client) => client.id === clientId);
     console.log("Selected client:", selectedClient); // Debug selected client
     if (selectedClient) {
       setState((prev) => ({
@@ -320,7 +320,7 @@ const AddRFQ = () => {
         company_address: selectedClient.company_address || "",
         company_phone: selectedClient.company_phone || "",
         company_email: selectedClient.company_email || "",
-        rfq_channel: String(selectedClient.rfq_channel) || "", // Ensure string for select
+        rfq_channel: selectedClient.rfq_channel ? String(selectedClient.rfq_channel) : "",
         point_of_contact_name: selectedClient.point_of_contact_name || "",
         point_of_contact_email: selectedClient.point_of_contact_email || "",
         point_of_contact_phone: selectedClient.point_of_contact_phone || "",
@@ -330,6 +330,9 @@ const AddRFQ = () => {
           phone: selectedClient.point_of_contact_phone || "",
         },
       }));
+    } else {
+      console.error("Client not found for ID:", clientId);
+      toast.error("Selected client not found.");
     }
   };
 
@@ -497,7 +500,7 @@ const AddRFQ = () => {
                 Company Phone
               </label>
               <InputField
-                type="text" // Changed from number to text
+                type="text"
                 placeholder="Enter company phone"
                 value={state.company_phone}
                 onChange={(e) =>
@@ -505,7 +508,7 @@ const AddRFQ = () => {
                   setState((prev) => ({ ...prev, company_phone: e.target.value }))
                 }
                 maxLength={20}
-                pattern="[\d\s-+]*" // Allow digits, spaces, +, -
+                pattern="[\d\s-+]*"
                 title="Please enter a valid phone number (e.g., +966-555-123456)"
                 disabled={state.isClientSelected}
               />
@@ -588,7 +591,7 @@ const AddRFQ = () => {
                 Contact Phone
               </label>
               <InputField
-                type="text" // Changed from number to text
+                type="text"
                 placeholder="Enter contact phone"
                 value={state.point_of_contact_phone}
                 onChange={(e) =>
@@ -598,7 +601,7 @@ const AddRFQ = () => {
                   }))
                 }
                 maxLength={20}
-                pattern="[\d\s-+]*" // Allow digits, spaces, +, -
+                pattern="[\d\s-+]*"
                 title="Please enter a valid phone number (e.g., +966-555-123456)"
               />
             </div>
