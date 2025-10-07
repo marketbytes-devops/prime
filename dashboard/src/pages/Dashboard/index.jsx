@@ -16,12 +16,14 @@ const Dashboard = () => {
     closedWorkOrders: 0,
     overdueWorkOrders: 0,
     invoices: 0,
+    managerApproval: 0, // Added for Manager Approval count
+    declinedWorkOrders: 0, // Added for Declined Work Orders count
   });
   const [loading, setLoading] = useState(true);
   const chartRef = useRef(null);
 
   const chartData = {
-    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices'],
+    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices', 'Manager Approval', 'Declined Work Orders'],
     datasets: [
       {
         label: 'Counts',
@@ -32,6 +34,8 @@ const Dashboard = () => {
           counts.workOrders,
           counts.deliveryNotes,
           counts.invoices,
+          counts.managerApproval,
+          counts.declinedWorkOrders,
         ],
         backgroundColor: [
           'rgba(79, 70, 229, 0.2)',
@@ -40,6 +44,8 @@ const Dashboard = () => {
           'rgba(147, 51, 234, 0.2)',
           'rgba(245, 158, 11, 0.2)',
           'rgba(236, 72, 153, 0.2)',
+          'rgba(34, 197, 94, 0.2)', // Green for Manager Approval
+          'rgba(239, 68, 68, 0.2)', // Red for Declined Work Orders
         ],
         borderColor: [
           'rgba(79, 70, 229, 1)',
@@ -48,6 +54,8 @@ const Dashboard = () => {
           'rgba(147, 51, 234, 1)',
           'rgba(245, 158, 11, 1)',
           'rgba(236, 72, 153, 1)',
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)',
         ],
         borderWidth: 1,
       },
@@ -66,26 +74,34 @@ const Dashboard = () => {
           dnRes,
           closedWoRes,
           invoicesRes,
+          managerApprovalRes,
+          declinedWoRes,
         ] = await Promise.all([
           apiClient.get('/rfqs/'),
           apiClient.get('/quotations/'),
           apiClient.get('/purchase-orders/'),
-          apiClient.get('/work-orders/?status=Submitted'),
+          apiClient.get('/work-orders/?status=Submitted,Manager Approval,Approved'),
           apiClient.get('/delivery-notes/'),
           apiClient.get('/work-orders/?status=Completed'),
           apiClient.get('/invoices/?status=processed'),
+          apiClient.get('/work-orders/?status=Manager Approval'),
+          apiClient.get('/work-orders/?status=Declined'),
         ]);
         console.log('Work Orders Response:', woRes.data);
         console.log('Invoices Response:', invoicesRes.data);
+        console.log('Manager Approval Response:', managerApprovalRes.data);
+        console.log('Declined Work Orders Response:', declinedWoRes.data);
         setCounts({
           rfqs: rfqsRes.data?.length || 0,
           quotations: quotationsRes.data?.length || 0,
           purchaseOrders: poRes.data?.length || 0,
-          workOrders: woRes.data?.filter(wo => wo.status === 'Submitted')?.length || 0,
+          workOrders: woRes.data?.length || 0, // Updated to count all relevant statuses
           deliveryNotes: dnRes.data?.length || 0,
           closedWorkOrders: closedWoRes.data?.length || 0,
           overdueWorkOrders: woRes.data?.filter(wo => wo.isOverdue)?.length || 0,
           invoices: invoicesRes.data?.filter(invoice => invoice.invoice_status === 'processed')?.length || 0,
+          managerApproval: managerApprovalRes.data?.length || 0,
+          declinedWorkOrders: declinedWoRes.data?.length || 0,
         });
       } catch (err) {
         console.error('Error fetching counts:', err);
@@ -110,7 +126,7 @@ const Dashboard = () => {
         Welcome back!
       </h2>
       <p className="text-gray-600 mb-6">
-        Monitor your RFQs, Quotations, Purchase Orders, Work Orders, Delivery Notes, and Invoices below.
+        Monitor your RFQs, Quotations, Purchase Orders, Work Orders, Delivery Notes, Invoices, Manager Approvals, and Declined Work Orders below.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -205,6 +221,38 @@ const Dashboard = () => {
               <h3 className="text-lg font-medium text-gray-700">Total Invoices</h3>
               <p className="text-2xl font-bold text-pink-600">
                 {loading ? 'Loading...' : counts.invoices}
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link to="/job-execution/processing-work-orders/manager-approval" className="block">
+          <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
+            <div className="p-3 bg-green-100 rounded-full">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-700">Manager Approvals</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {loading ? 'Loading...' : counts.managerApproval}
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link to="/job-execution/processing-work-orders/declined-work-orders" className="block">
+          <div className="bg-white shadow-md rounded-lg p-6 flex items-center space-x-4 hover:shadow-lg transition-shadow">
+            <div className="p-3 bg-red-100 rounded-full">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-700">Declined Work Orders</h3>
+              <p className="text-2xl font-bold text-red-600">
+                {loading ? 'Loading...' : counts.declinedWorkOrders}
               </p>
             </div>
           </div>
