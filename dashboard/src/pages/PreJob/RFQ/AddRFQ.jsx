@@ -125,7 +125,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
             <div className="p-2 border-b grid grid-cols-2 items-center gap-2">
               <InputField
                 type="text"
-                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : apiEndpoint === "units/" ? "unit" : "client"}...`}
+                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 className="flex-1 p-2 border rounded"
@@ -178,11 +178,7 @@ const AddRFQ = () => {
     teamMembers: [],
     itemsList: [],
     units: [],
-    clients: [],
-    selectedClientId: null,
     isNewClient: false,
-    isClientSelected: false,
-    originalContact: { name: "", email: "", phone: "" },
   });
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -191,40 +187,18 @@ const AddRFQ = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [channelsRes, teamsRes, itemsRes, unitsRes, rfqsRes] = await Promise.all([
+        const [channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
           apiClient.get("channels/"),
           apiClient.get("teams/"),
           apiClient.get("items/"),
           apiClient.get("units/"),
-          apiClient.get("rfqs/"),
         ]);
-        // Process RFQ data to extract unique clients
-        const uniqueClients = [];
-        const seenCompanies = new Set();
-        rfqsRes.data.forEach((rfq, index) => {
-          const companyKey = `${rfq.company_name}-${rfq.company_email}`;
-          if (!seenCompanies.has(companyKey)) {
-            seenCompanies.add(companyKey);
-            uniqueClients.push({
-              id: rfq.id, // Use RFQ ID as a temporary unique identifier
-              company_name: rfq.company_name,
-              company_address: rfq.company_address,
-              company_phone: rfq.company_phone,
-              company_email: rfq.company_email,
-              rfq_channel: rfq.rfq_channel,
-              point_of_contact_name: rfq.point_of_contact_name,
-              point_of_contact_email: rfq.point_of_contact_email,
-              point_of_contact_phone: rfq.point_of_contact_phone,
-            });
-          }
-        });
         setState((prev) => ({
           ...prev,
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
-          clients: uniqueClients,
         }));
         setError(null);
       } catch (error) {
@@ -265,48 +239,6 @@ const AddRFQ = () => {
     });
   };
 
-  const handleClientSelect = (clientId, clients) => {
-    const selectedClient = clients.find((client) => client.id === clientId);
-    if (selectedClient) {
-      setState((prev) => ({
-        ...prev,
-        selectedClientId: clientId,
-        isClientSelected: true,
-        isNewClient: false,
-        company_name: selectedClient.company_name || "",
-        company_address: selectedClient.company_address || "",
-        company_phone: selectedClient.company_phone || "",
-        company_email: selectedClient.company_email || "",
-        rfq_channel: selectedClient.rfq_channel || "",
-        point_of_contact_name: selectedClient.point_of_contact_name || "",
-        point_of_contact_email: selectedClient.point_of_contact_email || "",
-        point_of_contact_phone: selectedClient.point_of_contact_phone || "",
-        originalContact: {
-          name: selectedClient.point_of_contact_name || "",
-          email: selectedClient.point_of_contact_email || "",
-          phone: selectedClient.point_of_contact_phone || "",
-        },
-      }));
-      setIsModalOpen(false);
-    }
-  };
-
-  const handleConfirmContact = () => {
-    if (isStepValid()) {
-      setStep(2);
-    } else {
-      toast.error("Please fill all required fields.");
-    }
-  };
-
-  const isContactChanged = () => {
-    return (
-      state.point_of_contact_name !== state.originalContact.name ||
-      state.point_of_contact_email !== state.originalContact.email ||
-      state.point_of_contact_phone !== state.originalContact.phone
-    );
-  };
-
   const isStepValid = () => {
     if (step === 1) {
       return (
@@ -339,7 +271,7 @@ const AddRFQ = () => {
   };
 
   const handleNext = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent form submission
     if (isStepValid()) {
       if (step < 3) {
         setStep((prev) => prev + 1);
@@ -350,7 +282,7 @@ const AddRFQ = () => {
   };
 
   const handlePrev = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent form submission
     if (step > 1) {
       setStep((prev) => prev - 1);
     }
@@ -365,6 +297,16 @@ const AddRFQ = () => {
     }
 
     setLoading(true);
+    console.log("Submitting payload:", {
+      ...state,
+      items: state.items.map((item) => ({
+        item: item.item ? parseInt(item.item) : null,
+        quantity: item.quantity ? parseInt(item.quantity) : null,
+        unit: item.unit ? parseInt(item.unit) : null,
+        unit_price: null,
+      })),
+    });
+
     try {
       await apiClient.post("rfqs/", {
         company_name: state.company_name || null,
@@ -377,7 +319,7 @@ const AddRFQ = () => {
         point_of_contact_phone: state.point_of_contact_phone || null,
         assigned_sales_person: state.assigned_sales_person || null,
         due_date_for_quotation: state.due_date_for_quotation || null,
-        rfq_status: "Pending",
+        rfq_status: "Pending", // Set initial status to Pending
         items: state.items.map((item) => ({
           item: item.item ? parseInt(item.item) : null,
           quantity: item.quantity ? parseInt(item.quantity) : null,
@@ -397,216 +339,149 @@ const AddRFQ = () => {
     }
   };
 
-  const handleClientTypeSelect = (type) => {
+  const handleClientSelect = (type) => {
     setIsModalOpen(false);
     if (type === "new") {
-      setState((prev) => ({
-        ...prev,
-        isNewClient: true,
-        isClientSelected: false,
-        selectedClientId: null,
-        company_name: "",
-        company_address: "",
-        company_phone: "",
-        company_email: "",
-        rfq_channel: "",
-        point_of_contact_name: "",
-        point_of_contact_email: "",
-        point_of_contact_phone: "",
-        originalContact: { name: "", email: "", phone: "" },
-      }));
+      setState((prev) => ({ ...prev, isNewClient: true }));
     } else if (type === "existing") {
-      setState((prev) => ({ ...prev, isNewClient: false, isClientSelected: false }));
+      navigate("/existing-client");
     }
   };
 
   const renderStep1 = () => (
     <div className="grid gap-4">
-      {!state.isNewClient && !state.isClientSelected && (
-        <div className="bg-white p-4 space-y-4 rounded-md shadow">
-          <h2 className="text-black text-xl font-semibold">Select Existing Client</h2>
-          <SearchableDropdown
-            options={state.clients.map((client) => ({
-              id: client.id,
-              name: client.company_name,
-            }))}
-            value={state.selectedClientId}
-            onChange={handleClientSelect}
-            placeholder="Search or select client..."
-            allowAddItem={false}
-            apiEndpoint="rfqs/"
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h2 className="text-black text-xl font-semibold">Company Details</h2>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Company Name
+          </label>
+          <InputField
+            type="text"
+            placeholder="Enter company name"
+            value={state.company_name}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, company_name: e.target.value }))
+            }
+            maxLength={100}
           />
         </div>
-      )}
-      {(state.isNewClient || state.isClientSelected) && (
-        <>
-          <div className="bg-white p-4 space-y-4 rounded-md shadow">
-            <h2 className="text-black text-xl font-semibold">Company Details</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Name
-              </label>
-              <InputField
-                type="text"
-                placeholder="Enter company name"
-                value={state.company_name}
-                onChange={(e) =>
-                  state.isNewClient &&
-                  setState((prev) => ({ ...prev, company_name: e.target.value }))
-                }
-                maxLength={100}
-                disabled={state.isClientSelected}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Address
-              </label>
-              <InputField
-                type="text"
-                placeholder="Enter company address"
-                value={state.company_address}
-                onChange={(e) =>
-                  state.isNewClient &&
-                  setState((prev) => ({ ...prev, company_address: e.target.value }))
-                }
-                disabled={state.isClientSelected}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Phone
-              </label>
-              <InputField
-                type="number"
-                placeholder="Enter company phone"
-                value={state.company_phone}
-                onChange={(e) =>
-                  state.isNewClient &&
-                  setState((prev) => ({ ...prev, company_phone: e.target.value }))
-                }
-                maxLength={20}
-                disabled={state.isClientSelected}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Email
-              </label>
-              <InputField
-                type="email"
-                placeholder="Enter company email"
-                value={state.company_email}
-                onChange={(e) =>
-                  state.isNewClient &&
-                  setState((prev) => ({ ...prev, company_email: e.target.value }))
-                }
-                disabled={state.isClientSelected}
-              />
-            </div>
-          </div>
-          <div className="bg-white p-4 space-y-4 rounded-md shadow">
-            <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                RFQ Channel
-              </label>
-              <select
-                value={state.rfq_channel}
-                onChange={(e) =>
-                  state.isNewClient &&
-                  setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
-                }
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-                disabled={state.isClientSelected}
-              >
-                <option value="">Select Channel</option>
-                {state.channels.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.channel_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="bg-white p-4 space-y-4 rounded-md shadow">
-            <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Name
-              </label>
-              <InputField
-                type="text"
-                placeholder="Enter contact name"
-                value={state.point_of_contact_name}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    point_of_contact_name: e.target.value,
-                  }))
-                }
-                maxLength={100}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Email
-              </label>
-              <InputField
-                type="email"
-                placeholder="Enter contact email"
-                value={state.point_of_contact_email}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    point_of_contact_email: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Phone
-              </label>
-              <InputField
-                type="number"
-                placeholder="Enter contact phone"
-                value={state.point_of_contact_phone}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    point_of_contact_phone: e.target.value,
-                  }))
-                }
-                maxLength={20}
-              />
-            </div>
-          </div>
-        </>
-      )}
-      {(state.isNewClient || state.isClientSelected) && (
-        <div className="flex justify-end mt-4">
-          {state.isClientSelected && isContactChanged() ? (
-            <Button
-              type="button"
-              onClick={handleConfirmContact}
-              className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-              disabled={!isStepValid() || loading}
-            >
-              Save Point of Contact
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleNext}
-              className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-              disabled={!isStepValid()}
-            >
-              Go to Next Step
-            </Button>
-          )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Company Address
+          </label>
+          <InputField
+            type="text"
+            placeholder="Enter company address"
+            value={state.company_address}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, company_address: e.target.value }))
+            }
+          />
         </div>
-      )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Company Phone
+          </label>
+          <InputField
+            type="number"
+            placeholder="Enter company phone"
+            value={state.company_phone}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, company_phone: e.target.value }))
+            }
+            maxLength={20}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Company Email
+          </label>
+          <InputField
+            type="email"
+            placeholder="Enter company email"
+            value={state.company_email}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, company_email: e.target.value }))
+            }
+          />
+        </div>
+      </div>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            RFQ Channel
+          </label>
+          <select
+            value={state.rfq_channel}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
+            }
+            className="w-full p-2 border rounded focus:outline-indigo-500"
+          >
+            <option value="">Select Channel</option>
+            {state.channels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                {channel.channel_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+        <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Contact Name
+          </label>
+          <InputField
+            type="text"
+            placeholder="Enter contact name"
+            value={state.point_of_contact_name}
+            onChange={(e) =>
+              setState((prev) => ({
+                ...prev,
+                point_of_contact_name: e.target.value,
+              }))
+            }
+            maxLength={100}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Contact Email
+          </label>
+          <InputField
+            type="email"
+            placeholder="Enter contact email"
+            value={state.point_of_contact_email}
+            onChange={(e) =>
+              setState((prev) => ({
+                ...prev,
+                point_of_contact_email: e.target.value,
+              }))
+            }
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Contact Phone
+          </label>
+          <InputField
+            type="number"
+            placeholder="Enter contact phone"
+            value={state.point_of_contact_phone}
+            onChange={(e) =>
+              setState((prev) => ({
+                ...prev,
+                point_of_contact_phone: e.target.value,
+              }))
+            }
+            maxLength={20}
+          />
+        </div>
+      </div>
     </div>
   );
 
@@ -657,71 +532,74 @@ const AddRFQ = () => {
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="grid gap-4">
-      {state.items.map((item, index) => (
-        <div key={index} className="border p-4 rounded bg-gray-50">
-          <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
-          <div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Item
-              </label>
-              <SearchableDropdown
-                options={state.itemsList}
-                value={item.item}
-                onChange={(value, newOptions) => handleItemChange(index, "item", value, newOptions)}
-                placeholder="Search or enter item..."
-                allowAddItem={true}
-                apiEndpoint="items/"
-              />
+  const renderStep3 = () => {
+    console.log("state.items:", state.items);
+    return (
+      <div className="grid gap-4">
+        {state.items.map((item, index) => (
+          <div key={index} className="border p-4 rounded bg-gray-50">
+            <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
+            <div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item
+                </label>
+                <SearchableDropdown
+                  options={state.itemsList}
+                  value={item.item}
+                  onChange={(value, newOptions) => handleItemChange(index, "item", value, newOptions)}
+                  placeholder="Search or enter item..."
+                  allowAddItem={true}
+                  apiEndpoint="items/"
+                />
+              </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <InputField
+                  type="number"
+                  placeholder="Enter quantity"
+                  value={item.quantity}
+                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                  min={0}
+                />
+              </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <SearchableDropdown
+                  options={state.units}
+                  value={item.unit}
+                  onChange={(value, newOptions) => handleItemChange(index, "unit", value, newOptions)}
+                  placeholder="Search or enter unit..."
+                  allowAddItem={true}
+                  apiEndpoint="units/"
+                />
+              </div>
+              {state.items.length > 1 && (
+                <Button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Remove Item
+                </Button>
+              )}
             </div>
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Quantity
-              </label>
-              <InputField
-                type="number"
-                placeholder="Enter quantity"
-                value={item.quantity}
-                onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                min={0}
-              />
-            </div>
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Unit
-              </label>
-              <SearchableDropdown
-                options={state.units}
-                value={item.unit}
-                onChange={(value, newOptions) => handleItemChange(index, "unit", value, newOptions)}
-                placeholder="Search or enter unit..."
-                allowAddItem={true}
-                apiEndpoint="units/"
-              />
-            </div>
-            {state.items.length > 1 && (
-              <Button
-                type="button"
-                onClick={() => removeItem(index)}
-                className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Remove Item
-              </Button>
-            )}
           </div>
-        </div>
-      ))}
-      <Button
-        type="button"
-        onClick={addItem}
-        className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
-      >
-        Add Another Item
-      </Button>
-    </div>
-  );
+        ))}
+        <Button
+          type="button"
+          onClick={addItem}
+          className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
+        >
+          Add Another Item
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <div className="mx-auto p-4">
@@ -750,26 +628,36 @@ const AddRFQ = () => {
       >
         <div className="flex flex-col space-y-4">
           <Button
-            onClick={() => handleClientTypeSelect("new")}
+            onClick={() => handleClientSelect("new")}
             className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             New Client
           </Button>
           <Button
-            onClick={() => handleClientTypeSelect("existing")}
+            onClick={() => handleClientSelect("existing")}
             className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             Existing Client
           </Button>
         </div>
       </Modal>
-      <form onSubmit={handleSubmit} className="mb-6">
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step !== 1 && (
+      {state.isNewClient && (
+        <form onSubmit={handleSubmit} className="mb-6">
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
           <div className="mt-6">
-            {step === 2 ? (
+            {step === 1 ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                >
+                  Next
+                </Button>
+              </div>
+            ) : step === 2 ? (
               <div className="grid grid-cols-2 gap-4">
                 <Button
                   type="button"
@@ -782,7 +670,6 @@ const AddRFQ = () => {
                   type="button"
                   onClick={handleNext}
                   className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-                  disabled={!isStepValid()}
                 >
                   Next
                 </Button>
@@ -810,8 +697,8 @@ const AddRFQ = () => {
               </div>
             )}
           </div>
-        )}
-      </form>
+        </form>
+      )}
     </div>
   );
 };
