@@ -67,16 +67,15 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
             border: none;
           }
           .item-divider {
-            border-bottom: 2px solid #000;
+            border-bottom: 1px solid #000;
           }
           .component {
             font-size: 0.9em;
             margin-top: 4px;
             padding-left: 12px;
           }
-          /* Thinner and lighter borders for the items table */
           .items-table, .items-table th, .items-table td {
-            border: 1px solid #6B7280; /* Lighter gray (equivalent to border-gray-500) */
+            border: 1px solid #6B7280; 
           }
           .items-table {
             border-collapse: collapse;
