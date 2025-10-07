@@ -478,6 +478,7 @@ const AddRFQ = () => {
                 }
                 maxLength={100}
                 disabled={state.isClientSelected}
+                className={`w-full p-2 border rounded focus:outline-indigo-500 ${state.isClientSelected ? 'bg-gray-100' : 'bg-white'}`}
               />
             </div>
             <div>
@@ -493,6 +494,7 @@ const AddRFQ = () => {
                   setState((prev) => ({ ...prev, company_address: e.target.value }))
                 }
                 disabled={state.isClientSelected}
+                className={`w-full p-2 border rounded focus:outline-indigo-500 ${state.isClientSelected ? 'bg-gray-100' : 'bg-white'}`}
               />
             </div>
             <div>
@@ -511,6 +513,7 @@ const AddRFQ = () => {
                 pattern="[\d\s-+]*"
                 title="Please enter a valid phone number (e.g., +966-555-123456)"
                 disabled={state.isClientSelected}
+                className={`w-full p-2 border rounded focus:outline-indigo-500 ${state.isClientSelected ? 'bg-gray-100' : 'bg-white'}`}
               />
             </div>
             <div>
@@ -526,6 +529,7 @@ const AddRFQ = () => {
                   setState((prev) => ({ ...prev, company_email: e.target.value }))
                 }
                 disabled={state.isClientSelected}
+                className={`w-full p-2 border rounded focus:outline-indigo-500 ${state.isClientSelected ? 'bg-gray-100' : 'bg-white'}`}
               />
             </div>
           </div>
@@ -540,7 +544,7 @@ const AddRFQ = () => {
                 onChange={(e) =>
                   setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
                 }
-                className="w-full p-2 border rounded focus:outline-indigo-500"
+                className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
               >
                 <option value="">Select Channel</option>
                 {state.channels.map((channel) => (
@@ -568,6 +572,7 @@ const AddRFQ = () => {
                   }))
                 }
                 maxLength={100}
+                className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
               />
             </div>
             <div>
@@ -584,6 +589,7 @@ const AddRFQ = () => {
                     point_of_contact_email: e.target.value,
                   }))
                 }
+                className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
               />
             </div>
             <div>
@@ -603,6 +609,7 @@ const AddRFQ = () => {
                 maxLength={20}
                 pattern="[\d\s-+]*"
                 title="Please enter a valid phone number (e.g., +966-555-123456)"
+                className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
               />
             </div>
           </div>
@@ -650,7 +657,7 @@ const AddRFQ = () => {
                 assigned_sales_person: e.target.value,
               }))
             }
-            className="w-full p-2 border rounded focus:outline-indigo-500"
+            className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
           >
             <option value="">Select Team Member</option>
             {state.teamMembers.map((member) => (
@@ -673,6 +680,7 @@ const AddRFQ = () => {
                 due_date_for_quotation: e.target.value,
               }))
             }
+            className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
           />
         </div>
       </div>
@@ -708,6 +716,7 @@ const AddRFQ = () => {
                 value={item.quantity}
                 onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
                 min={0}
+                className="w-full p-2 border rounded focus:outline-indigo-500 bg-white"
               />
             </div>
             <div className="w-full">
