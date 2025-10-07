@@ -314,14 +314,14 @@ const AddRFQ = () => {
         company_address: selectedClient.company_address || "",
         company_phone: selectedClient.company_phone || "",
         company_email: selectedClient.company_email || "",
-        rfq_channel: selectedClient.rfq_channel || "",
-        point_of_contact_name: selectedClient.point_of_contact_name || "",
-        point_of_contact_email: selectedClient.point_of_contact_email || "",
-        point_of_contact_phone: selectedClient.point_of_contact_phone || "",
+        rfq_channel: "",
+        point_of_contact_name: "", 
+        point_of_contact_email: "", 
+        point_of_contact_phone: "", 
         originalContact: {
-          name: selectedClient.point_of_contact_name || "",
-          email: selectedClient.point_of_contact_email || "",
-          phone: selectedClient.point_of_contact_phone || "",
+          name: "",
+          email: "",
+          phone: "",
         },
       }));
     }
