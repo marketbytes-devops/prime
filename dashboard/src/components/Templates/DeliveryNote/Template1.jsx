@@ -142,8 +142,8 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
             {deliveryNote.items &&
               deliveryNote.items.map((item, index) => (
                 <tr key={item.id || index} className={index < deliveryNote.items.length - 1 ? 'item-divider' : ''}>
-                  <td className="border border-gray-800 p-2">{index + 1}</td>
-                  <td className="border border-gray-800 p-2">
+                  <td className="border-b border-gray-800 p-2">{index + 1}</td>
+                  <td className="border-b border-gray-800 p-2">
                     <div className="font-bold">
                       {itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
                     </div>
@@ -157,12 +157,12 @@ const Template1 = ({ deliveryNote, itemsList, units, quotationDetails }) => {
                       </div>
                     )}
                   </td>
-                  <td className="border border-gray-800 p-2">{item.range || 'N/A'}</td>
-                  <td className="border border-gray-800 p-2">{item.quantity || 'N/A'}</td>
+                  <td className="border-b border-gray-800 p-2">{item.range || 'N/A'}</td>
+                  <td className="border-b border-gray-800 p-2">{item.quantity || 'N/A'}</td>
                   <td className="border border-gray-800 p-2">
                     {units.find((u) => u.id === Number(item.uom))?.name || 'N/A'}
                   </td>
-                  <td className="border border-gray-800 p-2">{item.delivered_quantity || 'N/A'}</td>
+                  <td className="border-b border-gray-800 p-2">{item.delivered_quantity || 'N/A'}</td>
                 </tr>
               ))}
           </tbody>
