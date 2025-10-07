@@ -125,7 +125,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
             <div className="p-2 border-b grid grid-cols-2 items-center gap-2">
               <InputField
                 type="text"
-                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : apiEndpoint === "units/" ? "unit" : "client"}...`}
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 className="flex-1 p-2 border rounded"
@@ -178,17 +178,13 @@ const AddRFQ = () => {
     teamMembers: [],
     itemsList: [],
     units: [],
-    clients: [], // Added for existing clients
-    selectedClientId: null, // Track selected client
+    clients: [],
+    selectedClientId: null,
     isNewClient: false,
-    originalContact: { // Store original Point of Contact for comparison
-      point_of_contact_name: "",
-      point_of_contact_email: "",
-      point_of_contact_phone: "",
-    },
+    isClientSelected: false,
+    originalContact: { name: "", email: "", phone: "" },
   });
   const [isModalOpen, setIsModalOpen] = useState(true);
-  const [showClientList, setShowClientList] = useState(false); // Toggle client list modal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -200,7 +196,7 @@ const AddRFQ = () => {
           apiClient.get("teams/"),
           apiClient.get("items/"),
           apiClient.get("units/"),
-          apiClient.get("clients/"), // Fetch clients
+          apiClient.get("clients/"),
         ]);
         setState((prev) => ({
           ...prev,
@@ -249,6 +245,71 @@ const AddRFQ = () => {
     });
   };
 
+  const handleClientSelect = (clientId, clients) => {
+    const selectedClient = clients.find((client) => client.id === clientId);
+    if (selectedClient) {
+      setState((prev) => ({
+        ...prev,
+        selectedClientId: clientId,
+        isClientSelected: true,
+        isNewClient: false,
+        company_name: selectedClient.company_name || "",
+        company_address: selectedClient.company_address || "",
+        company_phone: selectedClient.company_phone || "",
+        company_email: selectedClient.company_email || "",
+        rfq_channel: selectedClient.rfq_channel || "",
+        point_of_contact_name: selectedClient.point_of_contact_name || "",
+        point_of_contact_email: selectedClient.point_of_contact_email || "",
+        point_of_contact_phone: selectedClient.point_of_contact_phone || "",
+        originalContact: {
+          name: selectedClient.point_of_contact_name || "",
+          email: selectedClient.point_of_contact_email || "",
+          phone: selectedClient.point_of_contact_phone || "",
+        },
+      }));
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!state.selectedClientId) {
+      toast.error("No client selected.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await apiClient.put(`/clients/${state.selectedClientId}/update-contact/`, {
+        point_of_contact_name: state.point_of_contact_name,
+        point_of_contact_email: state.point_of_contact_email,
+        point_of_contact_phone: state.point_of_contact_phone,
+      });
+      toast.success("Point of Contact updated successfully!");
+      setState((prev) => ({
+        ...prev,
+        originalContact: {
+          name: prev.point_of_contact_name,
+          email: prev.point_of_contact_email,
+          phone: prev.point_of_contact_phone,
+        },
+      }));
+      setStep(2);
+    } catch (error) {
+      console.error("Error updating Point of Contact:", error);
+      toast.error("Failed to update Point of Contact.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isContactChanged = () => {
+    return (
+      state.point_of_contact_name !== state.originalContact.name ||
+      state.point_of_contact_email !== state.originalContact.email ||
+      state.point_of_contact_phone !== state.originalContact.phone
+    );
+  };
+
   const isStepValid = () => {
     if (step === 1) {
       return (
@@ -280,14 +341,6 @@ const AddRFQ = () => {
     return false;
   };
 
-  const hasContactChanged = () => {
-    return (
-      state.point_of_contact_name !== state.originalContact.point_of_contact_name ||
-      state.point_of_contact_email !== state.originalContact.point_of_contact_email ||
-      state.point_of_contact_phone !== state.originalContact.point_of_contact_phone
-    );
-  };
-
   const handleNext = (e) => {
     e.preventDefault();
     if (isStepValid()) {
@@ -315,16 +368,6 @@ const AddRFQ = () => {
     }
 
     setLoading(true);
-    console.log("Submitting payload:", {
-      ...state,
-      items: state.items.map((item) => ({
-        item: item.item ? parseInt(item.item) : null,
-        quantity: item.quantity ? parseInt(item.quantity) : null,
-        unit: item.unit ? parseInt(item.unit) : null,
-        unit_price: null,
-      })),
-    });
-
     try {
       await apiClient.post("rfqs/", {
         company_name: state.company_name || null,
@@ -357,221 +400,196 @@ const AddRFQ = () => {
     }
   };
 
-  const handleClientSelect = (type) => {
-    if (type === "new") {
-      setState((prev) => ({ ...prev, isNewClient: true }));
-      setIsModalOpen(false);
-    } else if (type === "existing") {
-      setShowClientList(true);
-    }
-  };
-
-  const handleClientSelection = (client) => {
-    setState((prev) => ({
-      ...prev,
-      selectedClientId: client.id,
-      company_name: client.company_name || "",
-      company_address: client.company_address || "",
-      company_phone: client.company_phone || "",
-      company_email: client.company_email || "",
-      rfq_channel: client.rfq_channel || "",
-      point_of_contact_name: client.point_of_contact_name || "",
-      point_of_contact_email: client.point_of_contact_email || "",
-      point_of_contact_phone: client.point_of_contact_phone || "",
-      originalContact: {
-        point_of_contact_name: client.point_of_contact_name || "",
-        point_of_contact_email: client.point_of_contact_email || "",
-        point_of_contact_phone: client.point_of_contact_phone || "",
-      },
-      isNewClient: false,
-    }));
-    setShowClientList(false);
+  const handleClientTypeSelect = (type) => {
     setIsModalOpen(false);
-  };
-
-  const handleSaveContact = async (e) => {
-    e.preventDefault();
-    if (!state.selectedClientId) {
-      toast.error("No client selected.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await apiClient.put(`/clients/${state.selectedClientId}/`, {
-        point_of_contact_name: state.point_of_contact_name || null,
-        point_of_contact_email: state.point_of_contact_email || null,
-        point_of_contact_phone: state.point_of_contact_phone || null,
-      });
-      toast.success("Point of Contact updated successfully!");
+    if (type === "new") {
       setState((prev) => ({
         ...prev,
-        originalContact: {
-          point_of_contact_name: prev.point_of_contact_name,
-          point_of_contact_email: prev.point_of_contact_email,
-          point_of_contact_phone: prev.point_of_contact_phone,
-        },
+        isNewClient: true,
+        isClientSelected: false,
+        selectedClientId: null,
+        company_name: "",
+        company_address: "",
+        company_phone: "",
+        company_email: "",
+        rfq_channel: "",
+        point_of_contact_name: "",
+        point_of_contact_email: "",
+        point_of_contact_phone: "",
+        originalContact: { name: "", email: "", phone: "" },
       }));
-      setStep(2); // Proceed to Step 2
-    } catch (error) {
-      console.error("Error updating Point of Contact:", error);
-      toast.error("Failed to update Point of Contact.");
-    } finally {
-      setLoading(false);
+    } else if (type === "existing") {
+      setState((prev) => ({ ...prev, isNewClient: false, isClientSelected: false }));
     }
   };
 
   const renderStep1 = () => (
     <div className="grid gap-4">
-      <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h2 className="text-black text-xl font-semibold">Company Details</h2>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Name
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter company name"
-            value={state.company_name}
-            onChange={(e) =>
-              state.isNewClient &&
-              setState((prev) => ({ ...prev, company_name: e.target.value }))
-            }
-            maxLength={100}
-            disabled={!state.isNewClient}
-            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
+      {!state.isNewClient && !state.isClientSelected && (
+        <div className="bg-white p-4 space-y-4 rounded-md shadow">
+          <h2 className="text-black text-xl font-semibold">Select Existing Client</h2>
+          <SearchableDropdown
+            options={state.clients.map((client) => ({
+              id: client.id,
+              name: client.company_name,
+            }))}
+            value={state.selectedClientId}
+            onChange={handleClientSelect}
+            placeholder="Search or select client..."
+            allowAddItem={false}
+            apiEndpoint="clients/"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Address
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter company address"
-            value={state.company_address}
-            onChange={(e) =>
-              state.isNewClient &&
-              setState((prev) => ({ ...prev, company_address: e.target.value }))
-            }
-            disabled={!state.isNewClient}
-            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Phone
-          </label>
-          <InputField
-            type="number"
-            placeholder="Enter company phone"
-            value={state.company_phone}
-            onChange={(e) =>
-              state.isNewClient &&
-              setState((prev) => ({ ...prev, company_phone: e.target.value }))
-            }
-            maxLength={20}
-            disabled={!state.isNewClient}
-            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Email
-          </label>
-          <InputField
-            type="email"
-            placeholder="Enter company email"
-            value={state.company_email}
-            onChange={(e) =>
-              state.isNewClient &&
-              setState((prev) => ({ ...prev, company_email: e.target.value }))
-            }
-            disabled={!state.isNewClient}
-            className={state.isNewClient ? "" : "bg-gray-100 cursor-not-allowed"}
-          />
-        </div>
-      </div>
-      <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            RFQ Channel
-          </label>
-          <select
-            value={state.rfq_channel}
-            onChange={(e) =>
-              state.isNewClient &&
-              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
-            }
-            className={state.isNewClient ? "w-full p-2 border rounded focus:outline-indigo-500" : "w-full p-2 border rounded bg-gray-100 cursor-not-allowed"}
-            disabled={!state.isNewClient}
-          >
-            <option value="">Select Channel</option>
-            {state.channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.channel_name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Name
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter contact name"
-            value={state.point_of_contact_name}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_name: e.target.value,
-              }))
-            }
-            maxLength={100}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Email
-          </label>
-          <InputField
-            type="email"
-            placeholder="Enter contact email"
-            value={state.point_of_contact_email}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_email: e.target.value,
-              }))
-            }
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Phone
-          </label>
-          <InputField
-            type="number"
-            placeholder="Enter contact phone"
-            value={state.point_of_contact_phone}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_phone: e.target.value,
-              }))
-            }
-            maxLength={20}
-          />
-        </div>
-      </div>
-      {!state.isNewClient && (
+      )}
+      {(state.isNewClient || state.isClientSelected) && (
+        <>
+          <div className="bg-white p-4 space-y-4 rounded-md shadow">
+            <h2 className="text-black text-xl font-semibold">Company Details</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Name
+              </label>
+              <InputField
+                type="text"
+                placeholder="Enter company name"
+                value={state.company_name}
+                onChange={(e) =>
+                  state.isNewClient &&
+                  setState((prev) => ({ ...prev, company_name: e.target.value }))
+                }
+                maxLength={100}
+                disabled={state.isClientSelected}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Address
+              </label>
+              <InputField
+                type="text"
+                placeholder="Enter company address"
+                value={state.company_address}
+                onChange={(e) =>
+                  state.isNewClient &&
+                  setState((prev) => ({ ...prev, company_address: e.target.value }))
+                }
+                disabled={state.isClientSelected}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Phone
+              </label>
+              <InputField
+                type="number"
+                placeholder="Enter company phone"
+                value={state.company_phone}
+                onChange={(e) =>
+                  state.isNewClient &&
+                  setState((prev) => ({ ...prev, company_phone: e.target.value }))
+                }
+                maxLength={20}
+                disabled={state.isClientSelected}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company Email
+              </label>
+              <InputField
+                type="email"
+                placeholder="Enter company email"
+                value={state.company_email}
+                onChange={(e) =>
+                  state.isNewClient &&
+                  setState((prev) => ({ ...prev, company_email: e.target.value }))
+                }
+                disabled={state.isClientSelected}
+              />
+            </div>
+          </div>
+          <div className="bg-white p-4 space-y-4 rounded-md shadow">
+            <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                RFQ Channel
+              </label>
+              <select
+                value={state.rfq_channel}
+                onChange={(e) =>
+                  state.isNewClient &&
+                  setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
+                }
+                className="w-full p-2 border rounded focus:outline-indigo-500"
+                disabled={state.isClientSelected}
+              >
+                <option value="">Select Channel</option>
+                {state.channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.channel_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="bg-white p-4 space-y-4 rounded-md shadow">
+            <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Name
+              </label>
+              <InputField
+                type="text"
+                placeholder="Enter contact name"
+                value={state.point_of_contact_name}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    point_of_contact_name: e.target.value,
+                  }))
+                }
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Email
+              </label>
+              <InputField
+                type="email"
+                placeholder="Enter contact email"
+                value={state.point_of_contact_email}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    point_of_contact_email: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Phone
+              </label>
+              <InputField
+                type="number"
+                placeholder="Enter contact phone"
+                value={state.point_of_contact_phone}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    point_of_contact_phone: e.target.value,
+                  }))
+                }
+                maxLength={20}
+              />
+            </div>
+          </div>
+        </>
+      )}
+      {(state.isNewClient || state.isClientSelected) && (
         <div className="flex justify-end mt-4">
-          {hasContactChanged() ? (
+          {state.isClientSelected && isContactChanged() ? (
             <Button
               type="button"
               onClick={handleSaveContact}
@@ -642,74 +660,71 @@ const AddRFQ = () => {
     </div>
   );
 
-  const renderStep3 = () => {
-    console.log("state.items:", state.items);
-    return (
-      <div className="grid gap-4">
-        {state.items.map((item, index) => (
-          <div key={index} className="border p-4 rounded bg-gray-50">
-            <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
-            <div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
-              <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Item
-                </label>
-                <SearchableDropdown
-                  options={state.itemsList}
-                  value={item.item}
-                  onChange={(value, newOptions) => handleItemChange(index, "item", value, newOptions)}
-                  placeholder="Search or enter item..."
-                  allowAddItem={true}
-                  apiEndpoint="items/"
-                />
-              </div>
-              <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity
-                </label>
-                <InputField
-                  type="number"
-                  placeholder="Enter quantity"
-                  value={item.quantity}
-                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                  min={0}
-                />
-              </div>
-              <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit
-                </label>
-                <SearchableDropdown
-                  options={state.units}
-                  value={item.unit}
-                  onChange={(value, newOptions) => handleItemChange(index, "unit", value, newOptions)}
-                  placeholder="Search or enter unit..."
-                  allowAddItem={true}
-                  apiEndpoint="units/"
-                />
-              </div>
-              {state.items.length > 1 && (
-                <Button
-                  type="button"
-                  onClick={() => removeItem(index)}
-                  className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
-                >
-                  Remove Item
-                </Button>
-              )}
+  const renderStep3 = () => (
+    <div className="grid gap-4">
+      {state.items.map((item, index) => (
+        <div key={index} className="border p-4 rounded bg-gray-50">
+          <h4 className="text-md font-medium mb-2">Item {index + 1}</h4>
+          <div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Item
+              </label>
+              <SearchableDropdown
+                options={state.itemsList}
+                value={item.item}
+                onChange={(value, newOptions) => handleItemChange(index, "item", value, newOptions)}
+                placeholder="Search or enter item..."
+                allowAddItem={true}
+                apiEndpoint="items/"
+              />
             </div>
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quantity
+              </label>
+              <InputField
+                type="number"
+                placeholder="Enter quantity"
+                value={item.quantity}
+                onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                min={0}
+              />
+            </div>
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Unit
+              </label>
+              <SearchableDropdown
+                options={state.units}
+                value={item.unit}
+                onChange={(value, newOptions) => handleItemChange(index, "unit", value, newOptions)}
+                placeholder="Search or enter unit..."
+                allowAddItem={true}
+                apiEndpoint="units/"
+              />
+            </div>
+            {state.items.length > 1 && (
+              <Button
+                type="button"
+                onClick={() => removeItem(index)}
+                className="mt-5 w-full bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Remove Item
+              </Button>
+            )}
           </div>
-        ))}
-        <Button
-          type="button"
-          onClick={addItem}
-          className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
-        >
-          Add Another Item
-        </Button>
-      </div>
-    );
-  };
+        </div>
+      ))}
+      <Button
+        type="button"
+        onClick={addItem}
+        className="bg-blue-500 text-white rounded-md hover:bg-blue-400 mt-2"
+      >
+        Add Another Item
+      </Button>
+    </div>
+  );
 
   return (
     <div className="mx-auto p-4">
@@ -738,52 +753,46 @@ const AddRFQ = () => {
       >
         <div className="flex flex-col space-y-4">
           <Button
-            onClick={() => handleClientSelect("new")}
+            onClick={() => handleClientTypeSelect("new")}
             className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             New Client
           </Button>
           <Button
-            onClick={() => handleClientSelect("existing")}
+            onClick={() => handleClientTypeSelect("existing")}
             className="bg-gray-200 text-black p-3 rounded-lg hover:bg-gray-300 shadow-md hover:shadow-lg transition-colors duration-300"
           >
             Existing Client
           </Button>
         </div>
       </Modal>
-      <Modal
-        isOpen={showClientList}
-        onClose={() => {
-          setShowClientList(false);
-          setIsModalOpen(true);
-        }}
-        title="Select Existing Client"
-      >
-        <div className="flex flex-col space-y-2 max-h-60 overflow-y-auto">
-          {state.clients.length > 0 ? (
-            state.clients.map((client) => (
-              <Button
-                key={client.id}
-                onClick={() => handleClientSelection(client)}
-                className="bg-gray-100 text-black p-2 rounded-lg hover:bg-gray-200 transition-colors duration-300"
-              >
-                {client.company_name}
-              </Button>
-            ))
-          ) : (
-            <p className="text-gray-500">No clients found.</p>
-          )}
-        </div>
-      </Modal>
-      {(state.isNewClient || state.selectedClientId) && (
-        <form onSubmit={handleSubmit} className="mb-6">
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
-          {step > 1 && (
-            <div className="mt-6">
-              {step === 2 ? (
-                <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="mb-6">
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step !== 1 && (
+          <div className="mt-6">
+            {step === 2 ? (
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  onClick={handlePrev}
+                  className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+                  disabled={!isStepValid()}
+                >
+                  Next
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
                   <Button
                     type="button"
                     onClick={handlePrev}
@@ -791,41 +800,21 @@ const AddRFQ = () => {
                   >
                     Previous
                   </Button>
+                </div>
+                <div className="flex justify-end">
                   <Button
-                    type="button"
-                    onClick={handleNext}
-                    className="w-full whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-                    disabled={!isStepValid()}
+                    type="submit"
+                    disabled={!isStepValid() || loading}
+                    className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
-                    Next
+                    {loading ? "Submitting..." : "Submit RFQ"}
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <Button
-                      type="button"
-                      onClick={handlePrev}
-                      className="w-full whitespace-nowrap bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                    >
-                      Previous
-                    </Button>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!isStepValid() || loading}
-                      className={`w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600 ${!isStepValid() || loading ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      {loading ? "Submitting..." : "Submit RFQ"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </form>
-      )}
+              </div>
+            )}
+          </div>
+        )}
+      </form>
     </div>
   );
 };
