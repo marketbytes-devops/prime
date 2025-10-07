@@ -276,7 +276,7 @@ const RaisedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
@@ -531,27 +531,27 @@ const RaisedInvoices = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-<thead>
-  <tr className="bg-gray-100">
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Due Date</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-  </tr>
-</thead>
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Due Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+              </tr>
+            </thead>
             <tbody>
               {currentPairs.length === 0 ? (
                 <tr>
-                <td colSpan="11" className="border p-2 text-center text-gray-500">
-  No raised invoices found.
-</td>
+                  <td colSpan="11" className="border p-2 text-center text-gray-500">
+                    No raised invoices found.
+                  </td>
                 </tr>
               ) : (
                 currentPairs.map((pair, index) => (
@@ -568,8 +568,8 @@ const RaisedInvoices = () => {
                         : 'N/A'}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-  {pair.invoice?.due_in_days ? `${pair.invoice.due_in_days} days` : 'N/A'}
-</td>
+                      {pair.invoice?.due_in_days ? `${pair.invoice.due_in_days} days` : 'N/A'}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -620,22 +620,32 @@ const RaisedInvoices = () => {
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                         <select
-                          onChange={(e) => handleUpdateStatus(pair, e.target.value)}
-                          disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            if (newStatus && newStatus !== pair.invoice?.invoice_status) {
+                              handleUpdateStatus(pair, newStatus);
+                            }
+                          }}
+                          disabled={isSubmitting || !hasPermission('raised_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
+                          value={pair.invoice?.invoice_status || 'raised'}
                           className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
-                            isSubmitting || !hasPermission('raised_invoices', 'edit')
+                            isSubmitting || !hasPermission('raised_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                              : pair.invoice?.invoice_status === 'pending'
+                              ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                              : pair.invoice?.invoice_status === 'raised'
+                              ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
+                              : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
                           }`}
-                          value=""
                         >
-                          <option value="" disabled>Select Status</option>
                           <option value="pending">Pending</option>
                           <option value="processed">Processed</option>
                         </select>
-                      </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">Fill all the details</span>
+                      )}
                     </td>
                   </tr>
                 ))
