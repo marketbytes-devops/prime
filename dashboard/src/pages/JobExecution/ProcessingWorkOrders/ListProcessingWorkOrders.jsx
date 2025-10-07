@@ -473,16 +473,22 @@ const ListProcessingWorkOrders = () => {
                               onClick={() => handleViewWO(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
                               className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
-                                  ? "bg-gray-300 cursor-not-allowed"
-                                  : "bg-green-600 text-white hover:bg-green-700"
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-green-600 text-white hover:bg-green-700"
                                 }`}
                             >
                               View
                             </Button>
                             <Button
                               onClick={() => handleEditWO(wo.id)}
-                              disabled={!hasPermission("processing_work_orders", "edit")}
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit")
+                              disabled={
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
+                              }
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
+                                  wo.status === "Manager Approval" ||
+                                  wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 text-white hover:bg-blue-700"
                                 }`}
@@ -491,8 +497,14 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
-                              disabled={!hasPermission("processing_work_orders", "delete")}
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "delete")
+                              disabled={
+                                !hasPermission("processing_work_orders", "delete") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
+                              }
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "delete") || wo.status === "Manager Approval" ||
+                                  wo.status === "Manager Approval" ||
+                                  wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
                                 }`}
@@ -506,28 +518,27 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
+                                  wo.status === "Manager Approval" ||
+                                  wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
-                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                  : "bg-yellow-600 text-white hover:bg-yellow-700"
-                              }`}
+                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    : "bg-yellow-600 text-white hover:bg-yellow-700"
+                                }`}
                             >
                               {(wo.status === "Manager Approval" || wo.status === "Approved")
                                 ? "Manager Approved"
                                 : isDUTComplete(wo)
-                                ? "Move to Manager Approval"
-                                : "Update Device Test Details"}
+                                  ? "Move to Manager Approval"
+                                  : "Update Device Test Details"}
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
                               className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
-                                  ? "bg-gray-300 cursor-not-allowed"
-                                  : "bg-gray-600 text-white hover:bg-gray-700"
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-gray-600 text-white hover:bg-gray-700"
                                 }`}
                             >
                               Print
@@ -555,8 +566,8 @@ const ListProcessingWorkOrders = () => {
                   key={page}
                   onClick={() => handlePageChange(page)}
                   className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                 >
                   {page}
