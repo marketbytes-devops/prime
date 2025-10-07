@@ -601,11 +601,10 @@ const ProcessedInvoices = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600">{pair.invoice?.invoice_status || 'Processed'}</span>
                         <select
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
-                          className={`px-3 py-1 rounded-md text-sm border ${
+                          className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
                             isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'border-gray-300 text-gray-700 hover:bg-gray-100'
