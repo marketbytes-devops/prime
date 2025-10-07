@@ -147,9 +147,9 @@ const ListProcessingWorkOrders = () => {
       toast.error("Work order not found.");
       return;
     }
-    console.log("Work Order Status:", wo.status); // Debug status
-    if (wo.status === "Manager Approval") {
-      toast.info("Work order is already in Manager Approval.");
+    console.log("Work Order Status:", wo.status);
+    if (wo.status === "Manager Approval" || wo.status === "Approved") {
+      toast.info("Work order is already in Manager Approval or Approved.");
       return;
     }
     if (!isDUTComplete(wo)) {
@@ -312,9 +312,9 @@ const ListProcessingWorkOrders = () => {
   };
 
   const getDisplayStatus = (status) => {
-    if (status === "Manager Approval") return "Manager Approved";
-    if (status === "Approved") return "Approved";
-    return status || "Submitted";
+    if (status === "Submitted") return "Pending";
+    if (status === "Manager Approval" || status === "Approved") return "Collected";
+    return "Pending";
   };
 
   const filteredWOs = state.workOrders
@@ -472,10 +472,11 @@ const ListProcessingWorkOrders = () => {
                             <Button
                               onClick={() => handleViewWO(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
-                                ? "bg-gray-300 cursor-not-allowed"
-                                : "bg-green-600 text-white hover:bg-green-700"
-                                }`}
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "view")
+                                  ? "bg-gray-300 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700"
+                              }`}
                             >
                               View
                             </Button>
@@ -486,12 +487,13 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
-                                  wo.status === "Manager Approval" ||
-                                  wo.status === "Approved"
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 text-white hover:bg-blue-700"
-                                }`}
+                              }`}
                             >
                               Update
                             </Button>
@@ -502,12 +504,13 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "delete") || wo.status === "Manager Approval" ||
-                                  wo.status === "Manager Approval" ||
-                                  wo.status === "Approved"
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "delete") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
-                                }`}
+                              }`}
                             >
                               Delete
                             </Button>
@@ -518,28 +521,28 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
-                                  wo.status === "Manager Approval" ||
-                                  wo.status === "Approved"
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
                                     ? "bg-indigo-600 text-white hover:bg-indigo-700"
                                     : "bg-yellow-600 text-white hover:bg-yellow-700"
-                                }`}
+                              }`}
                             >
-                              {(wo.status === "Manager Approval" || wo.status === "Approved")
-                                ? "Manager Approved"
-                                : isDUTComplete(wo)
-                                  ? "Move to Manager Approval"
-                                  : "Update Device Test Details"}
+                              {isDUTComplete(wo)
+                                ? "Move to Manager Approval"
+                                : "Update Device Test Details"}
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
                               disabled={!hasPermission("processing_work_orders", "view")}
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
-                                ? "bg-gray-300 cursor-not-allowed"
-                                : "bg-gray-600 text-white hover:bg-gray-700"
-                                }`}
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "view")
+                                  ? "bg-gray-300 cursor-not-allowed"
+                                  : "bg-gray-600 text-white hover:bg-gray-700"
+                              }`}
                             >
                               Print
                             </Button>
@@ -565,10 +568,11 @@ const ListProcessingWorkOrders = () => {
                 <Button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
+                  className={`px-3 py-1 rounded-md min-w-fit ${
+                    state.currentPage === page
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
                 >
                   {page}
                 </Button>
@@ -591,8 +595,7 @@ const ListProcessingWorkOrders = () => {
                 selectedWO: null,
               }))
             }
-            title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"
-              }`}
+            title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"}`}
           >
             {state.selectedWO && (
               <div className="space-y-4">
