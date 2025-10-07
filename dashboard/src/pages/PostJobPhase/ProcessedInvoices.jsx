@@ -202,7 +202,6 @@ const ProcessedInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'slip') {
-      // For processed status, use processed_certificate_file (slip)
       if (pair.invoice?.processed_certificate_file) {
         window.open(pair.invoice.processed_certificate_file, '_blank');
       } else {
@@ -256,12 +255,12 @@ const ProcessedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
-        e.target.value = ''; // Clear the input
-        e.target.focus(); // Focus back on the input
-        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
+        e.target.value = '';
+        e.target.focus();
+        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } }));
         return;
       }
       setState((prev) => ({
@@ -285,7 +284,6 @@ const ProcessedInvoices = () => {
       }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
 
-      // For processed, upload to processed_certificate_file (slip)
       if (state.newStatus === 'processed') {
         formData.append('processed_certificate_file', state.invoiceUpload.invoiceFile);
       }
@@ -509,34 +507,36 @@ const ProcessedInvoices = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-<thead>
-  <tr className="bg-gray-100">
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Received Date</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
-    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-  </tr>
-</thead>
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">PO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Received Date</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+              </tr>
+            </thead>
             <tbody>
-        {currentPairs.length === 0 ? (
-  <tr>
-    <td colSpan="11" className="border p-2 text-center text-gray-500">
-      No processed invoices found.
-    </td>
-  </tr>
-) : (
+              {currentPairs.length === 0 ? (
+                <tr>
+                  <td colSpan="12" className="border p-2 text-center text-gray-500">
+                    No processed invoices found.
+                  </td>
+                </tr>
+              ) : (
                 currentPairs.map((pair, index) => (
                   <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).po_series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">{getInvoiceItems(pair.deliveryNote)}</td>
@@ -546,10 +546,10 @@ const ProcessedInvoices = () => {
                         : 'N/A'}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-  {pair.workOrder.created_at
-    ? new Date(pair.workOrder.created_at).toLocaleDateString()
-    : 'N/A'}
-</td>
+                      {pair.invoice.received_date
+                        ? new Date(pair.invoice.received_date).toLocaleDateString()
+                        : 'N/A'}
+                    </td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
