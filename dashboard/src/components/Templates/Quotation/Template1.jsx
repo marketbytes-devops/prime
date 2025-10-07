@@ -22,9 +22,6 @@ const Template1 = ({ data }) => {
     remarks,
     purchase_orders,
     subtotal,
-    vat_applicable,
-    vat_amount,
-    grand_total
   } = data;
 
   // Function to format date as "24 Aug 2025"
@@ -153,8 +150,8 @@ const Template1 = ({ data }) => {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Grand Total</strong></td>
-                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {grand_total ? Number(grand_total).toFixed(2) : '0.00'}</td>
+                <td colSpan="5" style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', textAlign: 'right', backgroundColor: '#f8f4f4', color: '#000000' }}><strong>Total</strong></td>
+                <td style={{ borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd', padding: '8px', backgroundColor: '#f8f4f4', color: '#000000' }}>SAR {subtotal ? Number(subtotal).toFixed(2) : '0.00'}</td>
               </tr>
             </tfoot>
           </table>
@@ -200,9 +197,6 @@ const Template1 = ({ data }) => {
             </li>
             <li style={{ marginBottom: '10px' }}>
               CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.
-            </li>
-            <li style={{ marginBottom: '10px' }}>
-              VAT is excluded from our quotation and will be charged at 15% extra.
             </li>
           </ul>
         </div>
