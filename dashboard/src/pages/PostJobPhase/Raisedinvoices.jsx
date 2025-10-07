@@ -5,7 +5,6 @@ import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 
-// Utility function to format date as DD/MM/YYYY
 const formatDate = (date) => {
   if (!date) return 'N/A';
   const d = new Date(date);
@@ -15,15 +14,15 @@ const formatDate = (date) => {
   return `${day}/${month}/${year}`;
 };
 
-// Utility function to calculate due date and determine if it's past due
 const calculateDueDate = (createdAt, dueInDays) => {
-  if (!createdAt || !dueInDays) return { formattedDate: 'N/A', isPastDue: false };
+  if (!createdAt || !dueInDays) return { formattedDueDate: 'N/A', isOverdue: false };
   const createdDate = new Date(createdAt);
   const dueDate = new Date(createdDate);
   dueDate.setDate(createdDate.getDate() + parseInt(dueInDays));
-  const today = new Date();
-  const isPastDue = dueDate < today;
-  return { formattedDate: formatDate(dueDate), isPastDue };
+  const formattedDueDate = formatDate(dueDate);
+  const currentDate = new Date();
+  const isOverdue = dueDate < currentDate;
+  return { formattedDueDate, isOverdue };
 };
 
 const RaisedInvoices = () => {
@@ -125,6 +124,7 @@ const RaisedInvoices = () => {
       const workOrders = woRes.data || [];
       const invoices = invoiceRes.data || [];
 
+      // Log invoices to check for duplicates
       console.log('Fetched Invoices:', invoices.map(invoice => ({
         id: invoice.id,
         delivery_note: invoice.delivery_note,
@@ -132,7 +132,7 @@ const RaisedInvoices = () => {
       })));
 
       const workOrderDeliveryPairs = [];
-      const seenInvoiceIds = new Set();
+      const seenInvoiceIds = new Set(); // Track unique invoice IDs
 
       workOrders.forEach((workOrder) => {
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
@@ -157,6 +157,7 @@ const RaisedInvoices = () => {
         });
       });
 
+      // Log pairs to verify deduplication
       console.log('WorkOrderDeliveryPairs:', workOrderDeliveryPairs.map(pair => ({
         id: pair.id,
         invoiceId: pair.invoiceId,
@@ -238,6 +239,7 @@ const RaisedInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'invoice') {
+      // For raised status, use final_invoice_file
       if (pair.invoice?.final_invoice_file) {
         window.open(pair.invoice.final_invoice_file, '_blank');
       } else {
@@ -294,12 +296,12 @@ const RaisedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024;
+      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
-        e.target.value = '';
-        e.target.focus();
-        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } }));
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
         return;
       }
       setState((prev) => ({
@@ -323,6 +325,7 @@ const RaisedInvoices = () => {
       }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
 
+      // Conditional file upload based on status
       if (state.newStatus === 'raised') {
         formData.append('final_invoice_file', state.invoiceUpload.invoiceFile);
       } else if (state.newStatus === 'processed') {
@@ -520,7 +523,7 @@ const RaisedInvoices = () => {
     }
   };
 
-  return (
+return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Raised Invoices</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
@@ -573,13 +576,16 @@ const RaisedInvoices = () => {
                 </tr>
               ) : (
                 currentPairs.map((pair, index) => {
-                  const { formattedDate, isPastDue } = calculateDueDate(pair.invoice?.created_at, pair.invoice?.due_in_days);
+                  const { formattedDueDate, isOverdue } = calculateDueDate(
+                    pair.invoice?.created_at,
+                    pair.invoice?.due_in_days
+                  );
                   return (
                     <tr key={pair.id} className="border hover:bg-gray-50">
                       <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                       <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                       <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
-                      <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
+                      <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).po_series_number}</td>
                       <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                       <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                       <td className="border p-2 whitespace-nowrap">{getInvoiceItems(pair.deliveryNote)}</td>
@@ -588,8 +594,8 @@ const RaisedInvoices = () => {
                           ? formatDate(pair.workOrder.created_at)
                           : 'N/A'}
                       </td>
-                      <td className={`border p-2 whitespace-nowrap ${isPastDue ? 'text-red-600' : ''}`}>
-                        {formattedDate}
+                      <td className={`border p-2 whitespace-nowrap ${isOverdue ? 'text-red-600' : ''}`}>
+                        {formattedDueDate}
                       </td>
                       <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                       <td className="border p-2 whitespace-nowrap">
@@ -828,7 +834,7 @@ const RaisedInvoices = () => {
             <div>
               <h3 className="text-lg font-medium text-black">Work Order Details</h3>
               <p><strong>WO Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Created Date:</strong> {formatDate(state.selectedWO.created_at)}</p>
+              <p><strong>Created Date:</strong> {new Date(state.selectedWO.created_at).toLocaleDateString()}</p>
               <p><strong>Assigned To:</strong> {getAssignedTechnicians(state.selectedWO.items)}</p>
             </div>
             <div>
@@ -865,12 +871,12 @@ const RaisedInvoices = () => {
                           <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'Not Provided'}</td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_date
-                              ? formatDate(item.calibration_date)
+                              ? new Date(item.calibration_date).toLocaleDateString()
                               : 'Not Provided'}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.calibration_due_date
-                              ? formatDate(item.calibration_due_date)
+                              ? new Date(item.calibration_due_date).toLocaleDateString()
                               : 'Not Provided'}
                           </td>
                           <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'Not Provided'}</td>
@@ -930,7 +936,7 @@ const RaisedInvoices = () => {
               <p><strong>Delivery Status:</strong> {state.selectedDN.delivery_status || 'N/A'}</p>
               <p>
                 <strong>Created At:</strong>{' '}
-                {state.selectedDN.created_at ? formatDate(state.selectedDN.created_at) : 'N/A'}
+                {state.selectedDN.created_at ? new Date(state.selectedDN.created_at).toLocaleDateString() : 'N/A'}
               </p>
               <p>
                 <strong>Signed Delivery Note:</strong>{' '}
