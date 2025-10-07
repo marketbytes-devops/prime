@@ -301,7 +301,7 @@ const handleViewDocument = (pair, type) => {
   const handlePOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+      const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
@@ -375,7 +375,7 @@ const handleViewDocument = (pair, type) => {
   const handleWOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
@@ -447,7 +447,7 @@ const handleViewDocument = (pair, type) => {
   const handleDNFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
@@ -530,7 +530,7 @@ const handleViewDocument = (pair, type) => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024;
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
         e.target.value = ''; 
