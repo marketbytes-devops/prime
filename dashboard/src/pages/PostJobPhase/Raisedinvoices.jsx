@@ -579,7 +579,7 @@ const RaisedInvoices = () => {
                       <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                       <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                       <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
-                      <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).client_po_number}</td>
+                      <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
                       <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                       <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                       <td className="border p-2 whitespace-nowrap">{getInvoiceItems(pair.deliveryNote)}</td>
