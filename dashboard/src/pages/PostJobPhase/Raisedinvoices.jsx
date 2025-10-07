@@ -276,9 +276,9 @@ const RaisedInvoices = () => {
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 1 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
@@ -1066,7 +1066,7 @@ const RaisedInvoices = () => {
         <div className="space-y-4">
           <div>
             <InputField
-              label={`${state.invoiceUploadType} Invoice File`}
+              label={`${state.invoiceUploadType} Invoice File (Upload 5 MB file)`}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => handleInvoiceFileChange(e)}

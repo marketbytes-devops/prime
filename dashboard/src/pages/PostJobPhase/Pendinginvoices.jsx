@@ -301,9 +301,9 @@ const handleViewDocument = (pair, type) => {
   const handlePOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
       if (file.size > maxSize) {
-        alert('File size exceeds 1 MB limit. Please upload a smaller file.');
+        alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
         e.target.focus(); // Focus back on the input
         setState((prev) => ({ ...prev, poUpload: { ...prev.poUpload, poFile: null } })); // Clear the file
@@ -1635,7 +1635,7 @@ const handleViewDocument = (pair, type) => {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Signed Delivery Note</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Signed Delivery Note (Upload 5 MB file)</label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -1701,7 +1701,7 @@ const handleViewDocument = (pair, type) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {state.invoiceUploadType} {state.newStatus === 'raised' ? 'Invoice' : 'Certificate'} File
+              {state.invoiceUploadType} {state.newStatus === 'raised' ? 'Invoice' : 'Certificate'} File (Upload 5 MB file)
             </label>
             <input
               type="file"
