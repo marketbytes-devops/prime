@@ -191,20 +191,40 @@ const AddRFQ = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [channelsRes, teamsRes, itemsRes, unitsRes, clientsRes] = await Promise.all([
+        const [channelsRes, teamsRes, itemsRes, unitsRes, rfqsRes] = await Promise.all([
           apiClient.get("channels/"),
           apiClient.get("teams/"),
           apiClient.get("items/"),
           apiClient.get("units/"),
-          apiClient.get("clients/"),
+          apiClient.get("rfqs/"),
         ]);
+        // Process RFQ data to extract unique clients
+        const uniqueClients = [];
+        const seenCompanies = new Set();
+        rfqsRes.data.forEach((rfq, index) => {
+          const companyKey = `${rfq.company_name}-${rfq.company_email}`;
+          if (!seenCompanies.has(companyKey)) {
+            seenCompanies.add(companyKey);
+            uniqueClients.push({
+              id: rfq.id, // Use RFQ ID as a temporary unique identifier
+              company_name: rfq.company_name,
+              company_address: rfq.company_address,
+              company_phone: rfq.company_phone,
+              company_email: rfq.company_email,
+              rfq_channel: rfq.rfq_channel,
+              point_of_contact_name: rfq.point_of_contact_name,
+              point_of_contact_email: rfq.point_of_contact_email,
+              point_of_contact_phone: rfq.point_of_contact_phone,
+            });
+          }
+        });
         setState((prev) => ({
           ...prev,
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
-          clients: clientsRes.data || [],
+          clients: uniqueClients,
         }));
         setError(null);
       } catch (error) {
@@ -271,34 +291,11 @@ const AddRFQ = () => {
     }
   };
 
-  const handleSaveContact = async () => {
-    if (!state.selectedClientId) {
-      toast.error("No client selected.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await apiClient.put(`/clients/${state.selectedClientId}/update-contact/`, {
-        point_of_contact_name: state.point_of_contact_name,
-        point_of_contact_email: state.point_of_contact_email,
-        point_of_contact_phone: state.point_of_contact_phone,
-      });
-      toast.success("Point of Contact updated successfully!");
-      setState((prev) => ({
-        ...prev,
-        originalContact: {
-          name: prev.point_of_contact_name,
-          email: prev.point_of_contact_email,
-          phone: prev.point_of_contact_phone,
-        },
-      }));
+  const handleConfirmContact = () => {
+    if (isStepValid()) {
       setStep(2);
-    } catch (error) {
-      console.error("Error updating Point of Contact:", error);
-      toast.error("Failed to update Point of Contact.");
-    } finally {
-      setLoading(false);
+    } else {
+      toast.error("Please fill all required fields.");
     }
   };
 
@@ -437,7 +434,7 @@ const AddRFQ = () => {
             onChange={handleClientSelect}
             placeholder="Search or select client..."
             allowAddItem={false}
-            apiEndpoint="clients/"
+            apiEndpoint="rfqs/"
           />
         </div>
       )}
@@ -592,11 +589,11 @@ const AddRFQ = () => {
           {state.isClientSelected && isContactChanged() ? (
             <Button
               type="button"
-              onClick={handleSaveContact}
+              onClick={handleConfirmContact}
               className="w-fit whitespace-nowrap bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-              disabled={loading}
+              disabled={!isStepValid() || loading}
             >
-              {loading ? "Saving..." : "Save Point of Contact"}
+              Save Point of Contact
             </Button>
           ) : (
             <Button
