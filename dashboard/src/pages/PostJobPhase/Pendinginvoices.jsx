@@ -186,8 +186,7 @@ const PendingInvoices = () => {
     };
   };
 
-
-const handleViewDocument = (pair, type) => {
+  const handleViewDocument = (pair, type) => {
     const workOrder = pair.workOrder;
     if (type === 'wo') {
       setState((prev) => ({
@@ -223,8 +222,6 @@ const handleViewDocument = (pair, type) => {
         );
         if (relatedInvoices.length > 0) {
           const invoice = relatedInvoices[0];
-          
-          // Only open final_invoice_file for "View Invoice" button
           if (invoice.final_invoice_file) {
             window.open(invoice.final_invoice_file, '_blank');
           } else {
@@ -246,7 +243,6 @@ const handleViewDocument = (pair, type) => {
       );
       if (relatedInvoices.length > 0) {
         const invoice = relatedInvoices[0];
-        
         if (invoice.processed_certificate_file) {
           window.open(invoice.processed_certificate_file, '_blank');
         } else {
@@ -301,12 +297,12 @@ const handleViewDocument = (pair, type) => {
   const handlePOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
-        e.target.value = ''; // Clear the input
-        e.target.focus(); // Focus back on the input
-        setState((prev) => ({ ...prev, poUpload: { ...prev.poUpload, poFile: null } })); // Clear the file
+        e.target.value = '';
+        e.target.focus();
+        setState((prev) => ({ ...prev, poUpload: { ...prev.poUpload, poFile: null } }));
         return;
       }
       setState((prev) => ({
@@ -375,12 +371,12 @@ const handleViewDocument = (pair, type) => {
   const handleWOFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
-        e.target.value = ''; // Clear the input
-        e.target.focus(); // Focus back on the input
-        setState((prev) => ({ ...prev, woUpload: { ...prev.woUpload, certificateFile: null } })); // Clear the file
+        e.target.value = '';
+        e.target.focus();
+        setState((prev) => ({ ...prev, woUpload: { ...prev.woUpload, certificateFile: null } }));
         return;
       }
       setState((prev) => ({
@@ -447,12 +443,12 @@ const handleViewDocument = (pair, type) => {
   const handleDNFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
-        e.target.value = ''; // Clear the input
-        e.target.focus(); // Focus back on the input
-        setState((prev) => ({ ...prev, dnUpload: { ...prev.dnUpload, signedDeliveryNote: null } })); // Clear the file
+        e.target.value = '';
+        e.target.focus();
+        setState((prev) => ({ ...prev, dnUpload: { ...prev.dnUpload, signedDeliveryNote: null } }));
         return;
       }
       setState((prev) => ({
@@ -492,39 +488,39 @@ const handleViewDocument = (pair, type) => {
   };
 
   const handleUploadInvoice = (pair) => {
-      if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
-        toast.error('No delivery note items found.');
-        return;
-      }
-      const relatedInvoices = state.invoices.filter(
-        (invoice) => invoice.delivery_note === pair.deliveryNote.id
-      );
-      setState((prev) => ({
-        ...prev,
-        isUploadInvoiceModalOpen: true,
-        selectedWOForInvoiceUpload: pair.workOrder,
-        selectedDNForInvoiceUpload: pair.deliveryNote,
-        selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
-        invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
-        invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
-        invoiceUploadType: 'Final',
-        newStatus: 'processed',
-      }));
-    };
+    if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
+      toast.error('No delivery note items found.');
+      return;
+    }
+    const relatedInvoices = state.invoices.filter(
+      (invoice) => invoice.delivery_note === pair.deliveryNote.id
+    );
+    setState((prev) => ({
+      ...prev,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: pair.workOrder,
+      selectedDNForInvoiceUpload: pair.deliveryNote,
+      selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
+      invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+      invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+      invoiceUploadType: 'Final',
+      newStatus: 'processed',
+    }));
+  };
 
   const validateInvoiceUpload = () => {
-      let isValid = true;
-      const errors = { finalInvoiceFile: '', processedCertificateFile: '' };
-      if (state.newStatus === 'raised' && !state.invoiceUpload.finalInvoiceFile) {
-        errors.finalInvoiceFile = 'Final Invoice File is required';
-        isValid = false;
-      }
-      if (state.newStatus === 'processed' && !state.invoiceUpload.processedCertificateFile) {
-        errors.processedCertificateFile = 'Processed Certificate File is required';
-        isValid = false;
-      }
-      setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
-      return isValid;
+    let isValid = true;
+    const errors = { finalInvoiceFile: '', processedCertificateFile: '' };
+    if (state.newStatus === 'raised' && !state.invoiceUpload.finalInvoiceFile) {
+      errors.finalInvoiceFile = 'Final Invoice File is required';
+      isValid = false;
+    }
+    if (state.newStatus === 'processed' && !state.invoiceUpload.processedCertificateFile) {
+      errors.processedCertificateFile = 'Processed Certificate File is required';
+      isValid = false;
+    }
+    setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
+    return isValid;
   };
 
   const handleInvoiceFileChange = (e) => {
@@ -533,8 +529,8 @@ const handleViewDocument = (pair, type) => {
       const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 1 MB limit. Please upload a smaller file.');
-        e.target.value = ''; 
-        e.target.focus(); 
+        e.target.value = '';
+        e.target.focus();
         setState((prev) => ({
           ...prev,
           invoiceUpload: {
@@ -640,7 +636,7 @@ const handleViewDocument = (pair, type) => {
         draggable: true,
         theme: 'colored',
       });
-      return;  // Early exit: No modal for processed
+      return;
     }
     const relatedInvoices = state.invoices.filter(
       (invoice) => invoice.delivery_note === pair.deliveryNote.id
@@ -686,14 +682,12 @@ const handleViewDocument = (pair, type) => {
 
       let response;
       if (invoiceId) {
-        // Update existing invoice
         response = await apiClient.patch(
           `/invoices/${invoiceId}/`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       } else {
-        // Create new invoice
         response = await apiClient.post(
           `/invoices/`,
           formData,
@@ -721,6 +715,7 @@ const handleViewDocument = (pair, type) => {
       setIsSubmitting(false);
     }
   };
+
   const handleStatusModalSubmit = () => {
     const { selectedDNId, selectedInvoiceId, newStatus, dueInDays, receivedDate } = state;
     const deliveryNote = state.deliveryNotes.find(dn => dn.id === selectedDNId);
@@ -729,7 +724,7 @@ const handleViewDocument = (pair, type) => {
       return;
     }
     const currentStatus = getInvoiceStatusForDN(deliveryNote);
-    if (currentStatus === 'processed' && newStatus !== 'pending') {  // But since dropdown disables, this shouldn't trigger
+    if (currentStatus === 'processed' && newStatus !== 'pending') {
       toast.error('Cannot change a processed invoice.');
       return;
     }
@@ -813,25 +808,22 @@ const handleViewDocument = (pair, type) => {
     return deliveryNote && deliveryNote.signed_delivery_note;
   };
 
-
   const canUploadInvoice = (pair) => {
-  if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
-    return false;
-  }
-  const status = getInvoiceStatusForDN(pair.deliveryNote);
-  if (status === 'processed') return false;  // Block uploads/changes for completed
-  const relatedInvoices = state.invoices.filter(
-    (invoice) => invoice.delivery_note === pair.deliveryNote.id
-  );
-  return (
-    isPOComplete(pair.workOrder) &&
-    isDUTComplete(pair.workOrder) &&
-    isDNComplete(pair.deliveryNote) &&
-    !relatedInvoices.every(invoice => invoice.invoice_status === 'processed')
-  );
-};
-
-
+    if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
+      return false;
+    }
+    const status = getInvoiceStatusForDN(pair.deliveryNote);
+    if (status === 'processed') return false;
+    const relatedInvoices = state.invoices.filter(
+      (invoice) => invoice.delivery_note === pair.deliveryNote.id
+    );
+    return (
+      isPOComplete(pair.workOrder) &&
+      isDUTComplete(pair.workOrder) &&
+      isDNComplete(pair.deliveryNote) &&
+      !relatedInvoices.every(invoice => invoice.invoice_status === 'processed')
+    );
+  };
 
   const getAssignedTechnicians = (items) => {
     const technicianIds = [...new Set(items?.map((item) => item.assigned_to).filter((id) => id))];
@@ -865,13 +857,14 @@ const handleViewDocument = (pair, type) => {
     if (relatedInvoices.length === 0) return 'pending';
     
     const anyProcessed = relatedInvoices.some(invoice => invoice.invoice_status === 'processed');
-    if (anyProcessed) return 'processed';  // Locks this as completed—no further changes
+    if (anyProcessed) return 'processed';
 
     const anyRaised = relatedInvoices.some(invoice => invoice.invoice_status === 'raised');
     if (anyRaised) return 'raised';
   
     return 'pending';
   };
+
   const filteredPairs = state.workOrderDeliveryPairs
     .filter((pair) =>
       (pair.workOrder.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
@@ -946,6 +939,7 @@ const handleViewDocument = (pair, type) => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">PO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
@@ -958,7 +952,7 @@ const handleViewDocument = (pair, type) => {
             <tbody>
               {currentPairs.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="border p-2 text-center text-gray-500">
+                  <td colSpan="11" className="border p-2 text-center text-gray-500">
                     No work orders found.
                   </td>
                 </tr>
@@ -968,6 +962,7 @@ const handleViewDocument = (pair, type) => {
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).company_name}</td>
                     <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).series_number}</td>
+                    <td className="border p-2 whitespace-nowrap">{getQuotationDetails(pair.workOrder).po_series_number}</td>
                     <td className="border p-2 whitespace-nowrap">{pair.workOrder.wo_number || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">{getDNSeriesNumber(pair.deliveryNote)}</td>
                     <td className="border p-2 whitespace-nowrap">
@@ -989,130 +984,124 @@ const handleViewDocument = (pair, type) => {
                         : 'N/A'}
                     </td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
-<td className="border p-2 whitespace-nowrap">
-  <div className="flex items-center gap-2">
-    <Button
-      onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
-      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : isPOEmpty(pair.workOrder)
-          ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-          : 'bg-blue-600 text-white hover:bg-blue-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
-    </Button>
-    
-    <Button
-      onClick={() => handleViewDocument(pair, 'wo')}
-      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-green-600 text-white hover:bg-green-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 'View WO'}
-    </Button>
-    
-    <Button
-      onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
-      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : isDNReadyForUpload(pair.deliveryNote)
-          ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-          : 'bg-purple-600 text-white hover:bg-purple-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
-    </Button>
-    
-    {/* View Invoice Button - for final_invoice_file */}
-    <Button
-      onClick={() => handleViewDocument(pair, 'invoice')}
-      disabled={
-        isSubmitting || 
-        !hasPermission('pending_invoices', 'view') ||
-        !(pair.deliveryNote && state.invoices.some(invoice => 
-          invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-        ))
-      }
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || 
-        !hasPermission('pending_invoices', 'view') ||
-        !(pair.deliveryNote && state.invoices.some(invoice => 
-          invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-        ))
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-indigo-600 text-white hover:bg-indigo-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 
-       (pair.deliveryNote && state.invoices.some(invoice => 
-         invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-       )) ? 'View Invoice' : 'No Invoice'}
-    </Button>
-    
-    {/* View Slip Button - for processed_certificate_file */}
-    <Button
-      onClick={() => handleViewSlip(pair)}
-      disabled={
-        isSubmitting || 
-        !hasPermission('pending_invoices', 'view') ||
-        !(pair.deliveryNote && state.invoices.some(invoice => 
-          invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-        ))
-      }
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || 
-        !hasPermission('pending_invoices', 'view') ||
-        !(pair.deliveryNote && state.invoices.some(invoice => 
-          invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-        ))
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-teal-600 text-white hover:bg-teal-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 
-       (pair.deliveryNote && state.invoices.some(invoice => 
-         invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-       )) ? 'View Slip' : 'No Slip'}
-    </Button>
-  </div>
-</td>
-<td className="border p-2 whitespace-nowrap">
-  {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
-    <select
-      onChange={(e) => {
-        const newStatus = e.target.value;
-        if (newStatus !== getInvoiceStatusForDN(pair.deliveryNote)) {
-          handleUpdateStatus(pair, newStatus);
-        }
-      }}
-      disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair) || getInvoiceStatusForDN(pair.deliveryNote) === 'processed'}
-      value={getInvoiceStatusForDN(pair.deliveryNote)}
-      className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
-        isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair) || getInvoiceStatusForDN(pair.deliveryNote) === 'processed'
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : getInvoiceStatusForDN(pair.deliveryNote) === 'pending'
-          ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
-          : getInvoiceStatusForDN(pair.deliveryNote) === 'raised'
-          ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
-          : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
-      }`}
-    >
-      <option value="pending">Pending</option>
-      <option value="raised">Raised</option>
-      <option value="processed">Processed</option>
-    </select>
-  ) : (
-    <span className="text-sm text-gray-500">Fill all the details</span>
-  )}
-</td>
+                    <td className="border p-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : isPOEmpty(pair.workOrder)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'wo')}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 'View WO'}
+                        </Button>
+                        <Button
+                          onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : isDNReadyForUpload(pair.deliveryNote)
+                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
+                        </Button>
+                        <Button
+                          onClick={() => handleViewDocument(pair, 'invoice')}
+                          disabled={
+                            isSubmitting || 
+                            !hasPermission('pending_invoices', 'view') ||
+                            !(pair.deliveryNote && state.invoices.some(invoice => 
+                              invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+                            ))
+                          }
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || 
+                            !hasPermission('pending_invoices', 'view') ||
+                            !(pair.deliveryNote && state.invoices.some(invoice => 
+                              invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+                            ))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 
+                           (pair.deliveryNote && state.invoices.some(invoice => 
+                             invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+                           )) ? 'View Invoice' : 'No Invoice'}
+                        </Button>
+                        <Button
+                          onClick={() => handleViewSlip(pair)}
+                          disabled={
+                            isSubmitting || 
+                            !hasPermission('pending_invoices', 'view') ||
+                            !(pair.deliveryNote && state.invoices.some(invoice => 
+                              invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+                            ))
+                          }
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            isSubmitting || 
+                            !hasPermission('pending_invoices', 'view') ||
+                            !(pair.deliveryNote && state.invoices.some(invoice => 
+                              invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+                            ))
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-teal-600 text-white hover:bg-teal-700'
+                          }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 
+                           (pair.deliveryNote && state.invoices.some(invoice => 
+                             invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+                           )) ? 'View Slip' : 'No Slip'}
+                        </Button>
+                      </div>
+                    </td>
+                    <td className="border p-2 whitespace-nowrap">
+                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                        <select
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            if (newStatus !== getInvoiceStatusForDN(pair.deliveryNote)) {
+                              handleUpdateStatus(pair, newStatus);
+                            }
+                          }}
+                          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair) || getInvoiceStatusForDN(pair.deliveryNote) === 'processed'}
+                          value={getInvoiceStatusForDN(pair.deliveryNote)}
+                          className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
+                            isSubmitting || !hasPermission('pending_invoices', 'edit') || !canUploadInvoice(pair) || getInvoiceStatusForDN(pair.deliveryNote) === 'processed'
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : getInvoiceStatusForDN(pair.deliveryNote) === 'pending'
+                              ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                              : getInvoiceStatusForDN(pair.deliveryNote) === 'raised'
+                              ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
+                              : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="raised">Raised</option>
+                          <option value="processed">Processed</option>
+                        </select>
+                      ) : (
+                        <span className="text-sm text-gray-500">Fill all the details</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
