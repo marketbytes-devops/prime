@@ -202,6 +202,7 @@ const ProcessedInvoices = () => {
         selectedDN: pair.deliveryNote,
       }));
     } else if (type === 'slip') {
+      // For processed status, use processed_certificate_file (slip)
       if (pair.invoice?.processed_certificate_file) {
         window.open(pair.invoice.processed_certificate_file, '_blank');
       } else {
@@ -258,9 +259,9 @@ const ProcessedInvoices = () => {
       const maxSize = 5 * 1024 * 1024; 
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
-        e.target.value = '';
-        e.target.focus();
-        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } }));
+        e.target.value = ''; // Clear the input
+        e.target.focus(); // Focus back on the input
+        setState((prev) => ({ ...prev, invoiceUpload: { ...prev.invoiceUpload, invoiceFile: null } })); // Clear the file
         return;
       }
       setState((prev) => ({
@@ -284,6 +285,7 @@ const ProcessedInvoices = () => {
       }
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
 
+      // For processed, upload to processed_certificate_file (slip)
       if (state.newStatus === 'processed') {
         formData.append('processed_certificate_file', state.invoiceUpload.invoiceFile);
       }
@@ -507,29 +509,29 @@ const ProcessedInvoices = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Received Date</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
-              </tr>
-            </thead>
+<thead>
+  <tr className="bg-gray-100">
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Company Name</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quotation Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">WO Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">DN Number</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Received Date</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
+    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
+  </tr>
+</thead>
             <tbody>
-              {currentPairs.length === 0 ? (
-                <tr>
-                  <td colSpan="11" className="border p-2 text-center text-gray-500">
-                    No processed invoices found.
-                  </td>
-                </tr>
-              ) : (
+        {currentPairs.length === 0 ? (
+  <tr>
+    <td colSpan="11" className="border p-2 text-center text-gray-500">
+      No processed invoices found.
+    </td>
+  </tr>
+) : (
                 currentPairs.map((pair, index) => (
                   <tr key={pair.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
@@ -544,10 +546,10 @@ const ProcessedInvoices = () => {
                         : 'N/A'}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {pair.invoice.received_date
-                        ? new Date(pair.invoice.received_date).toLocaleDateString()
-                        : 'N/A'}
-                    </td>
+  {pair.workOrder.created_at
+    ? new Date(pair.workOrder.created_at).toLocaleDateString()
+    : 'N/A'}
+</td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -598,30 +600,20 @@ const ProcessedInvoices = () => {
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
+                      <div className="flex items-center gap-2">
                         <select
-                          onChange={(e) => {
-                            const newStatus = e.target.value;
-                            if (newStatus && newStatus !== pair.invoice?.invoice_status) {
-                              handleUpdateStatus(pair, newStatus);
-                            }
-                          }}
+                          onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
-                          value={pair.invoice?.invoice_status || 'pending'}
                           className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
                             isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : pair.invoice?.invoice_status === 'pending'
-                              ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
-                              : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
+                              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
                           }`}
+                          value=""
                         >
-                          <option value="pending">Pending</option>
-                          <option value="processed">Re-upload Slip</option>
+                          <option value="" disabled>Processed</option>
                         </select>
-                      ) : (
-                        <span className="text-sm text-gray-500">Fill all the details</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
