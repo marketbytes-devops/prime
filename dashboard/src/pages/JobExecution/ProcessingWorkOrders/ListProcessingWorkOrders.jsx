@@ -506,22 +506,21 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 wo.status === "Approved"
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit") ||
-                                  wo.status === "Manager Approval" ||
-                                  wo.status === "Manager Approved"
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission("processing_work_orders", "edit") ||
+                                wo.status === "Manager Approval" ||
+                                wo.status === "Approved"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
-                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                    : "bg-yellow-600 text-white hover:bg-yellow-700"
-                                }`}
+                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                  : "bg-yellow-600 text-white hover:bg-yellow-700"
+                              }`}
                             >
-                              {wo.status === "Manager Approval"
+                              {(wo.status === "Manager Approval" || wo.status === "Approved")
                                 ? "Manager Approved"
-                                : wo.status === "Manager Approved"
-                                  ? "Manager Approved"
-                                  : isDUTComplete(wo)
-                                    ? "Move to Manager Approval"
-                                    : "Update Device Test Details"}
+                                : isDUTComplete(wo)
+                                ? "Move to Manager Approval"
+                                : "Update Device Test Details"}
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
