@@ -23,7 +23,6 @@ class RFQ(models.Model):
     )
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    email_sent = models.BooleanField(default=False, blank=True, null=True)
     vat_applicable = models.BooleanField(default=False, blank=True, null=True)
     
     def __str__(self):
