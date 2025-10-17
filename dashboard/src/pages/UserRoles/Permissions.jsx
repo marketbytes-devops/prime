@@ -33,6 +33,7 @@ const Permissions = () => {
     pending_invoices: { apiName: "pending_invoices", displayName: "Pending Invoices" },
     raised_invoices: { apiName: "raised_invoices", displayName: "Raised Invoices" },
     processed_invoices: { apiName: "processed_invoices", displayName: "Processed Invoices" },
+    reports: { apiName: "reports", displayName: "Reports" },
     // completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
     series: { apiName: "series", displayName: "Series" },
     rfq_channel: { apiName: "rfq_channel", displayName: "RFQ Channel" },

@@ -9,9 +9,9 @@ from django.utils.translation import gettext_lazy as _
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError(_('The Email field must be set'))
+            raise ValueError(_("The Email field must be set"))
         email = self.normalize_email(email)
-        extra_fields.setdefault("username", email.split("@")[0])  
+        extra_fields.setdefault("username", email.split("@")[0])
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -21,7 +21,7 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
-        extra_fields.setdefault("username", email.split("@")[0]) 
+        extra_fields.setdefault("username", email.split("@")[0])
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
@@ -29,6 +29,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("Superuser must have is_superuser=True.")
 
         return self.create_user(email, password, **extra_fields)
+
 
 class CustomUser(AbstractUser):
     name = models.CharField(max_length=255, blank=True)
@@ -45,7 +46,7 @@ class CustomUser(AbstractUser):
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
-    
+
     objects = CustomUserManager()
 
     def __str__(self):
@@ -114,7 +115,7 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_edit": False,
                 "can_delete": False,
             },
-            # Add Without PO feature temporarily disabled 
+            # Add Without PO feature temporarily disabled
             # {
             #     "page": "work_orders",
             #     "can_view": True,
@@ -164,8 +165,15 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_edit": False,
                 "can_delete": False,
             },
-             {
+            {
                 "page": "processed_invoices",
+                "can_view": True,
+                "can_add": False,
+                "can_edit": False,
+                "can_delete": False,
+            },
+            {
+                "page": "reports",
                 "can_view": True,
                 "can_add": False,
                 "can_edit": False,
