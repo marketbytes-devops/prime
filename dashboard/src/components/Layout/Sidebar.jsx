@@ -33,7 +33,6 @@ import {
   FolderKanban,
   Clock,
   FileUp,
-  ClipboardMinus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../../assets/images/img-logo.webp";
@@ -47,6 +46,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const [isProcessingWorkOrdersOpen, setIsProcessingWorkOrdersOpen] = useState(false);
   const [isForDeliveryPendingOpen, setIsForDeliveryPendingOpen] = useState(false);
   const [isInvoicesOpen, setIsInvoicesOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   const [permissions, setPermissions] = useState([]);
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +122,7 @@ const Sidebar = ({ toggleSidebar }) => {
   const toggleProcessingWorkOrders = () => setIsProcessingWorkOrdersOpen(!isProcessingWorkOrdersOpen);
   const toggleForDeliveryPending = () => setIsForDeliveryPendingOpen(!isForDeliveryPendingOpen);
   const toggleInvoices = () => setIsInvoicesOpen(!isInvoicesOpen);
+  const toggleReports = () => setIsReportsOpen(!isReportsOpen);
 
   const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
 
@@ -299,11 +300,26 @@ const Sidebar = ({ toggleSidebar }) => {
       }),
     },
     {
-      to: "/reports",
       label: "Reports",
-      icon: <ClipboardMinus className="w-5 h-5 mr-3" />,
+      icon: <FileText className="w-5 h-5 mr-3" />,
       page: "reports",
       action: "view",
+      subItems: [
+        {
+          to: "/reports/view-reports",
+          label: "View Reports",
+          icon: <FileSearch className="w-5 h-5 mr-3" />,
+          page: "view_reports",
+          action: "view",
+        },
+        {
+          to: "/reports/due-date-reports",
+          label: "Due Date Reports",
+          icon: <Clock className="w-5 h-5 mr-3" />,
+          page: "due_date_reports",
+          action: "view",
+        },
+      ].filter((subItem) => hasPermission(subItem.page, subItem.action)),
     },
     {
       label: "Additional Settings",
@@ -428,7 +444,8 @@ const Sidebar = ({ toggleSidebar }) => {
         (item.label === "Initiate Work Order" && isInitiateWorkOrderOpen) ||
         (item.label === "Processing Work Orders" && isProcessingWorkOrdersOpen) ||
         (item.label === "Delivery" && isForDeliveryPendingOpen) ||
-        (item.label === "Invoices" && isInvoicesOpen);
+        (item.label === "Invoices" && isInvoicesOpen) ||
+        (item.label === "Reports" && isReportsOpen);
 
       return (
         <>
@@ -444,11 +461,13 @@ const Sidebar = ({ toggleSidebar }) => {
               else if (item.label === "Processing Work Orders") toggleProcessingWorkOrders();
               else if (item.label === "Delivery") toggleForDeliveryPending();
               else if (item.label === "Invoices") toggleInvoices();
+              else if (item.label === "Reports") toggleReports();
             }}
-            className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 ${isMenuOpen || isActiveSubmenu(item.subItems)
-              ? "bg-indigo-100 text-indigo-600"
-              : "text-gray-700 hover:bg-indigo-500 hover:text-white"
-              }`}
+            className={`flex items-center justify-between w-full px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 ${
+              isMenuOpen || isActiveSubmenu(item.subItems)
+                ? "bg-indigo-100 text-indigo-600"
+                : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+            }`}
           >
             <span className="flex items-center">
               {item.icon}
@@ -463,54 +482,57 @@ const Sidebar = ({ toggleSidebar }) => {
               (item.label === "Initiate Work Order" && (isInitiateWorkOrderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
               (item.label === "Processing Work Orders" && (isProcessingWorkOrdersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
               (item.label === "Delivery" && (isForDeliveryPendingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
-              (item.label === "Invoices" && (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
+              (item.label === "Invoices" && (isInvoicesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)) ||
+              (item.label === "Reports" && (isReportsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />))}
           </button>
           <AnimatePresence>
             {(item.label === "Pre-Job" ? activeOuterMenu === "Pre-Job" :
               item.label === "Job Execution" ? activeOuterMenu === "Job Execution" :
-                item.label === "Post Job Phase" ? activeOuterMenu === "Post Job Phase" :
-                  item.label === "Additional Settings" ? activeOuterMenu === "Additional Settings" :
-                    item.label === "User Roles" ? activeOuterMenu === "User Roles" :
-                      item.label === "RFQ" ? isRFQOpen :
-                        item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
-                          item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
-                            item.label === "Delivery" ? isForDeliveryPendingOpen :
-                              item.label === "Invoices" ? isInvoicesOpen : false) && (
-                <motion.ul
-                  className="ml-4 mt-1 space-y-1"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                >
-                  {filteredSubItems.map((subItem, subIndex) => (
-                    <li key={subIndex}>
-                      {subItem.subItems ? (
-                        renderMenuItem(subItem)
-                      ) : (
-                        <NavLink
-                          to={subItem.to}
-                          className={({ isActive }) =>
-                            `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${isActive
+              item.label === "Post Job Phase" ? activeOuterMenu === "Post Job Phase" :
+              item.label === "Additional Settings" ? activeOuterMenu === "Additional Settings" :
+              item.label === "User Roles" ? activeOuterMenu === "User Roles" :
+              item.label === "RFQ" ? isRFQOpen :
+              item.label === "Initiate Work Order" ? isInitiateWorkOrderOpen :
+              item.label === "Processing Work Orders" ? isProcessingWorkOrdersOpen :
+              item.label === "Delivery" ? isForDeliveryPendingOpen :
+              item.label === "Invoices" ? isInvoicesOpen :
+              item.label === "Reports" ? isReportsOpen : false) && (
+              <motion.ul
+                className="ml-4 mt-1 space-y-1"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              >
+                {filteredSubItems.map((subItem, subIndex) => (
+                  <li key={subIndex}>
+                    {subItem.subItems ? (
+                      renderMenuItem(subItem)
+                    ) : (
+                      <NavLink
+                        to={subItem.to}
+                        className={({ isActive }) =>
+                          `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${
+                            isActive
                               ? "bg-indigo-500 text-white"
                               : "text-gray-600 hover:bg-indigo-100 hover:text-indigo-600"
-                            }`
-                          }
-                          onClick={() => isMobile() && toggleSidebar()}
-                        >
-                          {subItem.icon}
-                          {subItem.label}
-                          {subItem.badge && (
-                            <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
-                              {subItem.badge}
-                            </span>
-                          )}
-                        </NavLink>
-                      )}
-                    </li>
-                  ))}
-                </motion.ul>
-              )}
+                          }`
+                        }
+                        onClick={() => isMobile() && toggleSidebar()}
+                      >
+                        {subItem.icon}
+                        {subItem.label}
+                        {subItem.badge && (
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                            {subItem.badge}
+                          </span>
+                        )}
+                      </NavLink>
+                    )}
+                  </li>
+                ))}
+              </motion.ul>
+            )}
           </AnimatePresence>
         </>
       );
@@ -521,9 +543,10 @@ const Sidebar = ({ toggleSidebar }) => {
         <NavLink
           to={item.to}
           className={({ isActive }) =>
-            `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${isActive
-              ? "bg-indigo-500 text-white"
-              : "text-gray-700 hover:bg-indigo-500 hover:text-white"
+            `flex items-center px-3 py-3 rounded-lg text-[13px] font-medium transition-colors duration-200 whitespace-nowrap ${
+              isActive
+                ? "bg-indigo-500 text-white"
+                : "text-gray-700 hover:bg-indigo-500 hover:text-white"
             }`
           }
           onClick={() => isMobile() && toggleSidebar()}

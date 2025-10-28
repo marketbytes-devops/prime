@@ -33,7 +33,8 @@ const Permissions = () => {
     pending_invoices: { apiName: "pending_invoices", displayName: "Pending Invoices" },
     raised_invoices: { apiName: "raised_invoices", displayName: "Raised Invoices" },
     processed_invoices: { apiName: "processed_invoices", displayName: "Processed Invoices" },
-    reports: { apiName: "reports", displayName: "Reports" },
+    view_reports: { apiName: "view_reports", displayName: "View Reports" },
+    due_date_reports: { apiName: "due_date_reports", displayName: "Due Date Reports" },
     // completed_work_orders: { apiName: "completed_work_orders", displayName: "Completed Work Orders" },
     series: { apiName: "series", displayName: "Series" },
     rfq_channel: { apiName: "rfq_channel", displayName: "RFQ Channel" },
@@ -253,11 +254,10 @@ const Permissions = () => {
                     <Button
                       onClick={() => openPermissionsModal(role)}
                       disabled={!hasPermission("permissions", "edit")}
-                      className={`flex items-center justify-start ${
-                        hasPermission("permissions", "edit")
+                      className={`flex items-center justify-start ${hasPermission("permissions", "edit")
                           ? "text-indigo-600 hover:text-indigo-800"
                           : "text-gray-400 cursor-not-allowed"
-                      }`}
+                        }`}
                     >
                       <Settings className="w-5 h-5 mr-2" /> Permissions
                     </Button>
@@ -351,11 +351,10 @@ const Permissions = () => {
               <Button
                 onClick={handleSavePermissions}
                 disabled={isSaving || !hasPermission("permissions", "edit")}
-                className={`px-4 py-2 rounded-lg ${
-                  isSaving || !hasPermission("permissions", "edit")
+                className={`px-4 py-2 rounded-lg ${isSaving || !hasPermission("permissions", "edit")
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-indigo-500 text-white hover:bg-indigo-600"
-                }`}
+                  }`}
               >
                 {isSaving ? "Saving..." : "Save"}
               </Button>

@@ -41,7 +41,8 @@ import apiClient from "./helpers/apiClient";
 import Loading from "./components/Loading";
 import InitiateDelivery from "./pages/JobExecution/ProcessingWorkOrders/InitiateDelivery";
 import EditDeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditDeclinedWorkOrders";
-import Reports from "./pages/Reports";
+import DueDateReports from "./pages/Reports/DueDateReports";
+import ViewReports from "./pages/Reports/ViewReports";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -288,10 +289,18 @@ function App() {
         //   ),
         // },
         {
-          path: "/reports",
+          path: "/reports/view-reports",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="reports" requiredAction="view">
-              <Reports />
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="view_reports" requiredAction="view">
+              <ViewReports />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/reports/due-date-reports",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="due_date_reports" requiredAction="view">
+              <DueDateReports />
             </ProtectedRoute>
           ),
         },

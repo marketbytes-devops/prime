@@ -173,7 +173,14 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_delete": False,
             },
             {
-                "page": "reports",
+                "page": "view_reports",
+                "can_view": True,
+                "can_add": False,
+                "can_edit": False,
+                "can_delete": False,
+            },
+            {
+                "page": "due_date_reports",
                 "can_view": True,
                 "can_add": False,
                 "can_edit": False,

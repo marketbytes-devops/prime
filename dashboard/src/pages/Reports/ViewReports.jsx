@@ -4,7 +4,7 @@ import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 
-const Reports = () => {
+const ViewReports = () => {
   const [state, setState] = useState({
     rfqs: [],
     quotations: [],
@@ -88,25 +88,37 @@ const Reports = () => {
     return { status: 'OK', color: 'bg-green-100 text-green-800 border-green-300' };
   };
 
-  // Format all calibration dates with days remaining
-  const formatCalibrationDates = (workOrder) => {
-    const dueDates = getAllCalibrationDueDates(workOrder);
-    if (dueDates.length === 0) return 'N/A';
-
-    return dueDates.map(date => {
-      const daysLeft = calculateDaysRemaining(date);
-      let daysText = '';
-      if (daysLeft < 0) daysText = 'EXPIRED';
-      else if (daysLeft === 0) daysText = 'TODAY';
-      else daysText = `${daysLeft} days`;
-      
-      return `${new Date(date).toLocaleDateString()} (${daysText})`;
-    }).join('\n');
-  };
-
   // Check if DN is complete (has signed delivery note)
   const isDNComplete = (deliveryNote) => {
     return deliveryNote && deliveryNote.signed_delivery_note;
+  };
+
+  // Get invoice status for a delivery note (same logic as Pending Invoices)
+  const getInvoiceStatusForDN = (deliveryNote) => {
+    if (!deliveryNote || !deliveryNote.items || deliveryNote.items.length === 0) return 'N/A';
+    
+    const relatedInvoices = state.invoices.filter(
+      (invoice) => invoice.delivery_note === deliveryNote.id
+    );
+    
+    if (relatedInvoices.length === 0) return 'pending';
+    
+    const anyProcessed = relatedInvoices.some(invoice => invoice.invoice_status === 'processed');
+    if (anyProcessed) return 'processed';
+
+    const anyRaised = relatedInvoices.some(invoice => invoice.invoice_status === 'raised');
+    if (anyRaised) return 'raised';
+  
+    return 'pending';
+  };
+
+  // Get the first related invoice for display purposes
+  const getRelatedInvoice = (deliveryNote) => {
+    if (!deliveryNote) return null;
+    const relatedInvoices = state.invoices.filter(
+      (invoice) => invoice.delivery_note === deliveryNote.id
+    );
+    return relatedInvoices.length > 0 ? relatedInvoices[0] : null;
   };
 
   useEffect(() => {
@@ -163,7 +175,7 @@ const Reports = () => {
       const channels = channelRes.data || [];
       const itemsList = itemsRes.data || [];
 
-      // Build report data starting from Work Orders - ONLY with signed DNs
+      // Build report data - ONE ROW PER WO-DN PAIR (same as Pending Invoices)
       const reportData = [];
 
       workOrders.forEach((workOrder) => {
@@ -176,41 +188,23 @@ const Reports = () => {
         // Find related RFQ through Quotation
         const rfq = quotation ? rfqs.find((r) => r.id === quotation.rfq) : null;
         
-        // Find related Delivery Notes
+        // Find related Delivery Notes for this work order
         const relatedDNs = deliveryNotes.filter((dn) => dn.work_order_id === workOrder.id);
 
         // ONLY include signed/complete DNs
         relatedDNs.forEach((dn) => {
           if (isDNComplete(dn)) {
-            const relatedInvoices = invoices.filter((inv) => inv.delivery_note === dn.id);
-
-            if (relatedInvoices.length === 0) {
-              // DN without invoice
-              reportData.push({
-                id: `dn-${dn.id}`,
-                rfq,
-                quotation,
-                purchaseOrder,
-                workOrder,
-                deliveryNote: dn,
-                invoice: null,
-                channel: rfq ? channels.find((c) => c.id === rfq.rfq_channel) : null,
-              });
-            } else {
-              // Complete chain with invoice(s)
-              relatedInvoices.forEach((invoice) => {
-                reportData.push({
-                  id: `inv-${invoice.id}`,
-                  rfq,
-                  quotation,
-                  purchaseOrder,
-                  workOrder,
-                  deliveryNote: dn,
-                  invoice,
-                  channel: rfq ? channels.find((c) => c.id === rfq.rfq_channel) : null,
-                });
-              });
-            }
+            // Create ONE row per WO-DN pair regardless of invoice count
+            reportData.push({
+              id: `wo-${workOrder.id}-dn-${dn.id}`, // Unique ID per WO-DN pair
+              rfq,
+              quotation,
+              purchaseOrder,
+              workOrder,
+              deliveryNote: dn,
+              invoice: getRelatedInvoice(dn), // Get first invoice for file links
+              channel: rfq ? channels.find((c) => c.id === rfq.rfq_channel) : null,
+            });
           }
         });
       });
@@ -470,6 +464,7 @@ const Reports = () => {
                   const isExpanded = state.expandedRows[row.id];
                   const earliestExpiredDate = getEarliestExpiredDate(row.workOrder);
                   const daysSinceEarliestExpired = earliestExpiredDate ? -calculateDaysRemaining(earliestExpiredDate) : null;
+                  const invoiceStatus = getInvoiceStatusForDN(row.deliveryNote);
 
                   return (
                     <React.Fragment key={row.id}>
@@ -477,7 +472,7 @@ const Reports = () => {
                         <td className="border p-2 whitespace-nowrap">
                           <span>{startIndex + index + 1}</span>
                         </td>
-                        <td className="border p-2 whitespace-nowrap">{row.rfq?.rfq_number || 'N/A'}</td>
+                        <td className="border p-2 whitespace-nowrap">{row.rfq?.series_number || 'N/A'}</td>
                         <td className="border p-2 whitespace-nowrap">{row.quotation?.company_name || 'N/A'}</td>
                         <td className="border p-2 whitespace-nowrap">{row.channel?.channel_name || 'N/A'}</td>
                         <td className="border p-2 whitespace-nowrap">{row.quotation?.series_number || 'N/A'}</td>
@@ -519,14 +514,11 @@ const Reports = () => {
                           )}
                         </td>
 
+                        {/* Invoice Status Column */}
                         <td className="border p-2 whitespace-nowrap">
-                          {row.invoice ? (
-                            <span className={`px-2 py-1 rounded-md text-xs border ${getStatusBadge(row.invoice.invoice_status)}`}>
-                              {row.invoice.invoice_status?.charAt(0).toUpperCase() + row.invoice.invoice_status?.slice(1) || 'N/A'}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">No Invoice</span>
-                          )}
+                          <span className={`px-2 py-1 rounded-md text-xs border ${getStatusBadge(invoiceStatus)}`}>
+                            {invoiceStatus.charAt(0).toUpperCase() + invoiceStatus.slice(1)}
+                          </span>
                         </td>
 
                         <td className="border p-2 whitespace-nowrap">
@@ -663,4 +655,4 @@ const Reports = () => {
   );
 };
 
-export default Reports;
+export default ViewReports;
