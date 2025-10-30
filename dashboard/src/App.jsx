@@ -43,6 +43,7 @@ import InitiateDelivery from "./pages/JobExecution/ProcessingWorkOrders/Initiate
 import EditDeclinedWorkOrders from "./pages/JobExecution/ProcessingWorkOrders/EditDeclinedWorkOrders";
 import DueDateReports from "./pages/Reports/DueDateReports";
 import ViewReports from "./pages/Reports/ViewReports";
+import UpdateTermsAndConditions from "./pages/PreJob/Quotation/UpdateTermsConditions";
 
 const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -168,7 +169,7 @@ function App() {
           path: "/view-quotation/update-terms-and-conditions",
           element: (
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
-              <UpdateTermsConditions />
+              <UpdateTermsAndConditions />
             </ProtectedRoute>
           ),
         },
