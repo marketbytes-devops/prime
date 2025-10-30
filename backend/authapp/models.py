@@ -291,6 +291,13 @@ def set_default_permissions(sender, instance, created, **kwargs):
                 "can_edit": False,
                 "can_delete": False,
             },
+            {
+                "page": "pricing",
+                "can_view": True,
+                "can_add": False,
+                "can_edit": False,
+                "can_delete": False,
+            },
         ]
         for perm in default_permissions:
             Permission.objects.create(

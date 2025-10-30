@@ -4,6 +4,7 @@ from .models import (
     RFQItem,
     Quotation,
     QuotationItem,
+    QuotationTerms,
     PurchaseOrder,
     PurchaseOrderItem,
 )
@@ -19,6 +20,7 @@ from django.utils import timezone
 from datetime import date, timedelta
 import json
 from authapp.models import CustomUser, Role
+from rest_framework.response import Response
 
 
 class RFQItemSerializer(serializers.ModelSerializer):
@@ -38,6 +40,22 @@ class RFQItemSerializer(serializers.ModelSerializer):
         if obj.quantity and obj.unit_price:
             return obj.quantity * obj.unit_price
         return 0
+
+
+class QuotationTermsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuotationTerms
+        fields = ["id", "content", "updated_at"]
+
+    def get_queryset(self):
+        return super().get_queryset().order_by("-updated_at")[:1]
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        if qs.exists():
+            serializer = self.get_serializer(qs[0])
+            return Response(serializer.data)
+        return Response({"id": None, "content": "", "updated_at": None})
 
 
 class QuotationItemSerializer(serializers.ModelSerializer):
@@ -79,16 +97,28 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
 
 
 class RFQSerializer(serializers.ModelSerializer):
-    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
+    rfq_channel = serializers.PrimaryKeyRelatedField(
+        queryset=RFQChannel.objects.all(), allow_null=True
+    )
+    assigned_sales_person = serializers.PrimaryKeyRelatedField(
+        queryset=TeamMember.objects.all(), allow_null=True
+    )
     items = RFQItemSerializer(many=True, required=False)
     rfq_status = serializers.ChoiceField(
-        choices=[("Pending", "Pending"), ("Processing", "Processing"), ("Completed", "Completed")],
+        choices=[
+            ("Pending", "Pending"),
+            ("Processing", "Processing"),
+            ("Completed", "Completed"),
+        ],
         allow_null=True,
         required=False,
     )
-    assigned_sales_person_name = serializers.CharField(source="assigned_sales_person.name", read_only=True)
-    assigned_sales_person_email = serializers.CharField(source="assigned_sales_person.email", read_only=True)
+    assigned_sales_person_name = serializers.CharField(
+        source="assigned_sales_person.name", read_only=True
+    )
+    assigned_sales_person_email = serializers.CharField(
+        source="assigned_sales_person.email", read_only=True
+    )
     subtotal = serializers.SerializerMethodField()
     vat_amount = serializers.SerializerMethodField()
     grand_total = serializers.SerializerMethodField()
@@ -113,6 +143,7 @@ class RFQSerializer(serializers.ModelSerializer):
             "rfq_status",
             "assigned_sales_person_name",
             "assigned_sales_person_email",
+            "email_sent",
             "vat_applicable",
             "subtotal",
             "vat_amount",
@@ -135,6 +166,92 @@ class RFQSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def send_creation_email(self, rfq):
+        email_sent = False
+        recipient_list = []
+
+        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
+        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
+            recipient_list.append(
+                (rfq.assigned_sales_person.email, rfq.assigned_sales_person.name)
+            )
+        if settings.ADMIN_EMAIL:
+            recipient_list.append(
+                (settings.ADMIN_EMAIL, None)
+            )  # Admin email with no specific name
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
+            for user in superadmin_users:
+                if user.email:
+                    recipient_list.append((user.email, user.name or user.username))
+
+        # Remove duplicates while preserving names
+        recipient_dict = {email: name for email, name in recipient_list}
+        recipient_list = [(email, name) for email, name in recipient_dict.items()]
+
+        if recipient_list:
+            for email, name in recipient_list:
+                # Determine salutation
+                if email == settings.ADMIN_EMAIL:
+                    salutation = "Dear Admin"
+                elif (
+                    superadmin_role
+                    and CustomUser.objects.filter(
+                        email=email, role=superadmin_role
+                    ).exists()
+                ):
+                    salutation = f"Dear {name}" if name else "Dear Superadmin"
+                elif (
+                    email
+                    == (
+                        rfq.assigned_sales_person.email
+                        if rfq.assigned_sales_person
+                        else None
+                    )
+                    and name
+                ):
+                    salutation = f"Dear {name}"
+                else:
+                    salutation = "Dear Recipient"
+
+                subject = f"New RFQ Created: #{rfq.series_number}"
+                message = (
+                    f"{salutation},\n\n"
+                    f"A new Request for Quotation (RFQ) has been created in PrimeCRM:\n"
+                    f"------------------------------------------------------------\n"
+                    f"🔹 RFQ Number: {rfq.series_number}\n"
+                    f'🔹 Project: {rfq.company_name or "Not specified"}\n'
+                    f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
+                    f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
+                    f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
+                    f'🔹 Company: {rfq.company_name or "Not specified"}\n'
+                    f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
+                    f"------------------------------------------------------------\n"
+                    f"Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n"
+                    f"Best regards,\n"
+                    f"PrimeCRM Team\n"
+                    f"---\n"
+                    f"This is an automated message. Please do not reply to this email."
+                )
+                try:
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.EMAIL_HOST_USER,
+                        recipient_list=[email],
+                        fail_silently=True,
+                    )
+                    email_sent = True
+                    print(
+                        f"RFQ creation email sent successfully to {email} for RFQ #{rfq.series_number}"
+                    )
+                except Exception as e:
+                    print(
+                        f"Failed to send RFQ creation email to {email} for RFQ #{rfq.series_number}: {str(e)}"
+                    )
+        return email_sent
+
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
@@ -156,6 +273,9 @@ class RFQSerializer(serializers.ModelSerializer):
         )
         for item_data in items_data:
             RFQItem.objects.create(rfq=rfq, **item_data)
+        creation_email_sent = self.send_creation_email(rfq)
+        rfq.email_sent = creation_email_sent
+        rfq.save()
         return rfq
 
     def update(self, instance, validated_data):
@@ -172,23 +292,50 @@ class RFQSerializer(serializers.ModelSerializer):
                 RFQItem.objects.create(rfq=instance, **item_data)
         return instance
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation["email_sent"] = getattr(instance, "email_sent", False)
+        return representation
+
+
 class QuotationSerializer(serializers.ModelSerializer):
     rfq = serializers.PrimaryKeyRelatedField(queryset=RFQ.objects.all())
-    rfq_channel = serializers.PrimaryKeyRelatedField(queryset=RFQChannel.objects.all(), allow_null=True)
-    assigned_sales_person = serializers.PrimaryKeyRelatedField(queryset=TeamMember.objects.all(), allow_null=True)
+    rfq_channel = serializers.PrimaryKeyRelatedField(
+        queryset=RFQChannel.objects.all(), allow_null=True
+    )
+    assigned_sales_person = serializers.PrimaryKeyRelatedField(
+        queryset=TeamMember.objects.all(), allow_null=True
+    )
     items = QuotationItemSerializer(many=True, required=True)
+    terms = QuotationTermsSerializer(read_only=True)
     quotation_status = serializers.ChoiceField(
-        choices=[("Pending", "Pending"), ("Approved", "Approved"), ("PO Created", "PO Created"), ("Not Approved", "Not Approved")],
+        choices=[
+            ("Pending", "Pending"),
+            ("Approved", "Approved"),
+            ("PO Created", "PO Created"),
+            ("Not Approved", "Not Approved"),
+        ],
         required=False,
     )
     followup_frequency = serializers.ChoiceField(
-        choices=[("24_hours", "24 Hours"), ("3_days", "3 Days"), ("7_days", "7 Days"), ("every_7th_day", "Every 7th Day")],
+        choices=[
+            ("24_hours", "24 Hours"),
+            ("3_days", "3 Days"),
+            ("7_days", "7 Days"),
+            ("every_7th_day", "Every 7th Day"),
+        ],
         required=False,
     )
     purchase_orders = serializers.SerializerMethodField()
-    assigned_sales_person_name = serializers.CharField(source="assigned_sales_person.name", read_only=True)
-    assigned_sales_person_email = serializers.CharField(source="assigned_sales_person.email", read_only=True)
-    not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    assigned_sales_person_name = serializers.CharField(
+        source="assigned_sales_person.name", read_only=True
+    )
+    assigned_sales_person_email = serializers.CharField(
+        source="assigned_sales_person.email", read_only=True
+    )
+    not_approved_reason_remark = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
     subtotal = serializers.SerializerMethodField()
     vat_amount = serializers.SerializerMethodField()
     grand_total = serializers.SerializerMethodField()
@@ -215,6 +362,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             "series_number",
             "created_at",
             "items",
+            "terms",
             "purchase_orders",
             "assigned_sales_person_name",
             "assigned_sales_person_email",
@@ -225,6 +373,10 @@ class QuotationSerializer(serializers.ModelSerializer):
             "vat_amount",
             "grand_total",
         ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        return rep
 
     def get_subtotal(self, obj):
         return float(obj.get_subtotal())

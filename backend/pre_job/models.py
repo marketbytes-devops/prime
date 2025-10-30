@@ -1,140 +1,214 @@
 from django.db import models
 from datetime import timedelta
 from django.utils import timezone
-from series.models import NumberSeries 
+from series.models import NumberSeries
 from decimal import Decimal
+
 
 class RFQ(models.Model):
     company_name = models.CharField(max_length=100, null=True, blank=True)
     company_address = models.TextField(null=True, blank=True)
     company_phone = models.CharField(max_length=20, null=True, blank=True)
     company_email = models.EmailField(null=True, blank=True)
-    rfq_channel = models.ForeignKey('channels.RFQChannel', on_delete=models.SET_NULL, null=True, blank=True)
+    rfq_channel = models.ForeignKey(
+        "channels.RFQChannel", on_delete=models.SET_NULL, null=True, blank=True
+    )
     point_of_contact_name = models.CharField(max_length=100, null=True, blank=True)
     point_of_contact_email = models.EmailField(null=True, blank=True)
     point_of_contact_phone = models.CharField(max_length=20, null=True, blank=True)
-    assigned_sales_person = models.ForeignKey('team.TeamMember', on_delete=models.SET_NULL, null=True, blank=True)
+    assigned_sales_person = models.ForeignKey(
+        "team.TeamMember", on_delete=models.SET_NULL, null=True, blank=True
+    )
     due_date_for_quotation = models.DateField(null=True, blank=True)
     rfq_status = models.CharField(
         max_length=20,
-        choices=[('Pending', 'Pending'), ('Processing', 'Processing'), ('Completed', 'Completed')],
+        choices=[
+            ("Pending", "Pending"),
+            ("Processing", "Processing"),
+            ("Completed", "Completed"),
+        ],
         null=True,
-        blank=True
+        blank=True,
     )
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    email_sent = models.BooleanField(default=False, blank=True, null=True)
     vat_applicable = models.BooleanField(default=False, blank=True, null=True)
-    
+
     def __str__(self):
         return f"RFQ {self.id} - {self.company_name or 'Unnamed'}"
 
     def get_subtotal(self):
-        return sum(item.quantity * item.unit_price for item in self.items.all() if item.quantity and item.unit_price) or 0
+        return (
+            sum(
+                item.quantity * item.unit_price
+                for item in self.items.all()
+                if item.quantity and item.unit_price
+            )
+            or 0
+        )
 
     def get_vat_amount(self):
         if self.vat_applicable:
-            return self.get_subtotal() * Decimal('0.15')
+            return self.get_subtotal() * Decimal("0.15")
         return 0
 
     def get_grand_total(self):
         return self.get_subtotal() + self.get_vat_amount()
 
+
 class RFQItem(models.Model):
-    rfq = models.ForeignKey(RFQ, related_name='items', on_delete=models.CASCADE)
-    item = models.ForeignKey('item.Item', on_delete=models.SET_NULL, null=True, blank=True)
+    rfq = models.ForeignKey(RFQ, related_name="items", on_delete=models.CASCADE)
+    item = models.ForeignKey(
+        "item.Item", on_delete=models.SET_NULL, null=True, blank=True
+    )
     quantity = models.PositiveIntegerField(null=True, blank=True)
-    unit = models.ForeignKey('unit.Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit = models.ForeignKey(
+        "unit.Unit", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.item} - {self.rfq}"
 
+
+class QuotationTerms(models.Model):
+    content = models.TextField(null=True, blank=True, default="")
+    updated_at = models.DateTimeField(null=True, blank=True, auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Quotation Terms & Conditions"
+
+    def __str__(self):
+        return f"Terms ({self.updated_at.strftime('%Y-%m-%d')})"
+
+
 class Quotation(models.Model):
-    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='quotations')
+    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name="quotations")
     company_name = models.CharField(max_length=100, null=True, blank=True)
     company_address = models.TextField(null=True, blank=True)
     company_phone = models.CharField(max_length=20, null=True, blank=True)
     company_email = models.EmailField(null=True, blank=True)
-    rfq_channel = models.ForeignKey('channels.RFQChannel', on_delete=models.SET_NULL, null=True, blank=True)
+    rfq_channel = models.ForeignKey(
+        "channels.RFQChannel", on_delete=models.SET_NULL, null=True, blank=True
+    )
     point_of_contact_name = models.CharField(max_length=100, null=True, blank=True)
     point_of_contact_email = models.EmailField(null=True, blank=True)
     point_of_contact_phone = models.CharField(max_length=20, null=True, blank=True)
-    assigned_sales_person = models.ForeignKey('team.TeamMember', on_delete=models.SET_NULL, null=True, blank=True)
+    assigned_sales_person = models.ForeignKey(
+        "team.TeamMember", on_delete=models.SET_NULL, null=True, blank=True
+    )
     due_date_for_quotation = models.DateField(null=True, blank=True)
     quotation_status = models.CharField(
         max_length=20,
-        choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('PO Created', 'PO Created'), ('Not Approved', 'Not Approved')],
-        default='Pending'
+        choices=[
+            ("Pending", "Pending"),
+            ("Approved", "Approved"),
+            ("PO Created", "PO Created"),
+            ("Not Approved", "Not Approved"),
+        ],
+        default="Pending",
     )
     not_approved_reason_remark = models.TextField(null=True, blank=True)
     next_followup_date = models.DateField(null=True, blank=True)
     followup_frequency = models.CharField(
         max_length=20,
-        choices=[('24_hours', '24 Hours'), ('3_days', '3 Days'), ('7_days', '7 Days'), ('every_7th_day', 'Every 7th Day')],
-        default='24_hours'
+        choices=[
+            ("24_hours", "24 Hours"),
+            ("3_days", "3 Days"),
+            ("7_days", "7 Days"),
+            ("every_7th_day", "Every 7th Day"),
+        ],
+        default="24_hours",
     )
     remarks = models.TextField(null=True, blank=True)
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     email_sent = models.BooleanField(default=False, blank=True, null=True)
-    vat_applicable = models.BooleanField(default=False, blank=True, null=True)  
-    
+    vat_applicable = models.BooleanField(default=False, blank=True, null=True)
+    terms = models.ForeignKey(
+        QuotationTerms, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
     def __str__(self):
         return f"Quotation {self.id} - {self.company_name or 'Unnamed'}"
 
     def save(self, *args, **kwargs):
-        if not self.next_followup_date or 'followup_frequency' in kwargs.get('update_fields', []):
+        if not self.next_followup_date or "followup_frequency" in kwargs.get(
+            "update_fields", []
+        ):
             today = self.created_at.date() if self.created_at else timezone.now().date()
-            if self.followup_frequency == '24_hours':
+            if self.followup_frequency == "24_hours":
                 self.next_followup_date = today + timedelta(days=1)
-            elif self.followup_frequency == '3_days':
+            elif self.followup_frequency == "3_days":
                 self.next_followup_date = today + timedelta(days=3)
-            elif self.followup_frequency == '7_days':
+            elif self.followup_frequency == "7_days":
                 self.next_followup_date = today + timedelta(days=7)
-            elif self.followup_frequency == 'every_7th_day':
+            elif self.followup_frequency == "every_7th_day":
                 self.next_followup_date = today + timedelta(days=7)
         super().save(*args, **kwargs)
 
     def get_subtotal(self):
-        return sum(item.quantity * item.unit_price for item in self.items.all() if item.quantity and item.unit_price) or 0
+        return (
+            sum(
+                item.quantity * item.unit_price
+                for item in self.items.all()
+                if item.quantity and item.unit_price
+            )
+            or 0
+        )
 
     def get_vat_amount(self):
         if self.vat_applicable:
-            return self.get_subtotal() * Decimal('0.15') 
+            return self.get_subtotal() * Decimal("0.15")
         return 0
 
     def get_grand_total(self):
         return self.get_subtotal() + self.get_vat_amount()
 
+
 class QuotationItem(models.Model):
-    quotation = models.ForeignKey(Quotation, related_name='items', on_delete=models.CASCADE)
-    item = models.ForeignKey('item.Item', on_delete=models.SET_NULL, null=True, blank=True)
+    quotation = models.ForeignKey(
+        Quotation, related_name="items", on_delete=models.CASCADE
+    )
+    item = models.ForeignKey(
+        "item.Item", on_delete=models.SET_NULL, null=True, blank=True
+    )
     quantity = models.PositiveIntegerField(null=True, blank=True)
-    unit = models.ForeignKey('unit.Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit = models.ForeignKey(
+        "unit.Unit", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.item} - {self.quotation}"
 
+
 class PurchaseOrder(models.Model):
-    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='purchase_orders')
+    quotation = models.ForeignKey(
+        Quotation, on_delete=models.CASCADE, related_name="purchase_orders"
+    )
     order_type = models.CharField(
         max_length=20,
-        choices=[('full', 'Full'), ('partial', 'Partial')],
-        default='full'
+        choices=[("full", "Full"), ("partial", "Partial")],
+        default="full",
     )
     client_po_number = models.CharField(max_length=100, blank=True, null=True)
-    po_file = models.FileField(upload_to='po_files/', blank=True, null=True)
+    po_file = models.FileField(upload_to="po_files/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     series_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
     status = models.CharField(
         max_length=20,
         choices=[
-            ('Collection Pending', 'Collection Pending'),
-            ('Collected', 'Collected'),
-            ('Completed', 'Completed'),
+            ("Collection Pending", "Collection Pending"),
+            ("Collected", "Collected"),
+            ("Completed", "Completed"),
         ],
-        default='Collection Pending'
+        default="Collection Pending",
     )
 
     def __str__(self):
@@ -143,30 +217,39 @@ class PurchaseOrder(models.Model):
     def save(self, *args, **kwargs):
         if not self.series_number and self._state.adding:
             try:
-                po_series = NumberSeries.objects.get(series_name='PurchaseOrder')
+                po_series = NumberSeries.objects.get(series_name="PurchaseOrder")
                 max_sequence = PurchaseOrder.objects.filter(
                     series_number__startswith=po_series.prefix
-                ).aggregate(models.Max('series_number'))['series_number__max']
+                ).aggregate(models.Max("series_number"))["series_number__max"]
                 sequence = 1
                 if max_sequence:
-                    sequence = int(max_sequence.split('-')[-1]) + 1
+                    sequence = int(max_sequence.split("-")[-1]) + 1
                 self.series_number = f"{po_series.prefix}-{sequence:06d}"
             except NumberSeries.DoesNotExist:
                 max_sequence = PurchaseOrder.objects.filter(
-                    series_number__startswith='PO-PRIME'
-                ).aggregate(models.Max('series_number'))['series_number__max']
+                    series_number__startswith="PO-PRIME"
+                ).aggregate(models.Max("series_number"))["series_number__max"]
                 sequence = 1
                 if max_sequence:
-                    sequence = int(max_sequence.split('-')[-1]) + 1
+                    sequence = int(max_sequence.split("-")[-1]) + 1
                 self.series_number = f"PO-PRIME-{sequence:06d}"
         super().save(*args, **kwargs)
 
+
 class PurchaseOrderItem(models.Model):
-    purchase_order = models.ForeignKey(PurchaseOrder, related_name='items', on_delete=models.CASCADE)
-    item = models.ForeignKey('item.Item', on_delete=models.SET_NULL, null=True, blank=True)
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, related_name="items", on_delete=models.CASCADE
+    )
+    item = models.ForeignKey(
+        "item.Item", on_delete=models.SET_NULL, null=True, blank=True
+    )
     quantity = models.PositiveIntegerField(null=True, blank=True)
-    unit = models.ForeignKey('unit.Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit = models.ForeignKey(
+        "unit.Unit", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.item} - {self.purchase_order}"

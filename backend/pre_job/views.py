@@ -1,8 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from .models import RFQ, Quotation, PurchaseOrder
-from .serializers import RFQSerializer, QuotationSerializer, PurchaseOrderSerializer
+from .models import RFQ, Quotation, PurchaseOrder, QuotationTerms
+from .serializers import RFQSerializer, QuotationSerializer, PurchaseOrderSerializer, QuotationTermsSerializer
 from rest_framework.decorators import action
 
 class RFQViewSet(viewsets.ModelViewSet):
@@ -69,7 +69,6 @@ class QuotationViewSet(viewsets.ModelViewSet):
         if status == 'Not Approved' and not not_approved_reason_remark:
             return Response({"detail": "Reason is required when setting status to 'Not Approved'"}, status=400)
         
-        # Check if the status is changing to 'Not Approved'
         was_not_approved = quotation.quotation_status == 'Not Approved'
         quotation.quotation_status = status
         if status == 'Not Approved':
@@ -78,13 +77,45 @@ class QuotationViewSet(viewsets.ModelViewSet):
             quotation.not_approved_reason_remark = None
         quotation.save()
         
-        # Send notification if status changed to 'Not Approved'
         if status == 'Not Approved' and not was_not_approved:
             serializer = self.get_serializer(quotation)
             serializer.send_not_approved_notification(quotation, quotation.assigned_sales_person)
         
         serializer = self.get_serializer(quotation)
         return Response(serializer.data)
+    
+class QuotationTermsViewSet(viewsets.ModelViewSet):
+    queryset = QuotationTerms.objects.all()
+    serializer_class = QuotationTermsSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return super().get_queryset().order_by('-updated_at')[:1]
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        if qs.exists():
+            serializer = self.get_serializer(qs.first())
+            return Response(serializer.data)
+        return Response({"id": None, "content": "", "updated_at": None})
+
+    @action(detail=False, methods=['patch'], url_path='update')
+    def update_terms(self, request):
+        if not QuotationTerms.objects.exists():
+            return Response(
+                {"detail": "No terms exist to update."},
+                status=404
+            )
+        instance = QuotationTerms.objects.first()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        if QuotationTerms.objects.exists():
+            return self.update_terms(request)
+        return super().create(request, *args, **kwargs)
 
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.all()
@@ -111,7 +142,6 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             for po in subsequent_pos:
                 current_sequence = int(po.series_number.split('-')[-1])
                 new_sequence = current_sequence - 1
-                # Check for existing series_number to avoid duplicates
                 while PurchaseOrder.objects.filter(series_number=f"PO-PRIME-{new_sequence:06d}").exists():
                     new_sequence += 1
                 po.series_number = f"PO-PRIME-{new_sequence:06d}"

@@ -72,7 +72,7 @@ const ListProcessingWorkOrders = () => {
   const fetchData = async () => {
     try {
       const [woRes, itemsRes, unitsRes, techRes, quotationsRes, channelsRes, poRes] = await Promise.all([
-        apiClient.get("/work-orders/?status=Submitted,Manager Approval,Approved"),
+        apiClient.get("/work-orders/?status=Submitted,Manager Approval"),
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -80,7 +80,7 @@ const ListProcessingWorkOrders = () => {
         apiClient.get("channels/"),
         apiClient.get("purchase-orders/"),
       ]);
-      console.log("Work Orders API Response:", woRes.data);
+      console.log("Work Orders API Response:", woRes.data); // Debug API response
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
@@ -148,8 +148,8 @@ const ListProcessingWorkOrders = () => {
       return;
     }
     console.log("Work Order Status:", wo.status);
-    if (wo.status === "Manager Approval" || wo.status === "Approved") {
-      toast.info("Work order is already in Manager Approval or Approved.");
+    if (wo.status === "Manager Approval") {
+      toast.info("Work order is already in Manager Approval.");
       return;
     }
     if (!isDUTComplete(wo)) {
@@ -312,9 +312,7 @@ const ListProcessingWorkOrders = () => {
   };
 
   const getDisplayStatus = (status) => {
-    if (status === "Submitted") return "Pending";
-    if (status === "Manager Approval" || status === "Approved") return "Collected";
-    return "Pending";
+    return status === "Manager Approval" ? "Manager Approved" : status || "Submitted";
   };
 
   const filteredWOs = state.workOrders
@@ -364,10 +362,14 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
+  {/* pricing implementation */}
+
+  const canViewPricing = isSuperadmin || permissions.some(p => p.page === "pricing" && p.can_view);
+
   return (
     <div className="mx-auto p-4">
       {isLoadingPermissions ? (
-        <div><Loading /></div>
+        <div><Loading/></div>
       ) : !hasPermission("processing_work_orders", "view") ? (
         <div className="text-red-600">You do not have permission to view this page.</div>
       ) : (
@@ -482,15 +484,9 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleEditWO(wo.id)}
-                              disabled={
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
-                              }
+                              disabled={!hasPermission("processing_work_orders", "edit")}
                               className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
+                                !hasPermission("processing_work_orders", "edit")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 text-white hover:bg-blue-700"
                               }`}
@@ -499,15 +495,9 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
-                              disabled={
-                                !hasPermission("processing_work_orders", "delete") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
-                              }
+                              disabled={!hasPermission("processing_work_orders", "delete")}
                               className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "delete") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
+                                !hasPermission("processing_work_orders", "delete")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
                               }`}
@@ -518,20 +508,20 @@ const ListProcessingWorkOrders = () => {
                               onClick={() => handleAction(wo.id)}
                               disabled={
                                 !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
+                                wo.status === "Manager Approval"
                               }
                               className={`px-3 py-1 rounded-md text-sm ${
                                 !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval" ||
-                                wo.status === "Approved"
+                                wo.status === "Manager Approval"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
-                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                    : "bg-yellow-600 text-white hover:bg-yellow-700"
+                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                  : "bg-yellow-600 text-white hover:bg-yellow-700"
                               }`}
                             >
-                              {isDUTComplete(wo)
+                              {wo.status === "Manager Approval"
+                                ? "Manager Approved"
+                                : isDUTComplete(wo)
                                 ? "Move to Manager Approval"
                                 : "Update Device Test Details"}
                             </Button>
@@ -595,7 +585,9 @@ const ListProcessingWorkOrders = () => {
                 selectedWO: null,
               }))
             }
-            title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"}`}
+            title={`Work Order Details - ${
+              state.selectedWO?.wo_number || "Not Provided"
+            }`}
           >
             {state.selectedWO && (
               <div className="space-y-4">
@@ -650,8 +642,13 @@ const ListProcessingWorkOrders = () => {
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                            {/* pricing implementation */}
+                            {canViewPricing && (
+                                <>
+                                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
+                                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
+                                </>
+                              )}
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
                             <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
@@ -672,12 +669,19 @@ const ListProcessingWorkOrders = () => {
                               <td className="border p-2 whitespace-nowrap">
                                 {state.units.find((u) => u.id === item.unit)?.name || "Not Provided"}
                               </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "Not Provided"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">
-                                SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : "0.00"}
-                              </td>
+                              {/* pricing implementation */}
+                              {canViewPricing && (
+                                <>
+                                  <td className="border p-2 whitespace-nowrap">
+                                    SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "Not Provided"}
+                                  </td>
+                                  <td className="border p-2 whitespace-nowrap">
+                                    SAR {item.quantity && item.unit_price
+                                      ? Number(item.quantity * item.unit_price).toFixed(2)
+                                      : "0.00"}
+                                  </td>
+                                </>
+                              )}
                               <td className="border p-2 whitespace-nowrap">{item.range || "Not Provided"}</td>
                               <td className="border p-2 whitespace-nowrap">
                                 {state.technicians.find((t) => t.id === item.assigned_to)?.name || "Not Provided"}

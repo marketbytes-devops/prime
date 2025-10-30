@@ -43,6 +43,19 @@ const ViewQuotation = () => {
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasTerms, setHasTerms] = useState(false);
+
+  useEffect(() => {
+    const fetchTerms = async () => {
+      try {
+        const res = await apiClient.get("/quotation-terms/");
+        setHasTerms(!!res.data.id);
+      } catch (e) {
+        setHasTerms(false);
+      }
+    };
+    fetchTerms();
+  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -385,13 +398,22 @@ const ViewQuotation = () => {
     setIsSubmitting(false);
   };
 
-  const handlePrint = (quotation) => {
+  const handlePrint = async (quotation) => {
+    // 1. Fetch the **latest singleton terms**
+    let terms = { content: "" };
+    try {
+      const termsRes = await apiClient.get("/quotation-terms/");
+      if (termsRes.data.id) {
+        terms = { content: termsRes.data.content || "" };
+      }
+    } catch (err) {
+      console.warn("No terms found, using empty.");
+    }
+
     const channelName =
-      state.channels.find((c) => c.id === quotation.rfq_channel)
-        ?.channel_name || "N/A";
+      state.channels.find((c) => c.id === quotation.rfq_channel)?.channel_name || "N/A";
     const salesPersonName =
-      state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)
-        ?.name || "N/A";
+      state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)?.name || "N/A";
 
     const itemsData = (quotation.items || []).map((item) => ({
       id: item.id,
@@ -406,15 +428,42 @@ const ViewQuotation = () => {
       channelName,
       salesPersonName,
       items: itemsData,
+      terms,
     };
 
-    const htmlString = ReactDOMServer.renderToStaticMarkup(
-      <Template1 data={data} />
-    );
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(htmlString);
+    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+      toast.error("Popup blocked. Allow popups to print.");
+      return;
+    }
+
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Quotation #${data.series_number}</title>
+        <meta charset="utf-8">
+        <style>
+          body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+          @media print { body { -webkit-print-color-adjust: exact; } }
+        </style>
+      </head>
+      <body>${htmlString}</body>
+    </html>
+  `);
     printWindow.document.close();
-    printWindow.print();
+
+    // Wait for images (logo) to load
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        // Optional: close after print
+        // printWindow.close();
+      }, 500);
+    };
   };
 
   const openModal = (quotation) => {
@@ -789,6 +838,16 @@ const ViewQuotation = () => {
                             }`}
                         >
                           Edit
+                        </Button>
+                        <Button
+                          onClick={() => navigate("/view-quotation/update-terms-and-conditions")}
+                          disabled={!hasPermission("quotation", "edit")}
+                          className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "edit")
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "text-sm bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
+                        >
+                          {hasTerms ? "View Terms & Conditions" : "Update Terms & Conditions"}
                         </Button>
                         <Button
                           onClick={() => handlePrint(quotation)}

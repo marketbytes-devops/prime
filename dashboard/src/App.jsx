@@ -165,6 +165,14 @@ function App() {
           ),
         },
         {
+          path: "/view-quotation/update-terms-and-conditions",
+          element: (
+            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
+              <UpdateTermsConditions />
+            </ProtectedRoute>
+          ),
+        },
+        {
           path: "/edit-quotation/:id",
           element: (
             <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
