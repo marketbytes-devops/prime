@@ -15,6 +15,8 @@ const PendingInvoices = () => {
     invoices: [],
     technicians: [],
     itemsList: [],
+    tempRemarks: {},
+    isEditingRemark: {},
     units: [],
     quotations: [],
     channels: [],
@@ -50,6 +52,10 @@ const PendingInvoices = () => {
     invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
     invoiceUploadType: '',
     isUploadWOModalOpen: false,
+    isUploadSignedInvoiceModalOpen: false,
+    selectedInvoiceForSignedUpload: null,
+    signedInvoiceUpload: { signedInvoiceFile: null },
+    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
     selectedWOForUpload: null,
     woUpload: { certificateFile: null },
     woUploadErrors: { certificateFile: '' },
@@ -146,6 +152,8 @@ const PendingInvoices = () => {
         workOrders,
         purchaseOrders: poRes.data || [],
         deliveryNotes,
+        tempRemarks: invoices.reduce((acc, invoice) => ({ ...acc, [invoice.id]: invoice.remarks || "" }), {}),
+        isEditingRemark: invoices.reduce((acc, invoice) => ({ ...acc, [invoice.id]: false }), {}),
         invoices,
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
@@ -215,25 +223,26 @@ const PendingInvoices = () => {
         isDNModalOpen: true,
         selectedDN: pair.deliveryNote,
       }));
-    } else if (type === 'invoice') {
-      if (pair.deliveryNote) {
-        const relatedInvoices = state.invoices.filter(
-          (invoice) => invoice.delivery_note === pair.deliveryNote.id
-        );
-        if (relatedInvoices.length > 0) {
-          const invoice = relatedInvoices[0];
-          if (invoice.final_invoice_file) {
-            window.open(invoice.final_invoice_file, '_blank');
-          } else {
-            toast.error('No final invoice file available.');
-          }
-        } else {
-          toast.error('No invoice found.');
-        }
+    } 
+   else if (type === 'invoice') {
+  if (pair.deliveryNote) {
+    const relatedInvoices = state.invoices.filter(
+      (invoice) => invoice.delivery_note === pair.deliveryNote.id
+    );
+    if (relatedInvoices.length > 0) {
+      const invoice = relatedInvoices[0];
+      if (invoice.final_invoice_file) {
+        window.open(invoice.final_invoice_file, '_blank');
       } else {
-        toast.error('No delivery note available.');
+        toast.error('No final invoice file available.');
       }
+    } else {
+      toast.error('No invoice found.');
     }
+  } else {
+    toast.error('No delivery note available.');
+  }
+}
   };
 
   const handleViewSlip = (pair) => {
@@ -508,20 +517,6 @@ const PendingInvoices = () => {
     }));
   };
 
-  const validateInvoiceUpload = () => {
-    let isValid = true;
-    const errors = { finalInvoiceFile: '', processedCertificateFile: '' };
-    if (state.newStatus === 'raised' && !state.invoiceUpload.finalInvoiceFile) {
-      errors.finalInvoiceFile = 'Final Invoice File is required';
-      isValid = false;
-    }
-    if (state.newStatus === 'processed' && !state.invoiceUpload.processedCertificateFile) {
-      errors.processedCertificateFile = 'Processed Certificate File is required';
-      isValid = false;
-    }
-    setState((prev) => ({ ...prev, invoiceUploadErrors: errors }));
-    return isValid;
-  };
 
   const handleInvoiceFileChange = (e) => {
     const file = e.target.files[0];
@@ -558,43 +553,43 @@ const PendingInvoices = () => {
   };
 
   const handleInvoiceUploadSubmit = async () => {
-    if (!validateInvoiceUpload()) {
-      return;
-    }
+    // NO validation - file is optional!
+    
     try {
       setIsSubmitting(true);
       const formData = new FormData();
-      formData.append('invoice_status', state.newStatus);
-      if (state.newStatus === 'raised' && state.dueInDays) {
-        formData.append('due_in_days', parseInt(state.dueInDays));
-      }
-      if (state.newStatus === 'processed' && state.receivedDate) {
-        formData.append('received_date', state.receivedDate);
-      }
+      
+      // Only add file if user selected one
       if (state.newStatus === 'raised' && state.invoiceUpload.finalInvoiceFile) {
         formData.append('final_invoice_file', state.invoiceUpload.finalInvoiceFile);
-      }
-      if (state.newStatus === 'processed' && state.invoiceUpload.processedCertificateFile) {
+        
+        // Only update invoice if file is provided
+        if (state.selectedInvoiceId) {
+          await apiClient.patch(
+            `/invoices/${state.selectedInvoiceId}/`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+          toast.success('Invoice file uploaded successfully.');
+        }
+      } else if (state.newStatus === 'processed' && state.invoiceUpload.processedCertificateFile) {
         formData.append('processed_certificate_file', state.invoiceUpload.processedCertificateFile);
-      }
-      formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
-
-      let response;
-      if (state.selectedInvoiceId) {
-        response = await apiClient.patch(
-          `/invoices/${state.selectedInvoiceId}/`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
+        
+        // Only update invoice if file is provided
+        if (state.selectedInvoiceId) {
+          await apiClient.patch(
+            `/invoices/${state.selectedInvoiceId}/`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+          toast.success('Certificate file uploaded successfully.');
+        }
       } else {
-        response = await apiClient.post(
-          `/invoices/`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
+        // No file provided - just close modal
+        toast.info('Status updated without file. You can upload the file later using the + button.');
       }
 
-      toast.success(`${state.invoiceUploadType} Invoice file uploaded and status updated successfully.`);
+      // Close modal and refresh
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
@@ -604,21 +599,45 @@ const PendingInvoices = () => {
         invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
         invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
         invoiceUploadType: '',
-        isStatusModalOpen: false,
-        selectedWorkOrderId: null,
-        selectedDNId: null,
         newStatus: '',
         dueInDays: '',
         receivedDate: '',
       }));
       await fetchData();
     } catch (error) {
-      console.error(`Error uploading ${state.invoiceUploadType.toLowerCase()} invoice file:`, error);
-      toast.error(`Failed to upload ${state.invoiceUploadType.toLowerCase()} invoice file.`);
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+
+  const handleUploadInvoiceFile = (pair, fileType) => {
+  if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
+    toast.error('No delivery note items found.');
+    return;
+  }
+  const relatedInvoices = state.invoices.filter(
+    (invoice) => invoice.delivery_note === pair.deliveryNote.id
+  );
+  
+  setState((prev) => ({
+    ...prev,
+    isUploadInvoiceModalOpen: true,
+    selectedWOForInvoiceUpload: pair.workOrder,
+    selectedDNForInvoiceUpload: pair.deliveryNote,
+    selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
+    invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+    invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+    invoiceUploadType: fileType,
+    newStatus: fileType === 'Final' ? 'raised' : 'processed',
+  }));
+};
+
+
+
+
 
   const handleUpdateStatus = (pair, newStatus) => {
     if (!pair.deliveryNote || !pair.deliveryNote.items || pair.deliveryNote.items.length === 0) {
@@ -657,26 +676,50 @@ const PendingInvoices = () => {
       );
       return;
     }
-    setState((prev) => ({
-      ...prev,
-      isStatusModalOpen: true,
-      selectedWorkOrderId: pair.workOrderId,
-      selectedDNId: pair.deliveryNoteId,
-      selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
-      newStatus,
-      dueInDays: newStatus === 'raised' ? prev.dueInDays : '',
-      receivedDate: newStatus === 'processed' ? prev.receivedDate : '',
-      invoiceUploadType: newStatus === 'raised' ? 'Final' : newStatus === 'processed' ? 'Processed' : '',
-    }));
+    
+    const relatedInvoice = relatedInvoices.length > 0 ? relatedInvoices[0] : null;
+    
+    if (newStatus === 'raised') {
+      // For raised status, show due days modal first
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: true,
+        selectedWorkOrderId: pair.workOrderId,
+        selectedDNId: pair.deliveryNoteId,
+        selectedInvoiceId: relatedInvoice ? relatedInvoice.id : null,
+        newStatus,
+        dueInDays: '',
+        invoiceUploadType: 'Final',
+      }));
+    } else if (newStatus === 'processed') {
+      // For processed status, show received date modal first
+      setState((prev) => ({
+        ...prev,
+        isStatusModalOpen: true,
+        selectedWorkOrderId: pair.workOrderId,
+        selectedDNId: pair.deliveryNoteId,
+        selectedInvoiceId: relatedInvoice ? relatedInvoice.id : null,
+        newStatus,
+        receivedDate: '',
+        invoiceUploadType: 'Processed',
+      }));
+    } else {
+      // For pending status, update directly
+      confirmStatusUpdate(relatedInvoice ? relatedInvoice.id : null, newStatus, '', '');
+    }
   };
 
-  const confirmStatusUpdate = async (invoiceId, newStatus, dueInDays) => {
+  const confirmStatusUpdate = async (invoiceId, newStatus, dueInDays, receivedDate, callback = null) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append('invoice_status', newStatus);
+      
       if (newStatus === 'raised' && dueInDays) {
         formData.append('due_in_days', parseInt(dueInDays));
+      }
+      if (newStatus === 'processed' && receivedDate) {
+        formData.append('received_date', receivedDate);
       }
       formData.append('delivery_note_id', state.selectedDNId);
 
@@ -707,7 +750,13 @@ const PendingInvoices = () => {
         receivedDate: '',
         invoiceUploadType: '',
       }));
-      await fetchData();
+      
+      // If callback provided, execute it
+      if (callback) {
+        callback();
+      } else {
+        await fetchData();
+      }
     } catch (error) {
       console.error('Error updating invoice status:', error);
       toast.error('Failed to update invoice status.');
@@ -716,63 +765,134 @@ const PendingInvoices = () => {
     }
   };
 
-  const handleStatusModalSubmit = () => {
-    const { selectedDNId, selectedInvoiceId, newStatus, dueInDays, receivedDate } = state;
-    const deliveryNote = state.deliveryNotes.find(dn => dn.id === selectedDNId);
-    if (!deliveryNote) {
-      toast.error('Delivery note not found.');
-      return;
+
+
+const handleStatusModalSubmit = async () => {
+  const { selectedWorkOrderId, selectedDNId, selectedInvoiceId, newStatus, dueInDays, receivedDate } = state;
+  const deliveryNote = state.deliveryNotes.find(dn => dn.id === selectedDNId);
+  if (!deliveryNote) {
+    toast.error('Delivery note not found.');
+    return;
+  }
+
+  if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
+    toast.error('Please enter a valid number of days.');
+    return;
+  }
+
+  if (newStatus === 'processed' && !receivedDate) {
+    toast.error('Please select a received date.');
+    return;
+  }
+
+  try {
+    setIsSubmitting(true);
+
+    // Create or update the invoice first
+    const formData = new FormData();
+    formData.append('invoice_status', newStatus);
+    if (newStatus === 'raised') {
+      formData.append('due_in_days', parseInt(dueInDays));
+    } else if (newStatus === 'processed') {
+      formData.append('received_date', receivedDate);
     }
-    const currentStatus = getInvoiceStatusForDN(deliveryNote);
-    if (currentStatus === 'processed' && newStatus !== 'pending') {
-      toast.error('Cannot change a processed invoice.');
-      return;
-    }
-    const relatedInvoices = state.invoices.filter(
-      (invoice) => invoice.delivery_note === selectedDNId
-    );
-    const allInvoicesProcessed = relatedInvoices.every(invoice => invoice.invoice_status === 'processed');
-    if (allInvoicesProcessed && newStatus !== 'pending') {
-      toast.error(
-        'The invoice status for all items is already "Processed" and cannot be changed except to "Pending."',
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        }
+    formData.append('delivery_note_id', selectedDNId);
+
+    let response;
+    if (selectedInvoiceId) {
+      // Update existing invoice
+      response = await apiClient.patch(
+        `/invoices/${selectedInvoiceId}/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-      return;
+    } else {
+      // Create new invoice
+      response = await apiClient.post(
+        `/invoices/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
     }
-    if (newStatus === 'raised' && (!dueInDays || isNaN(dueInDays) || parseInt(dueInDays) <= 0)) {
-      toast.error('Please enter a valid number of days.');
-      return;
-    }
-    if (newStatus === 'processed' && !receivedDate) {
-      toast.error('Please select a received date.');
-      return;
-    }
-    if (newStatus === 'raised' || newStatus === 'processed') {
+
+    toast.success('Invoice status updated successfully.');
+
+    // Get the actual invoice ID from the response (important!)
+    const updatedInvoiceId = response.data.id;
+
+    // Refresh data to reflect changes
+    await fetchData();
+
+    // Now open the upload modal with the correct invoice ID
+    const workOrder = state.workOrders.find(wo => wo.id === selectedWorkOrderId);
+
+    setState((prev) => ({
+      ...prev,
+      isStatusModalOpen: false,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: workOrder,
+      selectedDNForInvoiceUpload: deliveryNote,
+      selectedInvoiceId: updatedInvoiceId, // Use the actual ID from response
+      invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+      invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+      invoiceUploadType: newStatus === 'raised' ? 'Final' : 'Processed',
+      newStatus: newStatus,
+    }));
+
+  } catch (error) {
+    console.error('Error updating invoice status:', error);
+    toast.error('Failed to update invoice status.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+
+  const handleUploadSignedInvoice = (invoice) => {
+  setState((prev) => ({
+    ...prev,
+    isUploadSignedInvoiceModalOpen: true,
+    selectedInvoiceForSignedUpload: invoice,
+    signedInvoiceUpload: { signedInvoiceFile: null },
+    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
+  }));
+};
+
+  const handleUploadSignedInvoiceSubmit = async () => {
+    if (!state.signedInvoiceUpload.signedInvoiceFile) {
       setState((prev) => ({
         ...prev,
-        isStatusModalOpen: false,
-        isUploadInvoiceModalOpen: true,
-        selectedWOForInvoiceUpload: state.workOrderDeliveryPairs.find(
-          pair => pair.deliveryNoteId === selectedDNId
-        ).workOrder,
-        selectedDNForInvoiceUpload: deliveryNote,
-        selectedInvoiceId: relatedInvoices.length > 0 ? relatedInvoices[0].id : null,
-        invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
-        invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
-        invoiceUploadType: newStatus === 'raised' ? 'Final' : 'Processed',
+        signedInvoiceUploadErrors: { signedInvoiceFile: 'Signed Invoice File is required' },
       }));
-    } else {
-      confirmStatusUpdate(selectedInvoiceId, newStatus, dueInDays);
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('signed_invoice_file', state.signedInvoiceUpload.signedInvoiceFile);
+      await apiClient.patch(
+        `/invoices/${state.selectedInvoiceForSignedUpload.id}/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      toast.success('Signed invoice uploaded successfully.');
+      setState((prev) => ({
+        ...prev,
+        isUploadSignedInvoiceModalOpen: false,
+        selectedInvoiceForSignedUpload: null,
+        signedInvoiceUpload: { signedInvoiceFile: null },
+        signedInvoiceUploadErrors: { signedInvoiceFile: '' },
+      }));
+      await fetchData();
+    } catch (error) {
+      console.error('Error uploading signed invoice:', error);
+      toast.error('Failed to upload signed invoice.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+
 
   const isDUTComplete = (wo) => {
     return wo.items.every(
@@ -905,6 +1025,37 @@ const PendingInvoices = () => {
       setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
     }
   };
+  const handleRemarkChange = (id, value) => {
+  setState((prev) => ({
+    ...prev,
+    tempRemarks: { ...prev.tempRemarks, [id]: value },
+    isEditingRemark: { ...prev.isEditingRemark, [id]: true },
+  }));
+};
+
+const handleEditRemark = (id) => {
+  setState((prev) => ({
+    ...prev,
+    isEditingRemark: { ...prev.isEditingRemark, [id]: true },
+  }));
+};
+
+const handleRemarkSubmit = async (id) => {
+  try {
+    const updatePayload = { remarks: state.tempRemarks[id] || null };
+    await apiClient.patch(`/invoices/${id}/`, updatePayload);
+    await fetchData();
+    setState((prev) => ({
+      ...prev,
+      isEditingRemark: { ...prev.isEditingRemark, [id]: false },
+    }));
+    toast.success("Remark saved successfully!");
+  } catch (error) {
+    console.error("Error updating remark:", error);
+    toast.error("Failed to update remark.");
+  }
+};
+
 
   return (
     <div className="mx-auto p-4">
@@ -945,6 +1096,7 @@ const PendingInvoices = () => {
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Items</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Remarks</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">View Documents</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Invoice Status</th>
               </tr>
@@ -985,94 +1137,220 @@ const PendingInvoices = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isPOEmpty(pair.workOrder)
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                        >
-                          {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
-                        </Button>
-                        <Button
-                          onClick={() => handleViewDocument(pair, 'wo')}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-green-600 text-white hover:bg-green-700'
-                          }`}
-                        >
-                          {isSubmitting ? 'Submitting...' : 'View WO'}
-                        </Button>
-                        <Button
-                          onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
-                          disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : isDNReadyForUpload(pair.deliveryNote)
-                              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                              : 'bg-purple-600 text-white hover:bg-purple-700'
-                          }`}
-                        >
-                          {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
-                        </Button>
-                        <Button
-                          onClick={() => handleViewDocument(pair, 'invoice')}
-                          disabled={
-                            isSubmitting || 
-                            !hasPermission('pending_invoices', 'view') ||
-                            !(pair.deliveryNote && state.invoices.some(invoice => 
-                              invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-                            ))
-                          }
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || 
-                            !hasPermission('pending_invoices', 'view') ||
-                            !(pair.deliveryNote && state.invoices.some(invoice => 
-                              invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-                            ))
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                          }`}
-                        >
-                          {isSubmitting ? 'Submitting...' : 
-                           (pair.deliveryNote && state.invoices.some(invoice => 
-                             invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
-                           )) ? 'View Invoice' : 'No Invoice'}
-                        </Button>
-                        <Button
-                          onClick={() => handleViewSlip(pair)}
-                          disabled={
-                            isSubmitting || 
-                            !hasPermission('pending_invoices', 'view') ||
-                            !(pair.deliveryNote && state.invoices.some(invoice => 
-                              invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-                            ))
-                          }
-                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-                            isSubmitting || 
-                            !hasPermission('pending_invoices', 'view') ||
-                            !(pair.deliveryNote && state.invoices.some(invoice => 
-                              invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-                            ))
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-teal-600 text-white hover:bg-teal-700'
-                          }`}
-                        >
-                          {isSubmitting ? 'Submitting...' : 
-                           (pair.deliveryNote && state.invoices.some(invoice => 
-                             invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
-                           )) ? 'View Slip' : 'No Slip'}
-                        </Button>
-                      </div>
-                    </td>
+  {pair.deliveryNote ? (
+    state.invoices.some(invoice => invoice.delivery_note === pair.deliveryNote.id) ? (
+      <div className="flex items-center gap-2">
+        <InputField
+          type="text"
+          value={state.tempRemarks[state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id] || ""}
+          onChange={(e) => handleRemarkChange(state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id, e.target.value)}
+          className="min-w-[200px] p-1"
+          disabled={!state.isEditingRemark[state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id]}
+        />
+        <Button
+          onClick={() =>
+            state.isEditingRemark[state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id]
+              ? handleRemarkSubmit(state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id)
+              : handleEditRemark(state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id)
+          }
+          className={`px-2 py-1 rounded-md text-sm ${
+            state.isEditingRemark[state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id]
+              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+              : "bg-green-600 text-white hover:bg-green-700"
+          }`}
+        >
+          {state.isEditingRemark[state.invoices.find(invoice => invoice.delivery_note === pair.deliveryNote.id)?.id] ? "Update" : "Edit"}
+        </Button>
+      </div>
+    ) : (
+      <span className="text-sm text-gray-500">No invoice</span>
+    )
+  ) : (
+    <span className="text-sm text-gray-500">No DN</span>
+  )}
+</td>
+
+<td className="border p-2 whitespace-nowrap">
+  <div className="flex items-center gap-2">
+    <Button
+      onClick={() => (isPOEmpty(pair.workOrder) ? handleUploadPO(pair) : handleViewDocument(pair, 'po'))}
+      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))}
+      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+        isSubmitting || !hasPermission('pending_invoices', 'view') || (!isPOEmpty(pair.workOrder) && !isPOComplete(pair.workOrder))
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : isPOEmpty(pair.workOrder)
+          ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+          : 'bg-blue-600 text-white hover:bg-blue-700'
+      }`}
+    >
+      {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
+    </Button>
+    <Button
+      onClick={() => handleViewDocument(pair, 'wo')}
+      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
+      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+        isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-green-600 text-white hover:bg-green-700'
+      }`}
+    >
+      {isSubmitting ? 'Submitting...' : 'View WO'}
+    </Button>
+    <Button
+      onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
+      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
+      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+        isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : isDNReadyForUpload(pair.deliveryNote)
+          ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+          : 'bg-purple-600 text-white hover:bg-purple-700'
+      }`}
+    >
+      {isSubmitting ? 'Submitting...' : isDNReadyForUpload(pair.deliveryNote) ? 'Upload DN' : 'View DN'}
+    </Button>
+    
+    {/* Invoice Section with + Button */}
+<div className="flex items-center gap-1">
+  <Button
+    onClick={() => handleViewDocument(pair, 'invoice')}
+    disabled={
+      isSubmitting ||
+      !hasPermission('pending_invoices', 'view') ||
+      !(pair.deliveryNote && state.invoices.some(invoice =>
+        invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+      ))
+    }
+    className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+      isSubmitting ||
+      !hasPermission('pending_invoices', 'view') ||
+      !(pair.deliveryNote && state.invoices.some(invoice =>
+        invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+      ))
+        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+    }`}
+  >
+    {isSubmitting ? 'Submitting...' :
+    (pair.deliveryNote && state.invoices.some(invoice =>
+      invoice.delivery_note === pair.deliveryNote.id && invoice.final_invoice_file
+    )) ? 'View Invoice' : 'No Invoice'}
+  </Button>
+
+  {/* Pencil button for uploading signed invoice or Signed Invoice button */}
+  {getInvoiceStatusForDN(pair.deliveryNote) === 'raised' && (
+    <>
+      {/* Show "Signed Invoice" button if signed_invoice_file exists */}
+      {state.invoices.some(
+        invoice =>
+          invoice.delivery_note === pair.deliveryNote.id &&
+          invoice.signed_invoice_file
+      ) ? (
+        <Button
+          onClick={() => {
+            const signedInvoice = state.invoices.find(
+              invoice =>
+                invoice.delivery_note === pair.deliveryNote.id &&
+                invoice.signed_invoice_file
+            );
+            if (signedInvoice) {
+              window.open(signedInvoice.signed_invoice_file, '_blank');
+            }
+          }}
+          disabled={isSubmitting || !hasPermission('pending_invoices', 'view')}
+          className="px-3 py-1 rounded-md text-sm bg-purple-600 text-white hover:bg-purple-700"
+          title="View Signed Invoice"
+        >
+          Signed Invoice
+        </Button>
+      ) : (
+        /* Show pencil (✏️) button if final_invoice_file exists but signed_invoice_file does not */
+        state.invoices.some(
+          invoice =>
+            invoice.delivery_note === pair.deliveryNote.id &&
+            invoice.final_invoice_file &&
+            !invoice.signed_invoice_file
+        ) && (
+          <Button
+            onClick={() => {
+              const relatedInvoices = state.invoices.filter(
+                (invoice) => invoice.delivery_note === pair.deliveryNote.id
+              );
+              if (relatedInvoices.length > 0) {
+                handleUploadSignedInvoice(relatedInvoices[0]);
+              }
+            }}
+            disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+            className="px-2 py-1 rounded-md text-sm bg-yellow-600 text-white hover:bg-yellow-700"
+            title="Upload Signed Invoice"
+          >
+            ✏️
+          </Button>
+        )
+      )}
+    </>
+  )}
+
+  {/* Plus button for uploading invoice file (only if final invoice is not uploaded) */}
+  {getInvoiceStatusForDN(pair.deliveryNote) === 'raised' && !state.invoices.some(
+    invoice =>
+      invoice.delivery_note === pair.deliveryNote.id &&
+      invoice.final_invoice_file
+  ) && (
+    <Button
+      onClick={() => handleUploadInvoiceFile(pair, 'Final')}
+      disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+      className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+      title="Upload Invoice File"
+    >
+      +
+    </Button>
+  )}
+</div>
+
+
+
+    {/* Slip Section with + Button */}
+    <div className="flex items-center gap-1">
+      <Button
+        onClick={() => handleViewSlip(pair)}
+        disabled={
+          isSubmitting || 
+          !hasPermission('pending_invoices', 'view') ||
+          !(pair.deliveryNote && state.invoices.some(invoice => 
+            invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+          ))
+        }
+        className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+          isSubmitting || 
+          !hasPermission('pending_invoices', 'view') ||
+          !(pair.deliveryNote && state.invoices.some(invoice => 
+            invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+          ))
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-teal-600 text-white hover:bg-teal-700'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 
+         (pair.deliveryNote && state.invoices.some(invoice => 
+           invoice.delivery_note === pair.deliveryNote.id && invoice.processed_certificate_file
+         )) ? 'View Slip' : 'No Slip'}
+      </Button>
+      
+      {/* Plus button for uploading slip file */}
+      {getInvoiceStatusForDN(pair.deliveryNote) === 'processed' && (
+        <Button
+          onClick={() => handleUploadInvoiceFile(pair, 'Processed')}
+          disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+          className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+          title="Upload Slip File"
+        >
+          +
+        </Button>
+      )}
+    </div>
+  </div>
+</td>
                     <td className="border p-2 whitespace-nowrap">
                       {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                         <select
@@ -1330,6 +1608,79 @@ const PendingInvoices = () => {
           </div>
         )}
       </Modal>
+      <Modal
+  isOpen={state.isUploadSignedInvoiceModalOpen}
+  onClose={() => setState((prev) => ({
+    ...prev,
+    isUploadSignedInvoiceModalOpen: false,
+    selectedInvoiceForSignedUpload: null,
+    signedInvoiceUpload: { signedInvoiceFile: null },
+    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
+  }))}
+  title={`Upload Signed Invoice for ${state.selectedInvoiceForSignedUpload?.invoice_number || 'N/A'}`}
+>
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Signed Invoice File *</label>
+      <input
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) {
+              alert('File size exceeds 5 MB limit. Please upload a smaller file.');
+              e.target.value = '';
+              e.target.focus();
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              signedInvoiceUpload: { signedInvoiceFile: file },
+              signedInvoiceUploadErrors: { signedInvoiceFile: '' },
+            }));
+          }
+        }}
+        className="w-full p-2 border rounded focus:outline-indigo-500"
+      />
+      {state.signedInvoiceUploadErrors.signedInvoiceFile && (
+        <p className="text-red-500 text-sm mt-1">{state.signedInvoiceUploadErrors.signedInvoiceFile}</p>
+      )}
+    </div>
+    <div className="flex justify-end gap-2">
+      <Button
+        onClick={() => setState((prev) => ({
+          ...prev,
+          isUploadSignedInvoiceModalOpen: false,
+          selectedInvoiceForSignedUpload: null,
+          signedInvoiceUpload: { signedInvoiceFile: null },
+          signedInvoiceUploadErrors: { signedInvoiceFile: '' },
+        }))}
+        disabled={isSubmitting}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 'Cancel'}
+      </Button>
+      <Button
+        onClick={handleUploadSignedInvoiceSubmit}
+        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit') || !state.signedInvoiceUpload.signedInvoiceFile}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting || !hasPermission('pending_invoices', 'edit') || !state.signedInvoiceUpload.signedInvoiceFile
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 'Upload'}
+      </Button>
+    </div>
+  </div>
+</Modal>
+
       <Modal
         isOpen={state.isDNModalOpen}
         onClose={() => setState((prev) => ({ ...prev, isDNModalOpen: false, selectedDN: null }))}
@@ -1667,166 +2018,170 @@ const PendingInvoices = () => {
           </div>
         </div>
       </Modal>
-      <Modal
-        isOpen={state.isUploadInvoiceModalOpen}
-        onClose={() => setState((prev) => ({
+    <Modal
+  isOpen={state.isUploadInvoiceModalOpen}
+  onClose={() => {
+    setState((prev) => ({
+      ...prev,
+      isUploadInvoiceModalOpen: false,
+      selectedWOForInvoiceUpload: null,
+      selectedDNForInvoiceUpload: null,
+      selectedInvoiceId: null,
+      invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+      invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+      invoiceUploadType: '',
+    }));
+    // Refresh data to show updated status even if file upload was cancelled
+    fetchData();
+  }}
+  title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
+>
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {state.invoiceUploadType} {state.newStatus === 'raised' ? 'Invoice' : 'Certificate'} File (Optional)
+      </label>
+      <input
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={(e) => handleInvoiceFileChange(e)}
+        className="w-full p-2 border rounded focus:outline-indigo-500"
+      />
+      {state.invoiceUploadErrors.finalInvoiceFile && state.newStatus === 'raised' && (
+        <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.finalInvoiceFile}</p>
+      )}
+      {state.invoiceUploadErrors.processedCertificateFile && state.newStatus === 'processed' && (
+        <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.processedCertificateFile}</p>
+      )}
+      <p className="text-sm text-gray-600 mt-1">
+        File upload is optional. You can upload it later using the + button.
+      </p>
+    </div>
+    <div className="flex justify-end gap-2">
+      <Button
+        onClick={() => {
+          setState((prev) => ({
+            ...prev,
+            isUploadInvoiceModalOpen: false,
+            selectedWOForInvoiceUpload: null,
+            selectedDNForInvoiceUpload: null,
+            selectedInvoiceId: null,
+            invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
+            invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
+            invoiceUploadType: '',
+          }));
+          // Refresh data to show updated status
+          fetchData();
+        }}
+        disabled={isSubmitting}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 'Skip Upload'}
+      </Button>
+      <Button
+        onClick={handleInvoiceUploadSubmit}
+        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting || !hasPermission('pending_invoices', 'edit')
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 'Upload File'}
+      </Button>
+    </div>
+  </div>
+</Modal>
+  <Modal
+  isOpen={state.isStatusModalOpen}
+  onClose={() => setState((prev) => ({
+    ...prev,
+    isStatusModalOpen: false,
+    selectedWorkOrderId: null,
+    selectedDNId: null,
+    selectedInvoiceId: null,
+    newStatus: '',
+    dueInDays: '',
+    receivedDate: '',
+    invoiceUploadType: '',
+  }))}
+  title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
+>
+  <div className="space-y-4">
+    {state.newStatus === 'raised' && (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days *</label>
+        <InputField
+          type="number"
+          placeholder="Enter number of days"
+          value={state.dueInDays}
+          onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
+          className="w-full p-2 border rounded focus:outline-indigo-500"
+          min="1"
+          required
+        />
+        <p className="text-sm text-gray-600 mt-1">
+          You will be able to upload the invoice file in the next step.
+        </p>
+      </div>
+    )}
+    {state.newStatus === 'processed' && (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Received Date *</label>
+        <InputField
+          type="date"
+          value={state.receivedDate}
+          onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
+          className="w-full p-2 border rounded focus:outline-indigo-500"
+          required
+        />
+      </div>
+    )}
+    {state.newStatus === 'pending' && (
+      <p className="text-sm text-gray-600">
+        Setting status to Pending will clear any due dates or received dates.
+      </p>
+    )}
+    <div className="flex justify-end gap-2">
+      <Button
+        onClick={() => setState((prev) => ({
           ...prev,
-          isUploadInvoiceModalOpen: false,
-          selectedWOForInvoiceUpload: null,
-          selectedDNForInvoiceUpload: null,
-          selectedInvoiceId: null,
-          invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
-          invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
-          invoiceUploadType: '',
           isStatusModalOpen: false,
           selectedWorkOrderId: null,
           selectedDNId: null,
-          newStatus: '',
-          dueInDays: '',
-          receivedDate: '',
-        }))}
-        title={`Upload ${state.invoiceUploadType} Invoice for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {state.invoiceUploadType} {state.newStatus === 'raised' ? 'Invoice' : 'Certificate'} File (Upload 5 MB file)
-            </label>
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) => handleInvoiceFileChange(e)}
-              className="w-full p-2 border rounded focus:outline-indigo-500"
-            />
-            {state.invoiceUploadErrors.finalInvoiceFile && state.newStatus === 'raised' && (
-              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.finalInvoiceFile}</p>
-            )}
-            {state.invoiceUploadErrors.processedCertificateFile && state.newStatus === 'processed' && (
-              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.processedCertificateFile}</p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => setState((prev) => ({
-                ...prev,
-                isUploadInvoiceModalOpen: false,
-                selectedWOForInvoiceUpload: null,
-                selectedDNForInvoiceUpload: null,
-                selectedInvoiceId: null,
-                invoiceUpload: { finalInvoiceFile: null, processedCertificateFile: null },
-                invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
-                invoiceUploadType: '',
-                isStatusModalOpen: false,
-                selectedWorkOrderId: null,
-                selectedDNId: null,
-                newStatus: '',
-                dueInDays: '',
-                receivedDate: '',
-              }))}
-              disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
-            >
-              {isSubmitting ? 'Submitting...' : 'Cancel'}
-            </Button>
-            <Button
-              onClick={handleInvoiceUploadSubmit}
-              disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      <Modal
-        isOpen={state.isStatusModalOpen}
-        onClose={() => setState((prev) => ({
-          ...prev,
-          isStatusModalOpen: false,
-          selectedWorkOrderId: null,
-          selectedDNId: null,
           selectedInvoiceId: null,
           newStatus: '',
           dueInDays: '',
           receivedDate: '',
           invoiceUploadType: '',
         }))}
-        title={`Update Invoice Status to ${state.newStatus || 'Unknown'}`}
+        disabled={isSubmitting}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+        }`}
       >
-        <div className="space-y-4">
-          {state.newStatus === 'raised' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due in Days</label>
-              <InputField
-                type="number"
-                placeholder="Enter number of days"
-                value={state.dueInDays}
-                onChange={(e) => setState((prev) => ({ ...prev, dueInDays: e.target.value }))}
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-                min="1"
-              />
-            </div>
-          )}
-          {state.newStatus === 'processed' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
-              <InputField
-                type="date"
-                value={state.receivedDate}
-                onChange={(e) => setState((prev) => ({ ...prev, receivedDate: e.target.value }))}
-                className="w-full p-2 border rounded focus:outline-indigo-500"
-              />
-            </div>
-          )}
-          {state.newStatus === 'pending' && (
-            <p className="text-sm text-gray-600">
-              Setting status to Pending will clear any due dates or received dates.
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => setState((prev) => ({
-                ...prev,
-                isStatusModalOpen: false,
-                selectedWorkOrderId: null,
-                selectedDNId: null,
-                selectedInvoiceId: null,
-                newStatus: '',
-                dueInDays: '',
-                receivedDate: '',
-                invoiceUploadType: '',
-              }))}
-              disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
-            >
-              {isSubmitting ? 'Submitting...' : 'Cancel'}
-            </Button>
-            <Button
-              onClick={handleStatusModalSubmit}
-              disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('pending_invoices', 'edit')
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        {isSubmitting ? 'Submitting...' : 'Cancel'}
+      </Button>
+      <Button
+        onClick={handleStatusModalSubmit}
+        disabled={isSubmitting || !hasPermission('pending_invoices', 'edit')}
+        className={`px-3 py-1 rounded-md text-sm ${
+          isSubmitting || !hasPermission('pending_invoices', 'edit')
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {isSubmitting ? 'Submitting...' : 'Continue'}
+      </Button>
+    </div>
+  </div>
+</Modal>
     </div>
   );
 };

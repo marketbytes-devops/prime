@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
 import Button from '../../components/Button';
-import Loading from '../../components/Loading'; 
+import Loading from '../../components/Loading'; // Assuming this exists; adjust if needed
 
 const DueDateReports = () => {
   const [state, setState] = useState({
@@ -15,7 +15,7 @@ const DueDateReports = () => {
     invoices: [],
     channels: [],
     itemsList: [],
-    dueDateItems: [], 
+    dueDateItems: [], // Flattened list of items with due dates
     searchTerm: '',
     sortBy: 'due_date',
     sortOrder: 'asc',
