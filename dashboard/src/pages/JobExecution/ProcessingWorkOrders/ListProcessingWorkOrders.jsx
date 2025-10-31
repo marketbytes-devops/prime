@@ -63,16 +63,28 @@ const ListProcessingWorkOrders = () => {
   };
 
   useEffect(() => {
-    if (!isLoadingPermissions && !hasPermission("processing_work_orders", "view")) {
+    if (
+      !isLoadingPermissions &&
+      !hasPermission("processing_work_orders", "view")
+    ) {
       toast.error("You do not have permission to view this page.");
       navigate("/");
     }
   }, [isLoadingPermissions, permissions, navigate]);
 
+// In ListProcessingWorkOrders.jsx, change the fetch:
   const fetchData = async () => {
     try {
-      const [woRes, itemsRes, unitsRes, techRes, quotationsRes, channelsRes, poRes] = await Promise.all([
-        apiClient.get("/work-orders/?status=Submitted,Manager Approval"),
+      const [
+        woRes,
+        itemsRes,
+        unitsRes,
+        techRes,
+        quotationsRes,
+        channelsRes,
+        poRes,
+      ] = await Promise.all([
+        apiClient.get("/work-orders/"),  // Fetch ALL work orders
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -80,6 +92,7 @@ const ListProcessingWorkOrders = () => {
         apiClient.get("channels/"),
         apiClient.get("purchase-orders/"),
       ]);
+    // ... rest of the code
       console.log("Work Orders API Response:", woRes.data); // Debug API response
       setState((prev) => ({
         ...prev,
@@ -177,7 +190,9 @@ const ListProcessingWorkOrders = () => {
   };
 
   const getQuotationDetails = (wo) => {
-    const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order);
+    const purchaseOrder = state.purchaseOrders.find(
+      (po) => po.id === wo.purchase_order
+    );
     const quotation = state.quotations.find((q) => q.id === wo.quotation);
     return {
       series_number: quotation?.series_number || "N/A",
@@ -185,18 +200,45 @@ const ListProcessingWorkOrders = () => {
       company_address: quotation?.company_address || "N/A",
       company_phone: quotation?.company_phone || "N/A",
       company_email: quotation?.company_email || "N/A",
-      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || "N/A",
+      channel:
+        state.channels.find((c) => c.id === quotation?.rfq_channel)
+          ?.channel_name || "N/A",
       contact_name: quotation?.point_of_contact_name || "N/A",
       contact_email: quotation?.point_of_contact_email || "N/A",
       contact_phone: quotation?.point_of_contact_phone || "N/A",
       po_series_number: purchaseOrder?.series_number || "N/A",
       client_po_number: purchaseOrder?.client_po_number || "Nil",
       order_type: purchaseOrder?.order_type || "N/A",
-      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : "N/A",
+      created_at: purchaseOrder?.created_at
+        ? new Date(purchaseOrder.created_at).toLocaleDateString()
+        : "N/A",
       po_file: purchaseOrder?.po_file || null,
       assigned_sales_person: quotation?.assigned_sales_person_name || "N/A",
     };
   };
+
+  const filteredWOs = state.workOrders
+    .filter(
+      (wo) =>
+        (wo.wo_number || "")
+          .toLowerCase()
+          .includes(state.searchTerm.toLowerCase()) ||
+        getQuotationDetails(wo)
+          .company_name.toLowerCase()
+          .includes(state.searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (state.sortBy === "created_at") {
+        return new Date(b.created_at) - new Date(a.created_at);
+      } else if (state.sortBy === "wo_number") {
+        return (a.wo_number || "").localeCompare(b.wo_number || "");
+      } else if (state.sortBy === "company_name") {
+        return getQuotationDetails(a).company_name.localeCompare(
+          getQuotationDetails(b).company_name
+        );
+      }
+      return 0;
+    });
 
   const handlePrint = async (wo) => {
     try {
@@ -212,7 +254,9 @@ const ListProcessingWorkOrders = () => {
           const rfqRes = await apiClient.get(`/rfqs/${wo.quotation.rfq}/`);
           rfqDetails = rfqRes.data;
         } else if (wo.quotation) {
-          const quotationRes = await apiClient.get(`/quotations/${wo.quotation}/`);
+          const quotationRes = await apiClient.get(
+            `/quotations/${wo.quotation}/`
+          );
           const quotationData = quotationRes.data;
           if (quotationData.rfq) {
             const rfqRes = await apiClient.get(`/rfqs/${quotationData.rfq}/`);
@@ -259,7 +303,9 @@ const ListProcessingWorkOrders = () => {
         quantity: item.quantity || "Not Provided",
         unit:
           state.units.find((u) => u.id === item.unit)?.name || "Not Provided",
-        unit_price: item.unit_price ? `SAR ${Number(item.unit_price).toFixed(2)}` : "Not Provided",
+        unit_price: item.unit_price
+          ? `SAR ${Number(item.unit_price).toFixed(2)}`
+          : "Not Provided",
         range: item.range || "Not Provided",
         assigned_to_name:
           state.technicians.find((t) => t.id === item.assigned_to)?.name ||
@@ -312,23 +358,10 @@ const ListProcessingWorkOrders = () => {
   };
 
   const getDisplayStatus = (status) => {
-    return status === "Manager Approval" ? "Manager Approved" : status || "Submitted";
+    return status === "Manager Approval"
+      ? "Manager Approved"
+      : status || "Submitted";
   };
-
-  const filteredWOs = state.workOrders
-    .filter((wo) =>
-      (wo.wo_number || "")
-        .toLowerCase()
-        .includes(state.searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (state.sortBy === "created_at") {
-        return new Date(b.created_at) - new Date(a.created_at);
-      } else if (state.sortBy === "wo_number") {
-        return (a.wo_number || "").localeCompare(b.wo_number || "");
-      }
-      return 0;
-    });
 
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
@@ -362,16 +395,23 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
-  {/* pricing implementation */}
+  {
+    /* pricing implementation */
+  }
 
-  const canViewPricing = isSuperadmin || permissions.some(p => p.page === "pricing" && p.can_view);
+  const canViewPricing =
+    isSuperadmin || permissions.some((p) => p.page === "pricing" && p.can_view);
 
   return (
     <div className="mx-auto p-4">
       {isLoadingPermissions ? (
-        <div><Loading/></div>
+        <div>
+          <Loading />
+        </div>
       ) : !hasPermission("processing_work_orders", "view") ? (
-        <div className="text-red-600">You do not have permission to view this page.</div>
+        <div className="text-red-600">
+          You do not have permission to view this page.
+        </div>
       ) : (
         <>
           <h1 className="text-2xl font-bold mb-4">Processing Work Orders</h1>
@@ -383,10 +423,13 @@ const ListProcessingWorkOrders = () => {
                 </label>
                 <InputField
                   type="text"
-                  placeholder="Search by WO number..."
+                  placeholder="Search by WO number or Company Name..."
                   value={state.searchTerm}
                   onChange={(e) =>
-                    setState((prev) => ({ ...prev, searchTerm: e.target.value }))
+                    setState((prev) => ({
+                      ...prev,
+                      searchTerm: e.target.value,
+                    }))
                   }
                   className="w-full"
                 />
@@ -404,6 +447,7 @@ const ListProcessingWorkOrders = () => {
                 >
                   <option value="created_at">Creation Date</option>
                   <option value="wo_number">Work Order Number</option>
+                  <option value="company_name">Company Name</option>
                 </select>
               </div>
             </div>
@@ -421,6 +465,9 @@ const ListProcessingWorkOrders = () => {
                       Work Order Number
                     </th>
                     <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Company Name
+                    </th>
+                    <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                       Assigned To
                     </th>
                     <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
@@ -435,7 +482,7 @@ const ListProcessingWorkOrders = () => {
                   {currentWOs.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="7"
                         className="border p-2 text-center text-gray-500 whitespace-nowrap"
                       >
                         No work orders found.
@@ -454,6 +501,9 @@ const ListProcessingWorkOrders = () => {
                           {wo.wo_number || "Not Provided"}
                         </td>
                         <td className="border p-2 whitespace-nowrap">
+                          {getQuotationDetails(wo).company_name}
+                        </td>
+                        <td className="border p-2 whitespace-nowrap">
                           {wo.items
                             .map(
                               (item) =>
@@ -462,7 +512,8 @@ const ListProcessingWorkOrders = () => {
                                 )?.name || "Not Provided"
                             )
                             .filter(
-                              (name, index, self) => self.indexOf(name) === index
+                              (name, index, self) =>
+                                self.indexOf(name) === index
                             )
                             .join(", ")}
                         </td>
@@ -473,7 +524,9 @@ const ListProcessingWorkOrders = () => {
                           <div className="flex items-center gap-2">
                             <Button
                               onClick={() => handleViewWO(wo)}
-                              disabled={!hasPermission("processing_work_orders", "view")}
+                              disabled={
+                                !hasPermission("processing_work_orders", "view")
+                              }
                               className={`px-3 py-1 rounded-md text-sm ${
                                 !hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
@@ -484,7 +537,9 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleEditWO(wo.id)}
-                              disabled={!hasPermission("processing_work_orders", "edit")}
+                              disabled={
+                                !hasPermission("processing_work_orders", "edit")
+                              }
                               className={`px-3 py-1 rounded-md text-sm ${
                                 !hasPermission("processing_work_orders", "edit")
                                   ? "bg-gray-300 cursor-not-allowed"
@@ -495,9 +550,17 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
-                              disabled={!hasPermission("processing_work_orders", "delete")}
+                              disabled={
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "delete"
+                                )
+                              }
                               className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "delete")
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "delete"
+                                )
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
                               }`}
@@ -507,12 +570,16 @@ const ListProcessingWorkOrders = () => {
                             <Button
                               onClick={() => handleAction(wo.id)}
                               disabled={
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval"
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "edit"
+                                ) || wo.status === "Manager Approval"
                               }
                               className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit") ||
-                                wo.status === "Manager Approval"
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "edit"
+                                ) || wo.status === "Manager Approval"
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : isDUTComplete(wo)
                                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
@@ -527,7 +594,9 @@ const ListProcessingWorkOrders = () => {
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
-                              disabled={!hasPermission("processing_work_orders", "view")}
+                              disabled={
+                                !hasPermission("processing_work_orders", "view")
+                              }
                               className={`px-3 py-1 rounded-md text-sm ${
                                 !hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
@@ -592,109 +661,259 @@ const ListProcessingWorkOrders = () => {
             {state.selectedWO && (
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium text-black">Company Details</h3>
-                  <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
-                  <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
-                  <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
-                  <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
-                  <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
-                  <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
+                  <h3 className="text-lg font-medium text-black">
+                    Company Details
+                  </h3>
+                  <p>
+                    <strong>Series Number:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).series_number}
+                  </p>
+                  <p>
+                    <strong>Company Name:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).company_name}
+                  </p>
+                  <p>
+                    <strong>Company Address:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).company_address}
+                  </p>
+                  <p>
+                    <strong>Company Phone:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).company_phone}
+                  </p>
+                  <p>
+                    <strong>Company Email:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).company_email}
+                  </p>
+                  <p>
+                    <strong>Channel:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).channel}
+                  </p>
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-black">Contact Details</h3>
-                  <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
-                  <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
-                  <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
+                  <h3 className="text-lg font-medium text-black">
+                    Contact Details
+                  </h3>
+                  <p>
+                    <strong>Contact Name:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).contact_name}
+                  </p>
+                  <p>
+                    <strong>Contact Email:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).contact_email}
+                  </p>
+                  <p>
+                    <strong>Contact Phone:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).contact_phone}
+                  </p>
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-                  <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).po_series_number}</p>
-                  <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO).client_po_number}</p>
-                  <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO).order_type}</p>
-                  <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO).created_at}</p>
-                  <p><strong>PO File:</strong>{" "}
+                  <h3 className="text-lg font-medium text-black">
+                    Purchase Order Details
+                  </h3>
+                  <p>
+                    <strong>Series Number:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).po_series_number}
+                  </p>
+                  <p>
+                    <strong>Client PO Number:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).client_po_number}
+                  </p>
+                  <p>
+                    <strong>Order Type:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).order_type}
+                  </p>
+                  <p>
+                    <strong>Created:</strong>{" "}
+                    {getQuotationDetails(state.selectedWO).created_at}
+                  </p>
+                  <p>
+                    <strong>PO File:</strong>{" "}
                     {getQuotationDetails(state.selectedWO).po_file ? (
-                      <a href={getQuotationDetails(state.selectedWO).po_file} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">View File</a>
+                      <a
+                        href={getQuotationDetails(state.selectedWO).po_file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:underline"
+                      >
+                        View File
+                      </a>
                     ) : (
                       "Nil"
                     )}
                   </p>
-                  <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
+                  <p>
+                    <strong>Assigned Sales Person:</strong>{" "}
+                    {
+                      getQuotationDetails(state.selectedWO)
+                        .assigned_sales_person
+                    }
+                  </p>
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-                  <p><strong>Work Order Number:</strong> {state.selectedWO.wo_number || "Not Provided"}</p>
-                  <p><strong>Work Order Type:</strong> {state.selectedWO.wo_type || "Not Provided"}</p>
-                  <p><strong>Date Received:</strong> {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : "Not Provided"}</p>
-                  <p><strong>Expected Completion Date:</strong> {state.selectedWO.expected_completion_date ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString() : "Not Provided"}</p>
-                  <p><strong>Onsite or Lab:</strong> {state.selectedWO.onsite_or_lab || "Not Provided"}</p>
-                  <p><strong>Site Location:</strong> {state.selectedWO.site_location || "Not Provided"}</p>
-                  <p><strong>Remarks:</strong> {state.selectedWO.remarks || "Not Provided"}</p>
-                  <p><strong>Status:</strong> {getDisplayStatus(state.selectedWO.status)}</p>
+                  <h3 className="text-lg font-medium text-black">
+                    Work Order Details
+                  </h3>
+                  <p>
+                    <strong>Work Order Number:</strong>{" "}
+                    {state.selectedWO.wo_number || "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Work Order Type:</strong>{" "}
+                    {state.selectedWO.wo_type || "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Date Received:</strong>{" "}
+                    {state.selectedWO.date_received
+                      ? new Date(
+                          state.selectedWO.date_received
+                        ).toLocaleDateString()
+                      : "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Expected Completion Date:</strong>{" "}
+                    {state.selectedWO.expected_completion_date
+                      ? new Date(
+                          state.selectedWO.expected_completion_date
+                        ).toLocaleDateString()
+                      : "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Onsite or Lab:</strong>{" "}
+                    {state.selectedWO.onsite_or_lab || "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Site Location:</strong>{" "}
+                    {state.selectedWO.site_location || "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Remarks:</strong>{" "}
+                    {state.selectedWO.remarks || "Not Provided"}
+                  </p>
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    {getDisplayStatus(state.selectedWO.status)}
+                  </p>
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-black">Device Under Test Details</h3>
-                  {state.selectedWO.items && state.selectedWO.items.length > 0 ? (
+                  <h3 className="text-lg font-medium text-black">
+                    Device Under Test Details
+                  </h3>
+                  {state.selectedWO.items &&
+                  state.selectedWO.items.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gray-200">
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Item
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Quantity
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Unit
+                            </th>
                             {/* pricing implementation */}
                             {canViewPricing && (
-                                <>
-                                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                                  <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Total Price</th>
-                                </>
-                              )}
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned To</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
-                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
+                              <>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                                  Unit Price
+                                </th>
+                                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                                  Total Price
+                                </th>
+                              </>
+                            )}
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Range
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Assigned To
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Certificate UUT Label
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Certificate Number
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Calibration Date
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Calibration Due Date
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              UUC Serial Number
+                            </th>
+                            <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Certificate
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {state.selectedWO.items.map((item) => (
                             <tr key={item.id} className="border">
                               <td className="border p-2 whitespace-nowrap">
-                                {state.itemsList.find((i) => i.id === item.item)?.name || "Not Provided"}
+                                {state.itemsList.find((i) => i.id === item.item)
+                                  ?.name || "Not Provided"}
                               </td>
-                              <td className="border p-2 whitespace-nowrap">{item.quantity || "Not Provided"}</td>
                               <td className="border p-2 whitespace-nowrap">
-                                {state.units.find((u) => u.id === item.unit)?.name || "Not Provided"}
+                                {item.quantity || "Not Provided"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {state.units.find((u) => u.id === item.unit)
+                                  ?.name || "Not Provided"}
                               </td>
                               {/* pricing implementation */}
                               {canViewPricing && (
                                 <>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : "Not Provided"}
+                                    SAR{" "}
+                                    {item.unit_price
+                                      ? Number(item.unit_price).toFixed(2)
+                                      : "Not Provided"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR {item.quantity && item.unit_price
-                                      ? Number(item.quantity * item.unit_price).toFixed(2)
+                                    SAR{" "}
+                                    {item.quantity && item.unit_price
+                                      ? Number(
+                                          item.quantity * item.unit_price
+                                        ).toFixed(2)
                                       : "0.00"}
                                   </td>
                                 </>
                               )}
-                              <td className="border p-2 whitespace-nowrap">{item.range || "Not Provided"}</td>
                               <td className="border p-2 whitespace-nowrap">
-                                {state.technicians.find((t) => t.id === item.assigned_to)?.name || "Not Provided"}
-                              </td>
-                              <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || "Not Provided"}</td>
-                              <td className="border p-2 whitespace-nowrap">{item.certificate_number || "Not Provided"}</td>
-                              <td className="border p-2 whitespace-nowrap">
-                                {item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : "Not Provided"}
+                                {item.range || "Not Provided"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
-                                {item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : "Not Provided"}
+                                {state.technicians.find(
+                                  (t) => t.id === item.assigned_to
+                                )?.name || "Not Provided"}
                               </td>
-                              <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || "Not Provided"}</td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.certificate_uut_label || "Not Provided"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.certificate_number || "Not Provided"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.calibration_date
+                                  ? new Date(
+                                      item.calibration_date
+                                    ).toLocaleDateString()
+                                  : "Not Provided"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.calibration_due_date
+                                  ? new Date(
+                                      item.calibration_due_date
+                                    ).toLocaleDateString()
+                                  : "Not Provided"}
+                              </td>
+                              <td className="border p-2 whitespace-nowrap">
+                                {item.uuc_serial_number || "Not Provided"}
+                              </td>
                               <td className="border p-2 whitespace-nowrap">
                                 {item.certificate_file ? (
                                   <a

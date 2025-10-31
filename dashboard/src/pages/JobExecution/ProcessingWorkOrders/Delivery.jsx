@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import apiClient from '../../../helpers/apiClient';
-import InputField from '../../../components/InputField';
-import Button from '../../../components/Button';
-import Modal from '../../../components/Modal';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import apiClient from "../../../helpers/apiClient";
+import InputField from "../../../components/InputField";
+import Button from "../../../components/Button";
+import Modal from "../../../components/Modal";
 
 const Delivery = () => {
   const navigate = useNavigate();
@@ -17,8 +17,8 @@ const Delivery = () => {
     quotations: [], // Added quotations to state
     purchaseOrders: [], // Added purchaseOrders to state
     channels: [], // Added channels to state
-    searchTerm: '',
-    sortBy: 'created_at',
+    searchTerm: "",
+    sortBy: "created_at",
     currentPage: 1,
     itemsPerPage: 20,
     isViewModalOpen: false,
@@ -32,9 +32,9 @@ const Delivery = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await apiClient.get('/profile/');
+        const response = await apiClient.get("/profile/");
         const user = response.data;
-        setIsSuperadmin(user.is_superuser || user.role?.name === 'Superadmin');
+        setIsSuperadmin(user.is_superuser || user.role?.name === "Superadmin");
         const roleId = user.role?.id;
         if (roleId) {
           const res = await apiClient.get(`/roles/${roleId}/`);
@@ -43,7 +43,7 @@ const Delivery = () => {
           setPermissions([]);
         }
       } catch (error) {
-        console.error('Unable to fetch user profile:', error);
+        console.error("Unable to fetch user profile:", error);
         setPermissions([]);
         setIsSuperadmin(false);
       } finally {
@@ -61,25 +61,37 @@ const Delivery = () => {
 
   const fetchData = async () => {
     try {
-      const [woRes, techRes, itemsRes, dnRes, unitsRes, quotationsRes, poRes, channelsRes] = await Promise.all([
-        apiClient.get('work-orders/', { params: { status: 'approved' } }),
-        apiClient.get('technicians/'),
-        apiClient.get('items/'),
-        apiClient.get('delivery-notes/'),  // Fetch DNs
-        apiClient.get('units/'),
-        apiClient.get('quotations/'),
-        apiClient.get('purchase-orders/'),
-        apiClient.get('channels/'),
+      const [
+        woRes,
+        techRes,
+        itemsRes,
+        dnRes,
+        unitsRes,
+        quotationsRes,
+        poRes,
+        channelsRes,
+      ] = await Promise.all([
+        apiClient.get("work-orders/", { params: { status: "approved" } }),
+        apiClient.get("technicians/"),
+        apiClient.get("items/"),
+        apiClient.get("delivery-notes/"), // Fetch DNs
+        apiClient.get("units/"),
+        apiClient.get("quotations/"),
+        apiClient.get("purchase-orders/"),
+        apiClient.get("channels/"),
       ]);
-      console.log('Fetched WOs in Delivery:', woRes.data);  // Log WOs (remove after testing)
-      const allDNs = dnRes.data || [];  // All DNs including temp
-      const deliveryNotes = allDNs.filter(dn => dn.dn_number && !dn.dn_number.startsWith('TEMP-DN')) || [];  // UPDATED: Filter out temp DNs
-      console.log('Filtered Real DNs in Delivery:', deliveryNotes);  // Log real DNs (remove after testing)
+      console.log("Fetched WOs in Delivery:", woRes.data); // Log WOs (remove after testing)
+      const allDNs = dnRes.data || []; // All DNs including temp
+      const deliveryNotes =
+        allDNs.filter(
+          (dn) => dn.dn_number && !dn.dn_number.startsWith("TEMP-DN")
+        ) || []; // UPDATED: Filter out temp DNs
+      console.log("Filtered Real DNs in Delivery:", deliveryNotes); // Log real DNs (remove after testing)
 
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
-        deliveryNotes,  // Store only real DNs
+        deliveryNotes, // Store only real DNs
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
@@ -88,37 +100,63 @@ const Delivery = () => {
         channels: channelsRes.data || [],
       }));
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load work orders.');
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load work orders.");
     }
   };
-
 
   useEffect(() => {
     fetchData();
   }, []);
 
   const getQuotationDetails = (wo) => {
-    const purchaseOrder = state.purchaseOrders.find((po) => po.id === wo.purchase_order);
+    const purchaseOrder = state.purchaseOrders.find(
+      (po) => po.id === wo.purchase_order
+    );
     const quotation = state.quotations.find((q) => q.id === wo.quotation);
     return {
-      series_number: quotation?.series_number || 'N/A',
-      company_name: quotation?.company_name || 'N/A',
-      company_address: quotation?.company_address || 'N/A',
-      company_phone: quotation?.company_phone || 'N/A',
-      company_email: quotation?.company_email || 'N/A',
-      channel: state.channels.find((c) => c.id === quotation?.rfq_channel)?.channel_name || 'N/A',
-      contact_name: quotation?.point_of_contact_name || 'N/A',
-      contact_email: quotation?.point_of_contact_email || 'N/A',
-      contact_phone: quotation?.point_of_contact_phone || 'N/A',
-      po_series_number: purchaseOrder?.series_number || 'N/A',
-      client_po_number: purchaseOrder?.client_po_number || 'N/A',
-      order_type: purchaseOrder?.order_type || 'N/A',
-      created_at: purchaseOrder?.created_at ? new Date(purchaseOrder.created_at).toLocaleDateString() : 'N/A',
+      series_number: quotation?.series_number || "N/A",
+      company_name: quotation?.company_name || "N/A",
+      company_address: quotation?.company_address || "N/A",
+      company_phone: quotation?.company_phone || "N/A",
+      company_email: quotation?.company_email || "N/A",
+      channel:
+        state.channels.find((c) => c.id === quotation?.rfq_channel)
+          ?.channel_name || "N/A",
+      contact_name: quotation?.point_of_contact_name || "N/A",
+      contact_email: quotation?.point_of_contact_email || "N/A",
+      contact_phone: quotation?.point_of_contact_phone || "N/A",
+      po_series_number: purchaseOrder?.series_number || "N/A",
+      client_po_number: purchaseOrder?.client_po_number || "N/A",
+      order_type: purchaseOrder?.order_type || "N/A",
+      created_at: purchaseOrder?.created_at
+        ? new Date(purchaseOrder.created_at).toLocaleDateString()
+        : "N/A",
       po_file: purchaseOrder?.po_file || null,
-      assigned_sales_person: quotation?.assigned_sales_person_name || 'N/A',
+      assigned_sales_person: quotation?.assigned_sales_person_name || "N/A",
     };
   };
+
+  const filteredWOs = state.workOrders
+    .filter(
+      (wo) =>
+        getQuotationDetails(wo)
+          .company_name.toLowerCase()
+          .includes(state.searchTerm.toLowerCase()) ||
+        (wo.wo_number || "")
+          .toLowerCase()
+          .includes(state.searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (state.sortBy === "created_at") {
+        return new Date(b.created_at) - new Date(a.created_at);
+      } else if (state.sortBy === "company_name") {
+        return getQuotationDetails(a).company_name.localeCompare(
+          getQuotationDetails(b).company_name
+        );
+      }
+      return 0;
+    });
 
   const handleViewWO = (wo) => {
     setState((prev) => ({
@@ -129,41 +167,38 @@ const Delivery = () => {
   };
 
   const handleInitiateDelivery = (workOrder) => {
-    navigate(`/job-execution/processing-work-orders/initiate-delivery/${workOrder.id}`);
+    navigate(
+      `/job-execution/processing-work-orders/initiate-delivery/${workOrder.id}`
+    );
   };
 
   const getAssignedTechnicians = (items) => {
-    const technicianIds = [...new Set(items.map((item) => item.assigned_to).filter((id) => id))];
-    if (technicianIds.length === 0) return 'None';
-    if (technicianIds.length > 1) return 'Multiple';
+    const technicianIds = [
+      ...new Set(items.map((item) => item.assigned_to).filter((id) => id)),
+    ];
+    if (technicianIds.length === 0) return "None";
+    if (technicianIds.length > 1) return "Multiple";
     const technician = state.technicians.find((t) => t.id === technicianIds[0]);
-    return technician ? `${technician.name} (${technician.designation || 'N/A'})` : 'N/A';
+    return technician
+      ? `${technician.name} (${technician.designation || "N/A"})`
+      : "N/A";
   };
-
-  const filteredWOs = state.workOrders
-    .filter(
-      (wo) =>
-        (wo.quotation?.company_name || '').toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-        (wo.wo_number || '').toLowerCase().includes(state.searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (state.sortBy === 'created_at') {
-        return new Date(b.created_at) - new Date(a.created_at);
-      } else if (state.sortBy === 'company_name') {
-        return (a.quotation?.company_name || '').localeCompare(b.quotation?.company_name || '');
-      }
-      return 0;
-    });
 
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
-  const currentWOs = filteredWOs.slice(startIndex, startIndex + state.itemsPerPage);
+  const currentWOs = filteredWOs.slice(
+    startIndex,
+    startIndex + state.itemsPerPage
+  );
 
   const pageGroupSize = 3;
   const currentGroup = Math.floor((state.currentPage - 1) / pageGroupSize);
   const startPage = currentGroup * pageGroupSize + 1;
   const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
-  const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+  const pageNumbers = Array.from(
+    { length: endPage - startPage + 1 },
+    (_, i) => startPage + i
+  );
 
   const handlePageChange = (page) => {
     setState((prev) => ({ ...prev, currentPage: page }));
@@ -185,25 +220,30 @@ const Delivery = () => {
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Delivery</h1>
       {filteredWOs.length === 0 && (
-        <div className="text-center text-gray-500 mt-4">No work orders match the current filter.</div>
+        <div className="text-center text-gray-500 mt-4">
+          No work orders match the current filter.
+        </div>
       )}
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search Work Orders</label>
-            <InputField
-              type="text"
-              placeholder="Search by company name or WO Number..."
-              value={state.searchTerm}
-              onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
-              className="w-full"
-            />
-          </div>
+          <InputField
+            type="text"
+            placeholder="Search by company name or WO Number..."
+            value={state.searchTerm}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, searchTerm: e.target.value }))
+            }
+            className="w-full"
+          />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sort By
+            </label>
             <select
               value={state.sortBy}
-              onChange={(e) => setState((prev) => ({ ...prev, sortBy: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, sortBy: e.target.value }))
+              }
               className="p-2 border rounded focus:outline-indigo-500"
             >
               <option value="created_at">Creation Date</option>
@@ -215,17 +255,33 @@ const Delivery = () => {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
-                <th className="border p-2 text-left text-sm font-medium text-gray-700">Actions</th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  Sl No
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  WO Number
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  Company Name
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  Created At
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  Assigned To
+                </th>
+                <th className="border p-2 text-left text-sm font-medium text-gray-700">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="border p-2 text-center text-gray-500">
+                  <td
+                    colSpan="6"
+                    className="border p-2 text-center text-gray-500"
+                  >
                     No work orders available.
                   </td>
                 </tr>
@@ -233,9 +289,16 @@ const Delivery = () => {
                 currentWOs.map((wo, index) => (
                   <tr key={wo.id} className="border hover:bg-gray-50">
                     <td className="border p-2">{startIndex + index + 1}</td>
-                    <td className="border p-2">{wo.wo_number || 'N/A'}</td>
-                    <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
-                    <td className="border p-2">{getAssignedTechnicians(wo.items)}</td>
+                    <td className="border p-2">{wo.wo_number || "N/A"}</td>
+                    <td className="border p-2">
+                      {getQuotationDetails(wo).company_name}
+                    </td>
+                    <td className="border p-2">
+                      {new Date(wo.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border p-2">
+                      {getAssignedTechnicians(wo.items)}
+                    </td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
                         <Button
@@ -244,18 +307,30 @@ const Delivery = () => {
                         >
                           View WO & Certificates
                         </Button>
-<Button
-  onClick={() => handleInitiateDelivery(wo)}
-  disabled={!hasPermission('delivery', 'edit') || state.deliveryNotes.some(dn => dn.work_order_id === wo.id)}  
-  className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-    !hasPermission('delivery', 'edit') || state.deliveryNotes.some(dn => dn.work_order_id === wo.id)  
-      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-      : 'bg-indigo-600 text-white hover:bg-indigo-700'
-  }`}
->
-  {state.deliveryNotes.some(dn => dn.work_order_id === wo.id) ? 'Delivery Initiated' : 'Initiate Delivery'}  
-</Button>
-          </div>
+                        <Button
+                          onClick={() => handleInitiateDelivery(wo)}
+                          disabled={
+                            !hasPermission("delivery", "edit") ||
+                            state.deliveryNotes.some(
+                              (dn) => dn.work_order_id === wo.id
+                            )
+                          }
+                          className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
+                            !hasPermission("delivery", "edit") ||
+                            state.deliveryNotes.some(
+                              (dn) => dn.work_order_id === wo.id
+                            )
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                          }`}
+                        >
+                          {state.deliveryNotes.some(
+                            (dn) => dn.work_order_id === wo.id
+                          )
+                            ? "Delivery Initiated"
+                            : "Initiate Delivery"}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -278,7 +353,9 @@ const Delivery = () => {
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
-                state.currentPage === page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                state.currentPage === page
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >
               {page}
@@ -295,34 +372,85 @@ const Delivery = () => {
       )}
       <Modal
         isOpen={state.isViewModalOpen}
-        onClose={() => setState((prev) => ({ ...prev, isViewModalOpen: false, selectedWO: null }))}
-        title={`Work Order Details - ${state.selectedWO?.wo_number || 'N/A'}`}
+        onClose={() =>
+          setState((prev) => ({
+            ...prev,
+            isViewModalOpen: false,
+            selectedWO: null,
+          }))
+        }
+        title={`Work Order Details - ${state.selectedWO?.wo_number || "N/A"}`}
       >
         {state.selectedWO ? (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">Company Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).series_number}</p>
-              <p><strong>Company Name:</strong> {getQuotationDetails(state.selectedWO).company_name}</p>
-              <p><strong>Company Address:</strong> {getQuotationDetails(state.selectedWO).company_address}</p>
-              <p><strong>Company Phone:</strong> {getQuotationDetails(state.selectedWO).company_phone}</p>
-              <p><strong>Company Email:</strong> {getQuotationDetails(state.selectedWO).company_email}</p>
-              <p><strong>Channel:</strong> {getQuotationDetails(state.selectedWO).channel}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Contact Details</h3>
-              <p><strong>Contact Name:</strong> {getQuotationDetails(state.selectedWO).contact_name}</p>
-              <p><strong>Contact Email:</strong> {getQuotationDetails(state.selectedWO).contact_email}</p>
-              <p><strong>Contact Phone:</strong> {getQuotationDetails(state.selectedWO).contact_phone}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-black">Purchase Order Details</h3>
-              <p><strong>Series Number:</strong> {getQuotationDetails(state.selectedWO).po_series_number}</p>
-              <p><strong>Client PO Number:</strong> {getQuotationDetails(state.selectedWO).client_po_number}</p>
-              <p><strong>Order Type:</strong> {getQuotationDetails(state.selectedWO).order_type}</p>
-              <p><strong>Created:</strong> {getQuotationDetails(state.selectedWO).created_at}</p>
+              <h3 className="text-lg font-medium text-black">
+                Company Details
+              </h3>
               <p>
-                <strong>PO File:</strong>{' '}
+                <strong>Series Number:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).series_number}
+              </p>
+              <p>
+                <strong>Company Name:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).company_name}
+              </p>
+              <p>
+                <strong>Company Address:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).company_address}
+              </p>
+              <p>
+                <strong>Company Phone:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).company_phone}
+              </p>
+              <p>
+                <strong>Company Email:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).company_email}
+              </p>
+              <p>
+                <strong>Channel:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).channel}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">
+                Contact Details
+              </h3>
+              <p>
+                <strong>Contact Name:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).contact_name}
+              </p>
+              <p>
+                <strong>Contact Email:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).contact_email}
+              </p>
+              <p>
+                <strong>Contact Phone:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).contact_phone}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-black">
+                Purchase Order Details
+              </h3>
+              <p>
+                <strong>Series Number:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).po_series_number}
+              </p>
+              <p>
+                <strong>Client PO Number:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).client_po_number}
+              </p>
+              <p>
+                <strong>Order Type:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).order_type}
+              </p>
+              <p>
+                <strong>Created:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).created_at}
+              </p>
+              <p>
+                <strong>PO File:</strong>{" "}
                 {getQuotationDetails(state.selectedWO).po_file ? (
                   <a
                     href={getQuotationDetails(state.selectedWO).po_file}
@@ -333,29 +461,56 @@ const Delivery = () => {
                     View File
                   </a>
                 ) : (
-                  'N/A'
+                  "N/A"
                 )}
               </p>
-              <p><strong>Assigned Sales Person:</strong> {getQuotationDetails(state.selectedWO).assigned_sales_person}</p>
+              <p>
+                <strong>Assigned Sales Person:</strong>{" "}
+                {getQuotationDetails(state.selectedWO).assigned_sales_person}
+              </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Work Order Details</h3>
-              <p><strong>Work Order Number:</strong> {state.selectedWO.wo_number || 'N/A'}</p>
-              <p><strong>Work Order Type:</strong> {state.selectedWO.wo_type || 'N/A'}</p>
+              <h3 className="text-lg font-medium text-black">
+                Work Order Details
+              </h3>
               <p>
-                <strong>Date Received:</strong>{' '}
-                {state.selectedWO.date_received ? new Date(state.selectedWO.date_received).toLocaleDateString() : 'N/A'}
+                <strong>Work Order Number:</strong>{" "}
+                {state.selectedWO.wo_number || "N/A"}
               </p>
               <p>
-                <strong>Expected Completion Date:</strong>{' '}
+                <strong>Work Order Type:</strong>{" "}
+                {state.selectedWO.wo_type || "N/A"}
+              </p>
+              <p>
+                <strong>Date Received:</strong>{" "}
+                {state.selectedWO.date_received
+                  ? new Date(
+                      state.selectedWO.date_received
+                    ).toLocaleDateString()
+                  : "N/A"}
+              </p>
+              <p>
+                <strong>Expected Completion Date:</strong>{" "}
                 {state.selectedWO.expected_completion_date
-                  ? new Date(state.selectedWO.expected_completion_date).toLocaleDateString()
-                  : 'N/A'}
+                  ? new Date(
+                      state.selectedWO.expected_completion_date
+                    ).toLocaleDateString()
+                  : "N/A"}
               </p>
-              <p><strong>Onsite or Lab:</strong> {state.selectedWO.onsite_or_lab || 'N/A'}</p>
-              <p><strong>Site Location:</strong> {state.selectedWO.site_location || 'N/A'}</p>
-              <p><strong>Remarks:</strong> {state.selectedWO.remarks || 'N/A'}</p>
-              <p><strong>Status:</strong> {state.selectedWO.status || 'N/A'}</p>
+              <p>
+                <strong>Onsite or Lab:</strong>{" "}
+                {state.selectedWO.onsite_or_lab || "N/A"}
+              </p>
+              <p>
+                <strong>Site Location:</strong>{" "}
+                {state.selectedWO.site_location || "N/A"}
+              </p>
+              <p>
+                <strong>Remarks:</strong> {state.selectedWO.remarks || "N/A"}
+              </p>
+              <p>
+                <strong>Status:</strong> {state.selectedWO.status || "N/A"}
+              </p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
@@ -364,42 +519,86 @@ const Delivery = () => {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Item</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Quantity</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Unit Price</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Range</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate UUT Label</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Calibration Due Date</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">UUC Serial Number</th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Certificate</th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Item
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Quantity
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Unit
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Unit Price
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Range
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Certificate UUT Label
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Certificate Number
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Calibration Date
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Calibration Due Date
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          UUC Serial Number
+                        </th>
+                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                          Certificate
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedWO.items.map((item) => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)?.name || 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === Number(item.unit))?.name || 'N/A'}
+                            {state.itemsList.find((i) => i.id === item.item)
+                              ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">{item.range || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_uut_label || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">{item.certificate_number || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.calibration_date ? new Date(item.calibration_date).toLocaleDateString() : 'N/A'}
+                            {item.quantity || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {item.calibration_due_date ? new Date(item.calibration_due_date).toLocaleDateString() : 'N/A'}
+                            {state.units.find((u) => u.id === Number(item.unit))
+                              ?.name || "N/A"}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">{item.uuc_serial_number || 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.unit_price
+                              ? Number(item.unit_price).toFixed(2)
+                              : "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.range || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.certificate_uut_label || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.certificate_number || "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.calibration_date
+                              ? new Date(
+                                  item.calibration_date
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.calibration_due_date
+                              ? new Date(
+                                  item.calibration_due_date
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </td>
+                          <td className="border p-2 whitespace-nowrap">
+                            {item.uuc_serial_number || "N/A"}
+                          </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.certificate_file ? (
                               <a
@@ -411,7 +610,7 @@ const Delivery = () => {
                                 View Certificate
                               </a>
                             ) : (
-                              'N/A'
+                              "N/A"
                             )}
                           </td>
                         </tr>
