@@ -219,38 +219,48 @@ const Delivery = () => {
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Delivery</h1>
+      
       {filteredWOs.length === 0 && (
         <div className="text-center text-gray-500 mt-4">
           No work orders match the current filter.
         </div>
       )}
-      <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
-        <div className="mb-6 flex gap-4">
-          <InputField
-            type="text"
-            placeholder="Search by company name or WO Number..."
-            value={state.searchTerm}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, searchTerm: e.target.value }))
-            }
-            className="w-full"
-          />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort By
-            </label>
-            <select
-              value={state.sortBy}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, sortBy: e.target.value }))
-              }
-              className="p-2 border rounded focus:outline-indigo-500"
-            >
-              <option value="created_at">Creation Date</option>
-              <option value="company_name">Company Name</option>
-            </select>
+      
+      <div className="bg-white p-4 rounded-md shadow w-full">
+        {/* Updated Search Section - Matching Manager Approval Design */}
+        <div className="mb-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-3">Search Work Orders</h2>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <div className="w-full sm:w-80">
+              <InputField
+                type="text"
+                placeholder="Search by company name or WO Number..."
+                value={state.searchTerm}
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, searchTerm: e.target.value }))
+                }
+                className="w-full"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Sort By
+              </label>
+              <select
+                value={state.sortBy}
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, sortBy: e.target.value }))
+                }
+                className="p-2 border rounded focus:outline-indigo-500 text-sm"
+              >
+                <option value="created_at">Creation Date</option>
+                <option value="company_name">Company Name</option>
+              </select>
+            </div>
           </div>
         </div>
+
+        {/* Table Section */}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
@@ -339,6 +349,7 @@ const Delivery = () => {
           </table>
         </div>
       </div>
+      
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
           <Button
@@ -370,6 +381,7 @@ const Delivery = () => {
           </Button>
         </div>
       )}
+      
       <Modal
         isOpen={state.isViewModalOpen}
         onClose={() =>
