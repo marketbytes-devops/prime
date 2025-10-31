@@ -83,7 +83,7 @@ const ListProcessingWorkOrders = () => {
         channelsRes,
         poRes,
       ] = await Promise.all([
-        apiClient.get("/work-orders/?status=Submitted,Manager Approval"),
+        apiClient.get("/work-orders/"),
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -506,11 +506,10 @@ const ListProcessingWorkOrders = () => {
                               disabled={
                                 !hasPermission("processing_work_orders", "view")
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "view")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-green-600 text-white hover:bg-green-700"
-                              }`}
+                                }`}
                             >
                               View
                             </Button>
@@ -520,11 +519,10 @@ const ListProcessingWorkOrders = () => {
                               disabled={
                                 !hasPermission("processing_work_orders", "edit")
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "edit")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "edit")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-blue-600 text-white hover:bg-blue-700"
-                              }`}
+                                }`}
                             >
                               Update
                             </Button>
@@ -537,14 +535,13 @@ const ListProcessingWorkOrders = () => {
                                   "delete"
                                 )
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission(
-                                  "processing_work_orders",
-                                  "delete"
-                                )
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission(
+                                "processing_work_orders",
+                                "delete"
+                              )
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-red-600 text-white hover:bg-red-700"
-                              }`}
+                                }`}
                             >
                               Delete
                             </Button>
@@ -558,16 +555,15 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 isDUTComplete(wo)
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission(
-                                  "processing_work_orders",
-                                  "edit"
-                                ) ||
-                                wo.status === "Manager Approval" ||
-                                isDUTComplete(wo)
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission(
+                                "processing_work_orders",
+                                "edit"
+                              ) ||
+                                  wo.status === "Manager Approval" ||
+                                  isDUTComplete(wo)
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-indigo-600 text-white hover:bg-indigo-700"
-                              }`}
+                                }`}
                             >
                               Move to Manager Approval
                             </Button>
@@ -581,16 +577,15 @@ const ListProcessingWorkOrders = () => {
                                 wo.status === "Manager Approval" ||
                                 isDUTComplete(wo)
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission(
-                                  "processing_work_orders",
-                                  "edit"
-                                ) ||
-                                wo.status === "Manager Approval" ||
-                                isDUTComplete(wo)
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission(
+                                "processing_work_orders",
+                                "edit"
+                              ) ||
+                                  wo.status === "Manager Approval" ||
+                                  isDUTComplete(wo)
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-yellow-600 text-white hover:bg-yellow-700"
-                              }`}
+                                }`}
                             >
                               Update Device Test Details
                             </Button>
@@ -599,11 +594,10 @@ const ListProcessingWorkOrders = () => {
                               disabled={
                                 !hasPermission("processing_work_orders", "view")
                               }
-                              className={`px-3 py-1 rounded-md text-sm ${
-                                !hasPermission("processing_work_orders", "view")
+                              className={`px-3 py-1 rounded-md text-sm ${!hasPermission("processing_work_orders", "view")
                                   ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-gray-600 text-white hover:bg-gray-700"
-                              }`}
+                                }`}
                             >
                               Print
                             </Button>
@@ -630,11 +624,10 @@ const ListProcessingWorkOrders = () => {
                 <Button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded-md min-w-fit ${
-                    state.currentPage === page
+                  className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
                       ? "bg-blue-600 text-white"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                    }`}
                 >
                   {page}
                 </Button>
@@ -658,9 +651,8 @@ const ListProcessingWorkOrders = () => {
                 selectedWO: null,
               }))
             }
-            title={`Work Order Details - ${
-              state.selectedWO?.wo_number || "Not Provided"
-            }`}
+            title={`Work Order Details - ${state.selectedWO?.wo_number || "Not Provided"
+              }`}
           >
             {state.selectedWO && (
               <div className="space-y-4">
@@ -769,16 +761,16 @@ const ListProcessingWorkOrders = () => {
                     <strong>Date Received:</strong>{" "}
                     {state.selectedWO.date_received
                       ? new Date(
-                          state.selectedWO.date_received
-                        ).toLocaleDateString()
+                        state.selectedWO.date_received
+                      ).toLocaleDateString()
                       : "Not Provided"}
                   </p>
                   <p>
                     <strong>Expected Completion Date:</strong>{" "}
                     {state.selectedWO.expected_completion_date
                       ? new Date(
-                          state.selectedWO.expected_completion_date
-                        ).toLocaleDateString()
+                        state.selectedWO.expected_completion_date
+                      ).toLocaleDateString()
                       : "Not Provided"}
                   </p>
                   <p>
@@ -803,7 +795,7 @@ const ListProcessingWorkOrders = () => {
                     Device Under Test Details
                   </h3>
                   {state.selectedWO.items &&
-                  state.selectedWO.items.length > 0 ? (
+                    state.selectedWO.items.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
@@ -881,8 +873,8 @@ const ListProcessingWorkOrders = () => {
                                     SAR{" "}
                                     {item.quantity && item.unit_price
                                       ? Number(
-                                          item.quantity * item.unit_price
-                                        ).toFixed(2)
+                                        item.quantity * item.unit_price
+                                      ).toFixed(2)
                                       : "0.00"}
                                   </td>
                                 </>
@@ -904,15 +896,15 @@ const ListProcessingWorkOrders = () => {
                               <td className="border p-2 whitespace-nowrap">
                                 {item.calibration_date
                                   ? new Date(
-                                      item.calibration_date
-                                    ).toLocaleDateString()
+                                    item.calibration_date
+                                  ).toLocaleDateString()
                                   : "Not Provided"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
                                 {item.calibration_due_date
                                   ? new Date(
-                                      item.calibration_due_date
-                                    ).toLocaleDateString()
+                                    item.calibration_due_date
+                                  ).toLocaleDateString()
                                   : "Not Provided"}
                               </td>
                               <td className="border p-2 whitespace-nowrap">
