@@ -102,7 +102,7 @@ const EditProcessingWorkOrders = () => {
   const handleFileChange = (index, e) => {
     const file = e.target.files[0];
     if (file) {
-      const maxSize = 5 * 1024 * 1024; 
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         alert('File size exceeds 5 MB limit. Please upload a smaller file.');
         e.target.value = ''; // Clear the input
@@ -134,66 +134,87 @@ const EditProcessingWorkOrders = () => {
     }
   };
 
+  // const isFormValid = () => {
+  //   return state.items.every((item, index) =>
+  //     item.certificate_uut_label &&
+  //     item.certificate_number &&
+  //     item.calibration_date &&
+  //     item.calibration_due_date &&
+  //     item.uuc_serial_number &&
+  //     (item.certificate_file || state.fileChanges[index])
+  //   );
+  // };
+
   const isFormValid = () => {
-    return state.items.every((item, index) =>
-      item.certificate_uut_label &&
-      item.certificate_number &&
-      item.calibration_date &&
-      item.calibration_due_date &&
-      item.uuc_serial_number &&
-      (item.certificate_file || state.fileChanges[index])
+    return true;
+  };
+
+const handleSubmit = async () => {
+  setState((prev) => ({ ...prev, isSaving: true }));
+  try {
+    const formData = new FormData();
+
+    // Only send fields that changed or are required
+    formData.append("purchase_order", state.workOrder?.purchase_order || "");
+    formData.append("quotation", state.workOrder?.quotation || "");
+    if (state.dateReceived) formData.append("date_received", state.dateReceived);
+    if (state.expectedCompletionDate) formData.append("expected_completion_date", state.expectedCompletionDate);
+    if (state.onsiteOrLab) formData.append("onsite_or_lab", state.onsiteOrLab);
+    if (state.siteLocation) formData.append("site_location", state.siteLocation);
+    if (state.remarks) formData.append("remarks", state.remarks);
+    if (state.assignedTo) formData.append("created_by", state.assignedTo);
+
+    // === Items: only send changed or new files ===
+    state.items.forEach((item, index) => {
+      const prefix = `items[${index}]`;
+      formData.append(`${prefix}id`, item.id || "");
+      formData.append(`${prefix}item`, item.item || "");
+      formData.append(`${prefix}quantity`, item.quantity || 1);
+      formData.append(`${prefix}unit`, item.unit || "");
+      formData.append(`${prefix}unit_price`, item.unit_price || "");
+
+      // Only append DUT fields if they have value
+      if (item.certificate_uut_label) formData.append(`${prefix}certificate_uut_label`, item.certificate_uut_label);
+      if (item.certificate_number) formData.append(`${prefix}certificate_number`, item.certificate_number);
+      if (item.calibration_date) formData.append(`${prefix}calibration_date`, format(new Date(item.calibration_date), 'yyyy-MM-dd'));
+      if (item.calibration_due_date) formData.append(`${prefix}calibration_due_date`, format(new Date(item.calibration_due_date), 'yyyy-MM-dd'));
+      if (item.uuc_serial_number) formData.append(`${prefix}uuc_serial_number`, item.uuc_serial_number);
+      if (item.range) formData.append(`${prefix}range`, item.range);
+      if (item.assigned_to) formData.append(`${prefix}assigned_to`, item.assigned_to);
+
+      // Only send file if a **new** file was selected
+      if (state.fileChanges[index]) {
+        formData.append(`${prefix}certificate_file`, state.fileChanges[index]);
+      }
+      // If no new file → do NOT send anything → keeps existing file
+    });
+
+    // === Use PATCH instead of PUT ===
+    await apiClient.patch(`work-orders/${id}/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    // Detect if DUT is now complete
+    const dutFilled = state.items.every(
+      (item, idx) =>
+        item.certificate_uut_label &&
+        item.certificate_number &&
+        item.calibration_date &&
+        item.calibration_due_date &&
+        item.uuc_serial_number &&
+        (item.certificate_file || state.fileChanges[idx]) &&
+        item.range
     );
-  };
 
-  const handleSubmit = async () => {
-    if (!isFormValid()) {
-      toast.error("Please fill all required certificate details for every item before saving.");
-      return;
-    }
-    setState((prev) => ({ ...prev, isSaving: true }));
-    try {
-      const formData = new FormData();
-
-      formData.append("purchase_order", state.workOrder?.purchase_order || "");
-      formData.append("quotation", state.workOrder?.quotation || "");
-      formData.append("date_received", state.dateReceived || null);
-      formData.append("expected_completion_date", state.expectedCompletionDate || null);
-      formData.append("onsite_or_lab", state.onsiteOrLab || "");
-      formData.append("site_location", state.siteLocation || "");
-      formData.append("remarks", state.remarks || "");
-      formData.append("created_by", state.assignedTo || "");
-
-      state.items.forEach((item, index) => {
-        formData.append(`items[${index}]id`, item.id || "");
-        formData.append(`items[${index}]item`, item.item || "");
-        formData.append(`items[${index}]quantity`, item.quantity || 1);
-        formData.append(`items[${index}]unit`, item.unit || "");
-        formData.append(`items[${index}]unit_price`, item.unit_price || "");
-        formData.append(`items[${index}]certificate_uut_label`, item.certificate_uut_label || "");
-        formData.append(`items[${index}]certificate_number`, item.certificate_number || "");
-        formData.append(`items[${index}]calibration_date`, item.calibration_date || null);
-        formData.append(`items[${index}]calibration_due_date`, item.calibration_due_date || null);
-        formData.append(`items[${index}]uuc_serial_number`, item.uuc_serial_number || "");
-        formData.append(`items[${index}]assigned_to`, item.assigned_to || "");
-        formData.append(`items[${index}]range`, item.range || "");
-        if (state.fileChanges[index]) {
-          formData.append(`items[${index}]certificate_file`, state.fileChanges[index]);
-        }
-      });
-
-      await apiClient.put(`work-orders/${id}/`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      toast.success("Work Order updated successfully.");
-      navigate("/job-execution/processing-work-orders/list-all-processing-work-orders");
-    } catch (error) {
-      console.error("Error updating work order:", error.response?.data || error);
-      toast.error("Failed to update Work Order: " + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
-    } finally {
-      setState((prev) => ({ ...prev, isSaving: false }));
-    }
-  };
+    toast.success("Work Order updated successfully.");
+    navigate(`/job-execution/processing-work-orders/list-all-processing-work-orders?dutFilled=${dutFilled}`);
+  } catch (error) {
+    console.error("Error updating work order:", error);
+    toast.error("Failed to update: " + (error.response?.data?.detail || "Unknown error"));
+  } finally {
+    setState((prev) => ({ ...prev, isSaving: false }));
+  }
+};
 
   if (!state.workOrder) return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
 
@@ -282,7 +303,6 @@ const EditProcessingWorkOrders = () => {
                   value={item.certificate_uut_label || ""}
                   onChange={(e) => handleItemChange(index, "certificate_uut_label", e.target.value)}
                   className="w-full"
-                  required
                 />
               </div>
               <div>
@@ -292,7 +312,6 @@ const EditProcessingWorkOrders = () => {
                   value={item.certificate_number || ""}
                   onChange={(e) => handleItemChange(index, "certificate_number", e.target.value)}
                   className="w-full"
-                  required
                 />
               </div>
               <div>
@@ -302,7 +321,6 @@ const EditProcessingWorkOrders = () => {
                   value={item.calibration_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_date", e.target.value)}
                   className="w-full"
-                  required
                 />
               </div>
               <div>
@@ -312,7 +330,6 @@ const EditProcessingWorkOrders = () => {
                   value={item.calibration_due_date || ""}
                   onChange={(e) => handleItemChange(index, "calibration_due_date", e.target.value)}
                   className="w-full"
-                  required
                 />
               </div>
               <div>
@@ -331,7 +348,6 @@ const EditProcessingWorkOrders = () => {
                   value={item.uuc_serial_number || ""}
                   onChange={(e) => handleItemChange(index, "uuc_serial_number", e.target.value)}
                   className="w-full"
-                  required
                 />
               </div>
               <div>
@@ -356,7 +372,6 @@ const EditProcessingWorkOrders = () => {
                   onChange={(e) => handleFileChange(index, e)}
                   className="w-full p-2 border rounded"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  required={!item.certificate_file}
                 />
                 {state.fileChanges[index] && (
                   <div className="mt-1 text-sm text-green-600">

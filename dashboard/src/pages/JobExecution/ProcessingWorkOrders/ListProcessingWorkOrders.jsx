@@ -72,7 +72,6 @@ const ListProcessingWorkOrders = () => {
     }
   }, [isLoadingPermissions, permissions, navigate]);
 
-// In ListProcessingWorkOrders.jsx, change the fetch:
   const fetchData = async () => {
     try {
       const [
@@ -84,7 +83,7 @@ const ListProcessingWorkOrders = () => {
         channelsRes,
         poRes,
       ] = await Promise.all([
-        apiClient.get("/work-orders/"),  // Fetch ALL work orders
+        apiClient.get("/work-orders/?status=Submitted,Manager Approval"),
         apiClient.get("items/"),
         apiClient.get("units/"),
         apiClient.get("technicians/"),
@@ -92,8 +91,7 @@ const ListProcessingWorkOrders = () => {
         apiClient.get("channels/"),
         apiClient.get("purchase-orders/"),
       ]);
-    // ... rest of the code
-      console.log("Work Orders API Response:", woRes.data); // Debug API response
+
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
@@ -131,7 +129,6 @@ const ListProcessingWorkOrders = () => {
       try {
         await apiClient.delete(`/work-orders/${woId}/`);
         toast.success("Work order deleted successfully.");
-        navigate("/job-execution/initiate-work-order/list-all-purchase-orders");
         await fetchData();
       } catch (error) {
         console.error("Error deleting work order:", error);
@@ -140,6 +137,7 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
+  // NEW: DUT is complete only if ALL required fields are filled for ALL items
   const isDUTComplete = (wo) => {
     return wo.items.every(
       (item) =>
@@ -149,8 +147,7 @@ const ListProcessingWorkOrders = () => {
         item.calibration_due_date &&
         item.uuc_serial_number &&
         item.certificate_file &&
-        item.range !== null &&
-        item.range !== undefined
+        item.range
     );
   };
 
@@ -160,11 +157,13 @@ const ListProcessingWorkOrders = () => {
       toast.error("Work order not found.");
       return;
     }
-    console.log("Work Order Status:", wo.status);
+
     if (wo.status === "Manager Approval") {
       toast.info("Work order is already in Manager Approval.");
       return;
     }
+
+    // Always allow navigation to edit page
     if (!isDUTComplete(wo)) {
       navigate(
         `/job-execution/processing-work-orders/edit-work-order/${woId}?scrollToDUT=true`
@@ -217,35 +216,10 @@ const ListProcessingWorkOrders = () => {
     };
   };
 
-  const filteredWOs = state.workOrders
-    .filter(
-      (wo) =>
-        (wo.wo_number || "")
-          .toLowerCase()
-          .includes(state.searchTerm.toLowerCase()) ||
-        getQuotationDetails(wo)
-          .company_name.toLowerCase()
-          .includes(state.searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (state.sortBy === "created_at") {
-        return new Date(b.created_at) - new Date(a.created_at);
-      } else if (state.sortBy === "wo_number") {
-        return (a.wo_number || "").localeCompare(b.wo_number || "");
-      } else if (state.sortBy === "company_name") {
-        return getQuotationDetails(a).company_name.localeCompare(
-          getQuotationDetails(b).company_name
-        );
-      }
-      return 0;
-    });
-
   const handlePrint = async (wo) => {
     try {
-      console.log("Work Order Object:", wo);
       let rfqDetails = null;
       let teamMembers = [];
-
       try {
         if (wo.rfq) {
           const rfqRes = await apiClient.get(`/rfqs/${wo.rfq}/`);
@@ -263,7 +237,6 @@ const ListProcessingWorkOrders = () => {
             rfqDetails = rfqRes.data;
           }
         }
-
         const teamsRes = await apiClient.get("teams/");
         teamMembers = teamsRes.data || [];
       } catch (error) {
@@ -292,7 +265,6 @@ const ListProcessingWorkOrders = () => {
           assignedSalesPersonName = salesPerson.name;
         }
       }
-
       rfqDetails.assigned_sales_person_name = assignedSalesPersonName;
 
       const itemsData = wo.items.map((item) => ({
@@ -318,18 +290,10 @@ const ListProcessingWorkOrders = () => {
         certificate_file: item.certificate_file,
       }));
 
-      const printData = {
-        ...wo,
-        items: itemsData,
-        rfqDetails: rfqDetails,
-      };
-
-      console.log("Print data being sent to template:", printData);
-
+      const printData = { ...wo, items: itemsData, rfqDetails };
       const htmlString = ReactDOMServer.renderToStaticMarkup(
         <Template1 data={printData} />
       );
-
       const printWindow = window.open("", "_blank");
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -338,10 +302,7 @@ const ListProcessingWorkOrders = () => {
             <title>Work Order ${wo.wo_number}</title>
             <style>
               body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-              @media print {
-                body { margin: 0; }
-                @page { margin: 0.5in; }
-              }
+              @media print { body { margin: 0; } @page { margin: 0.5in; } }
             </style>
           </head>
           <body>${htmlString}</body>
@@ -358,10 +319,30 @@ const ListProcessingWorkOrders = () => {
   };
 
   const getDisplayStatus = (status) => {
-    return status === "Manager Approval"
-      ? "Manager Approved"
-      : status || "Submitted";
+    return status === "Manager Approval" ? "Collected" : status || "Submitted";
   };
+  const filteredWOs = state.workOrders
+    .filter(
+      (wo) =>
+        (wo.wo_number || "")
+          .toLowerCase()
+          .includes(state.searchTerm.toLowerCase()) ||
+        getQuotationDetails(wo)
+          .company_name.toLowerCase()
+          .includes(state.searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (state.sortBy === "created_at") {
+        return new Date(b.created_at) - new Date(a.created_at);
+      } else if (state.sortBy === "wo_number") {
+        return (a.wo_number || "").localeCompare(b.wo_number || "");
+      } else if (state.sortBy === "company_name") {
+        return getQuotationDetails(a).company_name.localeCompare(
+          getQuotationDetails(b).company_name
+        );
+      }
+      return 0;
+    });
 
   const totalPages = Math.ceil(filteredWOs.length / state.itemsPerPage);
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
@@ -395,10 +376,6 @@ const ListProcessingWorkOrders = () => {
     }
   };
 
-  {
-    /* pricing implementation */
-  }
-
   const canViewPricing =
     isSuperadmin || permissions.some((p) => p.page === "pricing" && p.can_view);
 
@@ -416,41 +393,44 @@ const ListProcessingWorkOrders = () => {
         <>
           <h1 className="text-2xl font-bold mb-4">Processing Work Orders</h1>
           <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
-            <div className="mb-6 flex gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Search Work Orders
-                </label>
-                <InputField
-                  type="text"
-                  placeholder="Search by WO number or Company Name..."
-                  value={state.searchTerm}
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      searchTerm: e.target.value,
-                    }))
-                  }
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sort By
-                </label>
-                <select
-                  value={state.sortBy}
-                  onChange={(e) =>
-                    setState((prev) => ({ ...prev, sortBy: e.target.value }))
-                  }
-                  className="p-2 border rounded focus:outline-indigo-500"
-                >
-                  <option value="created_at">Creation Date</option>
-                  <option value="wo_number">Work Order Number</option>
-                  <option value="company_name">Company Name</option>
-                </select>
+            <div className="mb-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-3">
+                Search Work Orders
+              </h2>
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                <div className="w-full sm:w-80">
+                  <InputField
+                    type="text"
+                    placeholder="Search by company name or WO number..."
+                    value={state.searchTerm}
+                    onChange={(e) =>
+                      setState((prev) => ({
+                        ...prev,
+                        searchTerm: e.target.value,
+                      }))
+                    }
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    Sort By
+                  </label>
+                  <select
+                    value={state.sortBy}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, sortBy: e.target.value }))
+                    }
+                    className="p-2 border rounded focus:outline-indigo-500 text-sm"
+                  >
+                    <option value="created_at">Creation Date</option>
+                    <option value="wo_number">Work Order Number</option>
+                    <option value="company_name">Company Name</option>
+                  </select>
+                </div>
               </div>
             </div>
+
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
@@ -512,8 +492,7 @@ const ListProcessingWorkOrders = () => {
                                 )?.name || "Not Provided"
                             )
                             .filter(
-                              (name, index, self) =>
-                                self.indexOf(name) === index
+                              (name, idx, self) => self.indexOf(name) === idx
                             )
                             .join(", ")}
                         </td>
@@ -535,6 +514,7 @@ const ListProcessingWorkOrders = () => {
                             >
                               View
                             </Button>
+
                             <Button
                               onClick={() => handleEditWO(wo.id)}
                               disabled={
@@ -548,6 +528,7 @@ const ListProcessingWorkOrders = () => {
                             >
                               Update
                             </Button>
+
                             <Button
                               onClick={() => handleDeleteWO(wo.id)}
                               disabled={
@@ -568,29 +549,50 @@ const ListProcessingWorkOrders = () => {
                               Delete
                             </Button>
                             <Button
-                              onClick={() => handleAction(wo.id)}
+                              onClick={() => handleMoveToApproval(wo.id)}
                               disabled={
                                 !hasPermission(
                                   "processing_work_orders",
                                   "edit"
-                                ) || wo.status === "Manager Approval"
+                                ) ||
+                                wo.status === "Manager Approval" ||
+                                isDUTComplete(wo)
                               }
                               className={`px-3 py-1 rounded-md text-sm ${
                                 !hasPermission(
                                   "processing_work_orders",
                                   "edit"
-                                ) || wo.status === "Manager Approval"
+                                ) ||
+                                wo.status === "Manager Approval" ||
+                                isDUTComplete(wo)
                                   ? "bg-gray-300 cursor-not-allowed"
-                                  : isDUTComplete(wo)
-                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+                              }`}
+                            >
+                              Move to Manager Approval
+                            </Button>
+                            <Button
+                              onClick={() => handleAction(wo.id)}
+                              disabled={
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "edit"
+                                ) ||
+                                wo.status === "Manager Approval" ||
+                                isDUTComplete(wo)
+                              }
+                              className={`px-3 py-1 rounded-md text-sm ${
+                                !hasPermission(
+                                  "processing_work_orders",
+                                  "edit"
+                                ) ||
+                                wo.status === "Manager Approval" ||
+                                isDUTComplete(wo)
+                                  ? "bg-gray-300 cursor-not-allowed"
                                   : "bg-yellow-600 text-white hover:bg-yellow-700"
                               }`}
                             >
-                              {wo.status === "Manager Approval"
-                                ? "Manager Approved"
-                                : isDUTComplete(wo)
-                                ? "Move to Manager Approval"
-                                : "Update Device Test Details"}
+                              Update Device Test Details
                             </Button>
                             <Button
                               onClick={() => handlePrint(wo)}
@@ -614,6 +616,7 @@ const ListProcessingWorkOrders = () => {
               </table>
             </div>
           </div>
+
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-4 w-fit">
               <Button
@@ -645,6 +648,7 @@ const ListProcessingWorkOrders = () => {
               </Button>
             </div>
           )}
+
           <Modal
             isOpen={state.isModalOpen}
             onClose={() =>
