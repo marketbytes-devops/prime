@@ -843,23 +843,6 @@ const handleStatusModalSubmit = async () => {
   }
 };
 
-
-
-
-  const isDUTComplete = (wo) => {
-    return wo.items.every(
-      (item) =>
-        item.certificate_number &&
-        item.certificate_uut_label &&
-        item.calibration_date &&
-        item.calibration_due_date &&
-        item.uuc_serial_number &&
-        item.certificate_file &&
-        item.range !== null &&
-        item.range !== undefined
-    );
-  };
-
   const isPOComplete = (workOrder) => {
     const poId = workOrder.purchase_order;
     const purchaseOrder = state.purchaseOrders.find((po) => po.id === poId);
@@ -891,7 +874,6 @@ const handleStatusModalSubmit = async () => {
     );
     return (
       isPOComplete(pair.workOrder) &&
-      isDUTComplete(pair.workOrder) &&
       isDNComplete(pair.deliveryNote) &&
       !relatedInvoices.every(invoice => invoice.invoice_status === 'processed')
     );
@@ -1137,17 +1119,17 @@ const handleRemarkSubmit = async (id) => {
     >
       {isSubmitting ? 'Submitting...' : isPOEmpty(pair.workOrder) ? 'Upload PO' : 'View PO'}
     </Button>
-    <Button
-      onClick={() => handleViewDocument(pair, 'wo')}
-      disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('pending_invoices', 'view') || !isDUTComplete(pair.workOrder)
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-green-600 text-white hover:bg-green-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 'View WO'}
-    </Button>
+<Button
+  onClick={() => handleViewDocument(pair, 'wo')}
+  disabled={isSubmitting || !hasPermission('pending_invoices', 'view')}
+  className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+    isSubmitting || !hasPermission('pending_invoices', 'view')
+      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+      : 'bg-green-600 text-white hover:bg-green-700'
+  }`}
+>
+  {isSubmitting ? 'Submitting...' : 'View WO'}
+</Button>
     <Button
       onClick={() => (isDNReadyForUpload(pair.deliveryNote) ? handleUploadDN(pair) : handleViewDocument(pair, 'dn'))}
       disabled={isSubmitting || !hasPermission('pending_invoices', 'view') || (!isDNReadyForUpload(pair.deliveryNote) && !isDNComplete(pair.deliveryNote))}
