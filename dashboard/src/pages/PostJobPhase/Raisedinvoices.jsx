@@ -59,10 +59,6 @@ const RaisedInvoices = () => {
     invoiceUploadErrors: { finalInvoiceFile: '', processedCertificateFile: '' },
     invoiceUploadType: '',
     workOrderDeliveryPairs: [],
-    isUploadSignedInvoiceModalOpen: false,
-    selectedInvoiceForSignedUpload: null,
-    signedInvoiceUpload: { signedInvoiceFile: null },
-    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
   });
 
   const [isSuperadmin, setIsSuperadmin] = useState(false);
@@ -389,53 +385,6 @@ const RaisedInvoices = () => {
     }
   };
 
-  // Add this function near your other handler functions
-const handleUploadSignedInvoice = (invoice) => {
-  setState((prev) => ({
-    ...prev,
-    isUploadSignedInvoiceModalOpen: true,
-    selectedInvoiceForSignedUpload: invoice,
-    signedInvoiceUpload: { signedInvoiceFile: null },
-    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
-  }));
-};
-
-  const handleUploadSignedInvoiceSubmit = async () => {
-    if (!state.signedInvoiceUpload.signedInvoiceFile) {
-      setState((prev) => ({
-        ...prev,
-        signedInvoiceUploadErrors: { signedInvoiceFile: 'Signed invoice file is required' }
-      }));
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const formData = new FormData();
-      formData.append('signed_invoice_file', state.signedInvoiceUpload.signedInvoiceFile);
-      
-      await apiClient.patch(
-        `/invoices/${state.selectedInvoiceForSignedUpload.id}/`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-      
-      toast.success('Signed invoice uploaded successfully.');
-      setState((prev) => ({
-        ...prev,
-        isUploadSignedInvoiceModalOpen: false,
-        selectedInvoiceForSignedUpload: null,
-        signedInvoiceUpload: { signedInvoiceFile: null },
-        signedInvoiceUploadErrors: { signedInvoiceFile: '' },
-      }));
-      await fetchData();
-    } catch (error) {
-      console.error('Error uploading signed invoice:', error);
-      toast.error('Failed to upload signed invoice.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const confirmStatusUpdate = async (invoiceId, newStatus, receivedDate) => {
     try {
@@ -659,84 +608,44 @@ const handleUploadSignedInvoice = (invoice) => {
                       </td>
                       <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                       <td className="border p-2 whitespace-nowrap">
+
+
 <td className="border p-2 whitespace-nowrap">
-  <div className="flex items-center gap-1">
-    {/* View Invoice Button */}
+<div className="flex items-center gap-1">
+  {/* View Invoice Button */}
+  <Button
+    onClick={() => handleViewDocument(pair, 'invoice')}
+    disabled={
+      isSubmitting ||
+      !hasPermission('raised_invoices', 'view') ||
+      !pair.invoice?.final_invoice_file
+    }
+    className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+      isSubmitting ||
+      !hasPermission('raised_invoices', 'view') ||
+      !pair.invoice?.final_invoice_file
+        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+    }`}
+  >
+    {isSubmitting ? 'Submitting...' :
+     pair.invoice?.final_invoice_file ? 'View Invoice' : 'No Invoice'}
+  </Button>
+
+  {/* Single Plus button for uploading invoice file - ALWAYS show when status is raised */}
+  {pair.invoice?.invoice_status === 'raised' && (
     <Button
-      onClick={() => handleViewDocument(pair, 'invoice')}
-      disabled={
-        isSubmitting ||
-        !hasPermission('raised_invoices', 'view') ||
-        !pair.invoice?.final_invoice_file
-      }
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting ||
-        !hasPermission('raised_invoices', 'view') ||
-        !pair.invoice?.final_invoice_file
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-indigo-600 text-white hover:bg-indigo-700'
-      }`}
+      onClick={() => handleUploadInvoiceFile(pair, 'Final')}
+      disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
+      className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+      title={pair.invoice?.final_invoice_file ? "Replace Invoice File" : "Upload Invoice File"}
     >
-      {isSubmitting ? 'Submitting...' :
-       pair.invoice?.final_invoice_file ? 'View Invoice' : 'No Invoice'}
+      +
     </Button>
-
-    {/* Signed Invoice Section */}
-    {pair.invoice?.invoice_status === 'raised' && (
-      <>
-        {pair.invoice?.signed_invoice_file ? (
-          <Button
-            onClick={() => {
-              if (pair.invoice.signed_invoice_file) {
-                window.open(pair.invoice.signed_invoice_file, '_blank');
-              }
-            }}
-            disabled={isSubmitting || !hasPermission('raised_invoices', 'view')}
-            className="px-3 py-1 rounded-md text-sm bg-purple-600 text-white hover:bg-purple-700"
-            title="View Signed Invoice"
-          >
-            Signed Invoice
-          </Button>
-        ) : (
-          pair.invoice?.final_invoice_file && !pair.invoice?.signed_invoice_file && (
-            <Button
-              onClick={() => handleUploadSignedInvoice(pair.invoice)}
-              disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-              className="px-2 py-1 rounded-md text-sm bg-yellow-600 text-white hover:bg-yellow-700"
-              title="Upload Signed Invoice"
-            >
-              ✏️
-            </Button>
-          )
-        )}
-      </>
-    )}
-
-    {/* Plus button for uploading invoice file */}
-    {pair.invoice?.invoice_status === 'raised' && !pair.invoice?.final_invoice_file && (
-      <Button
-        onClick={() => handleUploadInvoiceFile(pair, 'Final')}
-        disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-        className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
-        title="Upload Invoice File"
-      >
-        +
-      </Button>
-    )}
-
-    {/* Plus button for uploading slip file */}
-    {pair.invoice?.invoice_status === 'processed' && !pair.invoice?.processed_certificate_file && (
-      <Button
-        onClick={() => handleUploadInvoiceFile(pair, 'Processed')}
-        disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-        className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
-        title="Upload Slip File"
-      >
-        +
-      </Button>
-    )}
-  </div> {/* ← THIS CLOSING DIV TAG WAS MISSING */}
-</td>                   </td>
+  )}
+</div>
+</td>
+             </td>
                       <td className="border p-2 whitespace-nowrap">
                         {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                           <select
@@ -1176,78 +1085,6 @@ const handleUploadSignedInvoice = (invoice) => {
           </div>
         </div>
       </Modal>
-      <Modal
-  isOpen={state.isUploadSignedInvoiceModalOpen}
-  onClose={() => setState((prev) => ({
-    ...prev,
-    isUploadSignedInvoiceModalOpen: false,
-    selectedInvoiceForSignedUpload: null,
-    signedInvoiceUpload: { signedInvoiceFile: null },
-    signedInvoiceUploadErrors: { signedInvoiceFile: '' },
-  }))}
-  title={`Upload Signed Invoice for WO: ${state.selectedInvoiceForSignedUpload?.workOrder?.wo_number || 'N/A'} - DN: ${state.selectedInvoiceForSignedUpload?.delivery_note?.dn_number || 'N/A'}`}
->
-  <div className="space-y-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Signed Invoice File *</label>
-      <input
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        onChange={(e) => {
-          const file = e.target.files[0];
-          if (file) {
-            const maxSize = 5 * 1024 * 1024;
-            if (file.size > maxSize) {
-              alert('File size exceeds 5 MB limit. Please upload a smaller file.');
-              e.target.value = '';
-              e.target.focus();
-              return;
-            }
-            setState((prev) => ({
-              ...prev,
-              signedInvoiceUpload: { signedInvoiceFile: file },
-              signedInvoiceUploadErrors: { signedInvoiceFile: '' },
-            }));
-          }
-        }}
-        className="w-full p-2 border rounded focus:outline-indigo-500"
-      />
-      {state.signedInvoiceUploadErrors.signedInvoiceFile && (
-        <p className="text-red-500 text-sm mt-1">{state.signedInvoiceUploadErrors.signedInvoiceFile}</p>
-      )}
-    </div>
-    <div className="flex justify-end gap-2">
-      <Button
-        onClick={() => setState((prev) => ({
-          ...prev,
-          isUploadSignedInvoiceModalOpen: false,
-          selectedInvoiceForSignedUpload: null,
-          signedInvoiceUpload: { signedInvoiceFile: null },
-          signedInvoiceUploadErrors: { signedInvoiceFile: '' },
-        }))}
-        disabled={isSubmitting}
-        className={`px-3 py-1 rounded-md text-sm ${
-          isSubmitting
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-        }`}
-      >
-        {isSubmitting ? 'Submitting...' : 'Cancel'}
-      </Button>
-      <Button
-        onClick={handleUploadSignedInvoiceSubmit}
-        disabled={isSubmitting || !hasPermission('raised_invoices', 'edit') || !state.signedInvoiceUpload.signedInvoiceFile}
-        className={`px-3 py-1 rounded-md text-sm ${
-          isSubmitting || !hasPermission('raised_invoices', 'edit') || !state.signedInvoiceUpload.signedInvoiceFile
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
-        }`}
-      >
-        {isSubmitting ? 'Submitting...' : 'Upload'}
-      </Button>
-    </div>
-  </div>
-</Modal>
 
 
       {/* Invoice Upload Modal */}
