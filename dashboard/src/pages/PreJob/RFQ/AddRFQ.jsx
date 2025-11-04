@@ -637,8 +637,7 @@ const AddRFQ = () => {
           </div>
         </label>
         <div className="mt-3 flex items-center justify-center">
-          <Button
-            type="button"
+          <button
             onClick={handleDownloadTemplate}
             className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2"
           >
@@ -646,7 +645,7 @@ const AddRFQ = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Download Template
-          </Button>
+          </button>
         </div>
       </div>
 
