@@ -736,7 +736,8 @@ const AddRFQ = () => {
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => { }} title="Client Type">
+      {/* FIXED: onClose now closes the modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Client Type">
         <div className="space-y-4">
           <Button onClick={() => handleClientSelect("new")} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl">
             New Client

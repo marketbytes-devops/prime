@@ -277,6 +277,8 @@ const ViewRFQ = () => {
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">RFQ Number</th>
+                {/* ADDED: Company Name Column */}
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[180px]">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Sales Person</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[150px]">Status</th>
@@ -286,7 +288,7 @@ const ViewRFQ = () => {
             <tbody>
               {currentRfqs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500 whitespace-nowrap">
+                  <td colSpan="7" className="border p-2 text-center text-gray-500 whitespace-nowrap">
                     No RFQs found.
                   </td>
                 </tr>
@@ -295,6 +297,8 @@ const ViewRFQ = () => {
                   <tr key={rfq.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                    {/* ADDED: Company Name Display */}
+                    <td className="border p-2 whitespace-nowrap min-w-[180px]">{rfq.company_name || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(rfq.created_at).toLocaleDateString()}
                     </td>
