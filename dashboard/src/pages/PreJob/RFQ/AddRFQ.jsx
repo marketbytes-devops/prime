@@ -5,6 +5,8 @@ import { toast } from "react-toastify";
 import InputField from "../../../components/InputField";
 import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
+import * as ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddItem, apiEndpoint }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,6 +96,37 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
       }
     }
     setIsOpen(false);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('RFQ Template');
+
+    worksheet.columns = [
+      { header: 'Item Name', key: 'item', width: 30 },
+      { header: 'Quantity', key: 'quantity', width: 15 },
+      { header: 'Unit', key: 'unit', width: 15 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4F81BD' },
+    };
+    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+    worksheet.addRow({
+      item: 'Example: Cement Bag',
+      quantity: 100,
+      unit: 'Bag',
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const fileName = 'RFQ_Template.xlsx';
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    saveAs(blob, fileName);
   };
 
   return (
@@ -596,11 +629,18 @@ const AddRFQ = () => {
             {uploading ? "Processing..." : "Upload File"}
           </div>
         </label>
-        <p className="mt-3 text-sm">
-          <a href="/template.xlsx" download className="text-indigo-600 font-medium underline">
-            Download Template
-          </a>
-        </p>
+        <div className="mt-3">
+          <Button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download Template
+            </Button>
+        </div>
       </div>
 
       <div className="space-y-6">
