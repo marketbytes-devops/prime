@@ -245,6 +245,8 @@ const DeclinedWorkOrders = () => {
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">WO Number</th>
+                {/* ADDED: Company Name Column */}
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 min-w-[180px]">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Created At</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Assigned To</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700">Decline Reason</th>
@@ -254,7 +256,7 @@ const DeclinedWorkOrders = () => {
             <tbody>
               {currentWOs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="border p-2 text-center text-gray-500">
+                  <td colSpan="7" className="border p-2 text-center text-gray-500">
                     No declined work orders found.
                   </td>
                 </tr>
@@ -263,6 +265,8 @@ const DeclinedWorkOrders = () => {
                   <tr key={wo.id} className="border hover:bg-gray-50">
                     <td className="border p-2">{startIndex + index + 1}</td>
                     <td className="border p-2">{wo.wo_number || 'N/A'}</td>
+                    {/* ADDED: Display Company Name */}
+                    <td className="border p-2 min-w-[180px]">{wo.quotation?.company_name || 'N/A'}</td>
                     <td className="border p-2">{new Date(wo.created_at).toLocaleDateString()}</td>
                     <td className="border p-2">{getAssignedTechnicians(wo.items)}</td>
                     <td className="border p-2">{wo.decline_reason || 'N/A'}</td>
