@@ -98,37 +98,6 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
     setIsOpen(false);
   };
 
-  const handleDownloadTemplate = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('RFQ Template');
-
-    worksheet.columns = [
-      { header: 'Item Name', key: 'item', width: 30 },
-      { header: 'Quantity', key: 'quantity', width: 15 },
-      { header: 'Unit', key: 'unit', width: 15 },
-    ];
-
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4F81BD' },
-    };
-    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-
-    worksheet.addRow({
-      item: 'Example: Cement Bag',
-      quantity: 100,
-      unit: 'Bag',
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    const fileName = 'RFQ_Template.xlsx';
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
-    saveAs(blob, fileName);
-  };
-
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <InputField
@@ -418,6 +387,37 @@ const AddRFQ = () => {
     setIsModalOpen(false);
     if (type === "new") setState(prev => ({ ...prev, isNewClient: true }));
     else navigate("/existing-client");
+  };
+
+  const handleDownloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('RFQ Template');
+
+    worksheet.columns = [
+      { header: 'Item Name', key: 'item', width: 30 },
+      { header: 'Quantity', key: 'quantity', width: 15 },
+      { header: 'Unit', key: 'unit', width: 15 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4F81BD' },
+    };
+    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+    worksheet.addRow({
+      item: 'Example: Cement Bag',
+      quantity: 100,
+      unit: 'Bag',
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const fileName = 'RFQ_Template.xlsx';
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    saveAs(blob, fileName);
   };
 
   const renderStep1 = () => (
