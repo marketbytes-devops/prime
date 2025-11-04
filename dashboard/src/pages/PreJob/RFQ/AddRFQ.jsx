@@ -271,7 +271,7 @@ const AddRFQ = () => {
 
           if (!itemName || !qty) continue;
 
-          toast.info(`Processing: ${itemName} (${qty} ${unitName || "???"})`);
+          toast.info(`Processing: ${itemName} (${qty} ${unitName || "???"} )`);
 
           const [itemId, unitId] = await Promise.all([
             ensureItemExists(itemName),
@@ -389,35 +389,42 @@ const AddRFQ = () => {
     else navigate("/existing-client");
   };
 
+  // DOWNLOAD TEMPLATE - FIXED
   const handleDownloadTemplate = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ Template');
 
     worksheet.columns = [
-      { header: 'Item Name', key: 'item', width: 30 },
-      { header: 'Quantity', key: 'quantity', width: 15 },
-      { header: 'Unit', key: 'unit', width: 15 },
+      { header: 'Sl.no',   key: 'sl_no',   width: 10 },
+      { header: 'Item',    key: 'item',    width: 35 },
+      { header: 'Quantity',key: 'quantity',width: 15 },
+      { header: 'Unit',    key: 'unit',    width: 15 },
     ];
 
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = {
+    const header = worksheet.getRow(1);
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    header.fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF4F81BD' },
     };
-    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    header.alignment = { vertical: 'middle', horizontal: 'center' };
 
     worksheet.addRow({
-      item: 'Example: Cement Bag',
-      quantity: 100,
-      unit: 'Bag',
+      sl_no: 1,
+      item: 'Pressure Gauge',
+      quantity: 4,
+      unit: 'Pcs',
     });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    const fileName = 'RFQ_Template.xlsx';
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
-    saveAs(blob, fileName);
+    try {
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/octet-stream' });
+      saveAs(blob, 'RFQ_Template.xlsx');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate template');
+    }
   };
 
   const renderStep1 = () => (
@@ -629,17 +636,17 @@ const AddRFQ = () => {
             {uploading ? "Processing..." : "Upload File"}
           </div>
         </label>
-        <div className="mt-3">
+        <div className="mt-3 flex items-center justify-center">
           <Button
-              type="button"
-              onClick={handleDownloadTemplate}
-              className="bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Download Template
-            </Button>
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download Template
+          </Button>
         </div>
       </div>
 
