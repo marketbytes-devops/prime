@@ -19,8 +19,7 @@ const EditRFQ = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isQuotation = location.state?.isQuotation || false;
-  const scrollToVatFlag = location.state?.scrollToVat || false;   // <-- flag from navigation
-  const scrollToVatRef = useRef(scrollToVatFlag);                // <-- keep it across renders
+  const scrollToVat = location.state?.scrollToVat || false;
   const vatSectionRef = useRef(null);
 
   const [state, setState] = useState({
@@ -46,9 +45,6 @@ const EditRFQ = () => {
     submitting: false,
   });
 
-  /* --------------------------------------------------------------
-     1. FETCH DATA (unchanged except the dependency list)
-     -------------------------------------------------------------- */
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -99,33 +95,15 @@ const EditRFQ = () => {
     fetchData();
   }, [id]);
 
-  /* --------------------------------------------------------------
-     2. SCROLL TO VAT – runs after first paint, retries until element exists
-     -------------------------------------------------------------- */
   useEffect(() => {
-    if (!scrollToVatRef.current) return;
+    if (!state.loading && scrollToVat && vatSectionRef.current) {
+      const timer = setTimeout(() => {
+        vatSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [state.loading, scrollToVat]);
 
-    let cancelled = false;
-    const tryScroll = () => {
-      if (cancelled) return;
-      if (vatSectionRef.current) {
-        vatSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        scrollToVatRef.current = false;               // <-- stop further attempts
-      } else {
-        requestAnimationFrame(tryScroll);             // <-- keep trying next frame
-      }
-    };
-
-    const rafId = requestAnimationFrame(tryScroll);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(rafId);
-    };
-  }, [state.loading]);   // <-- re-run when loading finishes
-
-  /* --------------------------------------------------------------
-     3. AUTOSAVE (unchanged)
-     -------------------------------------------------------------- */
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
     company_address: state.company_address || null,
@@ -332,63 +310,81 @@ const EditRFQ = () => {
 
   const renderForm = () => (
     <div className="grid gap-6">
-      {/* ---- COMPANY DETAILS ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Company Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Name
+            </label>
             <InputField
               type="text"
               placeholder="Enter company name"
               value={state.company_name || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, company_name: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_name: e.target.value }))
+              }
               maxLength={100}
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Address
+            </label>
             <InputField
               type="text"
               placeholder="Enter company address"
               value={state.company_address || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, company_address: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_address: e.target.value }))
+              }
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Phone</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Phone
+            </label>
             <InputField
               type="text"
               placeholder="Enter company phone"
               value={state.company_phone || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, company_phone: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_phone: e.target.value }))
+              }
               maxLength={20}
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Email
+            </label>
             <InputField
               type="email"
               placeholder="Enter company email"
               value={state.company_email || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, company_email: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_email: e.target.value }))
+              }
               required
             />
           </div>
         </div>
       </div>
 
-      {/* ---- RFQ CHANNEL ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">RFQ Channel</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Channel</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            RFQ Channel
+          </label>
           <select
             value={state.rfq_channel || ''}
-            onChange={(e) => setState((prev) => ({ ...prev, rfq_channel: e.target.value }))}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
+            }
             className="w-full p-2 border rounded-md focus:outline-indigo-600"
             required
           >
@@ -402,39 +398,50 @@ const EditRFQ = () => {
         </div>
       </div>
 
-      {/* ---- POINT OF CONTACT ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Point of Contact</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contact Name
+            </label>
             <InputField
               type="text"
               placeholder="Enter contact name"
               value={state.point_of_contact_name || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, point_of_contact_name: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, point_of_contact_name: e.target.value }))
+              }
               maxLength={100}
               required
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Email
+              </label>
               <InputField
                 type="email"
                 placeholder="Enter contact email"
                 value={state.point_of_contact_email || ''}
-                onChange={(e) => setState((prev) => ({ ...prev, point_of_contact_email: e.target.value }))}
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, point_of_contact_email: e.target.value }))
+                }
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Phone
+              </label>
               <InputField
                 type="text"
                 placeholder="Enter contact phone"
                 value={state.point_of_contact_phone || ''}
-                onChange={(e) => setState((prev) => ({ ...prev, point_of_contact_phone: e.target.value }))}
+                onChange={(e) =>
+                  setState((prev) => ({ ...prev, point_of_contact_phone: e.target.value }))
+                }
                 maxLength={20}
                 required
               />
@@ -443,15 +450,18 @@ const EditRFQ = () => {
         </div>
       </div>
 
-      {/* ---- ASSIGNMENT & DUE DATE ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Assignment & Due Date</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Sales Person</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Assigned Sales Person
+            </label>
             <select
               value={state.assigned_sales_person || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, assigned_sales_person: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, assigned_sales_person: e.target.value }))
+              }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
               required
             >
@@ -464,26 +474,33 @@ const EditRFQ = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date for Quotation</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Due Date for Quotation
+            </label>
             <InputField
               type="date"
               value={state.due_date_for_quotation || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, due_date_for_quotation: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, due_date_for_quotation: e.target.value }))
+              }
               required
             />
           </div>
         </div>
       </div>
 
-      {/* ---- RFQ STATUS ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">RFQ Status</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              RFQ Status
+            </label>
             <select
               value={state.rfq_status || ''}
-              onChange={(e) => setState((prev) => ({ ...prev, rfq_status: e.target.value }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, rfq_status: e.target.value }))
+              }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
               required
             >
@@ -495,7 +512,6 @@ const EditRFQ = () => {
         </div>
       </div>
 
-      {/* ---- ITEMS ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Items</h3>
         {state.items.map((item, index) => (
@@ -503,7 +519,9 @@ const EditRFQ = () => {
             <h4 className="text-sm font-semibold mb-2">Item {index + 1}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item
+                </label>
                 <select
                   value={item.item || ''}
                   onChange={(e) => handleItemChange(index, 'item', e.target.value)}
@@ -519,7 +537,9 @@ const EditRFQ = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
                 <InputField
                   type="number"
                   placeholder="Enter quantity"
@@ -530,7 +550,9 @@ const EditRFQ = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
                 <select
                   value={item.unit || ''}
                   onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
@@ -546,7 +568,9 @@ const EditRFQ = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price
+                </label>
                 <InputField
                   type="number"
                   placeholder="Enter unit price"
@@ -578,7 +602,6 @@ const EditRFQ = () => {
         </Button>
       </div>
 
-      {/* ---- VAT SECTION (ref attached) ---- */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={vatSectionRef}>
         <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
@@ -587,7 +610,9 @@ const EditRFQ = () => {
             <input
               type="checkbox"
               checked={state.vat_applicable}
-              onChange={(e) => setState((prev) => ({ ...prev, vat_applicable: e.target.checked }))}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, vat_applicable: e.target.checked }))
+              }
               className="ml-2"
             />
           </div>
@@ -611,11 +636,10 @@ const EditRFQ = () => {
           <Button
             type="submit"
             disabled={!isFormValid() || state.submitting}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              !isFormValid() || state.submitting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${(!isFormValid() || state.submitting) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
           >
-            {state.submitting ? 'Submitting...' : isQuotation ? 'Submit Quotation' : 'Update RFQ'}
+            {state.submitting ? 'Submitting...' : (isQuotation ? 'Submit Quotation' : 'Update RFQ')}
           </Button>
         </div>
       </form>
