@@ -166,7 +166,8 @@ const AddRFQ = () => {
         item_name: "",
         quantity: "",
         unit: "",
-        unit_name: ""
+        unit_name: "",
+        unit_price: ""               // <<< NEW
       }
     ],
     channels: [],
@@ -237,7 +238,7 @@ const AddRFQ = () => {
     }
   };
 
-  // EXCEL UPLOAD WITH AUTO-CREATE
+  // EXCEL UPLOAD WITH AUTO-CREATE (now also reads Unit Price)
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -267,6 +268,7 @@ const AddRFQ = () => {
           const itemName = (row["Item"] || row["item"] || row["Name"] || "").toString().trim();
           const qty = row["Quantity"] || row["quantity"] || row["Qty"] || "";
           const unitName = (row["Unit"] || row["unit"] || "").toString().trim();
+          const price = row["Unit Price"] || row["unit_price"] || row["Price"] || "";
           const slNo = row["Sl.no"] || row["Sl.No"] || row["sl_no"] || (i + 1);
 
           if (!itemName || !qty) continue;
@@ -286,6 +288,7 @@ const AddRFQ = () => {
               quantity: Number(qty) || 1,
               unit: unitId,
               unit_name: unitName || "Each",
+              unit_price: price ? Number(price) : ""   // <<< NEW
             });
           }
         }
@@ -314,7 +317,8 @@ const AddRFQ = () => {
           quantity: "",
           unit: "",
           item_name: "",
-          unit_name: ""
+          unit_name: "",
+          unit_price: ""          // <<< NEW
         }],
       };
     });
@@ -368,7 +372,7 @@ const AddRFQ = () => {
         item: Number(it.item),
         quantity: Number(it.quantity),
         unit: Number(it.unit),
-        unit_price: null,
+        unit_price: it.unit_price ? Number(it.unit_price) : null,   // <<< NEW
       })),
     };
 
@@ -389,25 +393,22 @@ const AddRFQ = () => {
     else navigate("/existing-client");
   };
 
-  // DOWNLOAD TEMPLATE - FIXED
+  // DOWNLOAD TEMPLATE – added Unit Price column
   const handleDownloadTemplate = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ Template');
 
     worksheet.columns = [
-      { header: 'Sl.no',   key: 'sl_no',   width: 10 },
-      { header: 'Item',    key: 'item',    width: 35 },
-      { header: 'Quantity',key: 'quantity',width: 15 },
-      { header: 'Unit',    key: 'unit',    width: 15 },
+      { header: 'Sl.no', key: 'sl_no', width: 10 },
+      { header: 'Item', key: 'item', width: 35 },
+      { header: 'Quantity', key: 'quantity', width: 15 },
+      { header: 'Unit', key: 'unit', width: 15 },
+      { header: 'Unit Price', key: 'unit_price', width: 15 },   // <<< NEW
     ];
 
     const header = worksheet.getRow(1);
     header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    header.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4F81BD' },
-    };
+    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
     header.alignment = { vertical: 'middle', horizontal: 'center' };
 
     worksheet.addRow({
@@ -415,6 +416,7 @@ const AddRFQ = () => {
       item: 'Pressure Gauge',
       quantity: 4,
       unit: 'Pcs',
+      unit_price: 150.00,
     });
 
     try {
@@ -621,7 +623,8 @@ const AddRFQ = () => {
           Columns: <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Item</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Quantity</code>,{" "}
-          <code className="bg-gray-200 px-2 rounded">Unit</code>
+          <code className="bg-gray-200 px-2 rounded">Unit</code>,{" "}
+          <code className="bg-gray-200 px-2 rounded">Unit Price</code>
         </p>
         <label className="cursor-pointer">
           <input
@@ -667,7 +670,7 @@ const AddRFQ = () => {
                 </h4>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <div>
                   <label className="block font-medium mb-1">Item</label>
                   <SearchableDropdown
@@ -698,6 +701,18 @@ const AddRFQ = () => {
                     placeholder="Type or select unit"
                     allowAddItem
                     apiEndpoint="units/"
+                  />
+                </div>
+                {/* ---------- NEW UNIT PRICE INPUT ---------- */}
+                <div>
+                  <label className="block font-medium mb-1">Unit Price (SAR)</label>
+                  <InputField
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={it.unit_price}
+                    onChange={e => handleItemChange(idx, "unit_price", e.target.value)}
+                    className="text-md"
                   />
                 </div>
                 <div>
@@ -736,7 +751,6 @@ const AddRFQ = () => {
         ))}
       </div>
 
-      {/* FIXED: onClose now closes the modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Client Type">
         <div className="space-y-4">
           <Button onClick={() => handleClientSelect("new")} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl">

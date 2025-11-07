@@ -14,7 +14,7 @@ const DeclinedWorkOrders = () => {
     technicians: [],
     quotations: [],
     purchaseOrders: [],
-    channels: [], // Added channels to state
+    channels: [],
     searchTerm: '',
     sortBy: 'created_at',
     currentPage: 1,
