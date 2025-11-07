@@ -43,7 +43,6 @@ const EditRFQ = () => {
     loading: true,
     lastSaved: null,
     submitting: false,
-    shouldScrollToVat: false, // New state to control scrolling
   });
 
   useEffect(() => {
@@ -85,7 +84,6 @@ const EditRFQ = () => {
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
           loading: false,
-          shouldScrollToVat: scrollToVat, // Set the scroll flag after loading
         }));
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -95,46 +93,16 @@ const EditRFQ = () => {
     };
 
     fetchData();
-  }, [id, scrollToVat]);
+  }, [id]);
 
-  // Separate effect for scrolling - triggered by shouldScrollToVat state change
   useEffect(() => {
-    if (state.shouldScrollToVat && vatSectionRef.current) {
-      const scrollToVatSection = () => {
-        const element = vatSectionRef.current;
-        if (!element) return;
-
-        // Get element position
-        const elementPosition = element.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - 100; // 100px offset from top
-
-        // Scroll to position
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-
-        // Add highlight effect
-        element.classList.add('vat-highlight');
-        
-        // Remove highlight after animation
-        setTimeout(() => {
-          element.classList.remove('vat-highlight');
-          // Reset the scroll flag
-          setState(prev => ({ ...prev, shouldScrollToVat: false }));
-        }, 3000);
-      };
-
-      // Use requestAnimationFrame to ensure DOM is ready
-      const rafId = requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(scrollToVatSection, 100);
-        });
-      });
-
-      return () => cancelAnimationFrame(rafId);
+    if (!state.loading && scrollToVat && vatSectionRef.current) {
+      const timer = setTimeout(() => {
+        vatSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [state.shouldScrollToVat]);
+  }, [state.loading, scrollToVat]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -300,8 +268,9 @@ const EditRFQ = () => {
     e.preventDefault();
     if (!isFormValid()) {
       toast.error('Please fill all required fields, including unit prices for quotation conversion.');
-      // Trigger scroll to VAT section
-      setState(prev => ({ ...prev, shouldScrollToVat: true }));
+      if (isQuotation && vatSectionRef.current) {
+        vatSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -600,7 +569,7 @@ const EditRFQ = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price {isQuotation && <span className="text-red-500">*</span>}
+                  Unit Price
                 </label>
                 <InputField
                   type="number"
@@ -633,15 +602,8 @@ const EditRFQ = () => {
         </Button>
       </div>
 
-      <div 
-        className="bg-white p-4 space-y-4 rounded-md shadow" 
-        ref={vatSectionRef}
-        id="vat-section"
-      >
-        <h3 className="text-xl font-semibold text-black">
-          Is VAT Applicable? 
-          {isQuotation && <span className="ml-2 text-sm text-red-600 font-normal">⚠️ Required for quotation</span>}
-        </h3>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={vatSectionRef}>
+        <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex items-center">
             <label className="flex items-center text-sm font-medium text-gray-700">VAT Applicable (15%)</label>
@@ -651,7 +613,7 @@ const EditRFQ = () => {
               onChange={(e) =>
                 setState((prev) => ({ ...prev, vat_applicable: e.target.checked }))
               }
-              className="ml-2 w-5 h-5"
+              className="ml-2"
             />
           </div>
         </div>
@@ -661,24 +623,6 @@ const EditRFQ = () => {
 
   return (
     <div className="mx-auto p-4">
-      <style>{`
-        .vat-highlight {
-          animation: highlightPulse 3s ease-in-out;
-          border: 3px solid #f59e0b !important;
-        }
-        
-        @keyframes highlightPulse {
-          0%, 100% {
-            background-color: white;
-            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-          }
-          50% {
-            background-color: #fef3c7;
-            box-shadow: 0 0 0 3px #fbbf24, 0 10px 15px -3px rgb(0 0 0 / 0.1);
-          }
-        }
-      `}</style>
-      
       <h1 className="text-2xl text-center sm:text-left font-semibold mb-4">
         {isQuotation ? 'Convert to Quotation' : 'Edit RFQ'}
       </h1>
