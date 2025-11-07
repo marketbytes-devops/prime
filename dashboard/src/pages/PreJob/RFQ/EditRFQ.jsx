@@ -494,7 +494,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
-      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Items</h3>
         {state.items.map((item, index) => (
           <div key={index} className="border p-4 rounded-md bg-gray-50 shadow mb-4">
@@ -584,7 +584,7 @@ const EditRFQ = () => {
         </Button>
       </div>
 
-      <div className="bg-white p-4 space-y-4 rounded-md shadow">
+      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
         <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex items-center">
