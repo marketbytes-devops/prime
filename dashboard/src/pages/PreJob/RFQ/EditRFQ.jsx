@@ -21,7 +21,6 @@ const EditRFQ = () => {
   const isQuotation = location.state?.isQuotation || false;
   const scrollToVat = location.state?.scrollToVat || false;
   const vatSectionRef = useRef(null);
-  const hasScrolled = useRef(false); // Track if we've already scrolled
 
   const [state, setState] = useState({
     company_name: '',
@@ -44,6 +43,7 @@ const EditRFQ = () => {
     loading: true,
     lastSaved: null,
     submitting: false,
+    shouldScrollToVat: false, // New state to control scrolling
   });
 
   useEffect(() => {
@@ -85,6 +85,7 @@ const EditRFQ = () => {
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
           loading: false,
+          shouldScrollToVat: scrollToVat, // Set the scroll flag after loading
         }));
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -94,44 +95,46 @@ const EditRFQ = () => {
     };
 
     fetchData();
-  }, [id]);
+  }, [id, scrollToVat]);
 
-  // Enhanced scroll effect with multiple fallbacks
+  // Separate effect for scrolling - triggered by shouldScrollToVat state change
   useEffect(() => {
-    if (!state.loading && scrollToVat && vatSectionRef.current && !hasScrolled.current) {
-      const scrollToSection = () => {
-        if (vatSectionRef.current) {
-          // Method 1: scrollIntoView with options
-          vatSectionRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center',
-            inline: 'nearest'
-          });
-          
-          // Method 2: Fallback - Add visual highlight
-          vatSectionRef.current.style.backgroundColor = '#FEF3C7'; // Light yellow
-          setTimeout(() => {
-            if (vatSectionRef.current) {
-              vatSectionRef.current.style.backgroundColor = '';
-            }
-          }, 2000);
-          
-          hasScrolled.current = true;
-        }
+    if (state.shouldScrollToVat && vatSectionRef.current) {
+      const scrollToVatSection = () => {
+        const element = vatSectionRef.current;
+        if (!element) return;
+
+        // Get element position
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - 100; // 100px offset from top
+
+        // Scroll to position
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+
+        // Add highlight effect
+        element.classList.add('vat-highlight');
+        
+        // Remove highlight after animation
+        setTimeout(() => {
+          element.classList.remove('vat-highlight');
+          // Reset the scroll flag
+          setState(prev => ({ ...prev, shouldScrollToVat: false }));
+        }, 3000);
       };
 
-      // Try multiple times with increasing delays to ensure DOM is ready
-      const timeouts = [100, 300, 500];
-      timeouts.forEach(delay => {
-        setTimeout(scrollToSection, delay);
+      // Use requestAnimationFrame to ensure DOM is ready
+      const rafId = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(scrollToVatSection, 100);
+        });
       });
 
-      // Cleanup
-      return () => {
-        timeouts.forEach(delay => clearTimeout(delay));
-      };
+      return () => cancelAnimationFrame(rafId);
     }
-  }, [state.loading, scrollToVat]);
+  }, [state.shouldScrollToVat]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -297,9 +300,8 @@ const EditRFQ = () => {
     e.preventDefault();
     if (!isFormValid()) {
       toast.error('Please fill all required fields, including unit prices for quotation conversion.');
-      if (isQuotation && vatSectionRef.current) {
-        vatSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      // Trigger scroll to VAT section
+      setState(prev => ({ ...prev, shouldScrollToVat: true }));
       return;
     }
 
@@ -632,10 +634,14 @@ const EditRFQ = () => {
       </div>
 
       <div 
-        className="bg-white p-4 space-y-4 rounded-md shadow transition-colors duration-500" 
+        className="bg-white p-4 space-y-4 rounded-md shadow" 
         ref={vatSectionRef}
+        id="vat-section"
       >
-        <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
+        <h3 className="text-xl font-semibold text-black">
+          Is VAT Applicable? 
+          {isQuotation && <span className="ml-2 text-sm text-red-600 font-normal">⚠️ Required for quotation</span>}
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex items-center">
             <label className="flex items-center text-sm font-medium text-gray-700">VAT Applicable (15%)</label>
@@ -645,7 +651,7 @@ const EditRFQ = () => {
               onChange={(e) =>
                 setState((prev) => ({ ...prev, vat_applicable: e.target.checked }))
               }
-              className="ml-2"
+              className="ml-2 w-5 h-5"
             />
           </div>
         </div>
@@ -655,6 +661,24 @@ const EditRFQ = () => {
 
   return (
     <div className="mx-auto p-4">
+      <style>{`
+        .vat-highlight {
+          animation: highlightPulse 3s ease-in-out;
+          border: 3px solid #f59e0b !important;
+        }
+        
+        @keyframes highlightPulse {
+          0%, 100% {
+            background-color: white;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+          }
+          50% {
+            background-color: #fef3c7;
+            box-shadow: 0 0 0 3px #fbbf24, 0 10px 15px -3px rgb(0 0 0 / 0.1);
+          }
+        }
+      `}</style>
+      
       <h1 className="text-2xl text-center sm:text-left font-semibold mb-4">
         {isQuotation ? 'Convert to Quotation' : 'Edit RFQ'}
       </h1>
