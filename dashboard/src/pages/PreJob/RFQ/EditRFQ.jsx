@@ -70,34 +70,39 @@ const EditRFQ = () => {
           due_date_for_quotation: rfqRes.data.due_date_for_quotation || '',
           rfq_status: rfqRes.data.rfq_status || 'Processing',
           vat_applicable: rfqRes.data.vat_applicable || false,
-          items: rfqRes.data.items && rfqRes.data.items.length
-            ? rfqRes.data.items.map((item) => ({
-              item: item.item || '',
-              quantity: item.quantity || '',
-              unit: item.unit || '',
-              unit_price: item.unit_price || '',
-            }))
-            : [{ item: '', quantity: '', unit: '', unit_price: '' }],
+          items:
+            rfqRes.data.items && rfqRes.data.items.length
+              ? rfqRes.data.items.map((item) => ({
+                  item: item.item || '',
+                  quantity: item.quantity || '',
+                  unit: item.unit || '',
+                  unit_price: item.unit_price || '',
+                }))
+              : [{ item: '', quantity: '', unit: '', unit_price: '' }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
           loading: false,
         }));
-
-        if (scrollToVat && vatSectionRef.current) {
-          setTimeout(() => {
-            vatSectionRef.current.scrollIntoView({ behavior: 'smooth' });
-          }, 150);
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('Failed to load RFQ data.');
         setState((prev) => ({ ...prev, loading: false }));
       }
     };
+
     fetchData();
-  }, [id, scrollToVat]);
+  }, [id]);
+
+  useEffect(() => {
+    if (!state.loading && scrollToVat && vatSectionRef.current) {
+      const timer = setTimeout(() => {
+        vatSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [state.loading, scrollToVat]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -264,7 +269,7 @@ const EditRFQ = () => {
     if (!isFormValid()) {
       toast.error('Please fill all required fields, including unit prices for quotation conversion.');
       if (isQuotation && vatSectionRef.current) {
-        vatSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+        vatSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return;
     }
