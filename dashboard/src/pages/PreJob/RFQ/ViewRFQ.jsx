@@ -128,53 +128,29 @@ const ViewRFQ = () => {
     }
   };
 
-  // DIRECT CONVERT TO QUOTATION (ONE-CLICK)
   const handleConvertToQuotation = async (rfq) => {
     try {
-      const rfqRes = await apiClient.get(`rfqs/${rfq.id}/`);
-      const currentRfq = rfqRes.data;
-
-      // Validate all items have unit_price
-      const missingPrice = currentRfq.items.some(
-        (item) => !item.unit_price || item.unit_price === null || item.unit_price === ''
-      );
-      if (missingPrice) {
-        toast.error('All items must have a unit price to convert to quotation.');
+      const rfqResponse = await apiClient.get(`rfqs/${rfq.id}/`);
+      const currentRfq = rfqResponse.data;
+      const hasUnitPrices = currentRfq.items.every((item) => item.unit_price != null && item.unit_price !== '');
+      
+      if (!hasUnitPrices) {
+        toast.error('Please enter unit prices for all items.');
+        navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true, scrollToItems: true } });
         return;
       }
 
-      // 1. Update RFQ to "Completed"
-      await apiClient.patch(`rfqs/${rfq.id}/`, { rfq_status: 'Completed' });
-
-      // 2. Create Quotation
-      const quotationPayload = {
-        rfq: rfq.id,
-        company_name: currentRfq.company_name,
-        company_address: currentRfq.company_address,
-        company_phone: currentRfq.company_phone,
-        company_email: currentRfq.company_email,
-        rfq_channel: currentRfq.rfq_channel,
-        point_of_contact_name: currentRfq.point_of_contact_name,
-        point_of_contact_email: currentRfq.point_of_contact_email,
-        point_of_contact_phone: currentRfq.point_of_contact_phone,
-        assigned_sales_person: currentRfq.assigned_sales_person,
-        due_date_for_quotation: currentRfq.due_date_for_quotation,
-        quotation_status: 'Pending',
+      const payload = {
+        rfq_status: 'Completed',
+        items: currentRfq.items || [],
         vat_applicable: currentRfq.vat_applicable || false,
-        items: currentRfq.items.map(i => ({
-          item: i.item,
-          quantity: i.quantity,
-          unit: i.unit,
-          unit_price: i.unit_price,
-        })),
       };
-
-      const quotRes = await apiClient.post('quotations/', quotationPayload);
-      toast.success(`Quotation #${quotRes.data.series_number} created successfully!`);
-      await fetchRFQs(); // Refresh list
-    } catch (err) {
-      console.error('Convert error:', err);
-      toast.error('Failed to convert to quotation. Please try again.');
+      await apiClient.patch(`rfqs/${rfq.id}/`, payload);
+      toast.success('RFQ status updated to Completed!');
+      navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true } });
+    } catch (error) {
+      console.error('Error initiating quotation conversion:', error);
+      toast.error('Failed to initiate quotation conversion.');
     }
   };
 
@@ -295,13 +271,13 @@ const ViewRFQ = () => {
             </select>
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">RFQ Number</th>
+                {/* ADDED: Company Name Column */}
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[180px]">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Sales Person</th>
@@ -321,6 +297,7 @@ const ViewRFQ = () => {
                   <tr key={rfq.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
+                    {/* ADDED: Company Name Display */}
                     <td className="border p-2 whitespace-nowrap min-w-[180px]">{rfq.company_name || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(rfq.created_at).toLocaleDateString()}
@@ -341,26 +318,24 @@ const ViewRFQ = () => {
                       </select>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
-                      <div className="flex flex-wrap items-center gap-1">
+                      <div className="flex items-center gap-2">
                         <Button
                           onClick={() => openModal(rfq)}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
                         >
                           View Details
                         </Button>
-
                         <Button
                           onClick={() => handleConvertToQuotation(rfq)}
-                          disabled={rfq.rfq_status !== 'Processing' || rfq.hasQuotation}
+                          disabled={rfq.rfq_status !== 'Processing'}
                           className={`px-3 py-1 rounded-md text-sm ${
-                            rfq.rfq_status === 'Processing' && !rfq.hasQuotation
+                            rfq.rfq_status === 'Processing'
                               ? 'bg-purple-600 text-white hover:bg-purple-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                         >
                           Convert to Quotation
                         </Button>
-
                         <Button
                           onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
                           disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
@@ -372,7 +347,6 @@ const ViewRFQ = () => {
                         >
                           Edit
                         </Button>
-
                         <Button
                           onClick={() => handleDelete(rfq.id)}
                           disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
@@ -393,7 +367,6 @@ const ViewRFQ = () => {
           </table>
         </div>
       </div>
-
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
           <Button
@@ -425,8 +398,6 @@ const ViewRFQ = () => {
           </Button>
         </div>
       )}
-
-      {/* MODAL WITH UNIT PRICE */}
       <Modal
         isOpen={state.isModalOpen}
         onClose={closeModal}
@@ -479,12 +450,8 @@ const ViewRFQ = () => {
                           </td>
                           <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.unit_price ? `SAR ${Number(item.unit_price).toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td className="border p-2 whitespace-nowrap">
-                            {item.quantity && item.unit_price ? `SAR ${(item.quantity * item.unit_price).toFixed(2)}` : 'SAR 0.00'}
-                          </td>
+                          <td className="border p-2 whitespace-nowrap">SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                          <td className="border p-2 whitespace-nowrap">SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -505,7 +472,7 @@ const ViewRFQ = () => {
                   </table>
                 </div>
               ) : (
-                <p aclassName="text-gray-500">No items available.</p>
+                <p className="text-gray-500">No items available.</p>
               )}
             </div>
           </div>
