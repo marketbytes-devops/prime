@@ -21,6 +21,7 @@ const EditRFQ = () => {
   const isQuotation = location.state?.isQuotation || false;
   const scrollToVat = location.state?.scrollToVat || false;
   const vatSectionRef = useRef(null);
+  const hasScrolled = useRef(false); // Track if we've already scrolled
 
   const [state, setState] = useState({
     company_name: '',
@@ -95,12 +96,40 @@ const EditRFQ = () => {
     fetchData();
   }, [id]);
 
+  // Enhanced scroll effect with multiple fallbacks
   useEffect(() => {
-    if (!state.loading && scrollToVat && vatSectionRef.current) {
-      const timer = setTimeout(() => {
-        vatSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
-      return () => clearTimeout(timer);
+    if (!state.loading && scrollToVat && vatSectionRef.current && !hasScrolled.current) {
+      const scrollToSection = () => {
+        if (vatSectionRef.current) {
+          // Method 1: scrollIntoView with options
+          vatSectionRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+          
+          // Method 2: Fallback - Add visual highlight
+          vatSectionRef.current.style.backgroundColor = '#FEF3C7'; // Light yellow
+          setTimeout(() => {
+            if (vatSectionRef.current) {
+              vatSectionRef.current.style.backgroundColor = '';
+            }
+          }, 2000);
+          
+          hasScrolled.current = true;
+        }
+      };
+
+      // Try multiple times with increasing delays to ensure DOM is ready
+      const timeouts = [100, 300, 500];
+      timeouts.forEach(delay => {
+        setTimeout(scrollToSection, delay);
+      });
+
+      // Cleanup
+      return () => {
+        timeouts.forEach(delay => clearTimeout(delay));
+      };
     }
   }, [state.loading, scrollToVat]);
 
@@ -569,7 +598,7 @@ const EditRFQ = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price
+                  Unit Price {isQuotation && <span className="text-red-500">*</span>}
                 </label>
                 <InputField
                   type="number"
@@ -602,7 +631,10 @@ const EditRFQ = () => {
         </Button>
       </div>
 
-      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={vatSectionRef}>
+      <div 
+        className="bg-white p-4 space-y-4 rounded-md shadow transition-colors duration-500" 
+        ref={vatSectionRef}
+      >
         <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex items-center">
