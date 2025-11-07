@@ -21,6 +21,7 @@ const EditRFQ = () => {
   const isQuotation = location.state?.isQuotation || false;
   const scrollToItems = location.state?.scrollToItems || false;
   const itemsSectionRef = useRef(null);
+
   const [state, setState] = useState({
     company_name: '',
     company_address: '',
@@ -54,6 +55,7 @@ const EditRFQ = () => {
           apiClient.get('items/'),
           apiClient.get('units/'),
         ]);
+
         setState((prev) => ({
           ...prev,
           company_name: rfqRes.data.company_name || '',
@@ -70,11 +72,11 @@ const EditRFQ = () => {
           vat_applicable: rfqRes.data.vat_applicable || false,
           items: rfqRes.data.items && rfqRes.data.items.length
             ? rfqRes.data.items.map((item) => ({
-              item: item.item || '',
-              quantity: item.quantity || '',
-              unit: item.unit || '',
-              unit_price: item.unit_price || '',
-            }))
+                item: item.item || '',
+                quantity: item.quantity || '',
+                unit: item.unit || '',
+                unit_price: item.unit_price || '',
+              }))
             : [{ item: '', quantity: '', unit: '', unit_price: '' }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
@@ -82,9 +84,11 @@ const EditRFQ = () => {
           units: unitsRes.data || [],
           loading: false,
         }));
+
         if (scrollToItems && itemsSectionRef.current) {
-          itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
-          toast.error('Please enter unit prices for all items.');
+          setTimeout(() => {
+            itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -245,7 +249,6 @@ const EditRFQ = () => {
       state.assigned_sales_person &&
       state.due_date_for_quotation &&
       state.rfq_status;
-
     const isItemsValid = state.items.every(
       (item) =>
         item.item &&
@@ -253,7 +256,6 @@ const EditRFQ = () => {
         item.unit &&
         (!isQuotation || (isQuotation && item.unit_price))
     );
-
     return isBasicInfoValid && isItemsValid;
   };
 
@@ -266,6 +268,7 @@ const EditRFQ = () => {
       }
       return;
     }
+
     setState((prev) => ({ ...prev, submitting: true }));
     try {
       const rfqPayload = buildRfqPayload();
@@ -276,10 +279,12 @@ const EditRFQ = () => {
         rfqPayload.rfq_status = 'Completed';
       }
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
+
       if (isQuotation) {
         const quotationPayload = buildQuotationPayload();
         await apiClient.post('/quotations/', quotationPayload);
       }
+
       navigate(isQuotation ? '/view-quotation' : '/view-rfq');
       toast.success(isQuotation ? 'Quotation created successfully!' : 'RFQ updated successfully!');
     } catch (error) {
@@ -289,6 +294,14 @@ const EditRFQ = () => {
       setState((prev) => ({ ...prev, submitting: false }));
     }
   };
+
+  if (state.loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   const renderForm = () => (
     <div className="grid gap-6">
@@ -602,10 +615,6 @@ const EditRFQ = () => {
       </div>
     </div>
   );
-
-  if (state.loading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
-  }
 
   return (
     <div className="mx-auto p-4">

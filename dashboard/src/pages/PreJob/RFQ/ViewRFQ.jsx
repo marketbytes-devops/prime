@@ -132,11 +132,15 @@ const ViewRFQ = () => {
     try {
       const rfqResponse = await apiClient.get(`rfqs/${rfq.id}/`);
       const currentRfq = rfqResponse.data;
-      const hasUnitPrices = currentRfq.items.every((item) => item.unit_price != null && item.unit_price !== '');
-      
+      const hasUnitPrices = currentRfq.items.every(
+        (item) => item.unit_price != null && item.unit_price !== ''
+      );
+
       if (!hasUnitPrices) {
         toast.error('Please enter unit prices for all items.');
-        navigate(`/edit-rfq/${rfq.id}`, { state: { isQuotation: true, scrollToItems: true } });
+        navigate(`/edit-rfq/${rfq.id}`, {
+          state: { isQuotation: true, scrollToItems: true },
+        });
         return;
       }
 
@@ -271,13 +275,13 @@ const ViewRFQ = () => {
             </select>
           </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Sl No</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">RFQ Number</th>
-                {/* ADDED: Company Name Column */}
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap min-w-[180px]">Company Name</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Created Date</th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">Assigned Sales Person</th>
@@ -297,7 +301,6 @@ const ViewRFQ = () => {
                   <tr key={rfq.id} className="border hover:bg-gray-50">
                     <td className="border p-2 whitespace-nowrap">{startIndex + index + 1}</td>
                     <td className="border p-2 whitespace-nowrap">{rfq.series_number || 'N/A'}</td>
-                    {/* ADDED: Company Name Display */}
                     <td className="border p-2 whitespace-nowrap min-w-[180px]">{rfq.company_name || 'N/A'}</td>
                     <td className="border p-2 whitespace-nowrap">
                       {new Date(rfq.created_at).toLocaleDateString()}
@@ -367,6 +370,7 @@ const ViewRFQ = () => {
           </table>
         </div>
       </div>
+
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
           <Button
@@ -398,6 +402,7 @@ const ViewRFQ = () => {
           </Button>
         </div>
       )}
+
       <Modal
         isOpen={state.isModalOpen}
         onClose={closeModal}
@@ -448,7 +453,7 @@ const ViewRFQ = () => {
                           <td className="border p-2 whitespace-nowrap">
                             {typeof item.item === 'string' ? item.item : (state.itemsList.find((i) => i.id === item.item)?.name || 'N/A')}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
+                          <td className="border p709 p-2 whitespace-nowrap">{item.quantity || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">{state.units.find((u) => u.id === item.unit)?.name || 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">SAR {item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
                           <td className="border p-2 whitespace-nowrap">SAR {item.quantity && item.unit_price ? Number(item.quantity * item.unit_price).toFixed(2) : '0.00'}</td>
