@@ -139,7 +139,7 @@ const ViewRFQ = () => {
       if (!hasUnitPrices) {
         toast.error('Please enter unit prices for all items.');
         navigate(`/edit-rfq/${rfq.id}`, {
-          state: { isQuotation: true, scrollToItems: true },
+          state: { isQuotation: true, scrollToVat: true },
         });
         return;
       }

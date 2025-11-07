@@ -19,8 +19,8 @@ const EditRFQ = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isQuotation = location.state?.isQuotation || false;
-  const scrollToItems = location.state?.scrollToItems || false;
-  const itemsSectionRef = useRef(null);
+  const scrollToVat = location.state?.scrollToVat || false;
+  const vatSectionRef = useRef(null);
 
   const [state, setState] = useState({
     company_name: '',
@@ -72,11 +72,11 @@ const EditRFQ = () => {
           vat_applicable: rfqRes.data.vat_applicable || false,
           items: rfqRes.data.items && rfqRes.data.items.length
             ? rfqRes.data.items.map((item) => ({
-                item: item.item || '',
-                quantity: item.quantity || '',
-                unit: item.unit || '',
-                unit_price: item.unit_price || '',
-              }))
+              item: item.item || '',
+              quantity: item.quantity || '',
+              unit: item.unit || '',
+              unit_price: item.unit_price || '',
+            }))
             : [{ item: '', quantity: '', unit: '', unit_price: '' }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
@@ -85,10 +85,10 @@ const EditRFQ = () => {
           loading: false,
         }));
 
-        if (scrollToItems && itemsSectionRef.current) {
+        if (scrollToVat && vatSectionRef.current) {
           setTimeout(() => {
-            itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
+            vatSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+          }, 150);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -97,7 +97,7 @@ const EditRFQ = () => {
       }
     };
     fetchData();
-  }, [id, scrollToItems]);
+  }, [id, scrollToVat]);
 
   const buildRfqPayload = useCallback(() => ({
     company_name: state.company_name || null,
@@ -263,8 +263,8 @@ const EditRFQ = () => {
     e.preventDefault();
     if (!isFormValid()) {
       toast.error('Please fill all required fields, including unit prices for quotation conversion.');
-      if (isQuotation && itemsSectionRef.current) {
-        itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+      if (isQuotation && vatSectionRef.current) {
+        vatSectionRef.current.scrollIntoView({ behavior: 'smooth' });
       }
       return;
     }
@@ -597,7 +597,7 @@ const EditRFQ = () => {
         </Button>
       </div>
 
-      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
+      <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={vatSectionRef}>
         <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex items-center">
