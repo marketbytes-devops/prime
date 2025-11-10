@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 
 const ListPurchaseOrders = () => {
@@ -795,13 +794,13 @@ const ListPurchaseOrders = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => handleViewPO(po)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           View PO
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleConvertToWO(po)}
                           disabled={hasWorkOrder(po.id)}
                           className={`px-3 py-1 text-white rounded-md text-sm ${
@@ -811,8 +810,8 @@ const ListPurchaseOrders = () => {
                           }`}
                         >
                           Convert to Work Order
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleDeletePO(po.id)}
                           disabled={!hasPermission("purchase_orders", "delete")}
                           className={`px-3 py-1 rounded-md text-sm ${
@@ -822,7 +821,7 @@ const ListPurchaseOrders = () => {
                           }`}
                         >
                           Delete
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -834,15 +833,15 @@ const ListPurchaseOrders = () => {
       </div>
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
@@ -852,15 +851,15 @@ const ListPurchaseOrders = () => {
               }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
       <Modal
@@ -1488,7 +1487,7 @@ const ListPurchaseOrders = () => {
                         </tbody>
                       </table>
                     </div>
-                    <Button
+                    <button
                       onClick={handleGenerateSplitOrder}
                       disabled={isGenerateDisabled()}
                       className={`px-4 py-2 mt-2 rounded-md ${
@@ -1498,14 +1497,14 @@ const ListPurchaseOrders = () => {
                       }`}
                     >
                       Generate Split Order
-                    </Button>
+                    </button>
                   </div>
                 )}
               </div>
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={() =>
                 setState((prev) => ({
                   ...prev,
@@ -1517,8 +1516,8 @@ const ListPurchaseOrders = () => {
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleWOSubmit}
               disabled={isSubmitDisabled() || state.isSubmitting}
               className={`px-4 py-2 rounded-md ${
@@ -1528,7 +1527,7 @@ const ListPurchaseOrders = () => {
               }`}
             >
               {state.isSubmitting ? "Submitting..." : "Submit"}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

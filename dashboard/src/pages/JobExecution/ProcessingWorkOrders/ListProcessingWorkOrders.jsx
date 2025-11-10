@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 import Template1 from "../../../components/Templates/WorkOrder/Template1";
 import ReactDOMServer from "react-dom/server";
@@ -501,7 +500,7 @@ const ListProcessingWorkOrders = () => {
                         </td>
                         <td className="border p-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <Button
+                            <button
                               onClick={() => handleViewWO(wo)}
                               disabled={
                                 !hasPermission("processing_work_orders", "view")
@@ -512,9 +511,9 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               View
-                            </Button>
+                            </button>
 
-                            <Button
+                            <button
                               onClick={() => handleEditWO(wo.id)}
                               disabled={
                                 !hasPermission("processing_work_orders", "edit")
@@ -525,9 +524,9 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               Update
-                            </Button>
+                            </button>
 
-                            <Button
+                            <button
                               onClick={() => handleDeleteWO(wo.id)}
                               disabled={
                                 !hasPermission(
@@ -544,8 +543,8 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               Delete
-                            </Button>
-                            <Button
+                            </button>
+                            <button
                               onClick={() => handleMoveToApproval(wo.id)}
                               disabled={
                                 !hasPermission(
@@ -566,8 +565,8 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               Move to Manager Approval
-                            </Button>
-                            <Button
+                            </button>
+                            <button
                               onClick={() => handleAction(wo.id)}
                               disabled={
                                 !hasPermission(
@@ -588,8 +587,8 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               Update Device Test Details
-                            </Button>
-                            <Button
+                            </button>
+                            <button
                               onClick={() => handlePrint(wo)}
                               disabled={
                                 !hasPermission("processing_work_orders", "view")
@@ -600,7 +599,7 @@ const ListProcessingWorkOrders = () => {
                                 }`}
                             >
                               Print
-                            </Button>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -613,15 +612,15 @@ const ListProcessingWorkOrders = () => {
 
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-              <Button
+              <button
                 onClick={handlePrev}
                 disabled={state.currentPage === 1}
                 className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
               >
                 Prev
-              </Button>
+              </button>
               {pageNumbers.map((page) => (
-                <Button
+                <button
                   key={page}
                   onClick={() => handlePageChange(page)}
                   className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
@@ -630,15 +629,15 @@ const ListProcessingWorkOrders = () => {
                     }`}
                 >
                   {page}
-                </Button>
+                </button>
               ))}
-              <Button
+              <button
                 onClick={handleNext}
                 disabled={state.currentPage === totalPages}
                 className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
               >
                 Next
-              </Button>
+              </button>
             </div>
           )}
 

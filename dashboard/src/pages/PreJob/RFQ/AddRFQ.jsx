@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../../helpers/apiClient";
 import { toast } from "react-toastify";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -122,13 +121,15 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
                 className="flex-1 p-2 border rounded text-sm"
                 disabled={addingItem}
               />
-              <Button
+              <button
                 onClick={handleAddItem}
-                className="bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm"
+                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${
+                  addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
+                }`}
                 disabled={addingItem || !newItemName.trim()}
               >
                 {addingItem ? "..." : "+"}
-              </Button>
+              </button>
             </div>
           )}
           {filteredOptions.length > 0 ? (
@@ -167,7 +168,7 @@ const AddRFQ = () => {
         quantity: "",
         unit: "",
         unit_name: "",
-        unit_price: ""               // <<< NEW
+        unit_price: ""
       }
     ],
     channels: [],
@@ -203,7 +204,6 @@ const AddRFQ = () => {
     fetchData();
   }, []);
 
-  // AUTO CREATE + RETURN ID
   const ensureItemExists = async (name) => {
     if (!name.trim()) return null;
     const existing = state.itemsList.find(i => i.name.toLowerCase() === name.toLowerCase());
@@ -238,7 +238,6 @@ const AddRFQ = () => {
     }
   };
 
-  // EXCEL UPLOAD WITH AUTO-CREATE (now also reads Unit Price)
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -288,7 +287,7 @@ const AddRFQ = () => {
               quantity: Number(qty) || 1,
               unit: unitId,
               unit_name: unitName || "Each",
-              unit_price: price ? Number(price) : ""   // <<< NEW
+              unit_price: price ? Number(price) : ""
             });
           }
         }
@@ -318,7 +317,7 @@ const AddRFQ = () => {
           unit: "",
           item_name: "",
           unit_name: "",
-          unit_price: ""          // <<< NEW
+          unit_price: ""
         }],
       };
     });
@@ -372,7 +371,7 @@ const AddRFQ = () => {
         item: Number(it.item),
         quantity: Number(it.quantity),
         unit: Number(it.unit),
-        unit_price: it.unit_price ? Number(it.unit_price) : null,   // <<< NEW
+        unit_price: it.unit_price ? Number(it.unit_price) : null,
       })),
     };
 
@@ -393,7 +392,6 @@ const AddRFQ = () => {
     else navigate("/existing-client");
   };
 
-  // DOWNLOAD TEMPLATE – added Unit Price column
   const handleDownloadTemplate = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ Template');
@@ -403,7 +401,7 @@ const AddRFQ = () => {
       { header: 'Item', key: 'item', width: 35 },
       { header: 'Quantity', key: 'quantity', width: 15 },
       { header: 'Unit', key: 'unit', width: 15 },
-      { header: 'Unit Price', key: 'unit_price', width: 15 },   // <<< NEW
+      { header: 'Unit Price', key: 'unit_price', width: 15 },
     ];
 
     const header = worksheet.getRow(1);
@@ -642,7 +640,8 @@ const AddRFQ = () => {
         <div className="mt-3 flex items-center justify-center">
           <button
             onClick={handleDownloadTemplate}
-            className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2"
+            className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2 transition-opacity duration-300 opacity-90 hover:opacity-100"
+            type="button"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -703,7 +702,6 @@ const AddRFQ = () => {
                     apiEndpoint="units/"
                   />
                 </div>
-                {/* ---------- NEW UNIT PRICE INPUT ---------- */}
                 <div>
                   <label className="block font-medium mb-1">Unit Price (SAR)</label>
                   <InputField
@@ -716,21 +714,26 @@ const AddRFQ = () => {
                   />
                 </div>
                 <div>
-                  <Button
+                  <button
                     onClick={() => removeItem(idx)}
-                    className="relative top-7 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded"
+                    className="relative top-7 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded transition-opacity duration-300 opacity-90 hover:opacity-100"
+                    type="button"
                   >
                     Remove
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
           ))
         )}
       </div>
-      <Button onClick={addItem} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg">
+      <button
+        onClick={addItem}
+        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100"
+        type="button"
+      >
         + Add Manual
-      </Button>
+      </button>
     </div>
   );
 
@@ -753,12 +756,20 @@ const AddRFQ = () => {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Client Type">
         <div className="space-y-4">
-          <Button onClick={() => handleClientSelect("new")} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl">
+          <button
+            onClick={() => handleClientSelect("new")}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
+            type="button"
+          >
             New Client
-          </Button>
-          <Button onClick={() => handleClientSelect("existing")} className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl">
+          </button>
+          <button
+            onClick={() => handleClientSelect("existing")}
+            className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
+            type="button"
+          >
             Existing Client
-          </Button>
+          </button>
         </div>
       </Modal>
 
@@ -770,23 +781,32 @@ const AddRFQ = () => {
 
           <div className="flex justify-between space-x-4">
             {step > 1 && (
-              <Button type="button" onClick={handlePrev} className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg">
+              <button
+                type="button"
+                onClick={handlePrev}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100"
+              >
                 ← Back
-              </Button>
+              </button>
             )}
             {step < 3 ? (
-              <Button type="button" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto">
+              <button
+                type="button"
+                onClick={handleNext}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100"
+              >
                 Next →
-              </Button>
+              </button>
             ) : (
-              <Button
+              <button
                 type="submit"
                 disabled={loading || state.items.length === 0}
-                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto
-                  ${loading || state.items.length === 0 ? "opacity-50" : ""}`}
+                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
+                  loading || state.items.length === 0 ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
+                }`}
               >
                 {loading ? "Saving..." : "Submit RFQ"}
-              </Button>
+              </button>
             )}
           </div>
         </form>

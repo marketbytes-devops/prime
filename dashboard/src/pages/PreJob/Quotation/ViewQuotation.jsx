@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 import ReactDOMServer from "react-dom/server";
 import Template1 from "../../../components/Templates/Quotation/Template1";
@@ -798,7 +797,7 @@ const ViewQuotation = () => {
                           className="min-w-[300px] p-1"
                           disabled={!state.isEditingRemark[quotation.id]}
                         />
-                        <Button
+                        <button
                           onClick={() =>
                             state.isEditingRemark[quotation.id]
                               ? handleRemarkSubmit(quotation.id)
@@ -812,18 +811,18 @@ const ViewQuotation = () => {
                           {state.isEditingRemark[quotation.id]
                             ? "Update"
                             : "Edit"}
-                        </Button>
+                        </button>
                       </div>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => openModal(quotation)}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
                         >
                           View Details
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() =>
                             navigate(`/edit-quotation/${quotation.id}`)
                           }
@@ -838,8 +837,8 @@ const ViewQuotation = () => {
                             }`}
                         >
                           Edit
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => navigate("/view-quotation/update-terms-and-conditions")}
                           disabled={!hasPermission("quotation", "edit")}
                           className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "edit")
@@ -848,8 +847,8 @@ const ViewQuotation = () => {
                             }`}
                         >
                           {hasTerms ? "View Terms & Conditions" : "Update Terms & Conditions"}
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handlePrint(quotation)}
                           disabled={quotation.quotation_status !== "Approved"}
                           className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved"
@@ -858,12 +857,12 @@ const ViewQuotation = () => {
                             }`}
                         >
                           Print
-                        </Button>
+                        </button>
                         {hasBothOrderTypes(quotation) ||
                           isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
-                          <Button
+                          <button
                             onClick={() => handleUploadPO(quotation.id)}
                             disabled={!shouldEnableUploadPO(quotation)}
                             className={`px-3 py-1 rounded-md text-sm ${shouldEnableUploadPO(quotation)
@@ -872,9 +871,9 @@ const ViewQuotation = () => {
                               }`}
                           >
                             Upload PO
-                          </Button>
+                          </button>
                         ) : (
-                          <Button
+                          <button
                             onClick={() => handleConvertToPO(quotation.id)}
                             disabled={
                               quotation.quotation_status !== "Approved" ||
@@ -887,9 +886,9 @@ const ViewQuotation = () => {
                               }`}
                           >
                             Convert to PO
-                          </Button>
+                          </button>
                         )}
-                        <Button
+                        <button
                           onClick={() => handleDelete(quotation.id)}
                           disabled={!hasPermission("quotation", "delete")}
                           className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "delete")
@@ -898,7 +897,7 @@ const ViewQuotation = () => {
                             }`}
                         >
                           Delete
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -910,15 +909,15 @@ const ViewQuotation = () => {
       </div>
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
@@ -927,15 +926,15 @@ const ViewQuotation = () => {
                 }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
       <Modal
@@ -1254,18 +1253,18 @@ const ViewQuotation = () => {
         <div className="space-y-4">
           <p>Select PO Type:</p>
           <div className="flex gap-4">
-            <Button
+            <button
               onClick={() => handlePoOption("full")}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Full Order
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => handlePoOption("partial")}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
             >
               Partial Order
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>
@@ -1370,12 +1369,12 @@ const ViewQuotation = () => {
           ) : (
             <p className="text-gray-500">Nil</p>
           )}
-          <Button
+          <button
             onClick={handleFullOrderSubmit}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
           >
             Submit
-          </Button>
+          </button>
         </div>
       </Modal>
       <Modal
@@ -1500,12 +1499,12 @@ const ViewQuotation = () => {
               )}
             </div>
           ))}
-          <Button
+          <button
             onClick={handlePoUploadSubmit}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
           >
             Submit
-          </Button>
+          </button>
         </div>
       </Modal>
       <Modal
@@ -1528,7 +1527,7 @@ const ViewQuotation = () => {
             rows="4"
           />
           <div className="flex gap-4">
-            <Button
+            <button
               onClick={handleNotApprovedSubmit}
               disabled={isSubmitting}
               className={`px-4 py-2 rounded-md ${isSubmitting
@@ -1537,8 +1536,8 @@ const ViewQuotation = () => {
                 }`}
             >
               {isSubmitting ? "Submitting..." : "Submit"}
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={closeNotApprovedModal}
               disabled={isSubmitting}
               className={`px-4 py-2 rounded-md ${isSubmitting
@@ -1547,7 +1546,7 @@ const ViewQuotation = () => {
                 }`}
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

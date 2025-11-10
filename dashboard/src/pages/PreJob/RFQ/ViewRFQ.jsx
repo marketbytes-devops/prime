@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
-import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
 import { toast } from 'react-toastify';
 
@@ -322,13 +321,13 @@ const ViewRFQ = () => {
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => openModal(rfq)}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
                         >
                           View Details
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleConvertToQuotation(rfq)}
                           disabled={rfq.rfq_status !== 'Processing'}
                           className={`px-3 py-1 rounded-md text-sm ${
@@ -338,8 +337,8 @@ const ViewRFQ = () => {
                           }`}
                         >
                           Convert to Quotation
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => navigate(`/edit-rfq/${rfq.id}`)}
                           disabled={rfq.hasQuotation || !hasPermission('rfq', 'edit')}
                           className={`px-3 py-1 rounded-md text-sm ${
@@ -349,8 +348,8 @@ const ViewRFQ = () => {
                           }`}
                         >
                           Edit
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleDelete(rfq.id)}
                           disabled={rfq.hasQuotation || !hasPermission('rfq', 'delete')}
                           className={`px-3 py-1 rounded-md text-sm ${
@@ -360,7 +359,7 @@ const ViewRFQ = () => {
                           }`}
                         >
                           Delete
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -373,15 +372,15 @@ const ViewRFQ = () => {
 
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
@@ -391,15 +390,15 @@ const ViewRFQ = () => {
               }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
 
