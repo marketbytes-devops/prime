@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
-import Button from '../../components/Button';
-import Loading from '../../components/Loading'; // Assuming this exists; adjust if needed
+import Loading from '../../components/Loading'; 
 
 const DueDateReports = () => {
   const [state, setState] = useState({
@@ -15,7 +14,7 @@ const DueDateReports = () => {
     invoices: [],
     channels: [],
     itemsList: [],
-    dueDateItems: [], // Flattened list of items with due dates
+    dueDateItems: [],
     searchTerm: '',
     sortBy: 'due_date',
     sortOrder: 'asc',
@@ -30,10 +29,9 @@ const DueDateReports = () => {
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
 
-  // Calculate days remaining for a specific date
   const calculateDaysRemaining = (dueDate) => {
     if (!dueDate) return null;
-    const today = new Date('2025-10-27'); // Hardcoded current date as per context
+    const today = new Date('2025-10-27'); 
     today.setHours(0, 0, 0, 0);
     const due = new Date(dueDate);
     due.setHours(0, 0, 0, 0);
@@ -138,7 +136,7 @@ const DueDateReports = () => {
             const relatedInvoices = invoices.filter((inv) => inv.delivery_note === dn.id);
 
             // Include if there's at least one related invoice or even without (as per reports logic)
-            if (relatedInvoices.length > 0 || true) { // Adjust if needed to match reports
+            if (relatedInvoices.length > 0 || true) { 
               // Flatten items with due dates
               workOrder.items?.forEach((item) => {
                 if (item.calibration_due_date) {
@@ -162,7 +160,7 @@ const DueDateReports = () => {
                     purchaseOrder,
                     workOrder,
                     deliveryNote: dn,
-                    invoice: relatedInvoices[0] || null, // Use first if multiple
+                    invoice: relatedInvoices[0] || null, 
                     channel: rfq ? channels.find((c) => c.id === rfq.rfq_channel) : null,
                   });
                 }
@@ -355,12 +353,12 @@ const DueDateReports = () => {
             />
           </div>
           <div className="flex items-end">
-            <Button
+            <button
               onClick={() => setState((prev) => ({ ...prev, dateFromFilter: '', dateToFilter: '', currentPage: 1 }))}
               className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm"
             >
               Clear Dates
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -417,7 +415,7 @@ const DueDateReports = () => {
 
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-4">
-            <Button
+            <button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -427,9 +425,9 @@ const DueDateReports = () => {
               }`}
             >
               Prev
-            </Button>
+            </button>
             {pageNumbers.map((page) => (
-              <Button
+              <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
@@ -439,9 +437,9 @@ const DueDateReports = () => {
                 }`}
               >
                 {page}
-              </Button>
+              </button>
             ))}
-            <Button
+            <button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -451,7 +449,7 @@ const DueDateReports = () => {
               }`}
             >
               Next
-            </Button>
+            </button>
           </div>
         )}
       </div>

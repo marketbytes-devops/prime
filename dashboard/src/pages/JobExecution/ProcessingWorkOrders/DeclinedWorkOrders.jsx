@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
-import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
 import InputField from '../../../components/InputField';
 import { useNavigate } from 'react-router-dom';
@@ -272,13 +271,13 @@ const DeclinedWorkOrders = () => {
                     <td className="border p-2">{wo.decline_reason || 'N/A'}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => handleViewWO(wo)}
                           className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
                           View WO & Certificates
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleUpdate(wo.id)}
                           disabled={!hasPermission('declined_work_orders', 'edit')}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
@@ -288,8 +287,8 @@ const DeclinedWorkOrders = () => {
                           }`}
                         >
                           Update
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleResubmit(wo.id)}
                           disabled={!hasPermission('declined_work_orders', 'edit')}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
@@ -299,7 +298,7 @@ const DeclinedWorkOrders = () => {
                           }`}
                         >
                           Resubmit for Manager Approval
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -311,15 +310,15 @@ const DeclinedWorkOrders = () => {
       </div>
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
@@ -327,15 +326,15 @@ const DeclinedWorkOrders = () => {
               }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
       <Modal
@@ -455,7 +454,7 @@ const DeclinedWorkOrders = () => {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={handleDecline}
               disabled={!state.declineReason || !hasPermission('declined_work_orders', 'edit')}
               className={`px-4 py-2 rounded-md ${
@@ -465,13 +464,13 @@ const DeclinedWorkOrders = () => {
               }`}
             >
               Submit
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => setState((prev) => ({ ...prev, isDeclineModalOpen: false, selectedWO: null, declineReason: '' }))}
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

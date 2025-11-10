@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Modal from "../../../components/Modal";
 
 const Delivery = () => {
@@ -14,9 +13,9 @@ const Delivery = () => {
     itemsList: [],
     units: [],
     deliveryNotes: [],
-    quotations: [], // Added quotations to state
-    purchaseOrders: [], // Added purchaseOrders to state
-    channels: [], // Added channels to state
+    quotations: [], 
+    purchaseOrders: [], 
+    channels: [], 
     searchTerm: "",
     sortBy: "created_at",
     currentPage: 1,
@@ -311,13 +310,13 @@ const Delivery = () => {
                     </td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => handleViewWO(wo)}
                           className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
                           View WO & Certificates
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleInitiateDelivery(wo)}
                           disabled={
                             !hasPermission("delivery", "edit") ||
@@ -339,7 +338,7 @@ const Delivery = () => {
                           )
                             ? "Delivery Initiated"
                             : "Initiate Delivery"}
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -352,15 +351,15 @@ const Delivery = () => {
       
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
@@ -370,15 +369,15 @@ const Delivery = () => {
               }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
       

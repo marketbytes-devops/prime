@@ -4,7 +4,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
-import Button from '../../../components/Button';
 import Loading from '../../../components/Loading';
 
 const InitiateDelivery = () => {
@@ -790,7 +789,7 @@ const InitiateDelivery = () => {
                           ) : (
                             <p className="text-gray-500">No components added yet.</p>
                           )}
-                          <Button
+                          <button
                             onClick={() => {
                               const itemIndex = state.deliveryItems.findIndex((di) => di.id === item.id);
                               addComponent(itemIndex);
@@ -799,7 +798,7 @@ const InitiateDelivery = () => {
                             disabled={!hasPermission('delivery', 'edit')}
                           >
                             + Add Component
-                          </Button>
+                          </button>
                         </td>
                       </tr>
                     )}
@@ -813,7 +812,7 @@ const InitiateDelivery = () => {
         )}
         {state.deliveryType === 'Multiple' && state.numberOfSplitDNs && (
           <div className="mt-6">
-            <Button
+            <button
               onClick={handleGenerateSplitDN}
               disabled={isGenerateDisabled() || !hasPermission('delivery', 'edit')}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -823,7 +822,7 @@ const InitiateDelivery = () => {
               }`}
             >
               Generate Split Delivery Note
-            </Button>
+            </button>
             {state.createdSplitDNs.length > 0 && (
               <div className="mt-6 space-y-4">
                 <h2 className="text-lg font-semibold">Generated Split Delivery Notes</h2>
@@ -979,13 +978,13 @@ const InitiateDelivery = () => {
                                     ) : (
                                       <p className="text-gray-500">No components added yet.</p>
                                     )}
-                                    <Button
+                                    <button
                                       onClick={() => addSplitDNComponent(dnIndex, item.id)}
                                       className="mt-2 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                                       disabled={!hasPermission('delivery', 'edit')}
                                     >
                                       + Add Component
-                                    </Button>
+                                    </button>
                                   </td>
                                 </tr>
                               )}
@@ -1001,13 +1000,13 @@ const InitiateDelivery = () => {
           </div>
         )}
         <div className="flex justify-end gap-2 mt-4">
-          <Button
+          <button
             onClick={() => navigate('/job-execution/processing-work-orders/pending-deliveries')}
             className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={handleSubmitDelivery}
             disabled={isSubmitDisabled() || state.isSubmitting || !hasPermission('delivery', 'edit')}
             className={`px-3 py-1 rounded-md text-sm ${
@@ -1017,7 +1016,7 @@ const InitiateDelivery = () => {
             }`}
           >
             {state.isSubmitting ? 'Submitting...' : 'Submit Delivery'}
-          </Button>
+          </button>
         </div>
       </div>
     </div>

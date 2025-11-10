@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
-import Button from '../../components/Button';
+import button from '../../components/button';
 import Modal from '../../components/Modal';
 
 const CompletedWO = () => {
@@ -244,29 +244,29 @@ const CompletedWO = () => {
                     <td className="border p-2">{getAssignedTechnicians(wo.items || [])}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => handleViewDocument(wo, 'po')}
                           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
                           View PO
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleViewDocument(wo, 'wo')}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                         >
                           View WO
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleViewDocument(wo, 'dn')}
                           className="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
                         >
                           View DN
-                        </Button>
+                        </button>
                       </div>
                     </td>
                     <td className="border p-2">{getInvoiceStatus(wo)}</td>
                     <td className="border p-2">
-                      <Button
+                      <button
                         onClick={() => handleDeleteWorkOrder(wo.id)}
                         disabled={!hasPermission('completed_work_orders', 'delete')}
                         className={`px-3 py-1 rounded-md text-sm ${
@@ -276,7 +276,7 @@ const CompletedWO = () => {
                         }`}
                       >
                         Delete
-                      </Button>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -286,15 +286,15 @@ const CompletedWO = () => {
         </div>
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-            <Button
+            <button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
               className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
             >
               Prev
-            </Button>
+            </button>
             {pageNumbers.map((page) => (
-              <Button
+              <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 className={`px-3 py-1 rounded-md min-w-fit ${
@@ -304,15 +304,15 @@ const CompletedWO = () => {
                 }`}
               >
                 {page}
-              </Button>
+              </button>
             ))}
-            <Button
+            <button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
               className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
             >
               Next
-            </Button>
+            </button>
           </div>
         )}
       </div>

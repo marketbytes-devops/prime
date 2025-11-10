@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
-import Button from "../../../components/Button";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 
@@ -101,18 +100,18 @@ const UpdateTermsAndConditions = () => {
           />
 
           <div className="mt-16 flex gap-2">
-            <Button
+            <button
               onClick={handleSave}
               className="bg-indigo-600 text-white hover:bg-indigo-700"
             >
               Update
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => setIsEdit(false)}
               className="bg-gray-400 text-white hover:bg-gray-500"
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </>
       ) : (
@@ -124,12 +123,12 @@ const UpdateTermsAndConditions = () => {
             }}
           />
 
-          <Button
+          <button
             onClick={() => setIsEdit(true)}
             className="mt-4 bg-green-600 text-white hover:bg-green-700"
           >
             Edit
-          </Button>
+          </button>
         </>
       )}
     </div>

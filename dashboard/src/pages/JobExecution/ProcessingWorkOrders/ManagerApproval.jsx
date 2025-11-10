@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
-import Button from "../../../components/Button";
+import button from "../../../components/button";
 import Modal from "../../../components/Modal";
 import InputField from "../../../components/InputField";
 import { useNavigate } from "react-router-dom";
@@ -387,13 +387,13 @@ const ManagerApproval = () => {
                     <td className="border p-2">{getApplicationStatus(wo)}</td>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
-                        <Button
+                        <button
                           onClick={() => handleViewWO(wo)}
                           className="whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
                         >
                           View WO & Certificates
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() => handleApprove(wo.id)}
                           disabled={!hasPermission("manager_approval", "edit")}
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
@@ -403,8 +403,8 @@ const ManagerApproval = () => {
                           }`}
                         >
                           Approve
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           onClick={() =>
                             setState((prev) => ({
                               ...prev,
@@ -420,7 +420,7 @@ const ManagerApproval = () => {
                           }`}
                         >
                           Decline
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -432,15 +432,15 @@ const ManagerApproval = () => {
       </div>
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-4 w-fit">
-          <Button
+          <button
             onClick={handlePrev}
             disabled={state.currentPage === 1}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Prev
-          </Button>
+          </button>
           {pageNumbers.map((page) => (
-            <Button
+            <button
               key={page}
               onClick={() => handlePageChange(page)}
               className={`px-3 py-1 rounded-md min-w-fit ${
@@ -450,15 +450,15 @@ const ManagerApproval = () => {
               }`}
             >
               {page}
-            </Button>
+            </button>
           ))}
-          <Button
+          <button
             onClick={handleNext}
             disabled={state.currentPage === totalPages}
             className="px-3 py-1 bg-gray-400 text-white rounded-md hover:bg-gray-500 disabled:bg-gray-300 min-w-fit"
           >
             Next
-          </Button>
+          </button>
         </div>
       )}
       <Modal
@@ -749,7 +749,7 @@ const ManagerApproval = () => {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={handleDecline}
               disabled={
                 !state.declineReason ||
@@ -762,8 +762,8 @@ const ManagerApproval = () => {
               }`}
             >
               Submit
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() =>
                 setState((prev) => ({
                   ...prev,
@@ -775,7 +775,7 @@ const ManagerApproval = () => {
               className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

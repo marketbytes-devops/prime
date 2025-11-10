@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
-import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 
 const ProcessedInvoices = () => {
@@ -272,33 +271,33 @@ const ProcessedInvoices = () => {
   };
 
   const handleUploadSlipFile = (pair) => {
-  if (!pair.deliveryNote) {
-    toast.error('Delivery note not found.');
-    return;
-  }
-  
-  setState((prev) => ({
-    ...prev,
-    isUploadInvoiceModalOpen: true,
-    selectedWOForInvoiceUpload: pair.workOrder,
-    selectedDNForInvoiceUpload: pair.deliveryNote,
-    selectedInvoiceId: pair.invoiceId,
-    invoiceUpload: { invoiceFile: null },
-    invoiceUploadErrors: { invoiceFile: '' },
-    invoiceUploadType: 'Processed',
-    newStatus: 'processed',
-  }));
-};
+    if (!pair.deliveryNote) {
+      toast.error('Delivery note not found.');
+      return;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      isUploadInvoiceModalOpen: true,
+      selectedWOForInvoiceUpload: pair.workOrder,
+      selectedDNForInvoiceUpload: pair.deliveryNote,
+      selectedInvoiceId: pair.invoiceId,
+      invoiceUpload: { invoiceFile: null },
+      invoiceUploadErrors: { invoiceFile: '' },
+      invoiceUploadType: 'Processed',
+      newStatus: 'processed',
+    }));
+  };
 
   const handleInvoiceUploadSubmit = async () => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
-      
+
       // For processed status, we need to include the received_date
       if (state.newStatus === 'processed') {
         formData.append('invoice_status', 'processed');
-        
+
         // Include the existing received_date from the invoice
         const existingInvoice = state.invoices.find(inv => inv.id === state.selectedInvoiceId);
         if (existingInvoice?.received_date) {
@@ -309,7 +308,7 @@ const ProcessedInvoices = () => {
           formData.append('received_date', today);
         }
       }
-      
+
       formData.append('delivery_note_id', state.selectedDNForInvoiceUpload.id);
 
       // Only add file if user selected one
@@ -337,7 +336,7 @@ const ProcessedInvoices = () => {
       } else {
         toast.success('Status updated without file upload.');
       }
-      
+
       setState((prev) => ({
         ...prev,
         isUploadInvoiceModalOpen: false,
@@ -480,7 +479,7 @@ const ProcessedInvoices = () => {
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       (pair.deliveryNote && pair.deliveryNote.items &&
-       pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
+        pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -588,80 +587,75 @@ const ProcessedInvoices = () => {
 
                     <td className="border p-2 whitespace-nowrap">{getAssignedTechnicians(pair.workOrder.items)}</td>
                     <td className="border p-2 whitespace-nowrap">
-  <div className="flex items-center gap-2">
-    {/* Existing buttons for PO, WO, DN, Slip */}
-    <Button
-      onClick={() => handleViewDocument(pair, 'po')}
-      disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('processed_invoices', 'view')
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-blue-600 text-white hover:bg-blue-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 'View PO'}
-    </Button>
-    <Button
-      onClick={() => handleViewDocument(pair, 'wo')}
-      disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('processed_invoices', 'view')
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-green-600 text-white hover:bg-green-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 'View WO'}
-    </Button>
-    <Button
-      onClick={() => handleViewDocument(pair, 'dn')}
-      disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
-      className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-        isSubmitting || !hasPermission('processed_invoices', 'view')
-          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          : 'bg-purple-600 text-white hover:bg-purple-700'
-      }`}
-    >
-      {isSubmitting ? 'Submitting...' : 'View DN'}
-    </Button>
-    
-    {/* Slip Section with + Button */}
-    <div className="flex items-center gap-1">
-      <Button
-        onClick={() => handleViewDocument(pair, 'slip')}
-        disabled={isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file}
-        className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-          isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-teal-600 text-white hover:bg-teal-700'
-        }`}
-      >
-        {isSubmitting ? 'Submitting...' : pair.invoice?.processed_certificate_file ? 'View Slip' : 'No Slip'}
-      </Button>
-      
-      {/* Plus button for uploading/replacing slip file */}
-      {pair.invoice?.invoice_status === 'processed' && (
-        <Button
-          onClick={() => handleUploadSlipFile(pair)}
-          disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
-          className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
-          title="Upload/Replace Slip File"
-        >
-          +
-        </Button>
-      )}
-    </div>
-  </div>
-</td>
+                      <div className="flex items-center gap-2">
+                        {/* Existing buttons for PO, WO, DN, Slip */}
+                        <button
+                          onClick={() => handleViewDocument(pair, 'po')}
+                          disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('processed_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 'View PO'}
+                        </button>
+                        <button
+                          onClick={() => handleViewDocument(pair, 'wo')}
+                          disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('processed_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 'View WO'}
+                        </button>
+                        <button
+                          onClick={() => handleViewDocument(pair, 'dn')}
+                          disabled={isSubmitting || !hasPermission('processed_invoices', 'view')}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('processed_invoices', 'view')
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                        >
+                          {isSubmitting ? 'Submitting...' : 'View DN'}
+                        </button>
+
+                        {/* Slip Section with + button */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleViewDocument(pair, 'slip')}
+                            disabled={isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file}
+                            className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting || !hasPermission('processed_invoices', 'view') || !pair.invoice?.processed_certificate_file
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-teal-600 text-white hover:bg-teal-700'
+                              }`}
+                          >
+                            {isSubmitting ? 'Submitting...' : pair.invoice?.processed_certificate_file ? 'View Slip' : 'No Slip'}
+                          </button>
+
+                          {/* Plus button for uploading/replacing slip file */}
+                          {pair.invoice?.invoice_status === 'processed' && (
+                            <button
+                              onClick={() => handleUploadSlipFile(pair)}
+                              disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
+                              className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+                              title="Upload/Replace Slip File"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <select
                           onChange={(e) => handleUpdateStatus(pair, e.target.value)}
                           disabled={isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
-                          className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
-                            isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
+                          className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${isSubmitting || !hasPermission('processed_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                          }`}
+                            }`}
                           value=""
                         >
                           <option value="" disabled>Processed</option>
@@ -676,44 +670,41 @@ const ProcessedInvoices = () => {
         </div>
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-4">
-            <Button
+            <button
               onClick={handlePrev}
               disabled={state.currentPage === 1 || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === 1 || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === 1 || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Prev'}
-            </Button>
+            </button>
             {pageNumbers.map((page) => (
-              <Button
+              <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 disabled={isSubmitting}
-                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
-                  isSubmitting
+                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${isSubmitting
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 {isSubmitting ? 'Submitting...' : page}
-              </Button>
+              </button>
             ))}
-            <Button
+            <button
               onClick={handleNext}
               disabled={state.currentPage === totalPages || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === totalPages || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === totalPages || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Next'}
-            </Button>
+            </button>
           </div>
         )}
       </div>
@@ -1034,7 +1025,7 @@ const ProcessedInvoices = () => {
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={() => setState((prev) => ({
                 ...prev,
                 isStatusModalOpen: false,
@@ -1046,68 +1037,29 @@ const ProcessedInvoices = () => {
                 invoiceUploadType: '',
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleStatusModalSubmit}
               disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('processed_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('processed_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>
-<Modal
-  isOpen={state.isUploadInvoiceModalOpen}
-  onClose={() => setState((prev) => ({
-    ...prev,
-    isUploadInvoiceModalOpen: false,
-    selectedWOForInvoiceUpload: null,
-    selectedDNForInvoiceUpload: null,
-    selectedInvoiceId: null,
-    invoiceUpload: { invoiceFile: null },
-    invoiceUploadErrors: { invoiceFile: '' },
-    invoiceUploadType: '',
-    isStatusModalOpen: false,
-    selectedWorkOrderId: null,
-    selectedDNId: null,
-    newStatus: '',
-    receivedDate: '',
-  }))}
-  title={`Upload ${state.invoiceUploadType} Slip for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
->
-  <div className="space-y-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {state.invoiceUploadType} Slip File (Optional - Upload 5 MB file)
-      </label>
-      <input
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        onChange={(e) => handleInvoiceFileChange(e)}
-        className="w-full p-2 border rounded focus:outline-indigo-500"
-      />
-      {state.invoiceUploadErrors.invoiceFile && (
-        <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
-      )}
-      <p className="text-sm text-gray-600 mt-1">
-        File upload is optional. You can upload it later using the + button.
-      </p>
-    </div>
-    <div className="flex justify-end gap-2">
-      <Button
-        onClick={() => setState((prev) => ({
+      <Modal
+        isOpen={state.isUploadInvoiceModalOpen}
+        onClose={() => setState((prev) => ({
           ...prev,
           isUploadInvoiceModalOpen: false,
           selectedWOForInvoiceUpload: null,
@@ -1122,29 +1074,64 @@ const ProcessedInvoices = () => {
           newStatus: '',
           receivedDate: '',
         }))}
-        disabled={isSubmitting}
-        className={`px-3 py-1 rounded-md text-sm ${
-          isSubmitting
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-        }`}
+        title={`Upload ${state.invoiceUploadType} Slip for ${state.selectedWOForInvoiceUpload?.wo_number || 'N/A'} - DN: ${state.selectedDNForInvoiceUpload?.dn_number || 'N/A'}`}
       >
-        {isSubmitting ? 'Submitting...' : 'Skip Upload'}
-      </Button>
-      <Button
-        onClick={handleInvoiceUploadSubmit}
-        disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
-        className={`px-3 py-1 rounded-md text-sm ${
-          isSubmitting || !hasPermission('processed_invoices', 'edit')
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
-        }`}
-      >
-        {isSubmitting ? 'Submitting...' : 'Upload File'}
-      </Button>
-    </div>
-  </div>
-</Modal>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {state.invoiceUploadType} Slip File (Optional - Upload 5 MB file)
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => handleInvoiceFileChange(e)}
+              className="w-full p-2 border rounded focus:outline-indigo-500"
+            />
+            {state.invoiceUploadErrors.invoiceFile && (
+              <p className="text-red-500 text-sm mt-1">{state.invoiceUploadErrors.invoiceFile}</p>
+            )}
+            <p className="text-sm text-gray-600 mt-1">
+              File upload is optional. You can upload it later using the + button.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setState((prev) => ({
+                ...prev,
+                isUploadInvoiceModalOpen: false,
+                selectedWOForInvoiceUpload: null,
+                selectedDNForInvoiceUpload: null,
+                selectedInvoiceId: null,
+                invoiceUpload: { invoiceFile: null },
+                invoiceUploadErrors: { invoiceFile: '' },
+                invoiceUploadType: '',
+                isStatusModalOpen: false,
+                selectedWorkOrderId: null,
+                selectedDNId: null,
+                newStatus: '',
+                receivedDate: '',
+              }))}
+              disabled={isSubmitting}
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                }`}
+            >
+              {isSubmitting ? 'Submitting...' : 'Skip Upload'}
+            </button>
+            <button
+              onClick={handleInvoiceUploadSubmit}
+              disabled={isSubmitting || !hasPermission('processed_invoices', 'edit')}
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('processed_invoices', 'edit')
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+            >
+              {isSubmitting ? 'Submitting...' : 'Upload File'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

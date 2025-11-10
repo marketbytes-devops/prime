@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import apiClient from "../../helpers/apiClient";
 import InputField from "../../components/InputField";
-import Button from "../../components/Button";
 
 const ViewReports = () => {
   const [state, setState] = useState({
@@ -593,7 +592,7 @@ const ViewReports = () => {
             />
           </div>
           <div className="flex items-end">
-            <Button
+            <button
               onClick={() =>
                 setState((prev) => ({
                   ...prev,
@@ -605,7 +604,7 @@ const ViewReports = () => {
               className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm"
             >
               Clear Dates
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -760,7 +759,7 @@ const ViewReports = () => {
 
                         {/* Calibration Due Dates Column */}
                         <td className="border p-2 whitespace-nowrap">
-                          <Button
+                          <button
                             onClick={() =>
                               setState((prev) => ({
                                 ...prev,
@@ -773,7 +772,7 @@ const ViewReports = () => {
                             className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                           >
                             {isExpanded ? "Hide" : "Show"} Calibration Due Dates
-                          </Button>
+                          </button>
                         </td>
 
                         {/* Calibration Status Column */}
@@ -840,7 +839,7 @@ const ViewReports = () => {
                         <td className="border p-2 whitespace-nowrap">
                           {row.invoice ? (
                             row.invoice.final_invoice_file ? (
-                              <Button
+                              <button
                                 onClick={() =>
                                   handleViewFile(
                                     row.invoice.final_invoice_file,
@@ -850,7 +849,7 @@ const ViewReports = () => {
                                 className="px-3 py-1 rounded-md text-sm bg-indigo-600 text-white hover:bg-indigo-700"
                               >
                                 View Invoice
-                              </Button>
+                              </button>
                             ) : (
                               <span className="text-yellow-600 text-xs">
                                 Invoice exists, no file
@@ -866,7 +865,7 @@ const ViewReports = () => {
                         <td className="border p-2 whitespace-nowrap">
                           {row.invoice ? (
                             row.invoice.processed_certificate_file ? (
-                              <Button
+                              <button
                                 onClick={() =>
                                   handleViewFile(
                                     row.invoice.processed_certificate_file,
@@ -876,7 +875,7 @@ const ViewReports = () => {
                                 className="px-3 py-1 rounded-md text-sm bg-teal-600 text-white hover:bg-teal-700"
                               >
                                 View Slip
-                              </Button>
+                              </button>
                             ) : (
                               <span className="text-yellow-600 text-xs">
                                 Invoice exists, no slip
@@ -984,7 +983,7 @@ const ViewReports = () => {
 
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-4">
-            <Button
+            <button
               onClick={handlePrev}
               disabled={state.currentPage === 1}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -994,9 +993,9 @@ const ViewReports = () => {
               }`}
             >
               Prev
-            </Button>
+            </button>
             {pageNumbers.map((page) => (
-              <Button
+              <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
@@ -1006,9 +1005,9 @@ const ViewReports = () => {
                 }`}
               >
                 {page}
-              </Button>
+              </button>
             ))}
-            <Button
+            <button
               onClick={handleNext}
               disabled={state.currentPage === totalPages}
               className={`px-3 py-1 rounded-md text-sm ${
@@ -1018,7 +1017,7 @@ const ViewReports = () => {
               }`}
             >
               Next
-            </Button>
+            </button>
           </div>
         )}
       </div>

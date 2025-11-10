@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import InputField from "../../../components/InputField";
-import Button from "../../../components/Button";
 import Loading from "../../../components/Loading";
 import { format } from 'date-fns';
 
@@ -370,19 +369,19 @@ const EditDeclinedWorkOrders = () => {
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button
+          <button
             onClick={handleSubmit}
             disabled={!isFormValid() || state.isSaving}
             className={`px-4 py-2 rounded-md ${!isFormValid() || state.isSaving ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
           >
             {state.isSaving ? "Saving..." : "Save Changes"}
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={() => navigate("/job-execution/processing-work-orders/declined-work-orders")}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
           >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     </div>

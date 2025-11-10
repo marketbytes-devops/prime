@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '../../helpers/apiClient';
 import InputField from '../../components/InputField';
-import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 
 const formatDate = (date) => {
@@ -238,7 +237,7 @@ const RaisedInvoices = () => {
       toast.error('Delivery note not found.');
       return;
     }
-    
+
     setState((prev) => ({
       ...prev,
       isUploadInvoiceModalOpen: true,
@@ -333,11 +332,11 @@ const RaisedInvoices = () => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
-      
+
       // Use invoiceUploadType instead of newStatus to determine which file to upload
       if (state.invoiceUploadType === 'Final' && state.invoiceUpload.finalInvoiceFile) {
         formData.append('final_invoice_file', state.invoiceUpload.finalInvoiceFile);
-        
+
         if (state.selectedInvoiceId) {
           await apiClient.patch(
             `/invoices/${state.selectedInvoiceId}/`,
@@ -348,7 +347,7 @@ const RaisedInvoices = () => {
         }
       } else if (state.invoiceUploadType === 'Processed' && state.invoiceUpload.processedCertificateFile) {
         formData.append('processed_certificate_file', state.invoiceUpload.processedCertificateFile);
-        
+
         if (state.selectedInvoiceId) {
           await apiClient.patch(
             `/invoices/${state.selectedInvoiceId}/`,
@@ -408,7 +407,7 @@ const RaisedInvoices = () => {
       if (newStatus === 'processed') {
         const workOrder = state.workOrders.find(wo => wo.id === state.selectedWorkOrderId);
         const deliveryNote = state.deliveryNotes.find(dn => dn.id === state.selectedDNId);
-        
+
         setState((prev) => ({
           ...prev,
           isStatusModalOpen: false,
@@ -446,12 +445,12 @@ const RaisedInvoices = () => {
 
   const handleStatusModalSubmit = () => {
     const { selectedInvoiceId, newStatus, receivedDate } = state;
-    
+
     if (newStatus === 'processed' && !receivedDate) {
       toast.error('Please select a received date.');
       return;
     }
-    
+
     confirmStatusUpdate(selectedInvoiceId, newStatus, receivedDate);
   };
 
@@ -498,7 +497,7 @@ const RaisedInvoices = () => {
       getDNSeriesNumber(pair.deliveryNote).toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       getQuotationDetails(pair.workOrder).company_name.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
       (pair.deliveryNote && pair.deliveryNote.items &&
-       pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
+        pair.deliveryNote.items.some(item => getItemName(item.item).toLowerCase().includes(state.searchTerm.toLowerCase())))
     )
     .sort((a, b) => {
       if (state.sortBy === 'created_at') {
@@ -610,42 +609,41 @@ const RaisedInvoices = () => {
                       <td className="border p-2 whitespace-nowrap">
 
 
-<td className="border p-2 whitespace-nowrap">
-<div className="flex items-center gap-1">
-  {/* View Invoice Button */}
-  <Button
-    onClick={() => handleViewDocument(pair, 'invoice')}
-    disabled={
-      isSubmitting ||
-      !hasPermission('raised_invoices', 'view') ||
-      !pair.invoice?.final_invoice_file
-    }
-    className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-      isSubmitting ||
-      !hasPermission('raised_invoices', 'view') ||
-      !pair.invoice?.final_invoice_file
-        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        : 'bg-indigo-600 text-white hover:bg-indigo-700'
-    }`}
-  >
-    {isSubmitting ? 'Submitting...' :
-     pair.invoice?.final_invoice_file ? 'View Invoice' : 'No Invoice'}
-  </Button>
+                        <td className="border p-2 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            {/* View Invoice button */}
+                            <button
+                              onClick={() => handleViewDocument(pair, 'invoice')}
+                              disabled={
+                                isSubmitting ||
+                                !hasPermission('raised_invoices', 'view') ||
+                                !pair.invoice?.final_invoice_file
+                              }
+                              className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${isSubmitting ||
+                                  !hasPermission('raised_invoices', 'view') ||
+                                  !pair.invoice?.final_invoice_file
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                }`}
+                            >
+                              {isSubmitting ? 'Submitting...' :
+                                pair.invoice?.final_invoice_file ? 'View Invoice' : 'No Invoice'}
+                            </button>
 
-  {/* Single Plus button for uploading invoice file - ALWAYS show when status is raised */}
-  {pair.invoice?.invoice_status === 'raised' && (
-    <Button
-      onClick={() => handleUploadInvoiceFile(pair, 'Final')}
-      disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-      className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
-      title={pair.invoice?.final_invoice_file ? "Replace Invoice File" : "Upload Invoice File"}
-    >
-      +
-    </Button>
-  )}
-</div>
-</td>
-             </td>
+                            {/* Single Plus button for uploading invoice file - ALWAYS show when status is raised */}
+                            {pair.invoice?.invoice_status === 'raised' && (
+                              <button
+                                onClick={() => handleUploadInvoiceFile(pair, 'Final')}
+                                disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
+                                className="px-2 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+                                title={pair.invoice?.final_invoice_file ? "Replace Invoice File" : "Upload Invoice File"}
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </td>
                       <td className="border p-2 whitespace-nowrap">
                         {pair.deliveryNote && pair.deliveryNote.items && pair.deliveryNote.items.length > 0 ? (
                           <select
@@ -657,15 +655,14 @@ const RaisedInvoices = () => {
                             }}
                             disabled={isSubmitting || !hasPermission('raised_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'}
                             value={pair.invoice?.invoice_status || 'raised'}
-                            className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${
-                              isSubmitting || !hasPermission('raised_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
+                            className={`min-w-[150px] px-3 py-2 rounded-md text-sm border ${isSubmitting || !hasPermission('raised_invoices', 'edit') || pair.invoice?.invoice_status === 'processed'
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : pair.invoice?.invoice_status === 'pending'
-                                ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
-                                : pair.invoice?.invoice_status === 'raised'
-                                ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
-                                : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
-                            }`}
+                                  ? 'bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100'
+                                  : pair.invoice?.invoice_status === 'raised'
+                                    ? 'bg-blue-50 border-blue-300 text-blue-800 hover:bg-blue-100'
+                                    : 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100'
+                              }`}
                           >
                             <option value="raised">Raised</option>
                             <option value="pending">Pending</option>
@@ -684,44 +681,41 @@ const RaisedInvoices = () => {
         </div>
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-4">
-            <Button
+            <button
               onClick={handlePrev}
               disabled={state.currentPage === 1 || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === 1 || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === 1 || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Prev'}
-            </Button>
+            </button>
             {pageNumbers.map((page) => (
-              <Button
+              <button
                 key={page}
                 onClick={() => handlePageChange(page)}
                 disabled={isSubmitting}
-                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${
-                  isSubmitting
+                className={`px-3 py-1 rounded-md text-sm min-w-fit whitespace-nowrap ${isSubmitting
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : state.currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 {isSubmitting ? 'Submitting...' : page}
-              </Button>
+              </button>
             ))}
-            <Button
+            <button
               onClick={handleNext}
               disabled={state.currentPage === totalPages || isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                state.currentPage === totalPages || isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${state.currentPage === totalPages || isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Next'}
-            </Button>
+            </button>
           </div>
         )}
       </div>
@@ -1051,7 +1045,7 @@ const RaisedInvoices = () => {
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={() => setState((prev) => ({
                 ...prev,
                 isStatusModalOpen: false,
@@ -1063,25 +1057,23 @@ const RaisedInvoices = () => {
                 invoiceUploadType: '',
               }))}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Cancel'}
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleStatusModalSubmit}
               disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('raised_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('raised_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>
@@ -1127,7 +1119,7 @@ const RaisedInvoices = () => {
             </p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button
+            <button
               onClick={() => {
                 setState((prev) => ({
                   ...prev,
@@ -1142,25 +1134,23 @@ const RaisedInvoices = () => {
                 fetchData();
               }}
               disabled={isSubmitting}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Skip Upload'}
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleInvoiceUploadSubmit}
               disabled={isSubmitting || !hasPermission('raised_invoices', 'edit')}
-              className={`px-3 py-1 rounded-md text-sm ${
-                isSubmitting || !hasPermission('raised_invoices', 'edit')
+              className={`px-3 py-1 rounded-md text-sm ${isSubmitting || !hasPermission('raised_invoices', 'edit')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {isSubmitting ? 'Submitting...' : 'Upload File'}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

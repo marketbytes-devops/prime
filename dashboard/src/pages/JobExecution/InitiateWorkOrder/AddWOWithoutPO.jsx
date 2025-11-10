@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import apiClient from '../../../helpers/apiClient';
 import InputField from '../../../components/InputField';
-import Button from '../../../components/Button';
 import Modal from '../../../components/Modal';
 
 const AddWOWithoutPO = () => {
@@ -218,19 +217,19 @@ const AddWOWithoutPO = () => {
         </div>
         <div>
           <h3 className="text-lg font-medium text-black mb-2">Items</h3>
-          <Button onClick={handleAddItem} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <button onClick={handleAddItem} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
             Add Item
-          </Button>
+          </button>
           {state.items.map((item, index) => (
             <div key={index} className="border p-4 mt-2 rounded-md space-y-2">
               <div className="flex justify-between items-center">
                 <h4 className="text-sm font-medium text-gray-700">Item {index + 1}</h4>
-                <Button
+                <button
                   onClick={() => handleRemoveItem(index)}
                   className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
                 >
                   Remove
-                </Button>
+                </button>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
@@ -283,7 +282,7 @@ const AddWOWithoutPO = () => {
           ))}
         </div>
         <div className="flex justify-end gap-2">
-          <Button
+          <button
             onClick={handleSubmit}
             disabled={
               !state.selectedQuotation ||
@@ -307,13 +306,13 @@ const AddWOWithoutPO = () => {
             }`}
           >
             Submit for Approval
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={() => navigate('/job-execution/initiate-work-order/list-all-purchase-orders')}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
           >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     </div>
