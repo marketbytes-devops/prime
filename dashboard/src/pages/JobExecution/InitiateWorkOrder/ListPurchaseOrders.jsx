@@ -682,7 +682,7 @@ const ListPurchaseOrders = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Initiate Work Order</h1>
+      <h1 className="text-2xl font-bold mb-4">Purchase Order</h1>
       <div className="bg-white p-4 space-y-4 rounded-md shadow w-full">
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
