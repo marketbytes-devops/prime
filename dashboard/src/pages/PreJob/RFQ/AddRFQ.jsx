@@ -7,7 +7,7 @@ import Modal from "../../../components/Modal";
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddItem, apiEndpoint }) => {
+const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddItem, apiEndpoint, error }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [newItemName, setNewItemName] = useState("");
@@ -107,9 +107,10 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        className="w-full p-2 border rounded focus:outline-indigo-500"
+        className={`w-full p-2 border rounded focus:outline-indigo-500 ${error ? 'border-red-500' : ''}`}
         disabled={addingItem}
       />
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
       {isOpen && (
         <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
           {allowAddItem && (
@@ -123,8 +124,9 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
               />
               <button
                 onClick={handleAddItem}
-                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
-                  }`}
+                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${
+                  addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
+                }`}
                 disabled={addingItem || !newItemName.trim()}
               >
                 {addingItem ? "..." : "+"}
@@ -167,6 +169,15 @@ const AddRFQ = () => {
     isNewClient: false,
   });
 
+  // Validation errors
+  const [errors, setErrors] = useState({
+    company_name: "",
+    rfq_channel: "",
+    assigned_sales_person: "",
+    due_date_for_quotation: "",
+    items: [], // per item row
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
@@ -193,6 +204,72 @@ const AddRFQ = () => {
     };
     fetchData();
   }, []);
+
+  const validateField = (name, value, idx = null) => {
+    let error = "";
+
+    if (name === "company_name" && !value?.trim()) error = "Company name is required";
+    if (name === "rfq_channel" && !value) error = "RFQ channel is required";
+    if (name === "assigned_sales_person" && !value) error = "Sales person is required";
+    if (name === "due_date_for_quotation" && !value) error = "Due date is required";
+
+    if (idx !== null) {
+      if (name === "item" && !value) error = "Item is required";
+      if (name === "quantity" && (!value || value <= 0)) error = "Quantity must be > 0";
+      if (name === "unit" && !value) error = "Unit is required";
+    }
+
+    return error;
+  };
+
+  const validateStep = () => {
+    const newErrors = { ...errors, items: [] };
+
+    if (step === 1) {
+      newErrors.company_name = validateField("company_name", state.company_name);
+      newErrors.rfq_channel = validateField("rfq_channel", state.rfq_channel);
+    }
+
+    if (step === 2) {
+      newErrors.assigned_sales_person = validateField("assigned_sales_person", state.assigned_sales_person);
+      newErrors.due_date_for_quotation = validateField("due_date_for_quotation", state.due_date_for_quotation);
+    }
+
+    if (step === 3) {
+      state.items.forEach((item, idx) => {
+        const itemErrors = {
+          item: validateField("item", item.item, idx),
+          quantity: validateField("quantity", item.quantity, idx),
+          unit: validateField("unit", item.unit, idx),
+        };
+        newErrors.items[idx] = itemErrors;
+      });
+    }
+
+    setErrors(newErrors);
+    return Object.values(newErrors).every(err => !err && (!Array.isArray(err) || err.every(e => !Object.values(e).some(v => v))));
+  };
+
+  const handleChange = (field, value) => {
+    setState(prev => ({ ...prev, [field]: value }));
+    setErrors(prev => ({ ...prev, [field]: validateField(field, value) }));
+  };
+
+  const handleItemChange = (idx, field, value, newOptions) => {
+    setState(prev => {
+      const newItems = [...prev.items];
+      newItems[idx][field] = value;
+      if (field === "item" && newOptions) return { ...prev, items: newItems, itemsList: newOptions };
+      if (field === "unit" && newOptions) return { ...prev, items: newItems, units: newOptions };
+      return { ...prev, items: newItems };
+    });
+
+    setErrors(prev => {
+      const newItemErrors = [...(prev.items || [])];
+      newItemErrors[idx] = { ...newItemErrors[idx], [field]: validateField(field, value, idx) };
+      return { ...prev, items: newItemErrors };
+    });
+  };
 
   const ensureItemExists = async (name) => {
     if (!name.trim()) return null;
@@ -283,6 +360,7 @@ const AddRFQ = () => {
         }
 
         setState(prev => ({ ...prev, items: newItems }));
+        setErrors(prev => ({ ...prev, items: newItems.map(() => ({})) }));
         toast.success(`Loaded & auto-created ${newItems.length} items!`);
       };
       reader.readAsArrayBuffer(file);
@@ -311,42 +389,20 @@ const AddRFQ = () => {
         }],
       };
     });
+    setErrors(prev => ({ ...prev, items: [...prev.items, {}] }));
   };
 
   const removeItem = (idx) => {
     setState(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
-  };
-
-  const handleItemChange = (idx, field, value, newOptions) => {
-    setState(prev => {
-      const newItems = [...prev.items];
-      newItems[idx][field] = value;
-      if (field === "item" && newOptions) return { ...prev, items: newItems, itemsList: newOptions };
-      if (field === "unit" && newOptions) return { ...prev, items: newItems, units: newOptions };
-      return { ...prev, items: newItems };
-    });
-  };
-
-  // Validation per step
-  const isStepValid = () => {
-    if (step === 1) {
-      return state.company_name?.trim() && state.rfq_channel;
-    }
-    if (step === 2) {
-      return state.assigned_sales_person && state.due_date_for_quotation;
-    }
-    if (step === 3) {
-      return state.items.length > 0 && state.items.every(i => i.item && i.quantity > 0 && i.unit);
-    }
-    return true;
+    setErrors(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
   };
 
   const handleNext = (e) => {
     e.preventDefault();
-    if (isStepValid()) {
+    if (validateStep()) {
       setStep(s => s + 1);
     } else {
-      toast.error("Please complete all required fields");
+      toast.error("Please fix the errors below");
     }
   };
 
@@ -354,10 +410,8 @@ const AddRFQ = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submit RFQ clicked", { state });
-
-    if (!isStepValid()) {
-      toast.error("Please complete all required fields");
+    if (!validateStep()) {
+      toast.error("Please fix all errors before submitting");
       return;
     }
 
@@ -383,15 +437,14 @@ const AddRFQ = () => {
     };
 
     try {
-      console.log("Sending payload to /rfqs/:", payload);
+      console.log("Sending payload:", payload);
       const res = await apiClient.post("rfqs/", payload);
       console.log("RFQ created:", res.data);
       toast.success("RFQ Created Successfully!");
       navigate("/view-rfq");
     } catch (err) {
-      console.error("Submit RFQ error:", err.response || err);
-      const msg = err.response?.data?.message || err.message || "Failed to save RFQ";
-      toast.error(msg);
+      console.error("Submit error:", err.response || err);
+      toast.error(err.response?.data?.message || "Failed to save RFQ");
     } finally {
       setLoading(false);
     }
@@ -409,7 +462,6 @@ const AddRFQ = () => {
   const handleDownloadTemplate = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ Template');
-
     worksheet.columns = [
       { header: 'Sl.no', key: 'sl_no', width: 10 },
       { header: 'Item', key: 'item', width: 35 },
@@ -423,13 +475,7 @@ const AddRFQ = () => {
     header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
     header.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    worksheet.addRow({
-      sl_no: 1,
-      item: 'Pressure Gauge',
-      quantity: 4,
-      unit: 'Pcs',
-      unit_price: 150.00,
-    });
+    worksheet.addRow({ sl_no: 1, item: 'Pressure Gauge', quantity: 4, unit: 'Pcs', unit_price: 150.00 });
 
     try {
       const buffer = await workbook.xlsx.writeBuffer();
@@ -447,7 +493,14 @@ const AddRFQ = () => {
         <h2 className="text-black text-xl font-semibold">Company Details</h2>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-red-500">*</span></label>
-          <InputField type="text" placeholder="Enter company name" value={state.company_name} onChange={(e) => setState(prev => ({ ...prev, company_name: e.target.value }))} maxLength={100} />
+          <InputField
+            type="text"
+            placeholder="Enter company name"
+            value={state.company_name}
+            onChange={(e) => handleChange("company_name", e.target.value)}
+            className={errors.company_name ? 'border-red-500' : ''}
+          />
+          {errors.company_name && <p className="text-red-500 text-xs mt-1">{errors.company_name}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
@@ -462,18 +515,25 @@ const AddRFQ = () => {
           <InputField type="email" placeholder="Enter company email" value={state.company_email} onChange={(e) => setState(prev => ({ ...prev, company_email: e.target.value }))} />
         </div>
       </div>
+
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Channel <span className="text-red-500">*</span></label>
-          <select value={state.rfq_channel} onChange={(e) => setState(prev => ({ ...prev, rfq_channel: e.target.value }))} className="w-full p-2 border rounded focus:outline-indigo-500">
+          <select
+            value={state.rfq_channel}
+            onChange={(e) => handleChange("rfq_channel", e.target.value)}
+            className={`w-full p-2 border rounded focus:outline-indigo-500 ${errors.rfq_channel ? 'border-red-500' : ''}`}
+          >
             <option value="">Select Channel</option>
             {state.channels.map((channel) => (
               <option key={channel.id} value={channel.id}>{channel.channel_name}</option>
             ))}
           </select>
+          {errors.rfq_channel && <p className="text-red-500 text-xs mt-1">{errors.rfq_channel}</p>}
         </div>
       </div>
+
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
         <div>
@@ -498,7 +558,11 @@ const AddRFQ = () => {
         <h2 className="text-black text-xl font-semibold">Assigned Person & Due Date</h2>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Sales Person <span className="text-red-500">*</span></label>
-          <select value={state.assigned_sales_person} onChange={(e) => setState(prev => ({ ...prev, assigned_sales_person: e.target.value }))} className="w-full p-2 border rounded focus:outline-indigo-500">
+          <select
+            value={state.assigned_sales_person}
+            onChange={(e) => handleChange("assigned_sales_person", e.target.value)}
+            className={`w-full p-2 border rounded focus:outline-indigo-500 ${errors.assigned_sales_person ? 'border-red-500' : ''}`}
+          >
             <option value="">Select Team Member</option>
             {state.teamMembers.map((member) => (
               <option key={member.id} value={member.id}>
@@ -506,10 +570,17 @@ const AddRFQ = () => {
               </option>
             ))}
           </select>
+          {errors.assigned_sales_person && <p className="text-red-500 text-xs mt-1">{errors.assigned_sales_person}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Due Date for Quotation <span className="text-red-500">*</span></label>
-          <InputField type="date" value={state.due_date_for_quotation} onChange={(e) => setState(prev => ({ ...prev, due_date_for_quotation: e.target.value }))} />
+          <InputField
+            type="date"
+            value={state.due_date_for_quotation}
+            onChange={(e) => handleChange("due_date_for_quotation", e.target.value)}
+            className={errors.due_date_for_quotation ? 'border-red-500' : ''}
+          />
+          {errors.due_date_for_quotation && <p className="text-red-500 text-xs mt-1">{errors.due_date_for_quotation}</p>}
         </div>
       </div>
     </div>
@@ -517,6 +588,7 @@ const AddRFQ = () => {
 
   const renderStep3 = () => (
     <div className="grid gap-6">
+      {/* Upload Section */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center">
         <h3 className="text-2xl font-bold text-indigo-800 mb-3">Upload Excel/CSV to Auto-Create Items & Units</h3>
         <p className="text-gray-600 mb-4">
@@ -563,15 +635,38 @@ const AddRFQ = () => {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <div>
                   <label className="block font-medium mb-1">Item <span className="text-red-500">*</span></label>
-                  <SearchableDropdown options={state.itemsList} value={it.item} onChange={(val, opts) => handleItemChange(idx, "item", val, opts)} placeholder="Type or select item" allowAddItem apiEndpoint="items/" />
+                  <SearchableDropdown
+                    options={state.itemsList}
+                    value={it.item}
+                    onChange={(val, opts) => handleItemChange(idx, "item", val, opts)}
+                    placeholder="Type or select item"
+                    allowAddItem
+                    apiEndpoint="items/"
+                    error={errors.items[idx]?.item}
+                  />
                 </div>
                 <div>
                   <label className="block font-medium mb-1">Quantity <span className="text-red-500">*</span></label>
-                  <InputField type="number" value={it.quantity} onChange={e => handleItemChange(idx, "quantity", e.target.value)} min="1" className="text-md" />
+                  <InputField
+                    type="number"
+                    value={it.quantity}
+                    onChange={e => handleItemChange(idx, "quantity", e.target.value)}
+                    min="1"
+                    className={`text-md ${errors.items[idx]?.quantity ? 'border-red-500' : ''}`}
+                  />
+                  {errors.items[idx]?.quantity && <p className="text-red-500 text-xs mt-1">{errors.items[idx].quantity}</p>}
                 </div>
                 <div>
                   <label className="block font-medium mb-1">Unit <span className="text-red-500">*</span></label>
-                  <SearchableDropdown options={state.units} value={it.unit} onChange={(val, opts) => handleItemChange(idx, "unit", val, opts)} placeholder="Type or select unit" allowAddItem apiEndpoint="units/" />
+                  <SearchableDropdown
+                    options={state.units}
+                    value={it.unit}
+                    onChange={(val, opts) => handleItemChange(idx, "unit", val, opts)}
+                    placeholder="Type or select unit"
+                    allowAddItem
+                    apiEndpoint="units/"
+                    error={errors.items[idx]?.unit}
+                  />
                 </div>
                 <div>
                   <label className="block font-medium mb-1">Unit Price (SAR)</label>
@@ -587,6 +682,7 @@ const AddRFQ = () => {
           ))
         )}
       </div>
+
       <button onClick={addItem} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
         + Add Manual
       </button>
@@ -627,23 +723,23 @@ const AddRFQ = () => {
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
 
-          {/* Navigation inside form */}
-          <div className="grid mt-8 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between gap-4 mt-8">
             {step > 1 && (
-              <button type="button" onClick={handlePrev} className="w-full bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
+              <button type="button" onClick={handlePrev} className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
                 Back
               </button>
             )}
             {step < 3 ? (
-              <button type="button" onClick={handleNext} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100">
+              <button type="button" onClick={handleNext} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
                 Next
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={loading || !isStepValid()}
-                className={`w-full bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${loading || !isStepValid() ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
-                  }`}
+                disabled={loading}
+                className={`w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg transition-opacity duration-300 ${
+                  loading ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
+                }`}
               >
                 {loading ? "Saving..." : "Submit RFQ"}
               </button>
