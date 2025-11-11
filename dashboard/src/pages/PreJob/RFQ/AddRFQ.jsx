@@ -8,15 +8,11 @@ import Modal from "../../../components/Modal";
 import * as ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
-/* ---------- tiny clsx helper (no external dep) ---------- */
+/* ---------- tiny clsx helper ---------- */
 const clsx = (...args) =>
-  args
-    .flat()
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  args.flat().filter(Boolean).join(" ").trim();
 
-/* ---------- SearchableDropdown (unchanged, only className cleaned) ---------- */
+/* ---------- SearchableDropdown (unchanged) ---------- */
 const SearchableDropdown = ({
   options,
   value,
@@ -33,42 +29,38 @@ const SearchableDropdown = ({
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    const selected = options.find((o) => o.id === value);
-    setSearchTerm(selected ? selected.name : "");
+    const sel = options.find(o => o.id === value);
+    setSearchTerm(sel ? sel.name : "");
   }, [value, options]);
 
   useEffect(() => {
-    const clickOutside = (e) => {
+    const clickOut = e => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setIsOpen(false);
     };
-    document.addEventListener("mousedown", clickOutside);
-    return () => document.removeEventListener("mousedown", clickOutside);
+    document.addEventListener("mousedown", clickOut);
+    return () => document.removeEventListener("mousedown", clickOut);
   }, []);
 
-  const filtered = options.filter((o) =>
+  const filtered = options.filter(o =>
     o.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const select = (opt) => {
+  const select = opt => {
     onChange(opt.id, options);
     setSearchTerm(opt.name);
     setIsOpen(false);
   };
 
-  const create = async (name) => {
+  const create = async name => {
     if (!name.trim()) return null;
-    const existing = options.find(
-      (o) => o.name.toLowerCase() === name.toLowerCase()
-    );
+    const existing = options.find(o => o.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
 
     setAddingItem(true);
     try {
       const { data } = await apiClient.post(apiEndpoint, { name: name.trim() });
-      toast.success(
-        `${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`
-      );
+      toast.success(`${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`);
       return data;
     } catch {
       toast.error(`Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`);
@@ -87,12 +79,10 @@ const SearchableDropdown = ({
     }
   };
 
-  const keyDown = async (e) => {
+  const keyDown = async e => {
     if (e.key !== "Enter" || !searchTerm.trim()) return;
     e.preventDefault();
-    const exact = filtered.find(
-      (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
-    );
+    const exact = filtered.find(o => o.name.toLowerCase() === searchTerm.toLowerCase());
     if (exact) return select(exact);
     if (allowAddItem) {
       const item = await create(searchTerm);
@@ -105,15 +95,11 @@ const SearchableDropdown = ({
 
   const blur = async () => {
     if (!searchTerm.trim()) return setIsOpen(false);
-    const exact = options.find(
-      (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
-    );
+    const exact = options.find(o => o.name.toLowerCase() === searchTerm.toLowerCase());
     if (exact) return select(exact);
     if (allowAddItem) {
       const item = await create(searchTerm);
-      if (item) {
-        onChange(item.id, [...options, item]);
-      }
+      if (item) onChange(item.id, [...options, item]);
     }
     setIsOpen(false);
   };
@@ -124,10 +110,7 @@ const SearchableDropdown = ({
         type="text"
         placeholder={placeholder}
         value={searchTerm}
-        onChange={(e) => {
-          setSearchTerm(e.target.value);
-          setIsOpen(true);
-        }}
+        onChange={e => { setSearchTerm(e.target.value); setIsOpen(true); }}
         onFocus={() => setIsOpen(true)}
         onKeyDown={keyDown}
         onBlur={blur}
@@ -146,7 +129,7 @@ const SearchableDropdown = ({
               <InputField
                 placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
                 value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
+                onChange={e => setNewItemName(e.target.value)}
                 className="flex-1 p-2 border rounded text-sm"
                 disabled={addingItem}
               />
@@ -167,7 +150,7 @@ const SearchableDropdown = ({
           )}
 
           {filtered.length ? (
-            filtered.map((o) => (
+            filtered.map(o => (
               <div
                 key={o.id}
                 className="p-2 hover:bg-indigo-100 cursor-pointer text-sm"
@@ -190,15 +173,10 @@ const SearchableDropdown = ({
 };
 
 /* ---------- STEP COMPONENTS ---------- */
-const Step1 = ({
-  state,
-  errors,
-  onFieldChange,
-  channels,
-}) => (
-  <div className="space-y-6">
+const Step1 = ({ state, errors, onFieldChange, channels }) => (
+  <div className="space-y-6 w-full">
     {/* Company Details */}
-    <section className="bg-white p-4 rounded-md shadow">
+    <section className="bg-white p-6 rounded-lg shadow w-full">
       <h2 className="text-xl font-semibold mb-4">Company Details</h2>
 
       <div className="mb-4">
@@ -209,7 +187,7 @@ const Step1 = ({
           type="text"
           placeholder="Enter company name"
           value={state.company_name}
-          onChange={(e) => onFieldChange("company_name", e.target.value)}
+          onChange={e => onFieldChange("company_name", e.target.value)}
           className={errors.company_name ? "border-red-500" : ""}
         />
         {errors.company_name && (
@@ -225,7 +203,7 @@ const Step1 = ({
           type="text"
           placeholder="Enter company address"
           value={state.company_address}
-          onChange={(e) => onFieldChange("company_address", e.target.value)}
+          onChange={e => onFieldChange("company_address", e.target.value)}
         />
       </div>
 
@@ -237,7 +215,7 @@ const Step1 = ({
           type="tel"
           placeholder="Enter company phone"
           value={state.company_phone}
-          onChange={(e) => onFieldChange("company_phone", e.target.value)}
+          onChange={e => onFieldChange("company_phone", e.target.value)}
         />
       </div>
 
@@ -249,13 +227,13 @@ const Step1 = ({
           type="email"
           placeholder="Enter company email"
           value={state.company_email}
-          onChange={(e) => onFieldChange("company_email", e.target.value)}
+          onChange={e => onFieldChange("company_email", e.target.value)}
         />
       </div>
     </section>
 
     {/* RFQ Channel */}
-    <section className="bg-white p-4 rounded-md shadow">
+    <section className="bg-white p-6 rounded-lg shadow w-full">
       <h2 className="text-xl font-semibold mb-4">RFQ Channel</h2>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -263,14 +241,14 @@ const Step1 = ({
         </label>
         <select
           value={state.rfq_channel}
-          onChange={(e) => onFieldChange("rfq_channel", e.target.value)}
+          onChange={e => onFieldChange("rfq_channel", e.target.value)}
           className={clsx(
             "w-full p-2 border rounded focus:outline-indigo-500",
             errors.rfq_channel && "border-red-500"
           )}
         >
           <option value="">Select Channel</option>
-          {channels.map((c) => (
+          {channels.map(c => (
             <option key={c.id} value={c.id}>
               {c.channel_name}
             </option>
@@ -283,8 +261,9 @@ const Step1 = ({
     </section>
 
     {/* Point of Contact */}
-    <section className="bg-white p-4 rounded-md shadow">
+    <section className="bg-white p-6 rounded-lg shadow w-full">
       <h2 className="text-xl font-semibold mb-4">Point of Contact</h2>
+
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Contact Name
@@ -293,9 +272,10 @@ const Step1 = ({
           type="text"
           placeholder="Enter contact name"
           value={state.point_of_contact_name}
-          onChange={(e) => onFieldChange("point_of_contact_name", e.target.value)}
+          onChange={e => onFieldChange("point_of_contact_name", e.target.value)}
         />
       </div>
+
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Contact Email
@@ -304,9 +284,10 @@ const Step1 = ({
           type="email"
           placeholder="Enter contact email"
           value={state.point_of_contact_email}
-          onChange={(e) => onFieldChange("point_of_contact_email", e.target.value)}
+          onChange={e => onFieldChange("point_of_contact_email", e.target.value)}
         />
       </div>
+
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Contact Phone
@@ -315,20 +296,15 @@ const Step1 = ({
           type="tel"
           placeholder="Enter contact phone"
           value={state.point_of_contact_phone}
-          onChange={(e) => onFieldChange("point_of_contact_phone", e.target.value)}
+          onChange={e => onFieldChange("point_of_contact_phone", e.target.value)}
         />
       </div>
     </section>
   </div>
 );
 
-const Step2 = ({
-  state,
-  errors,
-  onFieldChange,
-  teamMembers,
-}) => (
-  <section className="bg-white p-4 rounded-md shadow space-y-6">
+const Step2 = ({ state, errors, onFieldChange, teamMembers }) => (
+  <section className="bg-white p-6 rounded-lg shadow w-full space-y-6">
     <h2 className="text-xl font-semibold">Assigned Person &amp; Due Date</h2>
 
     <div>
@@ -337,14 +313,14 @@ const Step2 = ({
       </label>
       <select
         value={state.assigned_sales_person}
-        onChange={(e) => onFieldChange("assigned_sales_person", e.target.value)}
+        onChange={e => onFieldChange("assigned_sales_person", e.target.value)}
         className={clsx(
           "w-full p-2 border rounded focus:outline-indigo-500",
           errors.assigned_sales_person && "border-red-500"
         )}
       >
         <option value="">Select Team Member</option>
-        {teamMembers.map((m) => (
+        {teamMembers.map(m => (
           <option key={m.id} value={m.id}>
             {m.name} ({m.designation || "No designation"})
           </option>
@@ -362,7 +338,7 @@ const Step2 = ({
       <InputField
         type="date"
         value={state.due_date_for_quotation}
-        onChange={(e) => onFieldChange("due_date_for_quotation", e.target.value)}
+        onChange={e => onFieldChange("due_date_for_quotation", e.target.value)}
         className={errors.due_date_for_quotation ? "border-red-500" : ""}
       />
       {errors.due_date_for_quotation && (
@@ -385,9 +361,9 @@ const Step3 = ({
   onFileUpload,
   onDownloadTemplate,
 }) => (
-  <div className="space-y-8">
+  <div className="space-y-8 w-full">
     {/* Upload */}
-    <section className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center">
+    <section className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center w-full">
       <h3 className="text-2xl font-bold text-indigo-800 mb-3">
         Upload Excel/CSV to Auto‑Create Items &amp; Units
       </h3>
@@ -439,13 +415,13 @@ const Step3 = ({
     </section>
 
     {/* Items List */}
-    <section>
+    <section className="w-full">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-2xl font-bold">Items List</h3>
       </div>
 
       {state.items.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl">
+        <div className="text-center py-12 bg-gray-50 rounded-xl w-full">
           <p className="text-gray-500 text-lg">
             No items yet. Upload or add manually.
           </p>
@@ -454,7 +430,7 @@ const Step3 = ({
         state.items.map((it, idx) => (
           <div
             key={idx}
-            className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-6 shadow-md"
+            className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-6 shadow-md w-full"
           >
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-lg font-bold text-indigo-700">
@@ -488,7 +464,7 @@ const Step3 = ({
                   type="number"
                   min="1"
                   value={it.quantity}
-                  onChange={(e) => onItemChange(idx, "quantity", e.target.value)}
+                  onChange={e => onItemChange(idx, "quantity", e.target.value)}
                   className={clsx(
                     "text-md",
                     errors.items[idx]?.quantity && "border-red-500"
@@ -525,7 +501,7 @@ const Step3 = ({
                   step="0.01"
                   placeholder="0.00"
                   value={it.unit_price}
-                  onChange={(e) => onItemChange(idx, "unit_price", e.target.value)}
+                  onChange={e => onItemChange(idx, "unit_price", e.target.value)}
                   className="text-md"
                 />
               </div>
@@ -548,7 +524,7 @@ const Step3 = ({
       <button
         type="button"
         onClick={onAddItem}
-        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity opacity-90 hover:opacity-100"
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition-opacity opacity-90 hover:opacity-100"
       >
         + Add Manual
       </button>
@@ -590,12 +566,10 @@ const AddRFQ = () => {
     rfq_channel: "",
     assigned_sales_person: "",
     due_date_for_quotation: "",
-    items: [], // array of objects per row
+    items: [],
   });
 
-  /* -------------------------------------------------- */
-  /*   DATA FETCHING                                    */
-  /* -------------------------------------------------- */
+  /* ---------- DATA FETCH ---------- */
   useEffect(() => {
     const load = async () => {
       try {
@@ -605,7 +579,7 @@ const AddRFQ = () => {
           apiClient.get("items/"),
           apiClient.get("units/"),
         ]);
-        setState((s) => ({
+        setState(s => ({
           ...s,
           channels: chan.data || [],
           teamMembers: team.data || [],
@@ -620,17 +594,12 @@ const AddRFQ = () => {
     load();
   }, []);
 
-  /* -------------------------------------------------- */
-  /*   VALIDATION LOGIC                                 */
-  /* -------------------------------------------------- */
+  /* ---------- VALIDATION ---------- */
   const validateField = (name, value, rowIdx = null) => {
-    if (name === "company_name" && !value?.trim())
-      return "Company name is required";
+    if (name === "company_name" && !value?.trim()) return "Company name is required";
     if (name === "rfq_channel" && !value) return "RFQ channel is required";
-    if (name === "assigned_sales_person" && !value)
-      return "Sales person is required";
-    if (name === "due_date_for_quotation" && !value)
-      return "Due date is required";
+    if (name === "assigned_sales_person" && !value) return "Sales person is required";
+    if (name === "due_date_for_quotation" && !value) return "Due date is required";
 
     if (rowIdx !== null) {
       if (name === "item" && !value) return "Item is required";
@@ -669,30 +638,27 @@ const AddRFQ = () => {
     }
 
     setErrors(newErr);
-
-    const flat = Object.values(newErr).flatMap((v) =>
+    const flat = Object.values(newErr).flatMap(v =>
       typeof v === "object" && v !== null ? Object.values(v) : v
     );
-    return flat.every((e) => !e);
+    return flat.every(e => !e);
   };
 
-  /* -------------------------------------------------- */
-  /*   CALLBACKS (memoised)                             */
-  /* -------------------------------------------------- */
+  /* ---------- CALLBACKS ---------- */
   const onFieldChange = useCallback((field, value) => {
-    setState((s) => ({ ...s, [field]: value }));
-    setErrors((e) => ({ ...e, [field]: validateField(field, value) }));
+    setState(s => ({ ...s, [field]: value }));
+    setErrors(e => ({ ...e, [field]: validateField(field, value) }));
   }, []);
 
   const onItemChange = useCallback((idx, field, value, newOpts) => {
-    setState((s) => {
+    setState(s => {
       const items = [...s.items];
       items[idx][field] = value;
       if (field === "item" && newOpts) return { ...s, items, itemsList: newOpts };
       if (field === "unit" && newOpts) return { ...s, items, units: newOpts };
       return { ...s, items };
     });
-    setErrors((e) => {
+    setErrors(e => {
       const row = { ...(e.items[idx] || {}) };
       row[field] = validateField(field, value, idx);
       const newItems = [...(e.items || [])];
@@ -703,7 +669,7 @@ const AddRFQ = () => {
 
   const addItem = useCallback(() => {
     const next = state.items.length + 1;
-    setState((s) => ({
+    setState(s => ({
       ...s,
       items: [
         ...s.items,
@@ -718,29 +684,29 @@ const AddRFQ = () => {
         },
       ],
     }));
-    setErrors((e) => ({ ...e, items: [...e.items, {}] }));
+    setErrors(e => ({ ...e, items: [...e.items, {}] }));
   }, [state.items.length]);
 
-  const removeItem = useCallback((idx) => {
-    setState((s) => ({
+  const removeItem = useCallback(idx => {
+    setState(s => ({
       ...s,
       items: s.items.filter((_, i) => i !== idx),
     }));
-    setErrors((e) => ({
+    setErrors(e => ({
       ...e,
       items: e.items.filter((_, i) => i !== idx),
     }));
   }, []);
 
-  const goNext = (e) => {
+  const goNext = e => {
     e.preventDefault();
-    if (validateCurrentStep()) setStep((s) => s + 1);
+    if (validateCurrentStep()) setStep(s => s + 1);
     else toast.error("Please fix the highlighted fields");
   };
 
-  const goPrev = () => setStep((s) => s - 1);
+  const goPrev = () => setStep(s => s - 1);
 
-  const onSubmit = async (e) => {
+  const onSubmit = async e => {
     e.preventDefault();
     if (!validateCurrentStep()) {
       toast.error("Please fix all errors before submitting");
@@ -760,7 +726,7 @@ const AddRFQ = () => {
       assigned_sales_person: state.assigned_sales_person || null,
       due_date_for_quotation: state.due_date_for_quotation || null,
       rfq_status: "Pending",
-      items: state.items.map((i) => ({
+      items: state.items.map(i => ({
         item: Number(i.item),
         quantity: Number(i.quantity),
         unit: Number(i.unit),
@@ -773,17 +739,16 @@ const AddRFQ = () => {
       toast.success("RFQ created successfully!");
       navigate("/view-rfq");
     } catch (err) {
-      const msg =
-        err.response?.data?.message || err.message || "Failed to save RFQ";
+      const msg = err.response?.data?.message || err.message || "Failed to save RFQ";
       toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const selectClient = (type) => {
+  const selectClient = type => {
     setIsModalOpen(false);
-    if (type === "new") setState((s) => ({ ...s, isNewClient: true }));
+    if (type === "new") setState(s => ({ ...s, isNewClient: true }));
     else navigate("/existing-client");
   };
 
@@ -799,19 +764,9 @@ const AddRFQ = () => {
     ];
     const header = ws.getRow(1);
     header.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    header.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF4F81BD" },
-    };
+    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F81BD" } };
     header.alignment = { vertical: "middle", horizontal: "center" };
-    ws.addRow({
-      sl_no: 1,
-      item: "Pressure Gauge",
-      quantity: 4,
-      unit: "Pcs",
-      unit_price: 150.0,
-    });
+    ws.addRow({ sl_no: 1, item: "Pressure Gauge", quantity: 4, unit: "Pcs", unit_price: 150.0 });
 
     try {
       const buf = await wb.xlsx.writeBuffer();
@@ -822,34 +777,28 @@ const AddRFQ = () => {
     }
   };
 
-  /* -------------------------------------------------- */
-  /*   FILE UPLOAD (unchanged logic, just memoised)    */
-  /* -------------------------------------------------- */
-  const ensureItem = async (name) => {
+  /* ---------- FILE UPLOAD ---------- */
+  const ensureItem = async name => {
     if (!name.trim()) return null;
-    const ex = state.itemsList.find(
-      (i) => i.name.toLowerCase() === name.toLowerCase()
-    );
+    const ex = state.itemsList.find(i => i.name.toLowerCase() === name.toLowerCase());
     if (ex) return ex.id;
     const { data } = await apiClient.post("items/", { name: name.trim() });
-    setState((s) => ({ ...s, itemsList: [...s.itemsList, data] }));
+    setState(s => ({ ...s, itemsList: [...s.itemsList, data] }));
     toast.success(`Item created: ${name}`);
     return data.id;
   };
 
-  const ensureUnit = async (name) => {
+  const ensureUnit = async name => {
     if (!name.trim()) return null;
-    const ex = state.units.find(
-      (u) => u.name.toLowerCase() === name.toLowerCase()
-    );
+    const ex = state.units.find(u => u.name.toLowerCase() === name.toLowerCase());
     if (ex) return ex.id;
     const { data } = await apiClient.post("units/", { name: name.trim() });
-    setState((s) => ({ ...s, units: [...s.units, data] }));
+    setState(s => ({ ...s, units: [...s.units, data] }));
     toast.success(`Unit created: ${name}`);
     return data.id;
   };
 
-  const handleFile = async (e) => {
+  const handleFile = async e => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -867,7 +816,7 @@ const AddRFQ = () => {
     try {
       const XLSX = await import("xlsx");
       const reader = new FileReader();
-      reader.onload = async (ev) => {
+      reader.onload = async ev => {
         const data = new Uint8Array(ev.target.result);
         const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -875,12 +824,7 @@ const AddRFQ = () => {
 
         const newItems = [];
         for (const [i, r] of rows.entries()) {
-          const itemName = (
-            r["Item"] ||
-            r["item"] ||
-            r["Name"] ||
-            ""
-          ).toString().trim();
+          const itemName = (r["Item"] || r["item"] || r["Name"] || "").toString().trim();
           const qty = r["Quantity"] || r["quantity"] || r["Qty"] || "";
           const unitName = (r["Unit"] || r["unit"] || "").toString().trim();
           const price = r["Unit Price"] || r["unit_price"] || r["Price"] || "";
@@ -906,8 +850,8 @@ const AddRFQ = () => {
           }
         }
 
-        setState((s) => ({ ...s, items: newItems }));
-        setErrors((e) => ({ ...e, items: newItems.map(() => ({})) }));
+        setState(s => ({ ...s, items: newItems }));
+        setErrors(e => ({ ...e, items: newItems.map(() => ({})) }));
         toast.success(`Loaded ${newItems.length} items`);
       };
       reader.readAsArrayBuffer(file);
@@ -920,18 +864,14 @@ const AddRFQ = () => {
     }
   };
 
-  /* -------------------------------------------------- */
-  /*   RENDER                                            */
-  /* -------------------------------------------------- */
+  /* ---------- RENDER ---------- */
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <h1 className="text-2xl font-bold text-center sm:text-left mb-6">
-        Add RFQ
-      </h1>
+    <div className="w-full p-4 md:p-8">
+      <h1 className="text-3xl font-bold text-center mb-6">Add RFQ</h1>
 
       {/* Step Indicator */}
-      <div className="flex justify-center sm:justify-between items-center gap-8 mb-8">
-        {[1, 2, 3].map((s) => (
+      <div className="flex justify-center md:justify-between items-center gap-6 mb-8">
+        {[1, 2, 3].map(s => (
           <div
             key={s}
             className={clsx(
@@ -941,7 +881,7 @@ const AddRFQ = () => {
           >
             <div
               className={clsx(
-                "w-10 h-10 rounded-full border-2 mx-auto mb-2 flex items-center justify-center text-xl",
+                "w-12 h-12 rounded-full border-2 mx-auto mb-2 flex items-center justify-center text-xl",
                 step === s
                   ? "border-indigo-600 bg-indigo-100"
                   : "border-gray-300"
@@ -949,7 +889,7 @@ const AddRFQ = () => {
             >
               {s}
             </div>
-            <p className="text-sm">
+            <p className="text-sm md:text-base">
               {s === 1 ? "Client" : s === 2 ? "Assign" : "Items"}
             </p>
           </div>
@@ -966,14 +906,14 @@ const AddRFQ = () => {
           <button
             type="button"
             onClick={() => selectClient("new")}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-opacity opacity-90 hover:opacity-100"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl transition-opacity opacity-90 hover:opacity-100"
           >
             New Client
           </button>
           <button
             type="button"
             onClick={() => selectClient("existing")}
-            className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl transition-opacity opacity-90 hover:opacity-100"
+            className="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-xl transition-opacity opacity-90 hover:opacity-100"
           >
             Existing Client
           </button>
@@ -982,7 +922,7 @@ const AddRFQ = () => {
 
       {/* FORM */}
       {state.isNewClient && (
-        <form onSubmit={onSubmit} className="space-y-8">
+        <form onSubmit={onSubmit} className="space-y-8 w-full">
           {step === 1 && (
             <Step1
               state={state}
@@ -1015,13 +955,13 @@ const AddRFQ = () => {
             />
           )}
 
-          {/* Navigation */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-8">
+          {/* Navigation Buttons – full width */}
+          <div className="flex flex-col gap-4 mt-8 w-full">
             {step > 1 && (
               <button
                 type="button"
                 onClick={goPrev}
-                className="order-2 sm:order-1 w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity opacity-90 hover:opacity-100"
+                className="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg transition-opacity opacity-90 hover:opacity-100"
               >
                 Back
               </button>
@@ -1031,7 +971,7 @@ const AddRFQ = () => {
               <button
                 type="button"
                 onClick={goNext}
-                className="order-1 sm:order-2 w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg transition-opacity opacity-90 hover:opacity-100"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg transition-opacity opacity-90 hover:opacity-100"
               >
                 Next
               </button>
@@ -1040,7 +980,7 @@ const AddRFQ = () => {
                 type="submit"
                 disabled={loading}
                 className={clsx(
-                  "order-1 sm:order-2 w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg transition-opacity",
+                  "w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg transition-opacity",
                   loading
                     ? "opacity-50 cursor-not-allowed"
                     : "opacity-90 hover:opacity-100"
