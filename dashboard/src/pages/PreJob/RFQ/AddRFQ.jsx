@@ -123,9 +123,8 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
               />
               <button
                 onClick={handleAddItem}
-                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${
-                  addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
-                }`}
+                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
+                  }`}
                 disabled={addingItem || !newItemName.trim()}
               >
                 {addingItem ? "..." : "+"}
@@ -629,23 +628,22 @@ const AddRFQ = () => {
           {step === 3 && renderStep3()}
 
           {/* Navigation inside form */}
-          <div className="flex justify-between space-x-4 mt-8">
+          <div className="grid mt-8 mb-8">
             {step > 1 && (
-              <button type="button" onClick={handlePrev} className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
+              <button type="button" onClick={handlePrev} className="w-full bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
                 Back
               </button>
             )}
             {step < 3 ? (
-              <button type="button" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100">
+              <button type="button" onClick={handleNext} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100">
                 Next
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={loading || !isStepValid()}
-                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
-                  loading || !isStepValid() ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
-                }`}
+                className={`w-full bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${loading || !isStepValid() ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
+                  }`}
               >
                 {loading ? "Saving..." : "Submit RFQ"}
               </button>
