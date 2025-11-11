@@ -25,10 +25,16 @@ from rest_framework.response import Response
 
 class RFQItemSerializer(serializers.ModelSerializer):
     item = serializers.PrimaryKeyRelatedField(
-        queryset=Item.objects.all(), allow_null=True
+        queryset=Item.objects.all(), allow_null=True, required=False
     )
     unit = serializers.PrimaryKeyRelatedField(
-        queryset=Unit.objects.all(), allow_null=True
+        queryset=Unit.objects.all(), allow_null=True, required=False
+    )
+    quantity = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    unit_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
     )
     total_price = serializers.SerializerMethodField()
 
@@ -97,12 +103,25 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
 
 
 class RFQSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(max_length=100, required=True)
+    company_address = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
+    company_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    company_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    
     rfq_channel = serializers.PrimaryKeyRelatedField(
-        queryset=RFQChannel.objects.all(), allow_null=True
+        queryset=RFQChannel.objects.all(), allow_null=True, required=False
     )
+    
+    point_of_contact_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    point_of_contact_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    point_of_contact_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    
     assigned_sales_person = serializers.PrimaryKeyRelatedField(
-        queryset=TeamMember.objects.all(), allow_null=True
+        queryset=TeamMember.objects.all(), allow_null=True, required=False
     )
+    
+    due_date_for_quotation = serializers.DateField(required=False, allow_null=True)
+    
     items = RFQItemSerializer(many=True, required=False)
     rfq_status = serializers.ChoiceField(
         choices=[
@@ -165,20 +184,25 @@ class RFQSerializer(serializers.ModelSerializer):
                 "Selected team member must have a valid email address."
             )
         return value
+    
+    def validate(self, data):
+        if not data.get('company_name'):
+            raise serializers.ValidationError({
+                "company_name": "Company name is required."
+            })
+        return data
 
     def send_creation_email(self, rfq):
         email_sent = False
         recipient_list = []
 
-        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
         if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
             recipient_list.append(
                 (rfq.assigned_sales_person.email, rfq.assigned_sales_person.name)
             )
         if settings.ADMIN_EMAIL:
-            recipient_list.append(
-                (settings.ADMIN_EMAIL, None)
-            )  # Admin email with no specific name
+            recipient_list.append((settings.ADMIN_EMAIL, None))
+        
         superadmin_role = Role.objects.filter(name="Superadmin").first()
         if superadmin_role:
             superadmin_users = CustomUser.objects.filter(role=superadmin_role)
@@ -186,13 +210,11 @@ class RFQSerializer(serializers.ModelSerializer):
                 if user.email:
                     recipient_list.append((user.email, user.name or user.username))
 
-        # Remove duplicates while preserving names
         recipient_dict = {email: name for email, name in recipient_list}
         recipient_list = [(email, name) for email, name in recipient_dict.items()]
 
         if recipient_list:
             for email, name in recipient_list:
-                # Determine salutation
                 if email == settings.ADMIN_EMAIL:
                     salutation = "Dear Admin"
                 elif (
@@ -255,27 +277,35 @@ class RFQSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
+        
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Quotation series not found.")
+        
         max_sequence = RFQ.objects.filter(
             series_number__startswith=quotation_series.prefix
         ).aggregate(Max("series_number"))["series_number__max"]
+        
         sequence = 1
         if max_sequence:
             sequence = int(max_sequence.split("-")[-1]) + 1
+        
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
+        
         rfq = RFQ.objects.create(
             series_number=series_number,
             assigned_sales_person=assigned_sales_person,
             **validated_data,
         )
+        
         for item_data in items_data:
             RFQItem.objects.create(rfq=rfq, **item_data)
+        
         creation_email_sent = self.send_creation_email(rfq)
         rfq.email_sent = creation_email_sent
         rfq.save()
+        
         return rfq
 
     def update(self, instance, validated_data):
@@ -283,13 +313,17 @@ class RFQSerializer(serializers.ModelSerializer):
         assigned_sales_person = validated_data.get(
             "assigned_sales_person", instance.assigned_sales_person
         )
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
         instance.save()
+        
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 RFQItem.objects.create(rfq=instance, **item_data)
+        
         return instance
 
     def to_representation(self, instance):

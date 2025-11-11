@@ -4,30 +4,40 @@ import apiClient from "../../../helpers/apiClient";
 import { toast } from "react-toastify";
 import InputField from "../../../components/InputField";
 import Modal from "../../../components/Modal";
-import * as ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import * as ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
-const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddItem, apiEndpoint }) => {
+const SearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  allowAddItem,
+  apiEndpoint,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [newItemName, setNewItemName] = useState("");
   const [addingItem, setAddingItem] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Sync displayed text with selected value
   useEffect(() => {
-    const selected = options.find(o => o.id === value);
+    const selected = options.find((o) => o.id === value);
     setSearchTerm(selected ? selected.name : "");
   }, [value, options]);
 
+  // Click-outside handler
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(o =>
+  const filteredOptions = options.filter((o) =>
     o.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -39,18 +49,22 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
 
   const createAndSelect = async (name) => {
     if (!name.trim()) return null;
-    if (options.some(o => o.name.toLowerCase() === name.toLowerCase())) {
-      const existing = options.find(o => o.name.toLowerCase() === name.toLowerCase());
-      return existing;
-    }
+    const existing = options.find(
+      (o) => o.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) return existing;
 
     setAddingItem(true);
     try {
       const res = await apiClient.post(apiEndpoint, { name: name.trim() });
-      toast.success(`${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`);
+      toast.success(
+        `${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`
+      );
       return res.data;
     } catch (err) {
-      toast.error(`Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`);
+      toast.error(
+        `Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`
+      );
       return null;
     } finally {
       setAddingItem(false);
@@ -69,7 +83,9 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
   const handleKeyDown = async (e) => {
     if (e.key === "Enter" && searchTerm.trim()) {
       e.preventDefault();
-      const exact = filteredOptions.find(o => o.name.toLowerCase() === searchTerm.toLowerCase());
+      const exact = filteredOptions.find(
+        (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+      );
       if (exact) {
         handleSelect(exact);
       } else if (allowAddItem) {
@@ -84,10 +100,12 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
 
   const handleBlur = async () => {
     if (searchTerm.trim()) {
-      const exact = options.find(o => o.name.toLowerCase() === searchTerm.toLowerCase());
+      const exact = options.find(
+        (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+      );
       if (exact) {
         onChange(exact.id, options);
-      } else if (allowAddItem && searchTerm.trim()) {
+      } else if (allowAddItem) {
         const newItem = await createAndSelect(searchTerm);
         if (newItem) {
           onChange(newItem.id, [...options, newItem]);
@@ -103,7 +121,10 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
         type="text"
         placeholder={placeholder}
         value={searchTerm}
-        onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          setIsOpen(true);
+        }}
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
@@ -115,25 +136,28 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
           {allowAddItem && (
             <div className="p-2 border-b flex gap-2">
               <InputField
-                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"
+                  }...`}
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 className="flex-1 p-2 border rounded text-sm"
                 disabled={addingItem}
               />
               <button
+                type="button"
                 onClick={handleAddItem}
-                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 opacity-90 ${
-                  addingItem || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-100'
-                }`}
                 disabled={addingItem || !newItemName.trim()}
+                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 ${addingItem || !newItemName.trim()
+                  ? "opacity-50 cursor-not-allowed"
+                  : "opacity-90 hover:opacity-100"
+                  }`}
               >
-                {addingItem ? "..." : "+"}
+                {addingItem ? "…" : "+"}
               </button>
             </div>
           )}
           {filteredOptions.length > 0 ? (
-            filteredOptions.map(o => (
+            filteredOptions.map((o) => (
               <div
                 key={o.id}
                 className="p-2 hover:bg-indigo-100 cursor-pointer text-sm"
@@ -144,7 +168,9 @@ const SearchableDropdown = ({ options, value, onChange, placeholder, allowAddIte
             ))
           ) : (
             <div className="p-2 text-gray-500 text-sm">
-              {searchTerm.trim() ? `Press Enter to create "${searchTerm}"` : "No options"}
+              {searchTerm.trim()
+                ? `Press Enter to create "${searchTerm}"`
+                : "No options"}
             </div>
           )}
         </div>
@@ -157,9 +183,16 @@ const AddRFQ = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [state, setState] = useState({
-    company_name: "", company_address: "", company_phone: "", company_email: "",
-    rfq_channel: "", point_of_contact_name: "", point_of_contact_email: "", point_of_contact_phone: "",
-    assigned_sales_person: "", due_date_for_quotation: "",
+    company_name: "",
+    company_address: "",
+    company_phone: "",
+    company_email: "",
+    rfq_channel: "",
+    point_of_contact_name: "",
+    point_of_contact_email: "",
+    point_of_contact_phone: "",
+    assigned_sales_person: "",
+    due_date_for_quotation: "",
     items: [
       {
         sl_no: 1,
@@ -168,8 +201,8 @@ const AddRFQ = () => {
         quantity: "",
         unit: "",
         unit_name: "",
-        unit_price: ""
-      }
+        unit_price: "",
+      },
     ],
     channels: [],
     teamMembers: [],
@@ -182,15 +215,21 @@ const AddRFQ = () => {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [companyNameError, setCompanyNameError] = useState("");
 
+  /* -------------------------------------------------
+   *  Load master data (channels, team, items, units)
+   * ------------------------------------------------- */
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [chanRes, teamRes, itemRes, unitRes] = await Promise.all([
-          apiClient.get("channels/"), apiClient.get("teams/"),
-          apiClient.get("items/"), apiClient.get("units/"),
+          apiClient.get("channels/"),
+          apiClient.get("teams/"),
+          apiClient.get("items/"),
+          apiClient.get("units/"),
         ]);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           channels: chanRes.data || [],
           teamMembers: teamRes.data || [],
@@ -198,21 +237,29 @@ const AddRFQ = () => {
           units: unitRes.data || [],
         }));
       } catch (err) {
-        toast.error("Failed to load data");
+        toast.error("Failed to load master data");
       }
     };
     fetchData();
   }, []);
 
+  /* -------------------------------------------------
+   *  Helper: ensure item/unit exists (create if not)
+   * ------------------------------------------------- */
   const ensureItemExists = async (name) => {
     if (!name.trim()) return null;
-    const existing = state.itemsList.find(i => i.name.toLowerCase() === name.toLowerCase());
+    const existing = state.itemsList.find(
+      (i) => i.name.toLowerCase() === name.toLowerCase()
+    );
     if (existing) return existing.id;
 
     try {
       const res = await apiClient.post("items/", { name: name.trim() });
       const newItem = res.data;
-      setState(prev => ({ ...prev, itemsList: [...prev.itemsList, newItem] }));
+      setState((prev) => ({
+        ...prev,
+        itemsList: [...prev.itemsList, newItem],
+      }));
       toast.success(`Item created: ${name}`);
       return newItem.id;
     } catch (err) {
@@ -223,13 +270,18 @@ const AddRFQ = () => {
 
   const ensureUnitExists = async (name) => {
     if (!name.trim()) return null;
-    const existing = state.units.find(u => u.name.toLowerCase() === name.toLowerCase());
+    const existing = state.units.find(
+      (u) => u.name.toLowerCase() === name.toLowerCase()
+    );
     if (existing) return existing.id;
 
     try {
       const res = await apiClient.post("units/", { name: name.trim() });
       const newUnit = res.data;
-      setState(prev => ({ ...prev, units: [...prev.units, newUnit] }));
+      setState((prev) => ({
+        ...prev,
+        units: [...prev.units, newUnit],
+      }));
       toast.success(`Unit created: ${name}`);
       return newUnit.id;
     } catch (err) {
@@ -238,8 +290,9 @@ const AddRFQ = () => {
     }
   };
 
+
   const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const validTypes = [
@@ -254,51 +307,68 @@ const AddRFQ = () => {
 
     setUploading(true);
     try {
-      const XLSX = await import("xlsx");
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const data = new Uint8Array(ev.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await file.arrayBuffer());
 
-        const newItems = [];
-        for (const [i, row] of json.entries()) {
-          const itemName = (row["Item"] || row["item"] || row["Name"] || "").toString().trim();
-          const qty = row["Quantity"] || row["quantity"] || row["Qty"] || "";
-          const unitName = (row["Unit"] || row["unit"] || "").toString().trim();
-          const price = row["Unit Price"] || row["unit_price"] || row["Price"] || "";
-          const slNo = row["Sl.no"] || row["Sl.No"] || row["sl_no"] || (i + 1);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) throw new Error("No worksheet found");
 
-          if (!itemName || !qty) continue;
+      const rows = [];
+      worksheet.eachRow({ includeEmpty: false }, (row) => {
+        rows.push(row.values);
+      });
 
-          toast.info(`Processing: ${itemName} (${qty} ${unitName || "???"} )`);
+      const header = rows[0].slice(1);
+      const dataRows = rows.slice(1);
 
-          const [itemId, unitId] = await Promise.all([
-            ensureItemExists(itemName),
-            ensureUnitExists(unitName || "Each")
-          ]);
+      const newItems = [];
 
-          if (itemId) {
-            newItems.push({
-              sl_no: slNo,
-              item: itemId,
-              item_name: itemName,
-              quantity: Number(qty) || 1,
-              unit: unitId,
-              unit_name: unitName || "Each",
-              unit_price: price ? Number(price) : ""
-            });
-          }
+      for (let i = 0; i < dataRows.length; i++) {
+        const raw = dataRows[i].slice(1);
+
+        const col = (keys) => {
+          return keys.reduce((val, k) => {
+            const idx = header.findIndex(
+              (h) =>
+                h && h.toString().toLowerCase().replace(/\s/g, "") === k.toLowerCase()
+            );
+            return val ?? (idx > -1 ? raw[idx] : undefined);
+          }, undefined);
+        };
+
+        const itemName = (col(["item", "name"]) ?? "").toString().trim();
+        const qtyRaw = col(["quantity", "qty"]) ?? "";
+        const unitName = (col(["unit"]) ?? "Each").toString().trim();
+        const priceRaw = col(["unitprice", "price", "unit_price"]) ?? "";
+        const slNo = col(["sl.no", "slno", "sl_no"]) ?? i + 1;
+
+        if (!itemName || !qtyRaw) continue;
+
+        toast.info(`Processing: ${itemName} (${qtyRaw} ${unitName})`);
+
+        const [itemId, unitId] = await Promise.all([
+          ensureItemExists(itemName),
+          ensureUnitExists(unitName),
+        ]);
+
+        if (itemId) {
+          newItems.push({
+            sl_no: Number(slNo) || i + 1,
+            item: itemId,
+            item_name: itemName,
+            quantity: Number(qtyRaw) || 1,
+            unit: unitId,
+            unit_name: unitName,
+            unit_price: priceRaw ? Number(priceRaw) : "",
+          });
         }
+      }
 
-        setState(prev => ({ ...prev, items: newItems }));
-        toast.success(`Loaded & auto-created ${newItems.length} items!`);
-      };
-      reader.readAsArrayBuffer(file);
+      setState((prev) => ({ ...prev, items: newItems }));
+      toast.success(`Loaded & auto-created ${newItems.length} items!`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to process file");
+      toast.error("Failed to process file – check console for details");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -306,55 +376,94 @@ const AddRFQ = () => {
   };
 
   const addItem = () => {
-    setState(prev => {
+    setState((prev) => {
       const nextSlNo = prev.items.length + 1;
       return {
         ...prev,
-        items: [...prev.items, {
-          sl_no: nextSlNo,
-          item: "",
-          quantity: "",
-          unit: "",
-          item_name: "",
-          unit_name: "",
-          unit_price: ""
-        }],
+        items: [
+          ...prev.items,
+          {
+            sl_no: nextSlNo,
+            item: "",
+            quantity: "",
+            unit: "",
+            item_name: "",
+            unit_name: "",
+            unit_price: "",
+          },
+        ],
       };
     });
   };
 
   const removeItem = (idx) => {
-    setState(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+    setState((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
   };
 
   const handleItemChange = (idx, field, value, newOptions) => {
-    setState(prev => {
+    setState((prev) => {
       const newItems = [...prev.items];
       newItems[idx][field] = value;
-      if (field === "item" && newOptions) return { ...prev, items: newItems, itemsList: newOptions };
-      if (field === "unit" && newOptions) return { ...prev, items: newItems, units: newOptions };
+
+      if (field === "item" && newOptions) {
+        return { ...prev, items: newItems, itemsList: newOptions };
+      }
+      if (field === "unit" && newOptions) {
+        return { ...prev, items: newItems, units: newOptions };
+      }
       return { ...prev, items: newItems };
     });
   };
 
   const isStepValid = () => {
+    if (step === 1) return state.company_name.trim() !== "";
     if (step === 3) {
-      return state.items.length > 0 && state.items.every(i => i.item && i.quantity > 0 && i.unit);
+      if (state.items.length === 0) return true;
+      return state.items.every(
+        (i) => i.item && i.quantity > 0 && i.unit
+      );
     }
     return true;
   };
 
   const handleNext = (e) => {
     e.preventDefault();
-    if (isStepValid() || step < 3) setStep(s => s + 1);
-    else toast.error("Please complete all items");
+
+    if (step === 1 && !state.company_name.trim()) {
+      setCompanyNameError("Company name is required");
+      toast.error("Company name is required");
+      return;
+    }
+
+    if (!isStepValid()) {
+      if (step === 3)
+        toast.error("Complete all items or remove incomplete ones");
+      return;
+    }
+    setStep((s) => s + 1);
+    setCompanyNameError("");
   };
 
-  const handlePrev = () => setStep(s => s - 1);
+  const handlePrev = () => setStep((s) => s - 1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!state.company_name.trim()) {
+      setCompanyNameError("Company name is required");
+      toast.error("Company name is required");
+      return;
+    }
+
     setLoading(true);
+    const validItems = state.items.filter(
+      (it) =>
+        it.item && it.item !== 0 && it.unit && it.unit !== 0 && it.quantity && Number(it.quantity) > 0
+    );
+
     const payload = {
       company_name: state.company_name || null,
       company_address: state.company_address || null,
@@ -367,7 +476,7 @@ const AddRFQ = () => {
       assigned_sales_person: state.assigned_sales_person || null,
       due_date_for_quotation: state.due_date_for_quotation || null,
       rfq_status: "Pending",
-      items: state.items.map(it => ({
+      items: validItems.map((it) => ({
         item: Number(it.item),
         quantity: Number(it.quantity),
         unit: Number(it.unit),
@@ -380,7 +489,13 @@ const AddRFQ = () => {
       toast.success("RFQ Created Successfully!");
       navigate("/view-rfq");
     } catch (err) {
-      toast.error("Failed to save RFQ");
+      console.error("RFQ submission error:", err);
+      const errors = err.response?.data;
+      if (errors?.items) {
+        toast.error("Some items have invalid data. Please check.");
+      } else {
+        toast.error(errors?.detail || "Failed to save RFQ");
+      }
     } finally {
       setLoading(false);
     }
@@ -388,52 +503,59 @@ const AddRFQ = () => {
 
   const handleClientSelect = (type) => {
     setIsModalOpen(false);
-    if (type === "new") setState(prev => ({ ...prev, isNewClient: true }));
+    if (type === "new") setState((prev) => ({ ...prev, isNewClient: true }));
     else navigate("/existing-client");
   };
 
   const handleDownloadTemplate = async () => {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('RFQ Template');
+    const ws = workbook.addWorksheet("RFQ Template");
 
-    worksheet.columns = [
-      { header: 'Sl.no', key: 'sl_no', width: 10 },
-      { header: 'Item', key: 'item', width: 35 },
-      { header: 'Quantity', key: 'quantity', width: 15 },
-      { header: 'Unit', key: 'unit', width: 15 },
-      { header: 'Unit Price', key: 'unit_price', width: 15 },
+    ws.columns = [
+      { header: "Sl.no", key: "sl_no", width: 10 },
+      { header: "Item", key: "item", width: 35 },
+      { header: "Quantity", key: "quantity", width: 15 },
+      { header: "Unit", key: "unit", width: 15 },
+      { header: "Unit Price", key: "unit_price", width: 15 },
     ];
 
-    const header = worksheet.getRow(1);
-    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
-    header.alignment = { vertical: 'middle', horizontal: 'center' };
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    headerRow.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4F81BD" },
+    };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
 
-    worksheet.addRow({
+    ws.addRow({
       sl_no: 1,
-      item: 'Pressure Gauge',
+      item: "Pressure Gauge",
       quantity: 4,
-      unit: 'Pcs',
-      unit_price: 150.00,
+      unit: "Pcs",
+      unit_price: 150.0,
     });
 
     try {
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/octet-stream' });
-      saveAs(blob, 'RFQ_Template.xlsx');
+      const blob = new Blob([buffer], {
+        type: "application/octet-stream",
+      });
+      saveAs(blob, "RFQ_Template.xlsx");
     } catch (err) {
       console.error(err);
-      toast.error('Failed to generate template');
+      toast.error("Failed to generate template");
     }
   };
 
   const renderStep1 = () => (
     <div className="grid gap-4">
+      {/* Company Details */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">Company Details</h2>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Name
+            Company Name <span className="text-red-500">*</span>
           </label>
           <InputField
             type="text"
@@ -442,8 +564,21 @@ const AddRFQ = () => {
             onChange={(e) =>
               setState((prev) => ({ ...prev, company_name: e.target.value }))
             }
+            onBlur={() => {
+              if (!state.company_name.trim()) {
+                setCompanyNameError("Company name is required");
+              } else {
+                setCompanyNameError("");
+              }
+            }}
             maxLength={100}
+            required
+            error={companyNameError}
+            className={companyNameError ? "border-red-500" : ""}
           />
+          {companyNameError && (
+            <p className="mt-1 text-sm text-red-600">{companyNameError}</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -486,6 +621,8 @@ const AddRFQ = () => {
           />
         </div>
       </div>
+
+      {/* RFQ Channel */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
         <div>
@@ -500,14 +637,16 @@ const AddRFQ = () => {
             className="w-full p-2 border rounded focus:outline-indigo-500"
           >
             <option value="">Select Channel</option>
-            {state.channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.channel_name}
+            {state.channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.channel_name}
               </option>
             ))}
           </select>
         </div>
       </div>
+
+      {/* Point of Contact */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
         <div>
@@ -585,9 +724,9 @@ const AddRFQ = () => {
             className="w-full p-2 border rounded focus:outline-indigo-500"
           >
             <option value="">Select Team Member</option>
-            {state.teamMembers.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name} ({member.designation || "No designation"})
+            {state.teamMembers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.designation || "No designation"})
               </option>
             ))}
           </select>
@@ -613,12 +752,14 @@ const AddRFQ = () => {
 
   const renderStep3 = () => (
     <div className="grid gap-6">
+      {/* Upload Section */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center">
         <h3 className="text-2xl font-bold text-indigo-800 mb-3">
           Upload Excel/CSV → Auto-Create Items & Units
         </h3>
         <p className="text-gray-600 mb-4">
-          Columns: <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
+          Columns:{" "}
+          <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Item</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Quantity</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Unit</code>,{" "}
@@ -634,90 +775,131 @@ const AddRFQ = () => {
             className="hidden"
           />
           <div className="inline-block bg-indigo-600 text-white px-8 py-2 rounded-xl hover:bg-indigo-700 transition text-lg shadow-lg">
-            {uploading ? "Processing..." : "Upload File"}
+            {uploading ? "Processing…" : "Upload File"}
           </div>
         </label>
         <div className="mt-3 flex items-center justify-center">
           <button
+            type="button"
             onClick={handleDownloadTemplate}
             className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2 transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             Download Template
           </button>
         </div>
       </div>
 
+      {/* Items List */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-2xl font-bold">Items List</h3>
+          <h3 className="text-2xl font-bold">
+            Items List{" "}
+          </h3>
         </div>
 
         {state.items.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <p className="text-gray-500 text-lg">No items yet. Upload or add manually.</p>
+            <p className="text-gray-500 text-lg">
+              No items yet. Upload or add manually, or skip to submit without
+              items.
+            </p>
           </div>
         ) : (
           state.items.map((it, idx) => (
-            <div key={idx} className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md">
+            <div
+              key={idx}
+              className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md"
+            >
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-bold text-indigo-700">
-                  {it.sl_no && <span className="text-black text-md">Sl.no {it.sl_no}</span>}
+                  {it.sl_no && (
+                    <span className="text-black text-md">Sl.no {it.sl_no}</span>
+                  )}
                 </h4>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                {/* Item */}
                 <div>
                   <label className="block font-medium mb-1">Item</label>
                   <SearchableDropdown
                     options={state.itemsList}
                     value={it.item}
-                    onChange={(val, opts) => handleItemChange(idx, "item", val, opts)}
+                    onChange={(val, opts) =>
+                      handleItemChange(idx, "item", val, opts)
+                    }
                     placeholder="Type or select item"
                     allowAddItem
                     apiEndpoint="items/"
                   />
                 </div>
+
+                {/* Quantity */}
                 <div>
                   <label className="block font-medium mb-1">Quantity</label>
                   <InputField
                     type="number"
                     value={it.quantity}
-                    onChange={e => handleItemChange(idx, "quantity", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(idx, "quantity", e.target.value)
+                    }
                     min="1"
                     className="text-md"
                   />
                 </div>
+
+                {/* Unit */}
                 <div>
                   <label className="block font-medium mb-1">Unit</label>
                   <SearchableDropdown
                     options={state.units}
                     value={it.unit}
-                    onChange={(val, opts) => handleItemChange(idx, "unit", val, opts)}
+                    onChange={(val, opts) =>
+                      handleItemChange(idx, "unit", val, opts)
+                    }
                     placeholder="Type or select unit"
                     allowAddItem
                     apiEndpoint="units/"
                   />
                 </div>
+
+                {/* Unit Price */}
                 <div>
-                  <label className="block font-medium mb-1">Unit Price (SAR)</label>
+                  <label className="block font-medium mb-1">
+                    Unit Price (SAR)
+                  </label>
                   <InputField
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={it.unit_price}
-                    onChange={e => handleItemChange(idx, "unit_price", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(idx, "unit_price", e.target.value)
+                    }
                     className="text-md"
                   />
                 </div>
+
+                {/* Remove */}
                 <div>
                   <button
+                    type="button"
                     onClick={() => removeItem(idx)}
                     className="relative top-7 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded transition-opacity duration-300 opacity-90 hover:opacity-100"
-                    type="button"
                   >
                     Remove
                   </button>
@@ -727,10 +909,11 @@ const AddRFQ = () => {
           ))
         )}
       </div>
+
       <button
+        type="button"
         onClick={addItem}
         className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100"
-        type="button"
       >
         + Add Manual
       </button>
@@ -739,12 +922,22 @@ const AddRFQ = () => {
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl text-center sm:text-left font-bold mb-4">Add RFQ</h1>
+      <h1 className="text-2xl text-center sm:text-left font-bold mb-4">
+        Add RFQ
+      </h1>
+
+      {/* Step Indicator */}
       <div className="flex justify-center sm:justify-between items-center gap-8 mb-8">
-        {[1, 2, 3].map(s => (
-          <div key={s} className={`text-center ${step === s ? "text-indigo-600 font-bold" : "text-gray-400"}`}>
-            <div className={`w-10 h-10 rounded-full border-2 mx-auto mb-2 flex items-center justify-center text-xl
-              ${step === s ? "border-indigo-600 bg-indigo-100" : "border-gray-300"}`}>
+        {[1, 2, 3].map((s) => (
+          <div
+            key={s}
+            className={`text-center ${step === s ? "text-indigo-600 font-bold" : "text-gray-400"
+              }`}
+          >
+            <div
+              className={`w-10 h-10 rounded-full border-2 mx-auto mb-2 flex items-center justify-center text-xl
+                ${step === s ? "border-indigo-600 bg-indigo-100" : "border-gray-300"}`}
+            >
               {s}
             </div>
             <p className="text-sm">
@@ -754,31 +947,38 @@ const AddRFQ = () => {
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Client Type">
+      {/* Client Type Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Client Type"
+      >
         <div className="space-y-4">
           <button
+            type="button"
             onClick={() => handleClientSelect("new")}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
           >
             New Client
           </button>
           <button
+            type="button"
             onClick={() => handleClientSelect("existing")}
             className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
           >
             Existing Client
           </button>
         </div>
       </Modal>
 
+      {/* Form (only when New Client selected) */}
       {state.isNewClient && (
         <form onSubmit={handleSubmit} className="space-y-8">
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
 
+          {/* Navigation Buttons */}
           <div className="flex justify-between space-x-4">
             {step > 1 && (
               <button
@@ -800,12 +1000,13 @@ const AddRFQ = () => {
             ) : (
               <button
                 type="submit"
-                disabled={loading || state.items.length === 0}
-                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
-                  loading || state.items.length === 0 ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
-                }`}
+                disabled={loading || !state.company_name.trim()}
+                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${loading || !state.company_name.trim()
+                  ? "opacity-50 cursor-not-allowed"
+                  : "opacity-90 hover:opacity-100"
+                  }`}
               >
-                {loading ? "Saving..." : "Submit RFQ"}
+                {loading ? "Saving…" : "Submit RFQ"}
               </button>
             )}
           </div>

@@ -20,7 +20,6 @@ const ExistingClient = () => {
     phone: rfqData.company_phone || "",
     email: rfqData.company_email || "",
     rfq_channel: rfqData.rfq_channel || "",
-    rfq_channel_name: "",
     point_of_contact_name: rfqData.point_of_contact_name || "",
     point_of_contact_phone: rfqData.point_of_contact_phone || "",
     point_of_contact_email: rfqData.point_of_contact_email || "",
@@ -29,7 +28,6 @@ const ExistingClient = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
-
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -70,23 +68,19 @@ const ExistingClient = () => {
   }, [searchQuery, clients]);
 
   useEffect(() => {
-    if (selectedClient && rfqChannels.length > 0) {
-      const channel = rfqChannels.find(
-        (ch) => ch.id === parseInt(selectedClient.rfq_channel)
-      );
+    if (selectedClient) {
       setFormData({
         company_name: selectedClient.company_name || "",
         address: selectedClient.company_address || "",
         phone: selectedClient.company_phone || "",
         email: selectedClient.company_email || "",
         rfq_channel: selectedClient.rfq_channel || "",
-        rfq_channel_name: channel ? channel.channel_name : "No channel selected",
         point_of_contact_name: selectedClient.point_of_contact_name || "",
         point_of_contact_phone: selectedClient.point_of_contact_phone || "",
         point_of_contact_email: selectedClient.point_of_contact_email || "",
       });
     }
-  }, [selectedClient, rfqChannels]);
+  }, [selectedClient]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -119,13 +113,12 @@ const ExistingClient = () => {
       phone: "",
       email: "",
       rfq_channel: "",
-      rfq_channel_name: "",
       point_of_contact_name: "",
       point_of_contact_phone: "",
       point_of_contact_email: "",
     });
     setSearchQuery("");
-    navigate("/add-rfq"); 
+    navigate("/add-rfq");
   };
 
   const handleSubmit = async (e) => {
@@ -158,11 +151,11 @@ const ExistingClient = () => {
       };
 
       await apiClient.put(`/rfqs/${selectedClient.id}/`, payload);
-      toast.success("Point of Contact updated successfully!");
-      navigate("/view-rfq"); 
+      toast.success("Client details updated successfully!");
+      navigate("/view-rfq");
     } catch (error) {
-      console.error("Failed to update Point of Contact:", error);
-      toast.error("Failed to update Point of Contact.");
+      console.error("Failed to update client:", error);
+      toast.error("Failed to update client details.");
     } finally {
       setIsSubmitting(false);
     }
@@ -209,7 +202,11 @@ const ExistingClient = () => {
           </div>
         )}
 
-        {loading && <div className="flex justify-center items-center min-h-screen"><Loading/></div>}
+        {loading && (
+          <div className="flex justify-center items-center min-h-screen">
+            <Loading />
+          </div>
+        )}
         {error && <p className="text-red-500">{error}</p>}
 
         {selectedClient && (
@@ -220,42 +217,70 @@ const ExistingClient = () => {
                 className="text-gray-600 hover:text-gray-900 text-lg font-bold"
                 aria-label="Close form"
               >
-                ✕
+                X
               </button>
             </div>
 
             <form onSubmit={handleSubmit}>
               <h3 className="text-lg font-semibold mb-4">Client Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Company Name - DISABLED */}
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-600">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.company_name || ""}
+                    disabled
+                    className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-black cursor-not-allowed text-sm"
+                  />
+                </div>
+
+                {/* Editable Fields */}
                 {[
-                  { name: "company_name", label: "Company Name" },
-                  { name: "address", label: "Company Address" },
-                  { name: "phone", label: "Phone Number" },
+                  { name: "address", label: "Company Address", type: "text" },
+                  { name: "phone", label: "Phone Number", type: "text" },
                   { name: "email", label: "Company Email", type: "email" },
                 ].map((field) => (
                   <div key={field.name} className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-600">{field.label}</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      {field.label}
+                    </label>
                     <input
-                      type={field.type || "text"}
+                      type={field.type}
+                      name={field.name}
                       value={formData[field.name] || ""}
-                      disabled
-                      className="mt-1 p-2 border border-gray-300 rounded bg-gray-100 text-black cursor-not-allowed text-sm"
+                      onChange={handleInputChange}
+                      className="mt-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all duration-200"
+                      placeholder={`Enter ${field.label}`}
                     />
                   </div>
                 ))}
               </div>
 
+              {/* RFQ Channel - ENABLED (Dropdown) */}
               <h3 className="text-lg font-semibold mb-4">RFQ Channel</h3>
               <div className="mb-6">
-                <input
-                  type="text"
-                  value={formData.rfq_channel_name || "No channel selected"}
-                  disabled
-                  className="w-full p-3 border border-gray-200 rounded bg-gray-50 text-gray-700 cursor-not-allowed text-sm"
-                  placeholder="Channel Name"
-                />
+                <label className="text-sm font-medium text-gray-600">
+                  Select Channel
+                </label>
+                <select
+                  name="rfq_channel"
+                  value={formData.rfq_channel}
+                  onChange={handleInputChange}
+                  className="mt-1 w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all duration-200"
+                >
+                  <option value="">-- Select Channel --</option>
+                  {rfqChannels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>
+                      {ch.channel_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              {/* Point of Contact - ALL ENABLED */}
               <h3 className="text-lg font-semibold mb-4">Point of Contact</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
@@ -263,7 +288,9 @@ const ExistingClient = () => {
                   { name: "point_of_contact_phone", label: "Contact Phone" },
                 ].map((field) => (
                   <div key={field.name} className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-600">{field.label}</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      {field.label}
+                    </label>
                     <input
                       type="text"
                       name={field.name}
@@ -274,8 +301,11 @@ const ExistingClient = () => {
                     />
                   </div>
                 ))}
+
                 <div className="md:col-span-2 flex flex-col">
-                  <label className="text-sm font-medium text-gray-600">Contact Email</label>
+                  <label className="text-sm font-medium text-gray-600">
+                    Contact Email
+                  </label>
                   <input
                     type="email"
                     name="point_of_contact_email"
@@ -286,6 +316,7 @@ const ExistingClient = () => {
                   />
                 </div>
               </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting}
