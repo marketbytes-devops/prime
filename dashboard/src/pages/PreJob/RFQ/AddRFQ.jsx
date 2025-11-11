@@ -160,17 +160,7 @@ const AddRFQ = () => {
     company_name: "", company_address: "", company_phone: "", company_email: "",
     rfq_channel: "", point_of_contact_name: "", point_of_contact_email: "", point_of_contact_phone: "",
     assigned_sales_person: "", due_date_for_quotation: "",
-    items: [
-      {
-        sl_no: 1,
-        item: "",
-        item_name: "",
-        quantity: "",
-        unit: "",
-        unit_name: "",
-        unit_price: ""
-      }
-    ],
+    items: [],
     channels: [],
     teamMembers: [],
     itemsList: [],
@@ -198,6 +188,7 @@ const AddRFQ = () => {
           units: unitRes.data || [],
         }));
       } catch (err) {
+        console.error("Failed to load initial data:", err);
         toast.error("Failed to load data");
       }
     };
@@ -297,7 +288,7 @@ const AddRFQ = () => {
       };
       reader.readAsArrayBuffer(file);
     } catch (err) {
-      console.error(err);
+      console.error("File upload error:", err);
       toast.error("Failed to process file");
     } finally {
       setUploading(false);
@@ -337,7 +328,14 @@ const AddRFQ = () => {
     });
   };
 
+  // Validation per step
   const isStepValid = () => {
+    if (step === 1) {
+      return state.company_name?.trim() && state.rfq_channel;
+    }
+    if (step === 2) {
+      return state.assigned_sales_person && state.due_date_for_quotation;
+    }
     if (step === 3) {
       return state.items.length > 0 && state.items.every(i => i.item && i.quantity > 0 && i.unit);
     }
@@ -346,14 +344,24 @@ const AddRFQ = () => {
 
   const handleNext = (e) => {
     e.preventDefault();
-    if (isStepValid() || step < 3) setStep(s => s + 1);
-    else toast.error("Please complete all items");
+    if (isStepValid()) {
+      setStep(s => s + 1);
+    } else {
+      toast.error("Please complete all required fields");
+    }
   };
 
   const handlePrev = () => setStep(s => s - 1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Submit RFQ clicked", { state });
+
+    if (!isStepValid()) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+
     setLoading(true);
     const payload = {
       company_name: state.company_name || null,
@@ -376,11 +384,15 @@ const AddRFQ = () => {
     };
 
     try {
-      await apiClient.post("rfqs/", payload);
+      console.log("Sending payload to /rfqs/:", payload);
+      const res = await apiClient.post("rfqs/", payload);
+      console.log("RFQ created:", res.data);
       toast.success("RFQ Created Successfully!");
       navigate("/view-rfq");
     } catch (err) {
-      toast.error("Failed to save RFQ");
+      console.error("Submit RFQ error:", err.response || err);
+      const msg = err.response?.data?.message || err.message || "Failed to save RFQ";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -388,8 +400,11 @@ const AddRFQ = () => {
 
   const handleClientSelect = (type) => {
     setIsModalOpen(false);
-    if (type === "new") setState(prev => ({ ...prev, isNewClient: true }));
-    else navigate("/existing-client");
+    if (type === "new") {
+      setState(prev => ({ ...prev, isNewClient: true }));
+    } else {
+      navigate("/existing-client");
+    }
   };
 
   const handleDownloadTemplate = async () => {
@@ -432,78 +447,30 @@ const AddRFQ = () => {
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">Company Details</h2>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Name
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter company name"
-            value={state.company_name}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, company_name: e.target.value }))
-            }
-            maxLength={100}
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-red-500">*</span></label>
+          <InputField type="text" placeholder="Enter company name" value={state.company_name} onChange={(e) => setState(prev => ({ ...prev, company_name: e.target.value }))} maxLength={100} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Address
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter company address"
-            value={state.company_address}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, company_address: e.target.value }))
-            }
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
+          <InputField type="text" placeholder="Enter company address" value={state.company_address} onChange={(e) => setState(prev => ({ ...prev, company_address: e.target.value }))} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Phone
-          </label>
-          <InputField
-            type="number"
-            placeholder="Enter company phone"
-            value={state.company_phone}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, company_phone: e.target.value }))
-            }
-            maxLength={20}
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Phone</label>
+          <InputField type="number" placeholder="Enter company phone" value={state.company_phone} onChange={(e) => setState(prev => ({ ...prev, company_phone: e.target.value }))} maxLength={20} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Company Email
-          </label>
-          <InputField
-            type="email"
-            placeholder="Enter company email"
-            value={state.company_email}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, company_email: e.target.value }))
-            }
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Email</label>
+          <InputField type="email" placeholder="Enter company email" value={state.company_email} onChange={(e) => setState(prev => ({ ...prev, company_email: e.target.value }))} />
         </div>
       </div>
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">RFQ Channel</h2>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            RFQ Channel
-          </label>
-          <select
-            value={state.rfq_channel}
-            onChange={(e) =>
-              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
-            }
-            className="w-full p-2 border rounded focus:outline-indigo-500"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">RFQ Channel <span className="text-red-500">*</span></label>
+          <select value={state.rfq_channel} onChange={(e) => setState(prev => ({ ...prev, rfq_channel: e.target.value }))} className="w-full p-2 border rounded focus:outline-indigo-500">
             <option value="">Select Channel</option>
             {state.channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.channel_name}
-              </option>
+              <option key={channel.id} value={channel.id}>{channel.channel_name}</option>
             ))}
           </select>
         </div>
@@ -511,54 +478,16 @@ const AddRFQ = () => {
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h2 className="text-black text-xl font-semibold">Point of Contact</h2>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Name
-          </label>
-          <InputField
-            type="text"
-            placeholder="Enter contact name"
-            value={state.point_of_contact_name}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_name: e.target.value,
-              }))
-            }
-            maxLength={100}
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+          <InputField type="text" placeholder="Enter contact name" value={state.point_of_contact_name} onChange={(e) => setState(prev => ({ ...prev, point_of_contact_name: e.target.value }))} maxLength={100} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Email
-          </label>
-          <InputField
-            type="email"
-            placeholder="Enter contact email"
-            value={state.point_of_contact_email}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_email: e.target.value,
-              }))
-            }
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+          <InputField type="email" placeholder="Enter contact email" value={state.point_of_contact_email} onChange={(e) => setState(prev => ({ ...prev, point_of_contact_email: e.target.value }))} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Contact Phone
-          </label>
-          <InputField
-            type="number"
-            placeholder="Enter contact phone"
-            value={state.point_of_contact_phone}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                point_of_contact_phone: e.target.value,
-              }))
-            }
-            maxLength={20}
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+          <InputField type="number" placeholder="Enter contact phone" value={state.point_of_contact_phone} onChange={(e) => setState(prev => ({ ...prev, point_of_contact_phone: e.target.value }))} maxLength={20} />
         </div>
       </div>
     </div>
@@ -567,23 +496,10 @@ const AddRFQ = () => {
   const renderStep2 = () => (
     <div className="grid gap-4">
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h2 className="text-black text-xl font-semibold">
-          Assigned Person & Due Date
-        </h2>
+        <h2 className="text-black text-xl font-semibold">Assigned Person & Due Date</h2>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Assigned Sales Person
-          </label>
-          <select
-            value={state.assigned_sales_person}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                assigned_sales_person: e.target.value,
-              }))
-            }
-            className="w-full p-2 border rounded focus:outline-indigo-500"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Sales Person <span className="text-red-500">*</span></label>
+          <select value={state.assigned_sales_person} onChange={(e) => setState(prev => ({ ...prev, assigned_sales_person: e.target.value }))} className="w-full p-2 border rounded focus:outline-indigo-500">
             <option value="">Select Team Member</option>
             {state.teamMembers.map((member) => (
               <option key={member.id} value={member.id}>
@@ -593,19 +509,8 @@ const AddRFQ = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Due Date for Quotation
-          </label>
-          <InputField
-            type="date"
-            value={state.due_date_for_quotation}
-            onChange={(e) =>
-              setState((prev) => ({
-                ...prev,
-                due_date_for_quotation: e.target.value,
-              }))
-            }
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Due Date for Quotation <span className="text-red-500">*</span></label>
+          <InputField type="date" value={state.due_date_for_quotation} onChange={(e) => setState(prev => ({ ...prev, due_date_for_quotation: e.target.value }))} />
         </div>
       </div>
     </div>
@@ -614,9 +519,7 @@ const AddRFQ = () => {
   const renderStep3 = () => (
     <div className="grid gap-6">
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center">
-        <h3 className="text-2xl font-bold text-indigo-800 mb-3">
-          Upload Excel/CSV → Auto-Create Items & Units
-        </h3>
+        <h3 className="text-2xl font-bold text-indigo-800 mb-3">Upload Excel/CSV to Auto-Create Items & Units</h3>
         <p className="text-gray-600 mb-4">
           Columns: <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Item</code>,{" "}
@@ -625,24 +528,13 @@ const AddRFQ = () => {
           <code className="bg-gray-200 px-2 rounded">Unit Price</code>
         </p>
         <label className="cursor-pointer">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} disabled={uploading} className="hidden" />
           <div className="inline-block bg-indigo-600 text-white px-8 py-2 rounded-xl hover:bg-indigo-700 transition text-lg shadow-lg">
             {uploading ? "Processing..." : "Upload File"}
           </div>
         </label>
         <div className="mt-3 flex items-center justify-center">
-          <button
-            onClick={handleDownloadTemplate}
-            className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2 transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
-          >
+          <button onClick={handleDownloadTemplate} className="w-fit px-8 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 flex items-center gap-2 transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -671,54 +563,23 @@ const AddRFQ = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <div>
-                  <label className="block font-medium mb-1">Item</label>
-                  <SearchableDropdown
-                    options={state.itemsList}
-                    value={it.item}
-                    onChange={(val, opts) => handleItemChange(idx, "item", val, opts)}
-                    placeholder="Type or select item"
-                    allowAddItem
-                    apiEndpoint="items/"
-                  />
+                  <label className="block font-medium mb-1">Item <span className="text-red-500">*</span></label>
+                  <SearchableDropdown options={state.itemsList} value={it.item} onChange={(val, opts) => handleItemChange(idx, "item", val, opts)} placeholder="Type or select item" allowAddItem apiEndpoint="items/" />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Quantity</label>
-                  <InputField
-                    type="number"
-                    value={it.quantity}
-                    onChange={e => handleItemChange(idx, "quantity", e.target.value)}
-                    min="1"
-                    className="text-md"
-                  />
+                  <label className="block font-medium mb-1">Quantity <span className="text-red-500">*</span></label>
+                  <InputField type="number" value={it.quantity} onChange={e => handleItemChange(idx, "quantity", e.target.value)} min="1" className="text-md" />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Unit</label>
-                  <SearchableDropdown
-                    options={state.units}
-                    value={it.unit}
-                    onChange={(val, opts) => handleItemChange(idx, "unit", val, opts)}
-                    placeholder="Type or select unit"
-                    allowAddItem
-                    apiEndpoint="units/"
-                  />
+                  <label className="block font-medium mb-1">Unit <span className="text-red-500">*</span></label>
+                  <SearchableDropdown options={state.units} value={it.unit} onChange={(val, opts) => handleItemChange(idx, "unit", val, opts)} placeholder="Type or select unit" allowAddItem apiEndpoint="units/" />
                 </div>
                 <div>
                   <label className="block font-medium mb-1">Unit Price (SAR)</label>
-                  <InputField
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={it.unit_price}
-                    onChange={e => handleItemChange(idx, "unit_price", e.target.value)}
-                    className="text-md"
-                  />
+                  <InputField type="number" step="0.01" placeholder="0.00" value={it.unit_price} onChange={e => handleItemChange(idx, "unit_price", e.target.value)} className="text-md" />
                 </div>
                 <div>
-                  <button
-                    onClick={() => removeItem(idx)}
-                    className="relative top-7 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded transition-opacity duration-300 opacity-90 hover:opacity-100"
-                    type="button"
-                  >
+                  <button onClick={() => removeItem(idx)} className="relative top-7 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
                     Remove
                   </button>
                 </div>
@@ -727,11 +588,7 @@ const AddRFQ = () => {
           ))
         )}
       </div>
-      <button
-        onClick={addItem}
-        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100"
-        type="button"
-      >
+      <button onClick={addItem} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
         + Add Manual
       </button>
     </div>
@@ -754,20 +611,12 @@ const AddRFQ = () => {
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Client Type">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Client Type">
         <div className="space-y-4">
-          <button
-            onClick={() => handleClientSelect("new")}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
-          >
+          <button onClick={() => handleClientSelect("new")} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
             New Client
           </button>
-          <button
-            onClick={() => handleClientSelect("existing")}
-            className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100"
-            type="button"
-          >
+          <button onClick={() => handleClientSelect("existing")} className="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-xl transition-opacity duration-300 opacity-90 hover:opacity-100" type="button">
             Existing Client
           </button>
         </div>
@@ -779,30 +628,23 @@ const AddRFQ = () => {
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
 
-          <div className="flex justify-between space-x-4">
+          {/* Navigation inside form */}
+          <div className="flex justify-between space-x-4 mt-8">
             {step > 1 && (
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100"
-              >
-                ← Back
+              <button type="button" onClick={handlePrev} className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2 rounded-lg transition-opacity duration-300 opacity-90 hover:opacity-100">
+                Back
               </button>
             )}
             {step < 3 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100"
-              >
-                Next →
+              <button type="button" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg ml-auto transition-opacity duration-300 opacity-90 hover:opacity-100">
+                Next
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={loading || state.items.length === 0}
+                disabled={loading || !isStepValid()}
                 className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
-                  loading || state.items.length === 0 ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
+                  loading || !isStepValid() ? "opacity-50 cursor-not-allowed" : "opacity-90 hover:opacity-100"
                 }`}
               >
                 {loading ? "Saving..." : "Submit RFQ"}
