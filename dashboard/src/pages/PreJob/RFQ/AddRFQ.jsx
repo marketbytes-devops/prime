@@ -598,7 +598,7 @@ const AddRFQ = () => {
             Company Phone
           </label>
           <InputField
-            type="number"
+            type="text"
             placeholder="Enter company phone"
             value={state.company_phone}
             onChange={(e) =>
@@ -687,7 +687,7 @@ const AddRFQ = () => {
             Contact Phone
           </label>
           <InputField
-            type="number"
+            type="text"
             placeholder="Enter contact phone"
             value={state.point_of_contact_phone}
             onChange={(e) =>
