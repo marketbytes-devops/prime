@@ -8,14 +8,14 @@ from decimal import Decimal
 class RFQ(models.Model):
     company_name = models.CharField(max_length=100, null=True, blank=True)
     company_address = models.TextField(null=True, blank=True)
-    company_phone = models.CharField(max_length=20, null=True, blank=True)
+    company_phone = models.CharField(max_length=50, null=True, blank=True)
     company_email = models.EmailField(null=True, blank=True)
     rfq_channel = models.ForeignKey(
         "channels.RFQChannel", on_delete=models.SET_NULL, null=True, blank=True
     )
     point_of_contact_name = models.CharField(max_length=100, null=True, blank=True)
     point_of_contact_email = models.EmailField(null=True, blank=True)
-    point_of_contact_phone = models.CharField(max_length=20, null=True, blank=True)
+    point_of_contact_phone = models.CharField(max_length=50, null=True, blank=True)
     assigned_sales_person = models.ForeignKey(
         "team.TeamMember", on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -89,14 +89,14 @@ class Quotation(models.Model):
     rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name="quotations")
     company_name = models.CharField(max_length=100, null=True, blank=True)
     company_address = models.TextField(null=True, blank=True)
-    company_phone = models.CharField(max_length=20, null=True, blank=True)
+    company_phone = models.CharField(max_length=50, null=True, blank=True)
     company_email = models.EmailField(null=True, blank=True)
     rfq_channel = models.ForeignKey(
         "channels.RFQChannel", on_delete=models.SET_NULL, null=True, blank=True
     )
     point_of_contact_name = models.CharField(max_length=100, null=True, blank=True)
     point_of_contact_email = models.EmailField(null=True, blank=True)
-    point_of_contact_phone = models.CharField(max_length=20, null=True, blank=True)
+    point_of_contact_phone = models.CharField(max_length=50, null=True, blank=True)
     assigned_sales_person = models.ForeignKey(
         "team.TeamMember", on_delete=models.SET_NULL, null=True, blank=True
     )
