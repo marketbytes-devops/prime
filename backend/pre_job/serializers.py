@@ -324,6 +324,55 @@ class RFQSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation["email_sent"] = getattr(instance, "email_sent", False)
         return representation
+    
+    def create_with_items(self, validated_data, items_data):
+        """
+        Create RFQ with bulk items (optimized for 500+ items)
+        """
+        assigned_sales_person = validated_data.pop("assigned_sales_person", None)
+        
+        try:
+            quotation_series = NumberSeries.objects.get(series_name="Quotation")
+        except NumberSeries.DoesNotExist:
+            raise serializers.ValidationError("Quotation series not found.")
+        
+        max_sequence = RFQ.objects.filter(
+            series_number__startswith=quotation_series.prefix
+        ).aggregate(Max("series_number"))["series_number__max"]
+        
+        sequence = 1
+        if max_sequence:
+            sequence = int(max_sequence.split("-")[-1]) + 1
+        
+        series_number = f"{quotation_series.prefix}-{sequence:06d}"
+        
+        # Create RFQ
+        rfq = RFQ.objects.create(
+            series_number=series_number,
+            assigned_sales_person=assigned_sales_person,
+            **validated_data,
+        )
+        
+        # Bulk create items (MUCH faster for 500+ items)
+        rfq_items = []
+        for item_data in items_data:
+            rfq_items.append(RFQItem(
+                rfq=rfq,
+                item_id=item_data['item'],
+                quantity=item_data['quantity'],
+                unit_id=item_data['unit'],
+                unit_price=item_data.get('unit_price')
+            ))
+        
+        # Use bulk_create for performance
+        RFQItem.objects.bulk_create(rfq_items)
+        
+        # Send email
+        creation_email_sent = self.send_creation_email(rfq)
+        rfq.email_sent = creation_email_sent
+        rfq.save()
+        
+        return rfq
 
 
 class QuotationSerializer(serializers.ModelSerializer):
