@@ -103,7 +103,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
 
 
 class RFQSerializer(serializers.ModelSerializer):
-    company_name = serializers.CharField(max_length=100, required=True)
+    company_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     company_address = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
     company_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     company_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
@@ -185,12 +185,6 @@ class RFQSerializer(serializers.ModelSerializer):
             )
         return value
     
-    def validate(self, data):
-        if not data.get('company_name'):
-            raise serializers.ValidationError({
-                "company_name": "Company name is required."
-            })
-        return data
 
     def send_creation_email(self, rfq):
         email_sent = False

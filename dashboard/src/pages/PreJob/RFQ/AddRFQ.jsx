@@ -604,7 +604,6 @@ const AddRFQ = () => {
             onChange={(e) =>
               setState((prev) => ({ ...prev, company_phone: e.target.value }))
             }
-            maxLength={20}
           />
         </div>
         <div>
@@ -696,7 +695,7 @@ const AddRFQ = () => {
                 point_of_contact_phone: e.target.value,
               }))
             }
-            maxLength={20}
+
           />
         </div>
       </div>

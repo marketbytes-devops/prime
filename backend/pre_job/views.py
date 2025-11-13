@@ -26,6 +26,25 @@ class RFQViewSet(viewsets.ModelViewSet):
                 rfq.series_number = f"QUO-PRIME-{new_sequence:06d}"
                 rfq.save()
         return Response(status=204)
+    
+    
+    @action(detail=True, methods=['patch'], url_path='update_status')
+    def update_status(self, request, pk=None):
+        rfq = self.get_object()
+        status = request.data.get('rfq_status')
+        
+        valid_statuses = [choice[0] for choice in RFQ._meta.get_field('rfq_status').choices]
+        if status not in valid_statuses:
+            return Response({"detail": "Invalid status"}, status=400)
+        
+        rfq.rfq_status = status
+        rfq.save()
+        
+        serializer = self.get_serializer(rfq)
+        return Response(serializer.data)
+    
+    
+    
 
 class QuotationViewSet(viewsets.ModelViewSet):
     queryset = Quotation.objects.all()
