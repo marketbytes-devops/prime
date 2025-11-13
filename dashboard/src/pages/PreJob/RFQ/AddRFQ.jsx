@@ -136,8 +136,9 @@ const SearchableDropdown = ({
           {allowAddItem && (
             <div className="p-2 border-b flex gap-2">
               <InputField
-                placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"
-                  }...`}
+                placeholder={`Add new ${
+                  apiEndpoint === "items/" ? "item" : "unit"
+                }...`}
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 className="flex-1 p-2 border rounded text-sm"
@@ -147,10 +148,11 @@ const SearchableDropdown = ({
                 type="button"
                 onClick={handleAddItem}
                 disabled={addingItem || !newItemName.trim()}
-                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 ${addingItem || !newItemName.trim()
-                  ? "opacity-50 cursor-not-allowed"
-                  : "opacity-90 hover:opacity-100"
-                  }`}
+                className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 ${
+                  addingItem || !newItemName.trim()
+                    ? "opacity-50 cursor-not-allowed"
+                    : "opacity-90 hover:opacity-100"
+                }`}
               >
                 {addingItem ? "…" : "+"}
               </button>
@@ -290,7 +292,6 @@ const AddRFQ = () => {
     }
   };
 
-
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -330,7 +331,9 @@ const AddRFQ = () => {
           return keys.reduce((val, k) => {
             const idx = header.findIndex(
               (h) =>
-                h && h.toString().toLowerCase().replace(/\s/g, "") === k.toLowerCase()
+                h &&
+                h.toString().toLowerCase().replace(/\s/g, "") ===
+                  k.toLowerCase()
             );
             return val ?? (idx > -1 ? raw[idx] : undefined);
           }, undefined);
@@ -422,9 +425,7 @@ const AddRFQ = () => {
     if (step === 1) return state.company_name.trim() !== "";
     if (step === 3) {
       if (state.items.length === 0) return true;
-      return state.items.every(
-        (i) => i.item && i.quantity > 0 && i.unit
-      );
+      return state.items.every((i) => i.item && i.quantity > 0 && i.unit);
     }
     return true;
   };
@@ -461,7 +462,12 @@ const AddRFQ = () => {
     setLoading(true);
     const validItems = state.items.filter(
       (it) =>
-        it.item && it.item !== 0 && it.unit && it.unit !== 0 && it.quantity && Number(it.quantity) > 0
+        it.item &&
+        it.item !== 0 &&
+        it.unit &&
+        it.unit !== 0 &&
+        it.quantity &&
+        Number(it.quantity) > 0
     );
 
     const payload = {
@@ -695,7 +701,6 @@ const AddRFQ = () => {
                 point_of_contact_phone: e.target.value,
               }))
             }
-
           />
         </div>
       </div>
@@ -754,15 +759,15 @@ const AddRFQ = () => {
       {/* Upload Section */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center">
         <h3 className="text-2xl font-bold text-indigo-800 mb-3">
-          Upload Excel/CSV → Auto-Create Items & Units
+          Upload Excel/CSV → Server Processes 500+ Items
         </h3>
         <p className="text-gray-600 mb-4">
-          Columns:{" "}
-          <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
+          Columns: <code className="bg-gray-200 px-2 rounded">Sl.no</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Item</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Quantity</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Unit</code>,{" "}
           <code className="bg-gray-200 px-2 rounded">Unit Price</code>
+          <br />
         </p>
         <label className="cursor-pointer">
           <input
@@ -805,9 +810,7 @@ const AddRFQ = () => {
       {/* Items List */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-2xl font-bold">
-            Items List{" "}
-          </h3>
+          <h3 className="text-2xl font-bold">Items List </h3>
         </div>
 
         {state.items.length === 0 ? (
@@ -930,12 +933,17 @@ const AddRFQ = () => {
         {[1, 2, 3].map((s) => (
           <div
             key={s}
-            className={`text-center ${step === s ? "text-indigo-600 font-bold" : "text-gray-400"
-              }`}
+            className={`text-center ${
+              step === s ? "text-indigo-600 font-bold" : "text-gray-400"
+            }`}
           >
             <div
               className={`w-10 h-10 rounded-full border-2 mx-auto mb-2 flex items-center justify-center text-xl
-                ${step === s ? "border-indigo-600 bg-indigo-100" : "border-gray-300"}`}
+                ${
+                  step === s
+                    ? "border-indigo-600 bg-indigo-100"
+                    : "border-gray-300"
+                }`}
             >
               {s}
             </div>
@@ -1000,10 +1008,11 @@ const AddRFQ = () => {
               <button
                 type="submit"
                 disabled={loading || !state.company_name.trim()}
-                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${loading || !state.company_name.trim()
-                  ? "opacity-50 cursor-not-allowed"
-                  : "opacity-90 hover:opacity-100"
-                  }`}
+                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
+                  loading || !state.company_name.trim()
+                    ? "opacity-50 cursor-not-allowed"
+                    : "opacity-90 hover:opacity-100"
+                }`}
               >
                 {loading ? "Saving…" : "Submit RFQ"}
               </button>
