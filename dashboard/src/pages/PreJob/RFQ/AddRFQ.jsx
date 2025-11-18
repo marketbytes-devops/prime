@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import apiClient from "../../../helpers/apiClient";
 import { toast } from "react-toastify";
 import InputField from "../../../components/InputField";
@@ -183,7 +183,10 @@ const SearchableDropdown = ({
 
 const AddRFQ = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1);
+
+  // ✅ CORRECTED: isNewClient should be at the main state level, not inside items array
   const [state, setState] = useState({
     company_name: "",
     company_address: "",
@@ -196,6 +199,7 @@ const AddRFQ = () => {
     assigned_sales_person: "",
     due_date_for_quotation: "",
     items: [
+      // ❌ REMOVE isNewClient from here
       {
         sl_no: 1,
         item: "",
@@ -210,10 +214,14 @@ const AddRFQ = () => {
     teamMembers: [],
     itemsList: [],
     units: [],
-    isNewClient: false,
+    isNewClient: !!location.state?.preFilledData, // ✅ MOVED to correct position
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(true);
+  // ✅ CORRECT: Modal state initialization
+  const [isModalOpen, setIsModalOpen] = useState(
+    !location.state?.preFilledData // Only show modal if NOT coming from existing client
+  );
+
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -245,6 +253,36 @@ const AddRFQ = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const locationState = location.state;
+    if (locationState?.preFilledData) {
+      setState((prev) => ({
+        ...prev,
+        isNewClient: true, // This will show the RFQ form
+        company_name: locationState.preFilledData.company_name || "",
+        company_address: locationState.preFilledData.company_address || "",
+        company_phone: locationState.preFilledData.company_phone || "",
+        company_email: locationState.preFilledData.company_email || "",
+        rfq_channel: locationState.preFilledData.rfq_channel || "",
+        point_of_contact_name:
+          locationState.preFilledData.point_of_contact_name || "",
+        point_of_contact_email:
+          locationState.preFilledData.point_of_contact_email || "",
+        point_of_contact_phone:
+          locationState.preFilledData.point_of_contact_phone || "",
+      }));
+
+      // Set the step to 2 if coming from existing client
+      if (locationState.preFilledData.skipToStep) {
+        setStep(locationState.preFilledData.skipToStep);
+      }
+
+      // ✅ ADD THIS: Close the modal when coming from existing client
+      setIsModalOpen(false);
+    }
+  }, [location.state]);
+
+  // ... rest of your code
   /* -------------------------------------------------
    *  Helper: ensure item/unit exists (create if not)
    * ------------------------------------------------- */

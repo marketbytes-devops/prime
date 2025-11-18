@@ -24,7 +24,6 @@ const ExistingClient = () => {
     point_of_contact_phone: rfqData.point_of_contact_phone || "",
     point_of_contact_email: rfqData.point_of_contact_email || "",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -121,44 +120,34 @@ const ExistingClient = () => {
     navigate("/add-rfq");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const { point_of_contact_email } = formData;
-    if (point_of_contact_email && !/\S+@\S+\.\S+/.test(point_of_contact_email)) {
-      toast.error("Point of Contact Email is invalid.");
-      setIsSubmitting(false);
-      return;
-    }
-
+  const handleNextToRFQ = () => {
     if (!selectedClient?.id) {
       toast.error("Please select a client first.");
-      setIsSubmitting(false);
       return;
     }
 
-    try {
-      const payload = {
-        ...selectedClient,
-        company_address: formData.address,
-        company_phone: formData.phone,
-        company_email: formData.email,
-        rfq_channel: formData.rfq_channel,
-        point_of_contact_name: formData.point_of_contact_name || null,
-        point_of_contact_phone: formData.point_of_contact_phone || null,
-        point_of_contact_email: formData.point_of_contact_email || null,
-      };
+    // Prepare the data to pass to RFQ form
+    const rfqFormData = {
+      company_name: formData.company_name || selectedClient.company_name,
+      company_address: formData.address || selectedClient.company_address,
+      company_phone: formData.phone || selectedClient.company_phone,
+      company_email: formData.email || selectedClient.company_email,
+      rfq_channel: formData.rfq_channel || selectedClient.rfq_channel,
+      point_of_contact_name: formData.point_of_contact_name || selectedClient.point_of_contact_name,
+      point_of_contact_phone: formData.point_of_contact_phone || selectedClient.point_of_contact_phone,
+      point_of_contact_email: formData.point_of_contact_email || selectedClient.point_of_contact_email,
+      isExistingClient: true,
+      existingClientId: selectedClient.id,
+      skipToStep: 2 // Add this flag to skip to step 2
+    };
 
-      await apiClient.put(`/rfqs/${selectedClient.id}/`, payload);
-      toast.success("Client details updated successfully!");
-      navigate("/view-rfq");
-    } catch (error) {
-      console.error("Failed to update client:", error);
-      toast.error("Failed to update client details.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Navigate back to AddRFQ with the pre-filled data
+    navigate("/add-rfq", { 
+      state: { 
+        preFilledData: rfqFormData,
+        fromExistingClient: true 
+      } 
+    });
   };
 
   return (
@@ -221,7 +210,7 @@ const ExistingClient = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={(e) => e.preventDefault()}>
               <h3 className="text-lg font-semibold mb-4">Client Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {/* Company Name - DISABLED */}
@@ -317,12 +306,13 @@ const ExistingClient = () => {
                 </div>
               </div>
 
+              {/* CHANGED: Next button instead of Save Contact */}
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-6 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+                type="button"
+                onClick={handleNextToRFQ}
+                className="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
               >
-                {isSubmitting ? "Saving..." : "Save Contact"}
+                Next →
               </button>
             </form>
           </div>
