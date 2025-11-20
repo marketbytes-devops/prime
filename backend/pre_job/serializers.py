@@ -105,7 +105,7 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
 class RFQSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     company_address = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
-    company_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    company_phone = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     company_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     
     rfq_channel = serializers.PrimaryKeyRelatedField(
@@ -114,7 +114,7 @@ class RFQSerializer(serializers.ModelSerializer):
     
     point_of_contact_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     point_of_contact_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    point_of_contact_phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    point_of_contact_phone = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     
     assigned_sales_person = serializers.PrimaryKeyRelatedField(
         queryset=TeamMember.objects.all(), allow_null=True, required=False
