@@ -70,27 +70,27 @@ const Delivery = () => {
         poRes,
         channelsRes,
       ] = await Promise.all([
-        apiClient.get("work-orders/", { params: { status: "approved" } }),
+        apiClient.get("work-orders/", { params: { status: "Approved" } }),
         apiClient.get("technicians/"),
         apiClient.get("items/"),
-        apiClient.get("delivery-notes/"), // Fetch DNs
+        apiClient.get("delivery-notes/"), 
         apiClient.get("units/"),
         apiClient.get("quotations/"),
         apiClient.get("purchase-orders/"),
         apiClient.get("channels/"),
       ]);
-      console.log("Fetched WOs in Delivery:", woRes.data); // Log WOs (remove after testing)
-      const allDNs = dnRes.data || []; // All DNs including temp
+      console.log("Fetched WOs in Delivery:", woRes.data); 
+      const allDNs = dnRes.data || []; 
       const deliveryNotes =
         allDNs.filter(
           (dn) => dn.dn_number && !dn.dn_number.startsWith("TEMP-DN")
-        ) || []; // UPDATED: Filter out temp DNs
-      console.log("Filtered Real DNs in Delivery:", deliveryNotes); // Log real DNs (remove after testing)
+        ) || [];
+      console.log("Filtered Real DNs in Delivery:", deliveryNotes); 
 
       setState((prev) => ({
         ...prev,
         workOrders: woRes.data || [],
-        deliveryNotes, // Store only real DNs
+        deliveryNotes, 
         technicians: techRes.data || [],
         itemsList: itemsRes.data || [],
         units: unitsRes.data || [],
