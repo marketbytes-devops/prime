@@ -384,7 +384,17 @@ class QuotationSerializer(serializers.ModelSerializer):
         queryset=TeamMember.objects.all(), allow_null=True
     )
     items = QuotationItemSerializer(many=True, required=True)
-    terms = QuotationTermsSerializer(read_only=True)
+    
+    # FIXED: Terms should be read-write, not read-only
+    terms = QuotationTermsSerializer(required=False, allow_null=True)
+    terms_id = serializers.PrimaryKeyRelatedField(
+        queryset=QuotationTerms.objects.all(),
+        source='terms',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    
     quotation_status = serializers.ChoiceField(
         choices=[
             ("Pending", "Pending"),
@@ -440,6 +450,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             "created_at",
             "items",
             "terms",
+            "terms_id",  # Add for write operations
             "purchase_orders",
             "assigned_sales_person_name",
             "assigned_sales_person_email",
@@ -559,40 +570,68 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
+        terms_data = validated_data.pop("terms", None)  # Extract terms data
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
+        
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Quotation series not found.")
+        
         max_sequence = Quotation.objects.filter(
             series_number__startswith=quotation_series.prefix
         ).aggregate(Max("series_number"))["series_number__max"]
+        
         sequence = 1
         if max_sequence:
             sequence = int(max_sequence.split("-")[-1]) + 1
+        
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
+        
         if "followup_frequency" not in validated_data:
             validated_data["followup_frequency"] = "24_hours"
+
+        # Create quotation first
         quotation = Quotation.objects.create(
             series_number=series_number,
             assigned_sales_person=assigned_sales_person,
             **validated_data,
         )
+
+        # Handle terms creation
+        if terms_data:
+            # Create new terms instance for this quotation
+            terms_instance = QuotationTerms.objects.create(**terms_data)
+            quotation.terms = terms_instance
+            quotation.save()
+        else:
+            # Create default terms for this quotation
+            default_terms = QuotationTerms.objects.create(
+                content="Default terms and conditions..."
+            )
+            quotation.terms = default_terms
+            quotation.save()
+
+        # Create items
         for item_data in items_data:
             QuotationItem.objects.create(quotation=quotation, **item_data)
+        
         email_sent = self.send_submission_email(quotation)
         quotation.email_sent = email_sent
         quotation.save()
+        
         return quotation
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
+        terms_data = validated_data.pop("terms", None)  # Extract terms data
         assigned_sales_person = validated_data.get(
             "assigned_sales_person", instance.assigned_sales_person
         )
         not_approved_reason_remark = validated_data.get(
             "not_approved_reason_remark", instance.not_approved_reason_remark
         )
+        
         if (
             validated_data.get("quotation_status") == "Not Approved"
             and not not_approved_reason_remark
@@ -600,8 +639,12 @@ class QuotationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "A reason must be provided when setting status to 'Not Approved'."
             )
+        
+        # Update quotation fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
+        # Handle followup frequency update
         if (
             validated_data.get("followup_frequency")
             and instance.followup_frequency != validated_data["followup_frequency"]
@@ -615,18 +658,34 @@ class QuotationSerializer(serializers.ModelSerializer):
                 instance.next_followup_date = today + timedelta(days=7)
             elif validated_data["followup_frequency"] == "every_7th_day":
                 instance.next_followup_date = today + timedelta(days=7)
+        
         instance.save()
+
+        # Handle terms update
+        if terms_data is not None:
+            if instance.terms:
+                # Update existing terms
+                for attr, value in terms_data.items():
+                    setattr(instance.terms, attr, value)
+                instance.terms.save()
+            else:
+                # Create new terms
+                terms_instance = QuotationTerms.objects.create(**terms_data)
+                instance.terms = terms_instance
+                instance.save()
+
+        # Handle items update
         if items_data is not None:
             instance.items.all().delete()
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
+        
         return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation["email_sent"] = getattr(instance, "email_sent", False)
         return representation
-
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all())
