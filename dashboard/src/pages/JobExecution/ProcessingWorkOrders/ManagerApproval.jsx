@@ -187,8 +187,9 @@ const handleApprove = async (id) => {
   ) {
     try {
       const selectedWO = state.workOrders.find((wo) => wo.id === id);
+      console.log("Selected WO before approval:", selectedWO);
+      
       let deliveryNote = null;
-
       if (
         selectedWO.delivery_notes &&
         Array.isArray(selectedWO.delivery_notes) &&
@@ -196,6 +197,8 @@ const handleApprove = async (id) => {
       ) {
         deliveryNote = selectedWO.delivery_notes[0];
       }
+
+      console.log("Delivery Note found:", deliveryNote);
 
       const payload = {
         delivery_note_type: state.deliveryNoteType,
@@ -207,27 +210,32 @@ const handleApprove = async (id) => {
         : `work-orders/${id}/approve/`;
       const method = deliveryNote ? "patch" : "post";
 
-      await apiClient[method](url, payload);
+      console.log("API Call:", method, url, payload);
+
+      const response = await apiClient[method](url, payload);
+      
+      console.log("API Response:", response.data);
 
       toast.success(
         `Work Order approved and ${state.deliveryNoteType} Delivery Note ${
           deliveryNote ? "updated" : "created"
-        } with temporary DN.`
+        }.`
       );
 
-      // ✅ CRITICAL FIX: Remove the approved work order from local state immediately
+      // Remove from local state immediately
       setState((prev) => ({
         ...prev,
         workOrders: prev.workOrders.filter((wo) => wo.id !== id),
       }));
 
-      // Optional: Fetch fresh data in background (not strictly necessary)
-      // await fetchData();
-
       // Navigate to delivery page
-      navigate("/job-execution/processing-work-orders/delivery");
+      setTimeout(() => {
+        navigate("/job-execution/processing-work-orders/delivery");
+      }, 500);
+      
     } catch (error) {
       console.error("Error approving work order:", error);
+      console.error("Error response:", error.response?.data);
       toast.error(
         error.response?.data?.error || "Failed to approve Work Order."
       );
