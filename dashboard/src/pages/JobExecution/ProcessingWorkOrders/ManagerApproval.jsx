@@ -164,84 +164,62 @@ const ManagerApproval = () => {
     }));
   };
 
-const handleApprove = async (id) => {
-  const deliveryNoteSeries = seriesList.find(
-    (s) => s.series_name === "Delivery Note"
-  );
-  if (!deliveryNoteSeries) {
-    setSeriesError(
-      'The "Delivery Note" series is not configured. Please add it in the Additional Settings section to approve this work order.'
+  const handleApprove = async (id) => {
+    const deliveryNoteSeries = seriesList.find(
+      (s) => s.series_name === "Delivery Note"
     );
-    toast.warn(
-      'The "Delivery Note" series is missing. Configure it in Additional Settings.'
-    );
-    return;
-  }
-
-  setSeriesError("");
-
-  if (
-    window.confirm(
-      "Are you sure you want to move this work order to Delivery?"
-    )
-  ) {
-    try {
-      const selectedWO = state.workOrders.find((wo) => wo.id === id);
-      console.log("Selected WO before approval:", selectedWO);
-      
-      let deliveryNote = null;
-      if (
-        selectedWO.delivery_notes &&
-        Array.isArray(selectedWO.delivery_notes) &&
-        selectedWO.delivery_notes.length > 0
-      ) {
-        deliveryNote = selectedWO.delivery_notes[0];
-      }
-
-      console.log("Delivery Note found:", deliveryNote);
-
-      const payload = {
-        delivery_note_type: state.deliveryNoteType,
-        wo_number: selectedWO.wo_number,
-      };
-
-      const url = deliveryNote
-        ? `delivery-notes/${deliveryNote.id}/`
-        : `work-orders/${id}/approve/`;
-      const method = deliveryNote ? "patch" : "post";
-
-      console.log("API Call:", method, url, payload);
-
-      const response = await apiClient[method](url, payload);
-      
-      console.log("API Response:", response.data);
-
-      toast.success(
-        `Work Order approved and ${state.deliveryNoteType} Delivery Note ${
-          deliveryNote ? "updated" : "created"
-        }.`
+    if (!deliveryNoteSeries) {
+      setSeriesError(
+        'The "Delivery Note" series is not configured. Please add it in the Additional Settings section to approve this work order.'
       );
-
-      // Remove from local state immediately
-      setState((prev) => ({
-        ...prev,
-        workOrders: prev.workOrders.filter((wo) => wo.id !== id),
-      }));
-
-      // Navigate to delivery page
-      setTimeout(() => {
-        navigate("/job-execution/processing-work-orders/delivery");
-      }, 500);
-      
-    } catch (error) {
-      console.error("Error approving work order:", error);
-      console.error("Error response:", error.response?.data);
-      toast.error(
-        error.response?.data?.error || "Failed to approve Work Order."
+      toast.warn(
+        'The "Delivery Note" series is missing. Configure it in Additional Settings.'
       );
+      return;
     }
-  }
-};
+
+    setSeriesError("");
+
+    if (
+      window.confirm(
+        "Are you sure you want to move this work order to Delivery?"
+      )
+    ) {
+      try {
+        const selectedWO = state.workOrders.find((wo) => wo.id === id);
+        console.log("Selected WO before approval:", selectedWO);
+
+        // ✅ ALWAYS call the approve endpoint
+        const url = `work-orders/${id}/approve/`;
+        
+        console.log("API Call: POST", url);
+
+        const response = await apiClient.post(url);
+        
+        console.log("API Response:", response.data);
+
+        toast.success("Work Order approved and moved to Delivery.");
+
+        // Remove from local state immediately
+        setState((prev) => ({
+          ...prev,
+          workOrders: prev.workOrders.filter((wo) => wo.id !== id),
+        }));
+
+        // Navigate to delivery page after a short delay
+        setTimeout(() => {
+          navigate("/job-execution/processing-work-orders/delivery");
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error approving work order:", error);
+        console.error("Error response:", error.response?.data);
+        toast.error(
+          error.response?.data?.error || "Failed to approve Work Order."
+        );
+      }
+    }
+  };
 
   const handleDecline = async () => {
     try {
