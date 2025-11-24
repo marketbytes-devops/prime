@@ -164,60 +164,76 @@ const ManagerApproval = () => {
     }));
   };
 
-  const handleApprove = async (id) => {
-    const deliveryNoteSeries = seriesList.find(
-      (s) => s.series_name === "Delivery Note"
+const handleApprove = async (id) => {
+  const deliveryNoteSeries = seriesList.find(
+    (s) => s.series_name === "Delivery Note"
+  );
+  if (!deliveryNoteSeries) {
+    setSeriesError(
+      'The "Delivery Note" series is not configured. Please add it in the Additional Settings section to approve this work order.'
     );
-    if (!deliveryNoteSeries) {
-      setSeriesError(
-        'The "Delivery Note" series is not configured. Please add it in the Additional Settings section to approve this work order.'
-      );
-      toast.warn(
-        'The "Delivery Note" series is missing. Configure it in Additional Settings.'
-      );
-      return;
-    }
-    setSeriesError("");
+    toast.warn(
+      'The "Delivery Note" series is missing. Configure it in Additional Settings.'
+    );
+    return;
+  }
 
-    if (
-      window.confirm(
-        "Are you sure you want to move this work order to Delivery?"
-      )
-    ) {
-      try {
-        const selectedWO = state.workOrders.find((wo) => wo.id === id);
-        let deliveryNote = null;
-        if (
-          selectedWO.delivery_notes &&
-          Array.isArray(selectedWO.delivery_notes) &&
-          selectedWO.delivery_notes.length > 0
-        ) {
-          deliveryNote = selectedWO.delivery_notes[0];
-        }
-        const payload = {
-          delivery_note_type: state.deliveryNoteType,
-          wo_number: selectedWO.wo_number,
-        };
-        const url = deliveryNote
-          ? `delivery-notes/${deliveryNote.id}/`
-          : `work-orders/${id}/approve/`;
-        const method = deliveryNote ? "patch" : "post";
-        await apiClient[method](url, payload);
-        toast.success(
-          `Work Order approved and ${state.deliveryNoteType} Delivery Note ${
-            deliveryNote ? "updated" : "created"
-          } with temporary DN.`
-        );
-        await fetchData();
-        navigate("/job-execution/processing-work-orders/delivery");
-      } catch (error) {
-        console.error("Error approving work order:", error);
-        toast.error(
-          error.response?.data?.error || "Failed to approve Work Order."
-        );
+  setSeriesError("");
+
+  if (
+    window.confirm(
+      "Are you sure you want to move this work order to Delivery?"
+    )
+  ) {
+    try {
+      const selectedWO = state.workOrders.find((wo) => wo.id === id);
+      let deliveryNote = null;
+
+      if (
+        selectedWO.delivery_notes &&
+        Array.isArray(selectedWO.delivery_notes) &&
+        selectedWO.delivery_notes.length > 0
+      ) {
+        deliveryNote = selectedWO.delivery_notes[0];
       }
+
+      const payload = {
+        delivery_note_type: state.deliveryNoteType,
+        wo_number: selectedWO.wo_number,
+      };
+
+      const url = deliveryNote
+        ? `delivery-notes/${deliveryNote.id}/`
+        : `work-orders/${id}/approve/`;
+      const method = deliveryNote ? "patch" : "post";
+
+      await apiClient[method](url, payload);
+
+      toast.success(
+        `Work Order approved and ${state.deliveryNoteType} Delivery Note ${
+          deliveryNote ? "updated" : "created"
+        } with temporary DN.`
+      );
+
+      // ✅ CRITICAL FIX: Remove the approved work order from local state immediately
+      setState((prev) => ({
+        ...prev,
+        workOrders: prev.workOrders.filter((wo) => wo.id !== id),
+      }));
+
+      // Optional: Fetch fresh data in background (not strictly necessary)
+      // await fetchData();
+
+      // Navigate to delivery page
+      navigate("/job-execution/processing-work-orders/delivery");
+    } catch (error) {
+      console.error("Error approving work order:", error);
+      toast.error(
+        error.response?.data?.error || "Failed to approve Work Order."
+      );
     }
-  };
+  }
+};
 
   const handleDecline = async () => {
     try {
