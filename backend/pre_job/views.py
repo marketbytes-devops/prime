@@ -246,6 +246,32 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 quotation.save()
         return Response(status=204)
 
+    # ✅ ADD THIS ACTION for updating terms
+    @action(detail=True, methods=['post', 'put', 'patch'], url_path='update-terms')
+    def update_terms(self, request, pk=None):
+        """Update terms for a specific quotation"""
+        quotation = self.get_object()
+        terms_content = request.data.get('content', '')
+        
+        if not terms_content:
+            return Response(
+                {"error": "Terms content is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if quotation.terms:
+            # Update existing terms
+            quotation.terms.content = terms_content
+            quotation.terms.save()
+        else:
+            # Create new terms for this quotation
+            new_terms = QuotationTerms.objects.create(content=terms_content)
+            quotation.terms = new_terms
+            quotation.save()
+            
+        serializer = self.get_serializer(quotation)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['patch'], url_path='update_status')
     def update_status(self, request, pk=None):
         quotation = self.get_object()
@@ -274,38 +300,24 @@ class QuotationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(quotation)
         return Response(serializer.data)
     
+    
 class QuotationTermsViewSet(viewsets.ModelViewSet):
     queryset = QuotationTerms.objects.all()
     serializer_class = QuotationTermsSerializer
     permission_classes = [AllowAny]
 
-    def get_queryset(self):
-        return super().get_queryset().order_by('-updated_at')[:1]
+    # REMOVED all singleton logic - now supports multiple terms instances
+    # Each quotation can have its own terms
 
-    def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
-        if qs.exists():
-            serializer = self.get_serializer(qs.first())
+    # Optional: Keep this for backward compatibility if needed
+    @action(detail=False, methods=['get'], url_path='latest')
+    def get_latest_terms(self, request):
+        """Get the most recent terms (for template purposes only)"""
+        latest_terms = QuotationTerms.objects.order_by('-updated_at').first()
+        if latest_terms:
+            serializer = self.get_serializer(latest_terms)
             return Response(serializer.data)
         return Response({"id": None, "content": "", "updated_at": None})
-
-    @action(detail=False, methods=['patch'], url_path='update')
-    def update_terms(self, request):
-        if not QuotationTerms.objects.exists():
-            return Response(
-                {"detail": "No terms exist to update."},
-                status=404
-            )
-        instance = QuotationTerms.objects.first()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def create(self, request, *args, **kwargs):
-        if QuotationTerms.objects.exists():
-            return self.update_terms(request)
-        return super().create(request, *args, **kwargs)
 
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.all()

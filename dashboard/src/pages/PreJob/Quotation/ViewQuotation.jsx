@@ -42,19 +42,6 @@ const ViewQuotation = () => {
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasTerms, setHasTerms] = useState(false);
-
-  useEffect(() => {
-    const fetchTerms = async () => {
-      try {
-        const res = await apiClient.get("/quotation-terms/");
-        setHasTerms(!!res.data.id);
-      } catch (e) {
-        setHasTerms(false);
-      }
-    };
-    fetchTerms();
-  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -103,17 +90,31 @@ const ViewQuotation = () => {
             const poRes = await apiClient.get(
               `/purchase-orders/?quotation_id=${quotation.id}`
             );
-            return { ...quotation, purchase_orders: poRes.data || [] };
+
+            // ✅ ADD THIS: Check if this quotation has custom terms
+            let hasCustomTerms = false;
+            if (quotation.terms && quotation.terms.id) {
+              hasCustomTerms = true;
+            }
+
+            return {
+              ...quotation,
+              purchase_orders: poRes.data || [],
+              has_custom_terms: hasCustomTerms, // ✅ Add this line
+            };
           } catch (error) {
             console.error(
               `Error fetching POs for quotation ${quotation.id}:`,
               error
             );
-            return { ...quotation, purchase_orders: [] };
+            return {
+              ...quotation,
+              purchase_orders: [],
+              has_custom_terms: false, // ✅ Add this line
+            };
           }
         })
       );
-
       setState((prev) => ({
         ...prev,
         quotations: quotationsWithPOs || [],
@@ -398,21 +399,32 @@ const ViewQuotation = () => {
   };
 
   const handlePrint = async (quotation) => {
-    // 1. Fetch the **latest singleton terms**
+    // ✅ FIXED: Use the quotation's OWN terms, not global terms
     let terms = { content: "" };
-    try {
-      const termsRes = await apiClient.get("/quotation-terms/");
-      if (termsRes.data.id) {
-        terms = { content: termsRes.data.content || "" };
+
+    if (quotation.terms && quotation.terms.id) {
+      // ✅ Use quotation's custom terms
+      terms = {
+        content: quotation.terms.content || "",
+      };
+    } else {
+      // ✅ Fallback: try to get global template (optional)
+      try {
+        const termsRes = await apiClient.get("/quotation-terms/latest/");
+        if (termsRes.data && termsRes.data.content) {
+          terms = { content: termsRes.data.content };
+        }
+      } catch (err) {
+        console.warn("No template terms found, using empty.");
       }
-    } catch (err) {
-      console.warn("No terms found, using empty.");
     }
 
     const channelName =
-      state.channels.find((c) => c.id === quotation.rfq_channel)?.channel_name || "N/A";
+      state.channels.find((c) => c.id === quotation.rfq_channel)
+        ?.channel_name || "N/A";
     const salesPersonName =
-      state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)?.name || "N/A";
+      state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)
+        ?.name || "N/A";
 
     const itemsData = (quotation.items || []).map((item) => ({
       id: item.id,
@@ -430,7 +442,9 @@ const ViewQuotation = () => {
       terms,
     };
 
-    const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
+    const htmlString = ReactDOMServer.renderToStaticMarkup(
+      <Template1 data={data} />
+    );
 
     const printWindow = window.open("", "_blank", "width=900,height=700");
     if (!printWindow) {
@@ -439,30 +453,38 @@ const ViewQuotation = () => {
     }
 
     printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Quotation #${data.series_number}</title>
-        <meta charset="utf-8">
-        <style>
-          body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-          @media print { body { -webkit-print-color-adjust: exact; } }
-        </style>
-      </head>
-      <body>${htmlString}</body>
-    </html>
-  `);
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>Quotation #${data.series_number}</title>
+      <meta charset="utf-8">
+      <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        @media print { body { -webkit-print-color-adjust: exact; } }
+      </style>
+    </head>
+    <body>${htmlString}</body>
+  </html>
+`);
     printWindow.document.close();
 
-    // Wait for images (logo) to load
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.focus();
         printWindow.print();
-        // Optional: close after print
-        // printWindow.close();
       }, 500);
     };
+  };
+
+  // ✅ ADD THIS NEW METHOD: Navigation to terms for specific quotation
+  const handleNavigateToTerms = (quotationId, hasCustomTerms) => {
+    if (quotationId) {
+      // ✅ Navigate to quotation-specific terms
+      navigate(`/quotations/${quotationId}/terms`);
+    } else {
+      // ✅ Navigate to global terms template
+      navigate("/terms-and-conditions");
+    }
   };
 
   const openModal = (quotation) => {
@@ -726,6 +748,10 @@ const ViewQuotation = () => {
                 <th className="min-w-[300px] border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Remarks
                 </th>
+                {/* ✅ ADD THIS NEW TERMS HEADER */}
+                <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Terms
+                </th>
                 <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
                   Actions
                 </th>
@@ -735,7 +761,7 @@ const ViewQuotation = () => {
               {currentQuotations.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="10"
+                    colSpan="11"
                     className="border p-2 text-center text-gray-500 whitespace-nowrap"
                   >
                     No quotations found.
@@ -782,8 +808,8 @@ const ViewQuotation = () => {
                     <td className="border p-2 whitespace-nowrap">
                       {quotation.next_followup_date
                         ? new Date(
-                          quotation.next_followup_date
-                        ).toLocaleDateString()
+                            quotation.next_followup_date
+                          ).toLocaleDateString()
                         : "N/A"}
                     </td>
                     <td className="border p-2 whitespace-nowrap">
@@ -803,16 +829,31 @@ const ViewQuotation = () => {
                               ? handleRemarkSubmit(quotation.id)
                               : handleEditRemark(quotation.id)
                           }
-                          className={`px-2 py-1 rounded-md text-sm ${state.isEditingRemark[quotation.id]
+                          className={`px-2 py-1 rounded-md text-sm ${
+                            state.isEditingRemark[quotation.id]
                               ? "bg-indigo-600 text-white hover:bg-indigo-700"
                               : "bg-green-600 text-white hover:bg-green-700"
-                            }`}
+                          }`}
                         >
                           {state.isEditingRemark[quotation.id]
                             ? "Update"
                             : "Edit"}
                         </button>
                       </div>
+                    </td>
+                    <td className="border p-2 whitespace-nowrap text-center">
+                      <span
+                        className={`inline-block w-3 h-3 rounded-full ${
+                          quotation.has_custom_terms
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                        title={
+                          quotation.has_custom_terms
+                            ? "Has Custom Terms"
+                            : "Uses Template"
+                        }
+                      ></span>
                     </td>
                     <td className="border p-2 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -830,45 +871,60 @@ const ViewQuotation = () => {
                             isPoComplete(quotation) ||
                             !hasPermission("quotation", "edit")
                           }
-                          className={`px-3 py-1 rounded-md text-sm ${isPoComplete(quotation) ||
-                              !hasPermission("quotation", "edit")
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            isPoComplete(quotation) ||
+                            !hasPermission("quotation", "edit")
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-blue-600 text-white hover:bg-blue-700"
-                            }`}
+                          }`}
                         >
                           Edit
                         </button>
                         <button
-                          onClick={() => navigate("/view-quotation/update-terms-and-conditions")}
+                          onClick={() =>
+                            handleNavigateToTerms(
+                              quotation.id,
+                              quotation.has_custom_terms
+                            )
+                          }
                           disabled={!hasPermission("quotation", "edit")}
-                          className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "edit")
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            !hasPermission("quotation", "edit")
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "text-sm bg-blue-600 text-white hover:bg-blue-700"
-                            }`}
+                              : quotation.has_custom_terms
+                              ? "bg-purple-600 text-white hover:bg-purple-700"
+                              : "bg-blue-600 text-white hover:bg-blue-700"
+                          }`}
                         >
-                          {hasTerms ? "View Terms & Conditions" : "Update Terms & Conditions"}
+                          {quotation.has_custom_terms
+                            ? "View Terms"
+                            : "Add Terms"}
                         </button>
                         <button
                           onClick={() => handlePrint(quotation)}
                           disabled={quotation.quotation_status !== "Approved"}
-                          className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved"
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            quotation.quotation_status === "Approved"
                               ? "bg-green-600 text-white hover:bg-green-700"
                               : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            }`}
+                          }`}
                         >
                           Print
                         </button>
                         {hasBothOrderTypes(quotation) ||
-                          isPoComplete(quotation) ? null : quotation.purchase_orders?.some(
+                        isPoComplete(
+                          quotation
+                        ) ? null : quotation.purchase_orders?.some(
                             (po) => po.order_type === "partial"
                           ) ? (
                           <button
                             onClick={() => handleUploadPO(quotation.id)}
                             disabled={!shouldEnableUploadPO(quotation)}
-                            className={`px-3 py-1 rounded-md text-sm ${shouldEnableUploadPO(quotation)
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              shouldEnableUploadPO(quotation)
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              }`}
+                            }`}
                           >
                             Upload PO
                           </button>
@@ -879,11 +935,12 @@ const ViewQuotation = () => {
                               quotation.quotation_status !== "Approved" ||
                               isPoComplete(quotation)
                             }
-                            className={`px-3 py-1 rounded-md text-sm ${quotation.quotation_status === "Approved" &&
-                                !isPoComplete(quotation)
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              quotation.quotation_status === "Approved" &&
+                              !isPoComplete(quotation)
                                 ? "bg-yellow-600 text-white hover:bg-yellow-700"
                                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              }`}
+                            }`}
                           >
                             Convert to PO
                           </button>
@@ -891,10 +948,11 @@ const ViewQuotation = () => {
                         <button
                           onClick={() => handleDelete(quotation.id)}
                           disabled={!hasPermission("quotation", "delete")}
-                          className={`px-3 py-1 rounded-md text-sm ${!hasPermission("quotation", "delete")
+                          className={`px-3 py-1 rounded-md text-sm ${
+                            !hasPermission("quotation", "delete")
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-red-600 text-white hover:bg-red-700"
-                            }`}
+                          }`}
                         >
                           Delete
                         </button>
@@ -920,10 +978,11 @@ const ViewQuotation = () => {
             <button
               key={page}
               onClick={() => handlePageChange(page)}
-              className={`px-3 py-1 rounded-md min-w-fit ${state.currentPage === page
+              className={`px-3 py-1 rounded-md min-w-fit ${
+                state.currentPage === page
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+              }`}
             >
               {page}
             </button>
@@ -940,12 +999,16 @@ const ViewQuotation = () => {
       <Modal
         isOpen={state.isModalOpen}
         onClose={closeModal}
-        title={`Quotation Details - ${state.selectedQuotation?.series_number || "N/A"}`}
+        title={`Quotation Details - ${
+          state.selectedQuotation?.series_number || "N/A"
+        }`}
       >
         {state.selectedQuotation && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-black">Company Details</h3>
+              <h3 className="text-lg font-medium text-black">
+                Company Details
+              </h3>
               <p>
                 <strong>Series Number:</strong>{" "}
                 {state.selectedQuotation.series_number || "N/A"}
@@ -974,7 +1037,9 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Contact Details</h3>
+              <h3 className="text-lg font-medium text-black">
+                Contact Details
+              </h3>
               <p>
                 <strong>Contact Name:</strong>{" "}
                 {state.selectedQuotation.point_of_contact_name || "N/A"}
@@ -989,7 +1054,9 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Assignment & Status</h3>
+              <h3 className="text-lg font-medium text-black">
+                Assignment & Status
+              </h3>
               <p>
                 <strong>Assigned Sales Person:</strong>{" "}
                 {state.teamMembers.find(
@@ -1000,13 +1067,15 @@ const ViewQuotation = () => {
                 <strong>Due Date:</strong>{" "}
                 {state.selectedQuotation.due_date_for_quotation
                   ? new Date(
-                    state.selectedQuotation.due_date_for_quotation
-                  ).toLocaleDateString()
+                      state.selectedQuotation.due_date_for_quotation
+                    ).toLocaleDateString()
                   : "N/A"}
               </p>
               <p>
                 <strong>Created:</strong>{" "}
-                {new Date(state.selectedQuotation.created_at).toLocaleDateString()}
+                {new Date(
+                  state.selectedQuotation.created_at
+                ).toLocaleDateString()}
               </p>
               <p>
                 <strong>Quotation Status:</strong>{" "}
@@ -1022,8 +1091,8 @@ const ViewQuotation = () => {
                 <strong>Next Follow-up Date:</strong>{" "}
                 {state.selectedQuotation.next_followup_date
                   ? new Date(
-                    state.selectedQuotation.next_followup_date
-                  ).toLocaleDateString()
+                      state.selectedQuotation.next_followup_date
+                    ).toLocaleDateString()
                   : "N/A"}
               </p>
               <p>
@@ -1038,8 +1107,8 @@ const ViewQuotation = () => {
             <div>
               <h3 className="text-lg font-medium text-black">Items</h3>
               {state.selectedQuotation.items &&
-                Array.isArray(state.selectedQuotation.items) &&
-                state.selectedQuotation.items.length > 0 ? (
+              Array.isArray(state.selectedQuotation.items) &&
+              state.selectedQuotation.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -1065,15 +1134,15 @@ const ViewQuotation = () => {
                       {state.selectedQuotation.items.map((item) => (
                         <tr key={item.id} className="border">
                           <td className="border p-2 whitespace-nowrap">
-                            {state.itemsList.find((i) => i.id === item.item)?.name ||
-                              "N/A"}
+                            {state.itemsList.find((i) => i.id === item.item)
+                              ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             {item.quantity || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
-                            {state.units.find((u) => u.id === item.unit)?.name ||
-                              "N/A"}
+                            {state.units.find((u) => u.id === item.unit)
+                              ?.name || "N/A"}
                           </td>
                           <td className="border p-2 whitespace-nowrap">
                             SAR{" "}
@@ -1084,7 +1153,9 @@ const ViewQuotation = () => {
                           <td className="border p-2 whitespace-nowrap">
                             SAR{" "}
                             {item.quantity && item.unit_price
-                              ? Number(item.quantity * item.unit_price).toFixed(2)
+                              ? Number(item.quantity * item.unit_price).toFixed(
+                                  2
+                                )
                               : "0.00"}
                           </td>
                         </tr>
@@ -1101,7 +1172,9 @@ const ViewQuotation = () => {
                         <td className="border p-2 whitespace-nowrap">
                           SAR{" "}
                           {state.selectedQuotation.subtotal
-                            ? Number(state.selectedQuotation.subtotal).toFixed(2)
+                            ? Number(state.selectedQuotation.subtotal).toFixed(
+                                2
+                              )
                             : "0.00"}
                         </td>
                       </tr>
@@ -1115,7 +1188,9 @@ const ViewQuotation = () => {
                         <td className="border p-2 whitespace-nowrap">
                           SAR{" "}
                           {state.selectedQuotation.vat_applicable
-                            ? Number(state.selectedQuotation.vat_amount).toFixed(2)
+                            ? Number(
+                                state.selectedQuotation.vat_amount
+                              ).toFixed(2)
                             : "0.00"}
                         </td>
                       </tr>
@@ -1129,7 +1204,9 @@ const ViewQuotation = () => {
                         <td className="border p-2 whitespace-nowrap">
                           SAR{" "}
                           {state.selectedQuotation.grand_total
-                            ? Number(state.selectedQuotation.grand_total).toFixed(2)
+                            ? Number(
+                                state.selectedQuotation.grand_total
+                              ).toFixed(2)
                             : "0.00"}
                         </td>
                       </tr>
@@ -1149,7 +1226,8 @@ const ViewQuotation = () => {
                   {state.selectedQuotation.purchase_orders.map((po, index) => (
                     <div key={po.id} className="mb-4 p-2 border rounded">
                       <h4 className="text-md font-medium">
-                        Purchase Order - {index + 1} (ID: {po.id}, Type: {po.order_type})
+                        Purchase Order - {index + 1} (ID: {po.id}, Type:{" "}
+                        {po.order_type})
                       </h4>
                       <p>
                         <strong>Client PO Number:</strong>{" "}
@@ -1200,7 +1278,9 @@ const ViewQuotation = () => {
                               po.items.map((item) => (
                                 <tr key={item.id} className="border">
                                   <td className="border p-2 whitespace-nowrap">
-                                    {state.itemsList.find((i) => i.id === item.item)?.name ||
+                                    {state.itemsList.find(
+                                      (i) => i.id === item.item
+                                    )?.name ||
                                       item.item_name ||
                                       "N/A"}
                                   </td>
@@ -1208,8 +1288,8 @@ const ViewQuotation = () => {
                                     {item.quantity || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    {state.units.find((u) => u.id === item.unit)?.name ||
-                                      "N/A"}
+                                    {state.units.find((u) => u.id === item.unit)
+                                      ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
                                     SAR{" "}
@@ -1220,7 +1300,9 @@ const ViewQuotation = () => {
                                   <td className="border p-2 whitespace-nowrap">
                                     SAR{" "}
                                     {item.quantity && item.unit_price
-                                      ? Number(item.quantity * item.unit_price).toFixed(2)
+                                      ? Number(
+                                          item.quantity * item.unit_price
+                                        ).toFixed(2)
                                       : "0.00"}
                                   </td>
                                 </tr>
@@ -1415,7 +1497,9 @@ const ViewQuotation = () => {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={state.poUploads[po.id]?.poStatus === "not_available"}
+                    checked={
+                      state.poUploads[po.id]?.poStatus === "not_available"
+                    }
                     onChange={() =>
                       setState((prev) => ({
                         ...prev,
@@ -1530,20 +1614,22 @@ const ViewQuotation = () => {
             <button
               onClick={handleNotApprovedSubmit}
               disabled={isSubmitting}
-              className={`px-4 py-2 rounded-md ${isSubmitting
+              className={`px-4 py-2 rounded-md ${
+                isSubmitting
                   ? "bg-indigo-400 text-white cursor-not-allowed"
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
-                }`}
+              }`}
             >
               {isSubmitting ? "Submitting..." : "Submit"}
             </button>
             <button
               onClick={closeNotApprovedModal}
               disabled={isSubmitting}
-              className={`px-4 py-2 rounded-md ${isSubmitting
+              className={`px-4 py-2 rounded-md ${
+                isSubmitting
                   ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                   : "bg-gray-300 text-gray-700 hover:bg-gray-400"
-                }`}
+              }`}
             >
               Cancel
             </button>

@@ -45,7 +45,12 @@ import DueDateReports from "./pages/Reports/DueDateReports";
 import ViewReports from "./pages/Reports/ViewReports";
 import UpdateTermsAndConditions from "./pages/PreJob/Quotation/UpdateTermsConditions";
 
-const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredAction = "view" }) => {
+const ProtectedRoute = ({
+  children,
+  isAuthenticated,
+  requiredPage,
+  requiredAction = "view",
+}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
 
@@ -98,7 +103,11 @@ const ProtectedRoute = ({ children, isAuthenticated, requiredPage, requiredActio
   }
 
   if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
   }
 
   if (!hasPermission) {
@@ -125,17 +134,31 @@ function App() {
     {
       path: "/",
       element: (
-        <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="Dashboard">
-          <Layout isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
+        <ProtectedRoute
+          isAuthenticated={isAuthenticated}
+          requiredPage="Dashboard"
+        >
+          <Layout
+            isAuthenticated={isAuthenticated}
+            setIsAuthenticated={setIsAuthenticated}
+          />
         </ProtectedRoute>
       ),
-      errorElement: <div className="flex justify-center items-center min-h-screen text-red-600">Something went wrong. Please try again or contact support.</div>,
+      errorElement: (
+        <div className="flex justify-center items-center min-h-screen text-red-600">
+          Something went wrong. Please try again or contact support.
+        </div>
+      ),
       children: [
         { index: true, element: <Dashboard /> },
         {
           path: "/add-rfq",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="add">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="rfq"
+              requiredAction="add"
+            >
               <AddRFQ />
             </ProtectedRoute>
           ),
@@ -144,7 +167,11 @@ function App() {
         {
           path: "/edit-rfq/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="rfq"
+              requiredAction="edit"
+            >
               <EditRFQ />
             </ProtectedRoute>
           ),
@@ -152,7 +179,11 @@ function App() {
         {
           path: "/view-rfq",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="rfq"
+              requiredAction="view"
+            >
               <ViewRFQ />
             </ProtectedRoute>
           ),
@@ -160,7 +191,11 @@ function App() {
         {
           path: "/view-quotation",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="quotation"
+              requiredAction="view"
+            >
               <ViewQuotation />
             </ProtectedRoute>
           ),
@@ -168,7 +203,23 @@ function App() {
         {
           path: "/view-quotation/update-terms-and-conditions",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="quotation"
+              requiredAction="edit"
+            >
+              <UpdateTermsAndConditions />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/quotations/:quotationId/terms",
+          element: (
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="quotation"
+              requiredAction="edit"
+            >
               <UpdateTermsAndConditions />
             </ProtectedRoute>
           ),
@@ -176,7 +227,11 @@ function App() {
         {
           path: "/edit-quotation/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="quotation" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="quotation"
+              requiredAction="edit"
+            >
               <EditQuotation />
             </ProtectedRoute>
           ),
@@ -188,7 +243,11 @@ function App() {
         {
           path: "/job-execution/initiate-work-order/list-all-purchase-orders",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="purchase_orders" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="purchase_orders"
+              requiredAction="view"
+            >
               <ListPurchaseOrders />
             </ProtectedRoute>
           ),
@@ -204,7 +263,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/list-all-processing-work-orders",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processing_work_orders" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="processing_work_orders"
+              requiredAction="view"
+            >
               <ListProcessingWorkOrders />
             </ProtectedRoute>
           ),
@@ -212,7 +275,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/edit-work-order/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processing_work_orders" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="processing_work_orders"
+              requiredAction="edit"
+            >
               <EditProcessingWorkOrders />
             </ProtectedRoute>
           ),
@@ -220,7 +287,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/manager-approval",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="manager_approval" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="manager_approval"
+              requiredAction="view"
+            >
               <ManagerApproval />
             </ProtectedRoute>
           ),
@@ -228,7 +299,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/delivery",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="delivery"
+              requiredAction="view"
+            >
               <Delivery />
             </ProtectedRoute>
           ),
@@ -236,7 +311,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/initiate-delivery/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="delivery" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="delivery"
+              requiredAction="edit"
+            >
               <InitiateDelivery />
             </ProtectedRoute>
           ),
@@ -244,7 +323,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/pending-deliveries",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="pending_deliveries" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="pending_deliveries"
+              requiredAction="view"
+            >
               <PendingDeliveries />
             </ProtectedRoute>
           ),
@@ -252,7 +335,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/declined-work-orders",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="declined_work_orders" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="declined_work_orders"
+              requiredAction="view"
+            >
               <DeclinedWorkOrders />
             </ProtectedRoute>
           ),
@@ -260,7 +347,11 @@ function App() {
         {
           path: "/job-execution/processing-work-orders/edit-declined-work-order/:id",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="declined_work_orders" requiredAction="edit">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="declined_work_orders"
+              requiredAction="edit"
+            >
               <EditDeclinedWorkOrders />
             </ProtectedRoute>
           ),
@@ -268,7 +359,11 @@ function App() {
         {
           path: "/post-job-phase/pending-invoices",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="pending_invoices" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="pending_invoices"
+              requiredAction="view"
+            >
               <PendingInvoices />
             </ProtectedRoute>
           ),
@@ -276,7 +371,11 @@ function App() {
         {
           path: "/post-job-phase/raised-invoices",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="raised_invoices" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="raised_invoices"
+              requiredAction="view"
+            >
               <RaisedInvoices />
             </ProtectedRoute>
           ),
@@ -284,7 +383,11 @@ function App() {
         {
           path: "/post-job-phase/processed-invoices",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="processed_invoices" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="processed_invoices"
+              requiredAction="view"
+            >
               <ProcessedInvoices />
             </ProtectedRoute>
           ),
@@ -300,7 +403,11 @@ function App() {
         {
           path: "/reports/view-reports",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="view_reports" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="view_reports"
+              requiredAction="view"
+            >
               <ViewReports />
             </ProtectedRoute>
           ),
@@ -308,7 +415,11 @@ function App() {
         {
           path: "/reports/due-date-reports",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="due_date_reports" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="due_date_reports"
+              requiredAction="view"
+            >
               <DueDateReports />
             </ProtectedRoute>
           ),
@@ -316,7 +427,10 @@ function App() {
         {
           path: "/profile",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="Profile">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="Profile"
+            >
               <Profile />
             </ProtectedRoute>
           ),
@@ -324,7 +438,11 @@ function App() {
         {
           path: "/additional-settings/add-series",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="series" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="series"
+              requiredAction="view"
+            >
               <Series />
             </ProtectedRoute>
           ),
@@ -332,7 +450,11 @@ function App() {
         {
           path: "/additional-settings/add-item",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="item" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="item"
+              requiredAction="view"
+            >
               <Item />
             </ProtectedRoute>
           ),
@@ -340,7 +462,11 @@ function App() {
         {
           path: "/additional-settings/add-unit",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="unit" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="unit"
+              requiredAction="view"
+            >
               <Unit />
             </ProtectedRoute>
           ),
@@ -348,7 +474,11 @@ function App() {
         {
           path: "/additional-settings/add-team",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="team" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="team"
+              requiredAction="view"
+            >
               <Team />
             </ProtectedRoute>
           ),
@@ -356,7 +486,11 @@ function App() {
         {
           path: "/additional-settings/add-rfq-channel",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="rfq_channel" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="rfq_channel"
+              requiredAction="view"
+            >
               <Channels />
             </ProtectedRoute>
           ),
@@ -364,7 +498,11 @@ function App() {
         {
           path: "/user-roles/users",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="users" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="users"
+              requiredAction="view"
+            >
               <Users />
             </ProtectedRoute>
           ),
@@ -372,7 +510,11 @@ function App() {
         {
           path: "/user-roles/roles",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="roles" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="roles"
+              requiredAction="view"
+            >
               <Roles />
             </ProtectedRoute>
           ),
@@ -380,7 +522,11 @@ function App() {
         {
           path: "/user-roles/permissions",
           element: (
-            <ProtectedRoute isAuthenticated={isAuthenticated} requiredPage="permissions" requiredAction="view">
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="permissions"
+              requiredAction="view"
+            >
               <Permissions />
             </ProtectedRoute>
           ),
