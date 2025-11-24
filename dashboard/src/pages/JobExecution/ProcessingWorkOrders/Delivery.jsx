@@ -215,6 +215,15 @@ const Delivery = () => {
     }
   };
 
+  const hasRealDeliveryNote = (workOrderId) => {
+  return state.deliveryNotes.some(
+    (dn) =>
+      dn.work_order_id === workOrderId &&
+      dn.dn_number &&
+      !dn.dn_number.startsWith("TEMP-DN")
+  );
+};
+
   return (
     <div className="mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Delivery</h1>
@@ -320,24 +329,15 @@ const Delivery = () => {
                           onClick={() => handleInitiateDelivery(wo)}
                           disabled={
                             !hasPermission("delivery", "edit") ||
-                            state.deliveryNotes.some(
-                              (dn) => dn.work_order_id === wo.id
-                            )
+                            hasRealDeliveryNote(wo.id)
                           }
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
-                            !hasPermission("delivery", "edit") ||
-                            state.deliveryNotes.some(
-                              (dn) => dn.work_order_id === wo.id
-                            )
+                            !hasPermission("delivery", "edit") || hasRealDeliveryNote(wo.id)
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-indigo-600 text-white hover:bg-indigo-700"
                           }`}
                         >
-                          {state.deliveryNotes.some(
-                            (dn) => dn.work_order_id === wo.id
-                          )
-                            ? "Delivery Initiated"
-                            : "Initiate Delivery"}
+                          {hasRealDeliveryNote(wo.id) ? "Delivery Initiated" : "Initiate Delivery"}
                         </button>
                       </div>
                     </td>
