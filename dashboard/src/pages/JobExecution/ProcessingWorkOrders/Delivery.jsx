@@ -320,22 +320,16 @@ const Delivery = () => {
                           onClick={() => handleInitiateDelivery(wo)}
                           disabled={
                             !hasPermission("delivery", "edit") ||
-                            state.deliveryNotes.some(
-                              (dn) => dn.work_order_id === wo.id
-                            )
+                            state.deliveryNotes.some((dn) => dn.work_order === wo.id)
                           }
                           className={`whitespace-nowrap px-3 py-1 rounded-md text-sm ${
                             !hasPermission("delivery", "edit") ||
-                            state.deliveryNotes.some(
-                              (dn) => dn.work_order_id === wo.id
-                            )
+                            state.deliveryNotes.some((dn) => dn.work_order === wo.id)
                               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                               : "bg-indigo-600 text-white hover:bg-indigo-700"
                           }`}
                         >
-                          {state.deliveryNotes.some(
-                            (dn) => dn.work_order_id === wo.id
-                          )
+                          {state.deliveryNotes.some((dn) => dn.work_order === wo.id)
                             ? "Delivery Initiated"
                             : "Initiate Delivery"}
                         </button>
