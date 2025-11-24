@@ -120,32 +120,18 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             delivery_note = work_order.delivery_notes.first()
             if delivery_note:
-                # Generate proper DN number
-                max_sequence = DeliveryNote.objects.filter(
-                    dn_number__startswith=dn_series.prefix
-                ).aggregate(Max("dn_number"))["dn_number__max"]
-                sequence = 1 if not max_sequence else int(max_sequence.split("-")[-1]) + 1
-                dn_number = f"{dn_series.prefix}-{sequence:06d}"
-                
-                delivery_note.dn_number = dn_number
+                delivery_note.dn_number = f"TEMP-DN-{work_order.id:06d}"
                 delivery_note.series = dn_series
                 delivery_note.delivery_status = "Delivery Pending"
                 delivery_note.save()
                 logger.info(
-                    f"Updated existing Delivery Note with DN {dn_number} for WorkOrder {pk}"
+                    f"Updated existing Delivery Note with temp DN for WorkOrder {pk}"
                 )
             else:
-                # Generate proper DN number
-                max_sequence = DeliveryNote.objects.filter(
-                    dn_number__startswith=dn_series.prefix
-                ).aggregate(Max("dn_number"))["dn_number__max"]
-                sequence = 1 if not max_sequence else int(max_sequence.split("-")[-1]) + 1
-                dn_number = f"{dn_series.prefix}-{sequence:06d}"
-                
                 delivery_note = DeliveryNote.objects.create(
                     work_order=work_order,
                     series=dn_series,
-                    dn_number=dn_number,
+                    dn_number=f"TEMP-DN-{work_order.id:06d}",
                     delivery_status="Delivery Pending",
                 )
                 for item in work_order.items.all():
@@ -164,26 +150,18 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                         invoice_status="pending",
                     )
                 logger.info(
-                    f"Created new Delivery Note with DN {dn_number} for WorkOrder {pk}"
+                    f"Created new Delivery Note with temp DN for WorkOrder {pk}"
                 )
 
-            # ✅ CRITICAL FIX: Update work order status to "Approved"
             work_order.manager_approval_status = "Approved"
             work_order.status = "Approved"
             work_order.save()
-            
-            logger.info(f"WorkOrder {pk} status updated to Approved")
 
-            # Serialize the updated work order to return
-            serializer = WorkOrderSerializer(work_order)
-            
-            return Response(
-                {
-                    "status": "Work Order approved and Delivery Note created/updated",
-                    "work_order": serializer.data,
-                    "dn_number": delivery_note.dn_number
-                }
-            )
+        return Response(
+            {
+                "status": "Work Order approved and Delivery Note updated/created with temporary DN"
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="decline")
     def decline(self, request, pk=None):
