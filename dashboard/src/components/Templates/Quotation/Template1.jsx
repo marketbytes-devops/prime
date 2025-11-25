@@ -182,7 +182,7 @@ const Template1 = ({ data }) => {
           <p><strong>Notes</strong></p>
           <p>Looking forward for your business.</p>
           {terms?.content ? (
-            <div
+            <div className="ql-editor"
               dangerouslySetInnerHTML={{ __html: terms.content }}
               style={{ fontSize: '14px' }}
             />

@@ -76,26 +76,28 @@ option {
   border: 2px solid white;
 }
 
-.ql-align-right {
-  text-align: right !important;
-}
-
 .ql-align-center {
   text-align: center !important;
 }
-
+.ql-align-right {
+  text-align: right !important;
+}
+.ql-align-left {
+  text-align: left !important;
+}
 .ql-align-justify {
   text-align: justify !important;
 }
 
-.ql-align-left {
-  text-align: left !important;
+.ql-editor .ql-align-center,
+.ql-editor .ql-align-right,
+.ql-editor .ql-align-left,
+.ql-editor .ql-align-justify {
+  text-align: inherit !important;
 }
 
-.prose .ql-align-right,
-.prose .ql-align-center,
-.prose .ql-align-justify,
-.prose .ql-align-left {
+.ql-align-center,
+.ql-align-right,
+.ql-align-justify {
   display: block;
-  width: 100%;
 }
