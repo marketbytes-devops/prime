@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom"; // Added useParams
+import { useNavigate, useParams } from "react-router-dom"; 
 import { toast } from "react-toastify";
 import apiClient from "../../../helpers/apiClient";
 import ReactQuill from "react-quill";
@@ -7,18 +7,16 @@ import "react-quill/dist/quill.snow.css";
 
 const UpdateTermsAndConditions = () => {
   const navigate = useNavigate();
-  const { quotationId } = useParams(); // Get quotation ID from URL
+  const { quotationId } = useParams(); 
   const [content, setContent] = useState("");
   const [isEdit, setIsEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [termsId, setTermsId] = useState(null);
   const [quotationData, setQuotationData] = useState(null);
 
-  // Fetch quotation data including its terms
   const fetchQuotationWithTerms = async () => {
     try {
       if (!quotationId) {
-        // If no quotation ID, this might be for global template
         const res = await apiClient.get("/quotation-terms/latest/");
         const data = res.data;
         setContent(data.content || "");
@@ -26,8 +24,6 @@ const UpdateTermsAndConditions = () => {
         setLoading(false);
         return;
       }
-
-      // Fetch specific quotation with its terms
       const res = await apiClient.get(`/quotations/${quotationId}/`);
       const quotation = res.data;
       setQuotationData(quotation);
@@ -59,7 +55,6 @@ const UpdateTermsAndConditions = () => {
 
     try {
       if (quotationId) {
-        // Update terms for specific quotation
         await apiClient.patch(`/quotations/${quotationId}/`, {
           terms: {
             content: content,
@@ -67,7 +62,6 @@ const UpdateTermsAndConditions = () => {
         });
         toast.success("Terms updated for this quotation");
       } else {
-        // Global terms update (template)
         const payload = { content };
         if (termsId) {
           await apiClient.patch(`/quotation-terms/${termsId}/`, payload);
@@ -80,7 +74,6 @@ const UpdateTermsAndConditions = () => {
       }
 
       setIsEdit(false);
-      // Refresh data
       await fetchQuotationWithTerms();
     } catch (e) {
       console.error("Save error:", e);
@@ -88,36 +81,6 @@ const UpdateTermsAndConditions = () => {
     }
   };
 
-  const handleCloneFromTemplate = async () => {
-    try {
-      // Get latest global template
-      const templateRes = await apiClient.get("/quotation-terms/latest/");
-      if (templateRes.data && templateRes.data.content) {
-        setContent(templateRes.data.content);
-        toast.success("Loaded template terms");
-      } else {
-        toast.info("No template terms available");
-      }
-    } catch (e) {
-      console.error("Clone error:", e);
-      toast.error("Failed to load template");
-    }
-  };
-
-  const handleRemoveTerms = async () => {
-    if (!quotationId) return;
-
-    try {
-      await apiClient.delete(`/quotations/${quotationId}/remove-terms/`);
-      setContent("");
-      setTermsId(null);
-      toast.success("Terms removed from quotation");
-      setIsEdit(false);
-    } catch (e) {
-      console.error("Remove error:", e);
-      toast.error("Failed to remove terms");
-    }
-  };
 
   const modules = {
     toolbar: [
@@ -148,7 +111,7 @@ const UpdateTermsAndConditions = () => {
     "image",
   ];
 
-  if (loading) return <div className="p-4">Loading...</div>;
+  if (loading) return <div className="p-4"></div>;
 
   return (
     <div className="mx-auto p-4">
@@ -171,28 +134,6 @@ const UpdateTermsAndConditions = () => {
 
       {isEdit ? (
         <>
-          {/* Template Actions */}
-          {quotationId && (
-            <div className="mb-4 flex gap-2">
-              <button
-                onClick={handleCloneFromTemplate}
-                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                type="button"
-              >
-                Load Template
-              </button>
-              {termsId && (
-                <button
-                  onClick={handleRemoveTerms}
-                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                  type="button"
-                >
-                  Remove Terms
-                </button>
-              )}
-            </div>
-          )}
-
           <ReactQuill
             theme="snow"
             value={content}

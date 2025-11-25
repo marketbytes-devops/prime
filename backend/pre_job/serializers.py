@@ -570,7 +570,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
-        terms_data = validated_data.pop("terms", None)  # Extract terms data
+        terms_data = validated_data.pop("terms", None)  
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
         
         try:
@@ -591,22 +591,17 @@ class QuotationSerializer(serializers.ModelSerializer):
         if "followup_frequency" not in validated_data:
             validated_data["followup_frequency"] = "24_hours"
 
-        # Create quotation first
         quotation = Quotation.objects.create(
             series_number=series_number,
             assigned_sales_person=assigned_sales_person,
             **validated_data,
         )
 
-        # Handle terms creation
-    # Handle terms creation
         if terms_data:
-            # Create new terms instance for this quotation
             terms_instance = QuotationTerms.objects.create(**terms_data)
             quotation.terms = terms_instance
             quotation.save()
         else:
-            # ✅ Create default terms with your actual content
             default_terms_content = """
             <h3>Terms & Conditions</h3>
             <h4>Calibration Service General Terms and Conditions</h4>
@@ -637,9 +632,9 @@ class QuotationSerializer(serializers.ModelSerializer):
             
             <p><strong>• VAT:</strong> VAT is excluded from our quotation and will be charged at 15% extra.</p>
             
-            <p><strong>For Prime Innovation Company</strong><br>
+            <p><strong>For Prime Innovation Company<br>
             Hari Krishnan M<br>
-            Head - Engineering and QA/QC</p>
+            Head - Engineering and QA/QC</strong></p>
             """
             
             default_terms = QuotationTerms.objects.create(
