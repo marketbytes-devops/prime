@@ -928,7 +928,7 @@ const handlePrint = async (quotation) => {
                         >
                           {quotation.has_custom_terms
                             ? "View Terms"
-                            : "Add Terms"}
+                            : "Update Terms"}
                         </button>
                         <button
                           onClick={() => handlePrint(quotation)}
