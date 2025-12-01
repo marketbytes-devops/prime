@@ -25,7 +25,7 @@ const Template1 = ({ data }) => {
     vat_applicable,
     vat_amount,
     grand_total,
-    terms,               // <-- dynamic terms object
+    terms,               
   } = data;
 
   // Format date as "24 Aug 2025"
@@ -181,11 +181,8 @@ const Template1 = ({ data }) => {
         <div style={{ marginTop: '20px' }}>
           <p><strong>Notes</strong></p>
           <p>Looking forward for your business.</p>
-
-          <p><strong>Terms & Conditions</strong></p>
-
           {terms?.content ? (
-            <div
+            <div className="ql-editor"
               dangerouslySetInnerHTML={{ __html: terms.content }}
               style={{ fontSize: '14px' }}
             />
