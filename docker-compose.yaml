@@ -28,11 +28,6 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - prime_network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   backend:
     build: ./backend
@@ -49,16 +44,12 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mysql
     ports:
-      - "6370:8000"
+      - "6370:8000" 
     volumes:
       - ./backend:/app
       - media_data:/app/media
-      - static_data:/app/staticfiles
     networks:
       - prime_network
 
@@ -142,4 +133,3 @@ volumes:
   mysql_data:
   redis_data:
   media_data:
-  static_data:
