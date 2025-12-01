@@ -10,6 +10,11 @@ services:
       - redis_data:/data
     networks:
       - prime_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   mysql:
     image: mysql:8.0
@@ -23,6 +28,11 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - prime_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   backend:
     build: ./backend
@@ -39,8 +49,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "6370:8000"
     volumes:
@@ -50,9 +62,9 @@ services:
     networks:
       - prime_network
 
-  celery:
+  celery-worker:
     build: ./backend
-    container_name: prime_celery
+    container_name: prime_celery_worker
     restart: always
     env_file:
       - ./backend/.env
@@ -64,15 +76,21 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_WORKER_CONCURRENCY: 4
     depends_on:
-      - mysql
-      - redis
       - backend
+      - redis
     volumes:
       - ./backend:/app
       - media_data:/app/media
       - static_data:/app/staticfiles
-    command: celery -A backend worker --loglevel=info
+    command: >
+      sh -c "
+      echo 'Waiting for backend to be ready...'
+      sleep 15
+      echo 'Starting Celery worker...'
+      celery -A backend worker --loglevel=info --concurrency=4
+      "
     networks:
       - prime_network
 
@@ -91,14 +109,19 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
-      - mysql
-      - redis
       - backend
+      - redis
     volumes:
       - ./backend:/app
       - media_data:/app/media
       - static_data:/app/staticfiles
-    command: celery -A backend beat --loglevel=info
+    command: >
+      sh -c "
+      echo 'Waiting for backend to be ready...'
+      sleep 20
+      echo 'Starting Celery Beat...'
+      celery -A backend beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+      "
     networks:
       - prime_network
 
