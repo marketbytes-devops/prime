@@ -102,26 +102,44 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         return 0
 
 
+# pre_job/serializers.py
+# ← ONLY REPLACE THE RFQSerializer CLASS BELOW →
+
+
 class RFQSerializer(serializers.ModelSerializer):
-    company_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
-    company_address = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
-    company_phone = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
-    company_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    
+    company_name = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, allow_null=True
+    )
+    company_address = serializers.CharField(
+        max_length=200, required=False, allow_blank=True, allow_null=True
+    )
+    company_phone = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, allow_null=True
+    )
+    company_email = serializers.EmailField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     rfq_channel = serializers.PrimaryKeyRelatedField(
         queryset=RFQChannel.objects.all(), allow_null=True, required=False
     )
-    
-    point_of_contact_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
-    point_of_contact_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    point_of_contact_phone = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
-    
+
+    point_of_contact_name = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, allow_null=True
+    )
+    point_of_contact_email = serializers.EmailField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    point_of_contact_phone = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, allow_null=True
+    )
+
     assigned_sales_person = serializers.PrimaryKeyRelatedField(
         queryset=TeamMember.objects.all(), allow_null=True, required=False
     )
-    
+
     due_date_for_quotation = serializers.DateField(required=False, allow_null=True)
-    
+
     items = RFQItemSerializer(many=True, required=False)
     rfq_status = serializers.ChoiceField(
         choices=[
@@ -184,122 +202,95 @@ class RFQSerializer(serializers.ModelSerializer):
                 "Selected team member must have a valid email address."
             )
         return value
-    
 
-    def send_creation_email(self, rfq):
-        email_sent = False
-        recipient_list = []
-
-        if rfq.assigned_sales_person and rfq.assigned_sales_person.email:
-            recipient_list.append(
-                (rfq.assigned_sales_person.email, rfq.assigned_sales_person.name)
-            )
-        if settings.ADMIN_EMAIL:
-            recipient_list.append((settings.ADMIN_EMAIL, None))
-        
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
-            for user in superadmin_users:
-                if user.email:
-                    recipient_list.append((user.email, user.name or user.username))
-
-        recipient_dict = {email: name for email, name in recipient_list}
-        recipient_list = [(email, name) for email, name in recipient_dict.items()]
-
-        if recipient_list:
-            for email, name in recipient_list:
-                if email == settings.ADMIN_EMAIL:
-                    salutation = "Dear Admin"
-                elif (
-                    superadmin_role
-                    and CustomUser.objects.filter(
-                        email=email, role=superadmin_role
-                    ).exists()
-                ):
-                    salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif (
-                    email
-                    == (
-                        rfq.assigned_sales_person.email
-                        if rfq.assigned_sales_person
-                        else None
-                    )
-                    and name
-                ):
-                    salutation = f"Dear {name}"
-                else:
-                    salutation = "Dear Recipient"
-
-                subject = f"New RFQ Created: #{rfq.series_number}"
-                message = (
-                    f"{salutation},\n\n"
-                    f"A new Request for Quotation (RFQ) has been created in PrimeCRM:\n"
-                    f"------------------------------------------------------------\n"
-                    f"🔹 RFQ Number: {rfq.series_number}\n"
-                    f'🔹 Project: {rfq.company_name or "Not specified"}\n'
-                    f'🔹 Due Date: {rfq.due_date_for_quotation or "Not specified"}\n'
-                    f'🔹 Status: {rfq.rfq_status or "Pending"}\n'
-                    f'🔹 Assigned To: {rfq.assigned_sales_person.name if rfq.assigned_sales_person else "Not assigned"}\n'
-                    f'🔹 Company: {rfq.company_name or "Not specified"}\n'
-                    f'🔹 Contact: {rfq.point_of_contact_name or "Not specified"} ({rfq.point_of_contact_email or "Not specified"})\n'
-                    f"------------------------------------------------------------\n"
-                    f"Please log in to your PrimeCRM dashboard to view the details and take any necessary actions.\n\n"
-                    f"Best regards,\n"
-                    f"PrimeCRM Team\n"
-                    f"---\n"
-                    f"This is an automated message. Please do not reply to this email."
-                )
-                try:
-                    send_mail(
-                        subject=subject,
-                        message=message,
-                        from_email=settings.EMAIL_HOST_USER,
-                        recipient_list=[email],
-                        fail_silently=True,
-                    )
-                    email_sent = True
-                    print(
-                        f"RFQ creation email sent successfully to {email} for RFQ #{rfq.series_number}"
-                    )
-                except Exception as e:
-                    print(
-                        f"Failed to send RFQ creation email to {email} for RFQ #{rfq.series_number}: {str(e)}"
-                    )
-        return email_sent
+    # REMOVED: send_creation_email() → now handled by Celery task
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
-        
+
+        # Generate series number
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Quotation series not found.")
-        
+
         max_sequence = RFQ.objects.filter(
             series_number__startswith=quotation_series.prefix
         ).aggregate(Max("series_number"))["series_number__max"]
-        
+
         sequence = 1
         if max_sequence:
             sequence = int(max_sequence.split("-")[-1]) + 1
-        
+
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
-        
+
+        # Create RFQ
         rfq = RFQ.objects.create(
             series_number=series_number,
             assigned_sales_person=assigned_sales_person,
             **validated_data,
         )
-        
-        for item_data in items_data:
-            RFQItem.objects.create(rfq=rfq, **item_data)
-        
-        creation_email_sent = self.send_creation_email(rfq)
-        rfq.email_sent = creation_email_sent
-        rfq.save()
-        
+
+        # Bulk create items (fast even with 500+ items)
+        rfq_items = [RFQItem(rfq=rfq, **item_data) for item_data in items_data]
+        RFQItem.objects.bulk_create(rfq_items)
+
+        # ASYNC EMAIL: Fire and forget using Celery
+        from .tasks import send_rfq_creation_email_task
+
+        recipients = []
+        if assigned_sales_person and assigned_sales_person.email:
+            recipients.append(
+                (
+                    assigned_sales_person.email,
+                    assigned_sales_person.name or assigned_sales_person.email,
+                )
+            )
+
+        if settings.ADMIN_EMAIL:
+            recipients.append((settings.ADMIN_EMAIL, "Admin"))
+
+        superadmin_role = Role.objects.filter(name="Superadmin").first()
+        if superadmin_role:
+            for user in CustomUser.objects.filter(
+                role=superadmin_role
+            ).select_related():
+                if user.email:
+                    name = user.get_full_name() or user.username
+                    recipients.append((user.email, name))
+
+        # Remove duplicate emails
+        seen = set()
+        unique_recipients = []
+        for email, name in recipients:
+            if email not in seen:
+                seen.add(email)
+                unique_recipients.append((email, name))
+
+        # Prepare data for email
+        rfq_data = {
+            "series_number": rfq.series_number,
+            "company_name": rfq.company_name or "Not specified",
+            "due_date": (
+                rfq.due_date_for_quotation.strftime("%Y-%m-%d")
+                if rfq.due_date_for_quotation
+                else "Not specified"
+            ),
+            "assigned_name": (
+                assigned_sales_person.name if assigned_sales_person else "Not assigned"
+            ),
+            "contact_name": rfq.point_of_contact_name or "Not specified",
+            "contact_email": rfq.point_of_contact_email or "Not specified",
+        }
+
+        # This returns instantly — email sent in background
+        send_rfq_creation_email_task.delay(rfq_data, unique_recipients)
+
+        # Optimistically mark as sent (you can add a retry mechanism later if needed)
+        rfq.email_sent = True
+        rfq.save(update_fields=["email_sent"])
+
         return rfq
 
     def update(self, instance, validated_data):
@@ -307,72 +298,22 @@ class RFQSerializer(serializers.ModelSerializer):
         assigned_sales_person = validated_data.get(
             "assigned_sales_person", instance.assigned_sales_person
         )
-        
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
         instance.save()
-        
+
         if items_data is not None:
             instance.items.all().delete()
-            for item_data in items_data:
-                RFQItem.objects.create(rfq=instance, **item_data)
-        
+            rfq_items = [RFQItem(rfq=instance, **item_data) for item_data in items_data]
+            RFQItem.objects.bulk_create(rfq_items)
+
         return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation["email_sent"] = getattr(instance, "email_sent", False)
         return representation
-    
-    def create_with_items(self, validated_data, items_data):
-        """
-        Create RFQ with bulk items (optimized for 500+ items)
-        """
-        assigned_sales_person = validated_data.pop("assigned_sales_person", None)
-        
-        try:
-            quotation_series = NumberSeries.objects.get(series_name="Quotation")
-        except NumberSeries.DoesNotExist:
-            raise serializers.ValidationError("Quotation series not found.")
-        
-        max_sequence = RFQ.objects.filter(
-            series_number__startswith=quotation_series.prefix
-        ).aggregate(Max("series_number"))["series_number__max"]
-        
-        sequence = 1
-        if max_sequence:
-            sequence = int(max_sequence.split("-")[-1]) + 1
-        
-        series_number = f"{quotation_series.prefix}-{sequence:06d}"
-        
-        # Create RFQ
-        rfq = RFQ.objects.create(
-            series_number=series_number,
-            assigned_sales_person=assigned_sales_person,
-            **validated_data,
-        )
-        
-        # Bulk create items (MUCH faster for 500+ items)
-        rfq_items = []
-        for item_data in items_data:
-            rfq_items.append(RFQItem(
-                rfq=rfq,
-                item_id=item_data['item'],
-                quantity=item_data['quantity'],
-                unit_id=item_data['unit'],
-                unit_price=item_data.get('unit_price')
-            ))
-        
-        # Use bulk_create for performance
-        RFQItem.objects.bulk_create(rfq_items)
-        
-        # Send email
-        creation_email_sent = self.send_creation_email(rfq)
-        rfq.email_sent = creation_email_sent
-        rfq.save()
-        
-        return rfq
 
 
 class QuotationSerializer(serializers.ModelSerializer):
@@ -384,17 +325,17 @@ class QuotationSerializer(serializers.ModelSerializer):
         queryset=TeamMember.objects.all(), allow_null=True
     )
     items = QuotationItemSerializer(many=True, required=True)
-    
+
     # FIXED: Terms should be read-write, not read-only
     terms = QuotationTermsSerializer(required=False, allow_null=True)
     terms_id = serializers.PrimaryKeyRelatedField(
         queryset=QuotationTerms.objects.all(),
-        source='terms',
+        source="terms",
         write_only=True,
         required=False,
-        allow_null=True
+        allow_null=True,
     )
-    
+
     quotation_status = serializers.ChoiceField(
         choices=[
             ("Pending", "Pending"),
@@ -572,22 +513,22 @@ class QuotationSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items", [])
         terms_data = validated_data.pop("terms", None)  # Extract terms data
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
-        
+
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
         except NumberSeries.DoesNotExist:
             raise serializers.ValidationError("Quotation series not found.")
-        
+
         max_sequence = Quotation.objects.filter(
             series_number__startswith=quotation_series.prefix
         ).aggregate(Max("series_number"))["series_number__max"]
-        
+
         sequence = 1
         if max_sequence:
             sequence = int(max_sequence.split("-")[-1]) + 1
-        
+
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
-        
+
         if "followup_frequency" not in validated_data:
             validated_data["followup_frequency"] = "24_hours"
 
@@ -599,7 +540,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         )
 
         # Handle terms creation
-    # Handle terms creation
+        # Handle terms creation
         if terms_data:
             # Create new terms instance for this quotation
             terms_instance = QuotationTerms.objects.create(**terms_data)
@@ -641,21 +582,19 @@ class QuotationSerializer(serializers.ModelSerializer):
             Hari Krishnan M<br>
             Head - Engineering and QA/QC</p>
             """
-            
-            default_terms = QuotationTerms.objects.create(
-                content=default_terms_content
-            )
+
+            default_terms = QuotationTerms.objects.create(content=default_terms_content)
             quotation.terms = default_terms
             quotation.save()
 
         # Create items
         for item_data in items_data:
             QuotationItem.objects.create(quotation=quotation, **item_data)
-        
+
         email_sent = self.send_submission_email(quotation)
         quotation.email_sent = email_sent
         quotation.save()
-        
+
         return quotation
 
     def update(self, instance, validated_data):
@@ -667,7 +606,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         not_approved_reason_remark = validated_data.get(
             "not_approved_reason_remark", instance.not_approved_reason_remark
         )
-        
+
         if (
             validated_data.get("quotation_status") == "Not Approved"
             and not not_approved_reason_remark
@@ -675,11 +614,11 @@ class QuotationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "A reason must be provided when setting status to 'Not Approved'."
             )
-        
+
         # Update quotation fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         # Handle followup frequency update
         if (
             validated_data.get("followup_frequency")
@@ -694,7 +633,7 @@ class QuotationSerializer(serializers.ModelSerializer):
                 instance.next_followup_date = today + timedelta(days=7)
             elif validated_data["followup_frequency"] == "every_7th_day":
                 instance.next_followup_date = today + timedelta(days=7)
-        
+
         instance.save()
 
         # Handle terms update
@@ -715,13 +654,14 @@ class QuotationSerializer(serializers.ModelSerializer):
             instance.items.all().delete()
             for item_data in items_data:
                 QuotationItem.objects.create(quotation=instance, **item_data)
-        
+
         return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation["email_sent"] = getattr(instance, "email_sent", False)
         return representation
+
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     quotation = serializers.PrimaryKeyRelatedField(queryset=Quotation.objects.all())
