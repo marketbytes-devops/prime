@@ -74,12 +74,9 @@ services:
     volumes:
       - ./backend:/app
       - media_data:/app/media
-      - static_data:/app/staticfiles
     command: >
       sh -c "
-      echo 'Waiting for backend to be ready...'
       sleep 15
-      echo 'Starting Celery worker...'
       celery -A backend worker --loglevel=info --concurrency=4
       "
     networks:
@@ -105,12 +102,9 @@ services:
     volumes:
       - ./backend:/app
       - media_data:/app/media
-      - static_data:/app/staticfiles
     command: >
       sh -c "
-      echo 'Waiting for backend to be ready...'
       sleep 20
-      echo 'Starting Celery Beat...'
       celery -A backend beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
       "
     networks:
