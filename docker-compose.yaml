@@ -1,6 +1,16 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: prime_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - prime_network
+
   mysql:
     image: mysql:8.0
     container_name: mysql_primedb
@@ -23,14 +33,72 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       DJANGO_SETTINGS_MODULE: backend.settings
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
       - mysql
+      - redis
     ports:
-      - "6370:8000" # Django Gunicorn exposed at 6700
+      - "6370:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
+      - static_data:/app/staticfiles
+    networks:
+      - prime_network
+
+  celery:
+    build: ./backend
+    container_name: prime_celery
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DJANGO_SETTINGS_MODULE: backend.settings
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - mysql
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    command: celery -A backend worker --loglevel=info
+    networks:
+      - prime_network
+
+  celery-beat:
+    build: ./backend
+    container_name: prime_celery_beat
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DJANGO_SETTINGS_MODULE: backend.settings
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - mysql
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    command: celery -A backend beat --loglevel=info
     networks:
       - prime_network
 
@@ -39,7 +107,7 @@ services:
     container_name: prime_frontend
     restart: always
     ports:
-      - "6371:80" # Frontend served via Nginx at 6701
+      - "6371:80"
     networks:
       - prime_network
 
@@ -49,4 +117,6 @@ networks:
 
 volumes:
   mysql_data:
+  redis_data:
   media_data:
+  static_data:
