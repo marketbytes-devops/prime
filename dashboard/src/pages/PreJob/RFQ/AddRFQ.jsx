@@ -488,6 +488,8 @@ const AddRFQ = () => {
 
   const handlePrev = () => setStep((s) => s - 1);
 
+  // AddRFQ.jsx → Replace your handleSubmit function with this one:
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -498,6 +500,7 @@ const AddRFQ = () => {
     }
 
     setLoading(true);
+
     const validItems = state.items.filter(
       (it) =>
         it.item &&
@@ -530,7 +533,24 @@ const AddRFQ = () => {
 
     try {
       await apiClient.post("rfqs/", payload);
-      toast.success("RFQ Created Successfully!");
+
+      // SUCCESS TOAST WITH BACKGROUND EMAIL INFO
+      toast.success(
+        <div>
+          <strong>RFQ Created Successfully!</strong>
+          <br />
+          <span className="text-sm opacity-90">
+            Notification emails are being sent in the background...
+          </span>
+        </div>,
+        {
+          icon: "Success",
+          style: { background: "#10b981", color: "white" },
+          progressStyle: { background: "#86efac" },
+          autoClose: 5000,
+        }
+      );
+
       navigate("/view-rfq");
     } catch (err) {
       console.error("RFQ submission error:", err);
@@ -1046,13 +1066,35 @@ const AddRFQ = () => {
               <button
                 type="submit"
                 disabled={loading || !state.company_name.trim()}
-                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-2 rounded-lg ml-auto transition-opacity duration-300 ${
+                className={`bg-green-600 hover:bg-green-700 text-white px-12 py-3 rounded-lg ml-auto flex items-center gap-3 transition-all duration-300 ${
                   loading || !state.company_name.trim()
                     ? "opacity-50 cursor-not-allowed"
-                    : "opacity-90 hover:opacity-100"
+                    : "opacity-90 hover:opacity-100 shadow-lg"
                 }`}
               >
-                {loading ? "Saving…" : "Submit RFQ"}
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Creating RFQ...
+                  </>
+                ) : (
+                  "Submit RFQ"
+                )}
               </button>
             )}
           </div>

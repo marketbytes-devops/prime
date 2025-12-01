@@ -229,21 +229,32 @@ class QuotationViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(rfq=rfq_id)
         return queryset
 
+    @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         series_number = instance.series_number
+        
+        # Delete immediately
         self.perform_destroy(instance)
+        
+        # Only re-sequence if it had a QUO-PRIME number
         if series_number and series_number.startswith('QUO-PRIME'):
-            sequence = int(series_number.split('-')[-1])
-            subsequent_quotations = Quotation.objects.filter(
-                series_number__startswith='QUO-PRIME',
-                series_number__gt=series_number
-            ).order_by('series_number')
-            for quotation in subsequent_quotations:
-                current_sequence = int(quotation.series_number.split('-')[-1])
-                new_sequence = current_sequence - 1
-                quotation.series_number = f"QUO-PRIME-{new_sequence:06d}"
-                quotation.save()
+            try:
+                prefix = series_number.rsplit('-', 1)[0] + '-'
+                remaining = RFQ.objects.filter(
+                    series_number__startswith=prefix
+                ).order_by('series_number')
+                
+                # Re-number sequentially
+                for index, rfq in enumerate(remaining, start=1):
+                    expected = f"{prefix}{index:06d}"
+                    if rfq.series_number != expected:
+                        rfq.series_number = expected
+                        rfq.save(update_fields=['series_number'])
+            except Exception as e:
+                # Log but don't crash delete
+                print(f"Re-sequencing failed: {e}")
+        
         return Response(status=204)
 
     # ✅ ADD THIS ACTION for updating terms
