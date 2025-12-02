@@ -6,6 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_rfq_creation_email_task(self, rfq_data, recipients):
     try:
@@ -45,3 +46,39 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
     except Exception as exc:
         logger.error(f"RFQ email task failed: {exc}")
         raise self.retry(exc=exc)
+
+    # pre_job/tasks.py → ADD THIS NEW TASK
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_quotation_submission_email_task(self, quotation_data, recipients):
+    logger.info(f"Starting Quotation email task for #{quotation_data['series_number']}")
+
+    subject = f"New Quotation Submitted: #{quotation_data['series_number']}"
+    message = (
+        f"Dear Team,\n\n"
+        f"A new quotation has been submitted in PrimeCRM:\n"
+        f"------------------------------------------------------------\n"
+        f"Quotation No: {quotation_data['series_number']}\n"
+        f"Company: {quotation_data['company_name']}\n"
+        f"Contact: {quotation_data['contact_name']} ({quotation_data['contact_email']})\n"
+        f"Assigned To: {quotation_data['assigned_name']}\n"
+        f"Status: {quotation_data['status']}\n"
+        f"------------------------------------------------------------\n"
+        f"Please log in to review.\n\n"
+        f"Best regards,\nPrimeCRM System"
+    )
+
+    for email, name in recipients:
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            logger.info(f"Quotation email sent to {email}")
+        except Exception as e:
+            logger.error(f"Failed to send quotation email to {email}: {e}")
+            raise self.retry(exc=e)
