@@ -30,6 +30,7 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
         for email, name in recipients:
             try:
                 send_mail(
+                    name=name,
                     subject=subject,
                     message=message,
                     from_email=settings.EMAIL_HOST_USER,
@@ -72,6 +73,7 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
     for email, name in recipients:
         try:
             send_mail(
+                name=name,
                 subject=subject,
                 message=message,
                 from_email=settings.EMAIL_HOST_USER,

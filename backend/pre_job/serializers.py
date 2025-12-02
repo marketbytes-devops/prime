@@ -390,65 +390,51 @@ class QuotationSerializer(serializers.ModelSerializer):
         terms_data = validated_data.pop("terms", None)
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
 
-        # Generate series number
+        # Get RFQ instance
+        rfq_instance = validated_data.pop('rfq')  # ← REMOVE rfq from validated_data
+        if not rfq_instance or not rfq_instance.series_number:
+            raise serializers.ValidationError("Valid RFQ with series number is required")
+
+        # Get prefix from NumberSeries
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
+            prefix = quotation_series.prefix
         except NumberSeries.DoesNotExist:
-            raise serializers.ValidationError("Quotation series not found.")
+            prefix = "001-"
 
-        max_sequence = Quotation.objects.filter(
-            series_number__startswith=quotation_series.prefix
-        ).aggregate(Max("series_number"))["series_number__max"]
+        # Extract running number from RFQ (e.g., "000003" from "001-000003")
+        rfq_running_number = rfq_instance.series_number.split('-')[-1]
+        series_number = f"{prefix}{rfq_running_number}"  # ← SAME NUMBER!
 
-        sequence = 1
-        if max_sequence:
-            sequence = int(max_sequence.split("-")[-1]) + 1
-        series_number = f"{quotation_series.prefix}-{sequence:06d}"
-
-        # Default followup frequency
-        if "followup_frequency" not in validated_data:
-            validated_data["followup_frequency"] = "24_hours"
-
-        # Create Quotation object
+        # Create quotation
         quotation = Quotation.objects.create(
             series_number=series_number,
+            rfq=rfq_instance,                    # ← Only once
             assigned_sales_person=assigned_sales_person,
-            **validated_data,
+            **validated_data                     # ← Now safe — rfq removed
         )
 
-        # Handle Terms & Conditions
+        # Handle terms
         if terms_data:
             terms_instance = QuotationTerms.objects.create(**terms_data)
             quotation.terms = terms_instance
         else:
-            default_terms_content = """
-            <h3>Terms & Conditions</h3>
-            <h4>Calibration Service General Terms and Conditions</h4>
-            <p><strong>• Comprehensive Calibration Reports:</strong> Following the calibration of each instrument...</p>
-            <p><strong>• VAT:</strong> VAT is excluded from our quotation and will be charged at 15% extra.</p>
-            <p><strong>For Prime Innovation Company</strong><br>Hari Krishnan M<br>Head - Engineering and QA/QC</p>
-            """
+            default_terms_content = "YOUR DEFAULT TERMS HERE..."
             default_terms = QuotationTerms.objects.create(content=default_terms_content)
             quotation.terms = default_terms
         quotation.save()
 
-        # Create Quotation Items (bulk for speed)
-        quotation_items = [
+        # Create items
+        QuotationItem.objects.bulk_create([
             QuotationItem(quotation=quotation, **item_data)
             for item_data in items_data
-        ]
-        QuotationItem.objects.bulk_create(quotation_items)
+        ])
 
-        # ASYNC EMAIL: Send in background using Celery
+        # Background email
         from .tasks import send_quotation_submission_email_task
-
         recipients = []
         if assigned_sales_person and assigned_sales_person.email:
-            recipients.append((assigned_sales_person.email, assigned_sales_person.name or "Team Member"))
-
-        # Optional: Send to admin
-        # if settings.ADMIN_EMAIL:
-        #     recipients.append((settings.ADMIN_EMAIL, "Admin"))
+            recipients.append((assigned_sales_person.email, assigned_sales_person.name))
 
         if recipients:
             quotation_data = {
@@ -458,13 +444,9 @@ class QuotationSerializer(serializers.ModelSerializer):
                 "contact_email": quotation.point_of_contact_email or "Not specified",
                 "assigned_name": assigned_sales_person.name if assigned_sales_person else "Not assigned",
                 "status": quotation.quotation_status,
-                "due_date": quotation.due_date_for_quotation.strftime("%Y-%m-%d") if quotation.due_date_for_quotation else "Not set",
             }
-
-            # This returns INSTANTLY — email sent in background
             send_quotation_submission_email_task.delay(quotation_data, recipients)
 
-        # Mark as sent (optimistic)
         quotation.email_sent = bool(recipients)
         quotation.save(update_fields=["email_sent"])
 
