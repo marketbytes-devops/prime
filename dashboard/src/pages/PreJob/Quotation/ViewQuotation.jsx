@@ -476,13 +476,10 @@ const ViewQuotation = () => {
     };
   };
 
-  // ✅ ADD THIS NEW METHOD: Navigation to terms for specific quotation
   const handleNavigateToTerms = (quotationId, hasCustomTerms) => {
     if (quotationId) {
-      // ✅ Navigate to quotation-specific terms
       navigate(`/quotations/${quotationId}/terms`);
     } else {
-      // ✅ Navigate to global terms template
       navigate("/terms-and-conditions");
     }
   };
@@ -898,7 +895,7 @@ const ViewQuotation = () => {
                         >
                           {quotation.has_custom_terms
                             ? "View Terms"
-                            : "Add Terms"}
+                            : "Update Terms"}
                         </button>
                         <button
                           onClick={() => handlePrint(quotation)}

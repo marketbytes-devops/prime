@@ -75,3 +75,29 @@ option {
   color: black;
   border: 2px solid white;
 }
+
+.ql-align-center {
+  text-align: center !important;
+}
+.ql-align-right {
+  text-align: right !important;
+}
+.ql-align-left {
+  text-align: left !important;
+}
+.ql-align-justify {
+  text-align: justify !important;
+}
+
+.ql-editor .ql-align-center,
+.ql-editor .ql-align-right,
+.ql-editor .ql-align-left,
+.ql-editor .ql-align-justify {
+  text-align: inherit !important;
+}
+
+.ql-align-center,
+.ql-align-right,
+.ql-align-justify {
+  display: block;
+}
