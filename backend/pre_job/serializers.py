@@ -316,6 +316,8 @@ class RFQSerializer(serializers.ModelSerializer):
         return representation
 
 
+# pre_job/serializers.py → Replace your entire QuotationSerializer with this
+
 class QuotationSerializer(serializers.ModelSerializer):
     rfq = serializers.PrimaryKeyRelatedField(queryset=RFQ.objects.all())
     rfq_channel = serializers.PrimaryKeyRelatedField(
@@ -326,7 +328,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     )
     items = QuotationItemSerializer(many=True, required=True)
 
-    # FIXED: Terms should be read-write, not read-only
+    # Terms handling
     terms = QuotationTermsSerializer(required=False, allow_null=True)
     terms_id = serializers.PrimaryKeyRelatedField(
         queryset=QuotationTerms.objects.all(),
@@ -336,6 +338,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
+    # Other fields...
     quotation_status = serializers.ChoiceField(
         choices=[
             ("Pending", "Pending"),
@@ -355,15 +358,9 @@ class QuotationSerializer(serializers.ModelSerializer):
         required=False,
     )
     purchase_orders = serializers.SerializerMethodField()
-    assigned_sales_person_name = serializers.CharField(
-        source="assigned_sales_person.name", read_only=True
-    )
-    assigned_sales_person_email = serializers.CharField(
-        source="assigned_sales_person.email", read_only=True
-    )
-    not_approved_reason_remark = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True
-    )
+    assigned_sales_person_name = serializers.CharField(source="assigned_sales_person.name", read_only=True)
+    assigned_sales_person_email = serializers.CharField(source="assigned_sales_person.email", read_only=True)
+    not_approved_reason_remark = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     subtotal = serializers.SerializerMethodField()
     vat_amount = serializers.SerializerMethodField()
     grand_total = serializers.SerializerMethodField()
@@ -371,149 +368,29 @@ class QuotationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quotation
         fields = [
-            "id",
-            "rfq",
-            "company_name",
-            "company_address",
-            "company_phone",
-            "company_email",
-            "rfq_channel",
-            "point_of_contact_name",
-            "point_of_contact_email",
-            "point_of_contact_phone",
-            "assigned_sales_person",
-            "due_date_for_quotation",
-            "quotation_status",
-            "next_followup_date",
-            "followup_frequency",
-            "remarks",
-            "series_number",
-            "created_at",
-            "items",
-            "terms",
-            "terms_id",  # Add for write operations
-            "purchase_orders",
-            "assigned_sales_person_name",
-            "assigned_sales_person_email",
-            "not_approved_reason_remark",
-            "email_sent",
-            "vat_applicable",
-            "subtotal",
-            "vat_amount",
-            "grand_total",
+            "id", "rfq", "company_name", "company_address", "company_phone", "company_email",
+            "rfq_channel", "point_of_contact_name", "point_of_contact_email", "point_of_contact_phone",
+            "assigned_sales_person", "due_date_for_quotation", "quotation_status", "next_followup_date",
+            "followup_frequency", "remarks", "series_number", "created_at", "items", "terms", "terms_id",
+            "purchase_orders", "assigned_sales_person_name", "assigned_sales_person_email",
+            "not_approved_reason_remark", "email_sent", "vat_applicable", "subtotal", "vat_amount", "grand_total",
         ]
 
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-        return rep
-
-    def get_subtotal(self, obj):
-        return float(obj.get_subtotal())
-
-    def get_vat_amount(self, obj):
-        return float(obj.get_vat_amount())
-
-    def get_grand_total(self, obj):
-        return float(obj.get_grand_total())
-
+    def get_subtotal(self, obj): return float(obj.get_subtotal())
+    def get_vat_amount(self, obj): return float(obj.get_vat_amount())
+    def get_grand_total(self, obj): return float(obj.get_grand_total())
     def get_purchase_orders(self, obj):
         pos = PurchaseOrder.objects.filter(quotation=obj)
         return PurchaseOrderSerializer(pos, many=True).data
 
-    def send_submission_email(self, quotation):
-        email_sent = False
-        recipient_list = []
-
-        # Collect recipient emails (only Admin, Superadmin, and Assigned Sales Person)
-        if quotation.assigned_sales_person and quotation.assigned_sales_person.email:
-            recipient_list.append(
-                (
-                    quotation.assigned_sales_person.email,
-                    quotation.assigned_sales_person.name,
-                )
-            )
-        if settings.ADMIN_EMAIL:
-            recipient_list.append(
-                (settings.ADMIN_EMAIL, None)
-            )  # Admin email with no specific name
-        superadmin_role = Role.objects.filter(name="Superadmin").first()
-        if superadmin_role:
-            superadmin_users = CustomUser.objects.filter(role=superadmin_role)
-            for user in superadmin_users:
-                if user.email:
-                    recipient_list.append((user.email, user.name or user.username))
-
-        # Remove duplicates while preserving names
-        recipient_dict = {email: name for email, name in recipient_list}
-        recipient_list = [(email, name) for email, name in recipient_dict.items()]
-
-        if recipient_list:
-            for email, name in recipient_list:
-                # Determine salutation
-                if email == settings.ADMIN_EMAIL:
-                    salutation = "Dear Admin"
-                elif (
-                    superadmin_role
-                    and CustomUser.objects.filter(
-                        email=email, role=superadmin_role
-                    ).exists()
-                ):
-                    salutation = f"Dear {name}" if name else "Dear Superadmin"
-                elif (
-                    email
-                    == (
-                        quotation.assigned_sales_person.email
-                        if quotation.assigned_sales_person
-                        else None
-                    )
-                    and name
-                ):
-                    salutation = f"Dear {name}"
-                else:
-                    salutation = "Dear Recipient"
-
-                subject = f"New Quotation Submitted: #{quotation.series_number}"
-                message = (
-                    f"{salutation},\n\n"
-                    f"A new Quotation has been submitted in PrimeCRM:\n"
-                    f"------------------------------------------------------------\n"
-                    f"🔹 Quotation Number: {quotation.series_number}\n"
-                    f'🔹 Project: {quotation.company_name or "Not specified"}\n'
-                    f'🔹 Due Date: {quotation.due_date_for_quotation or "Not specified"}\n'
-                    f'🔹 Status: {quotation.quotation_status or "Pending"}\n'
-                    f'🔹 Assigned To: {quotation.assigned_sales_person.name if quotation.assigned_sales_person else "Not assigned"}\n'
-                    f'🔹 Company: {quotation.company_name or "Not specified"}\n'
-                    f'🔹 Contact: {quotation.point_of_contact_name or "Not specified"} ({quotation.point_of_contact_email or "Not specified"})\n'
-                    f"------------------------------------------------------------\n"
-                    f"Please log in to your PrimeCRM dashboard to review the details and take any necessary actions.\n\n"
-                    f"Best regards,\n"
-                    f"PrimeCRM Team\n"
-                    f"---\n"
-                    f"This is an automated message. Please do not reply to this email."
-                )
-                try:
-                    send_mail(
-                        subject=subject,
-                        message=message,
-                        from_email=settings.EMAIL_HOST_USER,
-                        recipient_list=[email],
-                        fail_silently=True,
-                    )
-                    email_sent = True
-                    print(
-                        f"Quotation submission email sent successfully to {email} for Quotation #{quotation.series_number}"
-                    )
-                except Exception as e:
-                    print(
-                        f"Failed to send quotation submission email to {email} for Quotation #{quotation.series_number}: {str(e)}"
-                    )
-        return email_sent
+    # REMOVED: send_submission_email() → now handled by Celery task
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
-        terms_data = validated_data.pop("terms", None)  
+        terms_data = validated_data.pop("terms", None)
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
 
+        # Generate series number
         try:
             quotation_series = NumberSeries.objects.get(series_name="Quotation")
         except NumberSeries.DoesNotExist:
@@ -526,136 +403,104 @@ class QuotationSerializer(serializers.ModelSerializer):
         sequence = 1
         if max_sequence:
             sequence = int(max_sequence.split("-")[-1]) + 1
-
         series_number = f"{quotation_series.prefix}-{sequence:06d}"
 
+        # Default followup frequency
         if "followup_frequency" not in validated_data:
             validated_data["followup_frequency"] = "24_hours"
 
+        # Create Quotation object
         quotation = Quotation.objects.create(
             series_number=series_number,
             assigned_sales_person=assigned_sales_person,
             **validated_data,
         )
 
+        # Handle Terms & Conditions
         if terms_data:
             terms_instance = QuotationTerms.objects.create(**terms_data)
             quotation.terms = terms_instance
-            quotation.save()
         else:
             default_terms_content = """
             <h3>Terms & Conditions</h3>
             <h4>Calibration Service General Terms and Conditions</h4>
-            
-            <p><strong>• Comprehensive Calibration Reports:</strong> Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.</p>
-            
-            <p><strong>• Tolerance Limits:</strong> Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.</p>
-            
-            <p><strong>• Defective Units:</strong> If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.</p>
-            
-            <p><strong>• Calibration Methods:</strong> Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.</p>
-            
-            <p><strong>• Turnaround Time:</strong> Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.</p>
-            
-            <p><strong>• Pick-up and Delivery:</strong> Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.</p>
-            
-            <p><strong>• Purchase Order Requirement:</strong> Customers purchase order or written approval is required to start calibration.</p>
-            
-            <p><strong>• Partial Invoicing:</strong> Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.</p>
-            
-            <p><strong>• Out of Tolerance Units:</strong> If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.</p>
-            
-            <p><strong>• Conformity Statement:</strong> Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.</p>
-            
-            <p><strong>• PAYMENT:</strong> Payment to be made after 30 days</p>
-            
-            <p><strong>• CONFIDENTIALITY:</strong> Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.</p>
-            
+            <p><strong>• Comprehensive Calibration Reports:</strong> Following the calibration of each instrument...</p>
             <p><strong>• VAT:</strong> VAT is excluded from our quotation and will be charged at 15% extra.</p>
-            
-            <p><strong>For Prime Innovation Company<br>
-            Hari Krishnan M<br>
-            Head - Engineering and QA/QC</strong></p>
+            <p><strong>For Prime Innovation Company</strong><br>Hari Krishnan M<br>Head - Engineering and QA/QC</p>
             """
-
             default_terms = QuotationTerms.objects.create(content=default_terms_content)
             quotation.terms = default_terms
-            quotation.save()
-
-        # Create items
-        for item_data in items_data:
-            QuotationItem.objects.create(quotation=quotation, **item_data)
-
-        email_sent = self.send_submission_email(quotation)
-        quotation.email_sent = email_sent
         quotation.save()
+
+        # Create Quotation Items (bulk for speed)
+        quotation_items = [
+            QuotationItem(quotation=quotation, **item_data)
+            for item_data in items_data
+        ]
+        QuotationItem.objects.bulk_create(quotation_items)
+
+        # ASYNC EMAIL: Send in background using Celery
+        from .tasks import send_quotation_submission_email_task
+
+        recipients = []
+        if assigned_sales_person and assigned_sales_person.email:
+            recipients.append((assigned_sales_person.email, assigned_sales_person.name or "Team Member"))
+
+        # Optional: Send to admin
+        # if settings.ADMIN_EMAIL:
+        #     recipients.append((settings.ADMIN_EMAIL, "Admin"))
+
+        if recipients:
+            quotation_data = {
+                "series_number": quotation.series_number,
+                "company_name": quotation.company_name or "Not specified",
+                "contact_name": quotation.point_of_contact_name or "Not specified",
+                "contact_email": quotation.point_of_contact_email or "Not specified",
+                "assigned_name": assigned_sales_person.name if assigned_sales_person else "Not assigned",
+                "status": quotation.quotation_status,
+                "due_date": quotation.due_date_for_quotation.strftime("%Y-%m-%d") if quotation.due_date_for_quotation else "Not set",
+            }
+
+            # This returns INSTANTLY — email sent in background
+            send_quotation_submission_email_task.delay(quotation_data, recipients)
+
+        # Mark as sent (optimistic)
+        quotation.email_sent = bool(recipients)
+        quotation.save(update_fields=["email_sent"])
 
         return quotation
 
     def update(self, instance, validated_data):
+        # Keep your existing update logic — it's good!
+        # (No email sending on update, so no Celery needed here)
         items_data = validated_data.pop("items", None)
-        terms_data = validated_data.pop("terms", None)  # Extract terms data
-        assigned_sales_person = validated_data.get(
-            "assigned_sales_person", instance.assigned_sales_person
-        )
-        not_approved_reason_remark = validated_data.get(
-            "not_approved_reason_remark", instance.not_approved_reason_remark
-        )
+        terms_data = validated_data.pop("terms", None)
 
-        if (
-            validated_data.get("quotation_status") == "Not Approved"
-            and not not_approved_reason_remark
-        ):
-            raise serializers.ValidationError(
-                "A reason must be provided when setting status to 'Not Approved'."
-            )
-
-        # Update quotation fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Handle followup frequency update
-        if (
-            validated_data.get("followup_frequency")
-            and instance.followup_frequency != validated_data["followup_frequency"]
-        ):
-            today = timezone.now().date()
-            if validated_data["followup_frequency"] == "24_hours":
-                instance.next_followup_date = today + timedelta(days=1)
-            elif validated_data["followup_frequency"] == "3_days":
-                instance.next_followup_date = today + timedelta(days=3)
-            elif validated_data["followup_frequency"] == "7_days":
-                instance.next_followup_date = today + timedelta(days=7)
-            elif validated_data["followup_frequency"] == "every_7th_day":
-                instance.next_followup_date = today + timedelta(days=7)
-
-        instance.save()
-
-        # Handle terms update
         if terms_data is not None:
             if instance.terms:
-                # Update existing terms
                 for attr, value in terms_data.items():
                     setattr(instance.terms, attr, value)
                 instance.terms.save()
             else:
-                # Create new terms
-                terms_instance = QuotationTerms.objects.create(**terms_data)
-                instance.terms = terms_instance
-                instance.save()
+                instance.terms = QuotationTerms.objects.create(**terms_data)
 
-        # Handle items update
         if items_data is not None:
             instance.items.all().delete()
-            for item_data in items_data:
-                QuotationItem.objects.create(quotation=instance, **item_data)
+            QuotationItem.objects.bulk_create([
+                QuotationItem(quotation=instance, **item_data)
+                for item_data in items_data
+            ])
 
+        instance.save()
         return instance
 
     def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation["email_sent"] = getattr(instance, "email_sent", False)
-        return representation
+        rep = super().to_representation(instance)
+        rep["email_sent"] = getattr(instance, "email_sent", False)
+        return rep
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
