@@ -393,14 +393,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                     invoice.invoice_file = invoice_file
                 invoice.save()
 
-                if new_status in ["raised", "processed"]:
-                    serializer = InvoiceSerializer()
-                    email_sent = serializer.send_invoice_status_change_email(
-                        invoice, new_status
-                    )
-                    logger.info(
-                        f"Email sent status for Invoice {invoice.id}: {email_sent}"
-                    )
+                # NEW — INSTANT RESPONSE
+            if new_status in ["raised", "processed"]:
+                serializer = InvoiceSerializer()
+                serializer.send_invoice_status_change_email(invoice, new_status)  # Now async!
+                logger.info(f"Invoice status email queued for Invoice {invoice.id}")
 
                 serializer = InvoiceSerializer(invoice)
                 return Response(serializer.data)
