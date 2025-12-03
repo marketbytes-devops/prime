@@ -84,3 +84,46 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
         except Exception as e:
             logger.error(f"Failed to send quotation email to {email}: {e}")
             raise self.retry(exc=e)
+        
+        
+        
+        # pre_job/tasks.py → ADD THIS TASK
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_invoice_status_email_task(self, invoice_id, new_status):
+    try:
+        invoice = Invoice.objects.get(id=invoice_id)
+        logger.info(f"Sending invoice status email: {new_status} for Invoice #{invoice.id}")
+
+        subject = f"Invoice Status Updated: {new_status.title()}"
+        message = (
+            f"Dear Team,\n\n"
+            f"The invoice status has been updated:\n"
+            f"------------------------------------------------\n"
+            f"Invoice ID: {invoice.id}\n"
+            f"Delivery Note: {invoice.delivery_note.dn_number if invoice.delivery_note else 'N/A'}\n"
+            f"New Status: {new_status.title()}\n"
+            f"{'Due in ' + str(invoice.due_in_days) + ' days' if new_status == 'raised' and invoice.due_in_days else ''}\n"
+            f"{'Received on: ' + invoice.received_date.strftime('%Y-%m-%d') if new_status == 'processed' else ''}\n"
+            f"------------------------------------------------\n"
+            f"Please check the system.\n\n"
+            f"Best regards,\nPrimeCRM System"
+        )
+
+        recipients = []
+        if settings.ADMIN_EMAIL:
+            recipients.append(settings.ADMIN_EMAIL)
+        # Optional: add finance team, manager, etc.
+        
+        for email in recipients:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+        logger.info(f"Invoice status email sent for Invoice #{invoice.id}")
+    except Exception as e:
+        logger.error(f"Failed to send invoice email: {e}")
+        raise self.retry(exc=e)

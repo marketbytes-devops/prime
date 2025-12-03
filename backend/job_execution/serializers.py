@@ -19,6 +19,7 @@ from django.utils import timezone
 from datetime import date, timedelta
 import logging
 from authapp.models import CustomUser, Role
+from pre_job.tasks import send_invoice_status_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ class DeliveryNoteItemSerializer(serializers.ModelSerializer):
                 delivery_note_item=instance, **component_data
             )
         return instance
+    # job_execution/serializers.py → Add this method inside InvoiceSerializer class
+
+
 
 
 class DeliveryNoteSerializer(serializers.ModelSerializer):
@@ -212,6 +216,10 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
                 }
             )
         return data
+    # In your InvoiceSerializer class
+
+# job_execution/serializers.py → Add this method inside InvoiceSerializer class
+
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
@@ -413,6 +421,22 @@ class InvoiceSerializer(serializers.ModelSerializer):
             self.send_invoice_status_change_email(instance, new_status)
 
         return instance
+    
+    def send_invoice_status_change_email(self, invoice, new_status):
+        """
+        Sends invoice status email asynchronously using Celery
+        """
+        try:
+            from pre_job.tasks import send_invoice_status_email_task
+            send_invoice_status_email_task.delay(invoice.id, new_status)
+            logger.info(f"Invoice status email queued for Invoice #{invoice.id} - Status: {new_status}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to queue invoice email: {e}")
+            return False
+
+    
+
 
 
 class WorkOrderSerializer(serializers.ModelSerializer):
