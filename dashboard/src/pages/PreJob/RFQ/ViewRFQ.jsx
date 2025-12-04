@@ -547,54 +547,69 @@ const ViewRFQ = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black">Items</h3>
-              {state.selectedRfq.items &&
-              Array.isArray(state.selectedRfq.items) &&
-              state.selectedRfq.items.length > 0 ? (
+              <h3 className="text-lg font-medium text-black mb-3">Items</h3>
+              {state.selectedRfq.items && state.selectedRfq.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
+                    {/* ← FIXED: All <th> inside <tr> */}
                     <thead>
-                      <tr className="bg-gray-200">
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                      <tr className="bg-indigo-600 text-white">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
+                          Sl.no
+                        </th>
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Item
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Quantity
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Unit
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Unit Price
                         </th>
-                        <th className="border p-2 text-left text-sm font-medium text-gray-700 whitespace-nowrap">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Total Price
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {state.selectedRfq.items.map((item) => (
-                        <tr key={item.id} className="border">
-                          <td className="border p-2 whitespace-nowrap">
+                      {state.selectedRfq.items.map((item, index) => (
+                        <tr key={item.id || index} className="hover:bg-gray-50">
+                          {/* Serial Number */}
+                          <td className="border p-3 text-indigo-700 font-semibold text-center">
+                            {index + 1}
+                          </td>
+
+                          {/* ← THIS IS THE PERFECT CODE — USE THIS! */}
+                          <td className="border p-3">
                             {typeof item.item === "string"
                               ? item.item
                               : state.itemsList.find((i) => i.id === item.item)
                                   ?.name || "N/A"}
                           </td>
-                          <td className="border p709 p-2 whitespace-nowrap">
+                          {/* Quantity */}
+                          <td className="border p-3 text-center">
                             {item.quantity || "N/A"}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">
+
+                          {/* Unit */}
+                          <td className="border p-3 text-center">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">
+
+                          {/* Unit Price */}
+                          <td className="border p-3 text-right">
                             SAR{" "}
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
-                          <td className="border p-2 whitespace-nowrap">
+
+                          {/* Total Price */}
+                          <td className="border p-3 text-right font-medium">
                             SAR{" "}
                             {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
@@ -605,54 +620,12 @@ const ViewRFQ = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot>
-                      <tr className="border">
-                        <td
-                          colSpan="4"
-                          className="border p-2 text-right font-semibold"
-                        >
-                          Subtotal:
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          SAR{" "}
-                          {state.selectedRfq.subtotal
-                            ? Number(state.selectedRfq.subtotal).toFixed(2)
-                            : "0.00"}
-                        </td>
-                      </tr>
-                      <tr className="border">
-                        <td
-                          colSpan="4"
-                          className="border p-2 text-right font-semibold"
-                        >
-                          VAT (15%):
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          SAR{" "}
-                          {state.selectedRfq.vat_amount
-                            ? Number(state.selectedRfq.vat_amount).toFixed(2)
-                            : "0.00"}
-                        </td>
-                      </tr>
-                      <tr className="border">
-                        <td
-                          colSpan="4"
-                          className="border p-2 text-right font-semibold"
-                        >
-                          Grand Total:
-                        </td>
-                        <td className="border p-2 whitespace-nowrap">
-                          SAR{" "}
-                          {state.selectedRfq.grand_total
-                            ? Number(state.selectedRfq.grand_total).toFixed(2)
-                            : "0.00"}
-                        </td>
-                      </tr>
-                    </tfoot>
                   </table>
                 </div>
               ) : (
-                <p className="text-gray-500">No items available.</p>
+                <p className="text-center text-gray-500 py-8">
+                  No items available.
+                </p>
               )}
             </div>
           </div>
