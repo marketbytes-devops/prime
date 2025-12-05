@@ -1122,10 +1122,10 @@ const ViewQuotation = () => {
                           Unit
                         </th>
                         <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
-                          Unit Price
+                          Unit Price (SAR)
                         </th>
                         <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
-                          Total Price
+                          Total Price (SAR)
                         </th>
                       </tr>
                     </thead>
@@ -1156,7 +1156,7 @@ const ViewQuotation = () => {
 
                           {/* UNIT PRICE */}
                           <td className="border p-3 text-right">
-                            SAR{" "}
+                            {" "}
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
@@ -1164,7 +1164,7 @@ const ViewQuotation = () => {
 
                           {/* TOTAL PRICE */}
                           <td className="border p-3 text-right font-medium">
-                            SAR{" "}
+                            {" "}
                             {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
@@ -1174,6 +1174,26 @@ const ViewQuotation = () => {
                         </tr>
                       ))}
                     </tbody>
+
+                    {/* GRAND TOTAL — EXACTLY LIKE CLIENT'S PDF! */}
+                    <tfoot>
+                      <tr className="bg-gray-100 font-bold text-lg border-2 border-black">
+                        <td
+                          colSpan="5"
+                          className="border border-black p-4 text-right pr-8"
+                        >
+                          Grand Total (SAR)
+                        </td>
+                        <td className="border border-black p-4 text-right text-indigo-700 font-bold">
+                          {" "}
+                          {state.selectedQuotation.grand_total
+                            ? Number(
+                                state.selectedQuotation.grand_total
+                              ).toFixed(2)
+                            : "0.00"}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               ) : (
@@ -1257,13 +1277,13 @@ const ViewQuotation = () => {
                                       ?.name || "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR{" "}
+                                    {" "}
                                     {item.unit_price
                                       ? Number(item.unit_price).toFixed(2)
                                       : "N/A"}
                                   </td>
                                   <td className="border p-2 whitespace-nowrap">
-                                    SAR{" "}
+                                    {" "}
                                     {item.quantity && item.unit_price
                                       ? Number(
                                           item.quantity * item.unit_price

@@ -551,7 +551,6 @@ const ViewRFQ = () => {
               {state.selectedRfq.items && state.selectedRfq.items.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
-                    {/* ← FIXED: All <th> inside <tr> */}
                     <thead>
                       <tr className="bg-indigo-600 text-white">
                         <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
@@ -567,50 +566,38 @@ const ViewRFQ = () => {
                           Unit
                         </th>
                         <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
-                          Unit Price
+                          Unit Price (SAR)
                         </th>
                         <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
-                          Total Price
+                          Total Price (SAR)
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedRfq.items.map((item, index) => (
                         <tr key={item.id || index} className="hover:bg-gray-50">
-                          {/* Serial Number */}
                           <td className="border p-3 text-indigo-700 font-semibold text-center">
                             {index + 1}
                           </td>
-
-                          {/* ← THIS IS THE PERFECT CODE — USE THIS! */}
                           <td className="border p-3">
                             {typeof item.item === "string"
                               ? item.item
                               : state.itemsList.find((i) => i.id === item.item)
                                   ?.name || "N/A"}
                           </td>
-                          {/* Quantity */}
                           <td className="border p-3 text-center">
                             {item.quantity || "N/A"}
                           </td>
-
-                          {/* Unit */}
                           <td className="border p-3 text-center">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
                           </td>
-
-                          {/* Unit Price */}
                           <td className="border p-3 text-right">
-                            SAR{" "}
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
-
-                          {/* Total Price */}
                           <td className="border p-3 text-right font-medium">
-                            SAR{" "}
                             {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
@@ -620,6 +607,24 @@ const ViewRFQ = () => {
                         </tr>
                       ))}
                     </tbody>
+
+                    {/* ←←← GRAND TOTAL — EXACTLY LIKE YOUR CLIENT'S PDF! ←←← */}
+                    <tfoot>
+                      <tr className="bg-gray-100 font-bold text-lg">
+                        <td
+                          colSpan="5"
+                          className="border border-black p-4 text-right pr-8"
+                        >
+                          Grand Total (SAR)
+                        </td>
+                        <td className="border border-black p-4 text-right text-indigo-700 font-bold">
+                          {" "}
+                          {state.selectedRfq.grand_total
+                            ? Number(state.selectedRfq.grand_total).toFixed(2)
+                            : "0.00"}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               ) : (
