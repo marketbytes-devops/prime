@@ -398,123 +398,118 @@ const ViewQuotation = () => {
     setIsSubmitting(false);
   };
 
-  const handlePrint = async (quotation) => {
-    // DEFAULT TERMS — YOUR OFFICIAL COMPANY TERMS (FROM PDF)
-    const DEFAULT_TERMS = `Calibration Service General Terms and Conditions
+const handlePrint = async (quotation) => {
+  // HARDCODED DEFAULT TERMS (fallback of last resort)
+  const DEFAULT_TERMS = `
+    <h3>Terms & Conditions</h3>
+    <h4>Calibration Service General Terms and Conditions</h4>
+    <p><strong>• Comprehensive Calibration Reports:</strong> Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.</p>
+    <p><strong>• Tolerance Limits:</strong> Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.</p>
+    <p><strong>• Defective Units:</strong> If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.</p>
+    <p><strong>• Calibration Methods:</strong> Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.</p>
+    <p><strong>• Turnaround Time:</strong> Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.</p>
+    <p><strong>• Pick-up and Delivery:</strong> Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.</p>
+    <p><strong>• Purchase Order Requirement:</strong> Customers purchase order or written approval is required to start calibration.</p>
+    <p><strong>• Partial Invoicing:</strong> Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.</p>
+    <p><strong>• Out of Tolerance Units:</strong> If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.</p>
+    <p><strong>• Conformity Statement:</strong> Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.</p>
+    <p><strong>• PAYMENT:</strong> Payment to be made after 30 days</p>
+    <p><strong>• CONFIDENTIALITY:</strong> Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.</p>
+    <p><strong>• VAT:</strong> VAT is excluded from our quotation and will be charged at 15% extra.</p>
+    <p><strong>For Prime Innovation Company<br>Hari Krishnan M<br>Head - Engineering and QA/QC</strong></p>
+  `;
 
-  • Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
+  let termsContent = "";
 
-  • Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
-
-  • If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.
-
-  • Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
-
-  • Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.
-
-  • Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.
-
-  • Customers purchase order or written approval is required to start calibration.
-
-  • Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.
-
-  • If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.
-
-  • Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.
-
-  • PAYMENT: Payment to be made after 30 days
-
-  • CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential.
-
-  • VAT is excluded from our quotation and will be charged at 15% extra.
-
-  For Prime Innovation Company
-  Hari Krishnan M
-  Head ‐ Engineering and QA/QC`;
-
-    // Use custom terms if exist, else use default
-    const termsContent = quotation.terms?.content?.trim() || DEFAULT_TERMS;
-
-    const itemsData = (quotation.items || []).map((item, index) => ({
-      sl_no: index + 1,
-      name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
-      quantity: item.quantity || "",
-      unit: state.units.find((u) => u.id === item.unit)?.name || "N/A",
-      unit_price: item.unit_price || "",
-      total_price:
-        item.quantity && item.unit_price
-          ? (item.quantity * item.unit_price).toFixed(2)
-          : "0.00",
-    }));
-
-    const data = {
-      ...quotation,
-      items: itemsData,
-      terms: { content: termsContent },
-      channelName:
-        state.channels.find((c) => c.id === quotation.rfq_channel)
-          ?.channel_name || "N/A",
-      salesPersonName:
-        state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)
-          ?.name || "N/A",
-      todayDate: new Date()
-        .toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-        .replace(/ /g, " "),
-    };
-
-    const htmlString = ReactDOMServer.renderToStaticMarkup(
-      <Template1 data={data} />
-    );
-
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
-    if (!printWindow) {
-      toast.error("Please allow popups to print quotation");
-      return;
+  // 1. Try custom terms from quotation
+  if (quotation.terms?.content) {
+    termsContent = quotation.terms.content;
+  } 
+  // 2. Try global template from API
+  else {
+    try {
+      const res = await apiClient.get("/quotation-terms/latest/");
+      if (res.data?.content) {
+        termsContent = res.data.content;
+      }
+    } catch (err) {
+      // Silently ignore - no global template exists
+      console.warn("No global terms template found");
     }
+  }
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Quotation ${data.series_number}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .header h1 { margin: 10px 0; color: #1e3a8a; }
-          .header h2 { margin: 5px 0; color: #dc2626; font-size: 18px; }
-          .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          .info-table td { padding: 8px; vertical-align: top; }
-          .info-table strong { color: #1e40af; }
-          .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
-          .items-table th, .items-table td { border: 1px solid #000; padding: 10px; text-align: center; }
-          .items-table th { background-color: #e0e7ff; }
-          .grand-total { background-color: #f3f4f6; font-weight: bold; font-size: 18px; }
-          .terms { margin-top: 40px; font-size: 12px; line-height: 1.8; }
-          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #666; }
-          @page { size: A4; margin: 1cm; }
-          @media print { body { -webkit-print-color-adjust: exact; } }
-        </style>
-      </head>
-      <body>
-        ${htmlString}
-      </body>
-      </html>
-    `);
+  // 3. Final fallback: use hard-coded DEFAULT_TERMS
+  if (!termsContent.trim()) {
+    termsContent = DEFAULT_TERMS;
+  }
 
-    printWindow.document.close();
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 800);
-    };
+  const channelName =
+    state.channels.find((c) => c.id === quotation.rfq_channel)?.channel_name || "N/A";
+  const salesPersonName =
+    state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)?.name || "N/A";
+
+  const itemsData = (quotation.items || []).map((item) => ({
+    id: item.id,
+    name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
+    quantity: item.quantity || "",
+    unit: state.units.find((u) => u.id === item.unit)?.name || "N/A",
+    unit_price: item.unit_price || "",
+    total_price: item.quantity && item.unit_price
+      ? (item.quantity * item.unit_price).toFixed(2)
+      : "0.00",
+  }));
+
+  const data = {
+    ...quotation,
+    channelName,
+    salesPersonName,
+    items: itemsData,
+    terms: { content: termsContent }, // Always has content now
+    todayDate: new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).replace(/ /g, " "),
   };
+
+  const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
+
+  const printWindow = window.open("", "_blank", "width=1000,height=800");
+  if (!printWindow) {
+    toast.error("Please allow popups to print quotation");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Quotation ${data.series_number}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .ql-editor { padding: 0; }
+        @media print { 
+          body { -webkit-print-color-adjust: exact; }
+          .ql-editor { padding: 0 !important; }
+        }
+      </style>
+    </head>
+    <body>
+      ${htmlString}
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }, 800);
+  };
+};
 
   const handleNavigateToTerms = (quotationId, hasCustomTerms) => {
     if (quotationId) {
@@ -1142,56 +1137,69 @@ const ViewQuotation = () => {
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-black mb-4">Items</h3>
+              <h3 className="text-lg font-medium text-black mb-3">Items</h3>
               {state.selectedQuotation.items &&
               state.selectedQuotation.items.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border-2 border-black">
+                  <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-indigo-600 text-white">
-                        <th className="border border-black p-3 text-left font-bold">
-                          Sl. No.
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
+                          Sl.no
                         </th>
-                        <th className="border border-black p-3 text-left font-bold">
-                          Description
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
+                          Item
                         </th>
-                        <th className="border border-black p-3 text-center font-bold">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
+                          Quantity
+                        </th>
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Unit
                         </th>
-                        <th className="border border-black p-3 text-center font-bold">
-                          Qty
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
+                          Unit Price (SAR)
                         </th>
-                        <th className="border border-black p-3 text-center font-bold">
-                          Unit price (SAR)
-                        </th>
-                        <th className="border border-black p-3 text-center font-bold">
+                        <th className="border p-3 text-left text-sm font-bold whitespace-nowrap">
                           Total Price (SAR)
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.selectedQuotation.items.map((item, index) => (
-                        <tr key={item.id || index}>
-                          <td className="border border-black p-3 text-center">
+                        <tr key={item.id || index} className="hover:bg-gray-50">
+                          {/* SERIAL NUMBER */}
+                          <td className="border p-3 text-indigo-700 font-semibold text-center">
                             {index + 1}
                           </td>
-                          <td className="border border-black p-3">
+
+                          {/* ITEM NAME */}
+                          <td className="border p-3">
                             {state.itemsList.find((i) => i.id === item.item)
                               ?.name || "N/A"}
                           </td>
-                          <td className="border border-black p-3 text-center">
+
+                          {/* QUANTITY */}
+                          <td className="border p-3 text-center">
+                            {item.quantity || "N/A"}
+                          </td>
+
+                          {/* UNIT */}
+                          <td className="border p-3 text-center">
                             {state.units.find((u) => u.id === item.unit)
                               ?.name || "N/A"}
                           </td>
-                          <td className="border border-black p-3 text-center">
-                            {item.quantity || "N/A"}
-                          </td>
-                          <td className="border border-black p-3 text-right">
+
+                          {/* UNIT PRICE */}
+                          <td className="border p-3 text-right">
+                            {" "}
                             {item.unit_price
                               ? Number(item.unit_price).toFixed(2)
                               : "N/A"}
                           </td>
-                          <td className="border border-black p-3 text-right font-medium">
+
+                          {/* TOTAL PRICE */}
+                          <td className="border p-3 text-right font-medium">
+                            {" "}
                             {item.quantity && item.unit_price
                               ? Number(item.quantity * item.unit_price).toFixed(
                                   2
@@ -1201,16 +1209,18 @@ const ViewQuotation = () => {
                         </tr>
                       ))}
                     </tbody>
+
+                    {/* GRAND TOTAL — EXACTLY LIKE CLIENT'S PDF! */}
                     <tfoot>
-                      <tr className="bg-gray-100 font-bold text-lg">
+                      <tr className="bg-gray-100 font-bold text-lg border-2 border-black">
                         <td
                           colSpan="5"
-                          className="border-2 border-black p-4 text-right pr-10"
+                          className="border border-black p-4 text-right pr-8"
                         >
                           Grand Total (SAR)
                         </td>
-                        <td className="border-2 border-black p-4 text-right text-indigo-700 font-bold">
-                          SAR{" "}
+                        <td className="border border-black p-4 text-right text-indigo-700 font-bold">
+                          {" "}
                           {state.selectedQuotation.grand_total
                             ? Number(
                                 state.selectedQuotation.grand_total
