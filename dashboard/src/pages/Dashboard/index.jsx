@@ -23,7 +23,7 @@ const Dashboard = () => {
   const chartRef = useRef(null);
 
   const chartData = {
-    labels: ['RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices', 'Manager Approval', 'Declined Work Orders'],
+    labels: ['Pending RFQs', 'Quotations', 'Purchase Orders', 'Work Orders', 'Delivery Notes', 'Invoices', 'Manager Approval', 'Declined Work Orders'],
     datasets: [
       {
         label: 'Counts',
@@ -87,12 +87,32 @@ const Dashboard = () => {
           apiClient.get('/work-orders/?status=Manager Approval'),
           apiClient.get('/work-orders/?status=Declined'),
         ]);
+
+        // Updated RFQ Logic: Enrich RFQs with hasQuotation check, then filter for Pending only
+        const rfqsWithQuotationStatus = await Promise.all(
+          rfqsRes.data.map(async (rfq) => {
+            try {
+              const quotationRes = await apiClient.get(`/quotations/?rfq=${rfq.id}`);
+              const hasQuotation = quotationRes.data.length > 0;
+              return { ...rfq, hasQuotation };
+            } catch (error) {
+              console.error(`Error checking quotation for RFQ ${rfq.id}:`, error);
+              return { ...rfq, hasQuotation: false };
+            }
+          })
+        );
+        const pendingRfqs = rfqsWithQuotationStatus.filter(
+          (rfq) => rfq.rfq_status === "Pending" && !rfq.hasQuotation
+        );
+
         console.log('Work Orders Response:', woRes.data);
         console.log('Invoices Response:', invoicesRes.data);
         console.log('Manager Approval Response:', managerApprovalRes.data);
         console.log('Declined Work Orders Response:', declinedWoRes.data);
+        console.log('Pending RFQs (filtered):', pendingRfqs.length);
+
         setCounts({
-          rfqs: rfqsRes.data?.length || 0,
+          rfqs: pendingRfqs.length, // Now only Pending RFQs without quotations
           quotations: quotationsRes.data?.length || 0,
           purchaseOrders: poRes.data?.length || 0,
           workOrders: woRes.data?.length || 0, // Updated to count all relevant statuses
@@ -126,7 +146,7 @@ const Dashboard = () => {
         Welcome back!
       </h2>
       <p className="text-gray-600 mb-6">
-        Monitor your RFQs, Quotations, Purchase Orders, Work Orders, Delivery Notes, Invoices, Manager Approvals, and Declined Work Orders below.
+        Monitor your Pending RFQs, Quotations, Purchase Orders, Work Orders, Delivery Notes, Invoices, Manager Approvals, and Declined Work Orders below.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -138,7 +158,7 @@ const Dashboard = () => {
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-700">Total RFQs</h3>
+              <h3 className="text-lg font-medium text-gray-700">Pending RFQs</h3>
               <p className="text-2xl font-bold text-indigo-600">
                 {loading ? 'Loading...' : counts.rfqs}
               </p>
