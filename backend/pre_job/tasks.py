@@ -1,5 +1,6 @@
 from celery import shared_task
 from django.core.mail import send_mail
+from job_execution.models import Invoice  # Adjust if Invoice is in another app (e.g., pre_job/models)
 from django.conf import settings
 from authapp.models import Role, CustomUser
 import logging
