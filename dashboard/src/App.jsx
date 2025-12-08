@@ -224,6 +224,18 @@ function App() {
             </ProtectedRoute>
           ),
         },
+         {
+          path: "/quotations/:quotationId/terms",
+          element: (
+            <ProtectedRoute
+              isAuthenticated={isAuthenticated}
+              requiredPage="quotation"
+              requiredAction="edit"
+            >
+              <UpdateTermsAndConditions />
+            </ProtectedRoute>
+          ),
+        },
         {
           path: "/edit-quotation/:id",
           element: (

@@ -6,7 +6,6 @@ import InputField from "../../../components/InputField";
 import Modal from "../../../components/Modal";
 import ReactDOMServer from "react-dom/server";
 import Template1 from "../../../components/Templates/Quotation/Template1";
-import { DEFAULT_TERMS_HTML } from "../../../constants/defaultTerms";
 
 const ViewQuotation = () => {
   const navigate = useNavigate();
@@ -400,7 +399,41 @@ const ViewQuotation = () => {
   };
 
   const handlePrint = async (quotation) => {
-    const termsContent = quotation.terms?.content?.trim() || DEFAULT_TERMS_HTML;
+    // DEFAULT TERMS — YOUR OFFICIAL COMPANY TERMS (FROM PDF)
+    const DEFAULT_TERMS = `Calibration Service General Terms and Conditions
+
+  • Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
+
+  • Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer’s tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
+
+  • If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.
+
+  • Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
+
+  • Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.
+
+  • Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.
+
+  • Customers purchase order or written approval is required to start calibration.
+
+  • Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.
+
+  • If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.
+
+  • Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.
+
+  • PAYMENT: Payment to be made after 30 days
+
+  • CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential.
+
+  • VAT is excluded from our quotation and will be charged at 15% extra.
+
+  For Prime Innovation Company
+  Hari Krishnan M
+  Head ‐ Engineering and QA/QC`;
+
+    // Use custom terms if exist, else use default
+    const termsContent = quotation.terms?.content?.trim() || DEFAULT_TERMS;
 
     const itemsData = (quotation.items || []).map((item, index) => ({
       sl_no: index + 1,
@@ -450,19 +483,21 @@ const ViewQuotation = () => {
         <meta charset="UTF-8">
         <title>Quotation ${data.series_number}</title>
         <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 40px; 
-            line-height: 1.6; 
-            color: #000;
-          }
-          .terms p { margin: 8px 0; }
-          .terms strong { color: #1e40af; }
+          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { margin: 10px 0; color: #1e3a8a; }
+          .header h2 { margin: 5px 0; color: #dc2626; font-size: 18px; }
+          .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .info-table td { padding: 8px; vertical-align: top; }
+          .info-table strong { color: #1e40af; }
+          .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+          .items-table th, .items-table td { border: 1px solid #000; padding: 10px; text-align: center; }
+          .items-table th { background-color: #e0e7ff; }
+          .grand-total { background-color: #f3f4f6; font-weight: bold; font-size: 18px; }
+          .terms { margin-top: 40px; font-size: 12px; line-height: 1.8; }
+          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #666; }
           @page { size: A4; margin: 1cm; }
-          @media print { 
-            body { -webkit-print-color-adjust: exact; }
-            .terms { font-size: 13px; }
-          }
+          @media print { body { -webkit-print-color-adjust: exact; } }
         </style>
       </head>
       <body>
