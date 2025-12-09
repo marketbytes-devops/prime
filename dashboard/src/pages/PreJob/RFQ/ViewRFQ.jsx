@@ -14,8 +14,8 @@ const ViewRFQ = () => {
     itemsList: [],
     units: [],
     searchTerm: "",
-    sortBy: "created_at",
-    sortOrder: "asc",
+    sortBy: "created_at",        
+    sortOrder: "desc",           
     currentPage: 1,
     itemsPerPage: 20,
     isModalOpen: false,
@@ -114,9 +114,8 @@ const ViewRFQ = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      console.log(`🔄 Updating RFQ ${id} status to: ${newStatus}`);
+      console.log(`Updating RFQ ${id} status to: ${newStatus}`);
 
-      // Use the new dedicated status endpoint
       await apiClient.patch(`rfqs/${id}/update_status/`, {
         rfq_status: newStatus,
       });
@@ -124,7 +123,7 @@ const ViewRFQ = () => {
       await fetchRFQs();
       toast.success("RFQ status updated successfully!");
     } catch (error) {
-      console.error("❌ Status update failed:", error.response?.data);
+      console.error("Status update failed:", error.response?.data);
       toast.error(
         "Failed to update status: " +
           (error.response?.data?.detail || "Unknown error")
@@ -197,7 +196,7 @@ const ViewRFQ = () => {
       } else if (state.sortBy === "created_at") {
         return state.sortOrder === "asc"
           ? new Date(a.created_at) - new Date(b.created_at)
-          : new Date(b.created_at) - new Date(a.created_at);
+          : new Date(b.created_at) - new Date(a.created_at);  // ← newest first when desc
       } else if (state.sortBy === "series_number") {
         return state.sortOrder === "asc"
           ? (a.series_number || "").localeCompare(b.series_number || "")
@@ -273,7 +272,8 @@ const ViewRFQ = () => {
               }
               className="p-2 border rounded focus:outline-indigo-500"
             >
-              <option value="created_at">Creation Date (FIFO)</option>
+              {/* ← Changed label to reflect actual default behavior */}
+              <option value="created_at">Creation Date (Latest First)</option>
               <option value="company_name">Company Name</option>
               <option value="series_number">RFQ Number</option>
               <option value="rfq_status">Status</option>
@@ -608,7 +608,6 @@ const ViewRFQ = () => {
                       ))}
                     </tbody>
 
-                    {/* ←←← GRAND TOTAL — EXACTLY LIKE YOUR CLIENT'S PDF! ←←← */}
                     <tfoot>
                       <tr className="bg-gray-100 font-bold text-lg">
                         <td
