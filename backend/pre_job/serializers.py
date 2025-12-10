@@ -1,3 +1,4 @@
+# serializers.py - FIXED VERSION
 from rest_framework import serializers
 from .models import (
     RFQ,
@@ -51,17 +52,7 @@ class RFQItemSerializer(serializers.ModelSerializer):
 class QuotationTermsSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuotationTerms
-        fields = ["id", "content", "updated_at"]
-
-    def get_queryset(self):
-        return super().get_queryset().order_by("-updated_at")[:1]
-
-    def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
-        if qs.exists():
-            serializer = self.get_serializer(qs[0])
-            return Response(serializer.data)
-        return Response({"id": None, "content": "", "updated_at": None})
+        fields = ["id", "content", "updated_at", "is_default"]
 
 
 class QuotationItemSerializer(serializers.ModelSerializer):
@@ -100,10 +91,6 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         if obj.quantity and obj.unit_price:
             return obj.quantity * obj.unit_price
         return 0
-
-
-# pre_job/serializers.py
-# ← ONLY REPLACE THE RFQSerializer CLASS BELOW →
 
 
 class RFQSerializer(serializers.ModelSerializer):
@@ -202,8 +189,6 @@ class RFQSerializer(serializers.ModelSerializer):
                 "Selected team member must have a valid email address."
             )
         return value
-
-    # REMOVED: send_creation_email() → now handled by Celery task
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
@@ -316,8 +301,6 @@ class RFQSerializer(serializers.ModelSerializer):
         return representation
 
 
-# pre_job/serializers.py → Replace your entire QuotationSerializer with this
-
 class QuotationSerializer(serializers.ModelSerializer):
     rfq = serializers.PrimaryKeyRelatedField(queryset=RFQ.objects.all())
     rfq_channel = serializers.PrimaryKeyRelatedField(
@@ -326,10 +309,12 @@ class QuotationSerializer(serializers.ModelSerializer):
     assigned_sales_person = serializers.PrimaryKeyRelatedField(
         queryset=TeamMember.objects.all(), allow_null=True
     )
+    
+    # FIXED: Use QuotationItemSerializer, not QuotationItem model
     items = QuotationItemSerializer(many=True, required=True)
 
     # Terms handling
-    terms = QuotationTermsSerializer(required=False, allow_null=True)
+    terms = QuotationTermsSerializer(read_only=True)
     terms_id = serializers.PrimaryKeyRelatedField(
         queryset=QuotationTerms.objects.all(),
         source="terms",
@@ -337,8 +322,11 @@ class QuotationSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    
+    # Add computed fields
+    terms_content = serializers.SerializerMethodField()
+    has_custom_terms = serializers.SerializerMethodField()
 
-    # Other fields...
     quotation_status = serializers.ChoiceField(
         choices=[
             ("Pending", "Pending"),
@@ -371,19 +359,80 @@ class QuotationSerializer(serializers.ModelSerializer):
             "id", "rfq", "company_name", "company_address", "company_phone", "company_email",
             "rfq_channel", "point_of_contact_name", "point_of_contact_email", "point_of_contact_phone",
             "assigned_sales_person", "due_date_for_quotation", "quotation_status", "next_followup_date",
-            "followup_frequency", "remarks", "series_number", "created_at", "items", "terms", "terms_id",
+            "followup_frequency", "remarks", "series_number", "created_at", "items", 
+            "terms", "terms_id", "terms_content", "has_custom_terms",
             "purchase_orders", "assigned_sales_person_name", "assigned_sales_person_email",
             "not_approved_reason_remark", "email_sent", "vat_applicable", "subtotal", "vat_amount", "grand_total",
         ]
+        read_only_fields = ["terms_content", "has_custom_terms"]
 
-    def get_subtotal(self, obj): return float(obj.get_subtotal())
-    def get_vat_amount(self, obj): return float(obj.get_vat_amount())
-    def get_grand_total(self, obj): return float(obj.get_grand_total())
+    def get_terms_content(self, obj):
+        """Get terms content - custom if exists, otherwise default"""
+        if obj.terms:
+            return obj.terms.content
+        else:
+            # Try to get default terms
+            default_terms = QuotationTerms.objects.filter(is_default=True).first()
+            if default_terms:
+                return default_terms.content
+            else:
+                # Create default terms if they don't exist
+                default_content = """Calibration Service General Terms and Conditions
+
+Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.
+
+Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer's tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.
+
+If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.
+
+Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.
+
+Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.
+
+Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.
+
+Customers purchase order or written approval is required to start calibration.
+
+Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.
+
+If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.
+
+Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.
+
+PAYMENT: Payment to be made after 30 days
+
+CONFIDENTIALITY: Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.
+
+VAT is excluded from our quotation and will be charged at 15% extra.
+
+For Prime Innovation Company
+Hari Krishnan M
+Head - Engineering and QA/QC"""
+                
+                # Create default terms
+                default_terms = QuotationTerms.objects.create(
+                    content=default_content,
+                    is_default=True
+                )
+                return default_terms.content
+        return ""
+
+    def get_has_custom_terms(self, obj):
+        """Check if quotation has custom terms"""
+        return obj.terms is not None
+
+    def get_subtotal(self, obj): 
+        return float(obj.get_subtotal())
+    
+    def get_vat_amount(self, obj): 
+        return float(obj.get_vat_amount())
+    
+    def get_grand_total(self, obj): 
+        return float(obj.get_grand_total())
+    
     def get_purchase_orders(self, obj):
         pos = PurchaseOrder.objects.filter(quotation=obj)
         return PurchaseOrderSerializer(pos, many=True).data
-
-    # REMOVED: send_submission_email() → now handled by Celery task
 
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
@@ -391,7 +440,7 @@ class QuotationSerializer(serializers.ModelSerializer):
         assigned_sales_person = validated_data.pop("assigned_sales_person", None)
 
         # Get RFQ instance
-        rfq_instance = validated_data.pop('rfq')  # ← REMOVE rfq from validated_data
+        rfq_instance = validated_data.pop('rfq')
         if not rfq_instance or not rfq_instance.series_number:
             raise serializers.ValidationError("Valid RFQ with series number is required")
 
@@ -402,33 +451,33 @@ class QuotationSerializer(serializers.ModelSerializer):
         except NumberSeries.DoesNotExist:
             prefix = "001-"
 
-        # Extract running number from RFQ (e.g., "000003" from "001-000003")
+        # Extract running number from RFQ
         rfq_running_number = rfq_instance.series_number.split('-')[-1]
-        series_number = f"{prefix}{rfq_running_number}"  # ← SAME NUMBER!
+        series_number = f"{prefix}{rfq_running_number}"
 
-        # Create quotation
+        # Create quotation WITHOUT terms initially
         quotation = Quotation.objects.create(
             series_number=series_number,
-            rfq=rfq_instance,                    # ← Only once
+            rfq=rfq_instance,
             assigned_sales_person=assigned_sales_person,
-            **validated_data                     # ← Now safe — rfq removed
+            **validated_data
         )
 
-        # Handle terms
+        # Handle terms: Only create custom terms if provided
+        # Otherwise, leave terms as NULL (will use default via get_terms_content)
         if terms_data:
+            # Create custom terms for this quotation
             terms_instance = QuotationTerms.objects.create(**terms_data)
             quotation.terms = terms_instance
-        else:
-            default_terms_content = "YOUR DEFAULT TERMS HERE..."
-            default_terms = QuotationTerms.objects.create(content=default_terms_content)
-            quotation.terms = default_terms
-        quotation.save()
+            quotation.save()
+        # If no terms provided, leave as NULL - will use default when needed
 
         # Create items
-        QuotationItem.objects.bulk_create([
-            QuotationItem(quotation=quotation, **item_data)
-            for item_data in items_data
-        ])
+        if items_data:
+            QuotationItem.objects.bulk_create([
+                QuotationItem(quotation=quotation, **item_data)
+                for item_data in items_data
+            ])
 
         # Background email
         from .tasks import send_quotation_submission_email_task
@@ -453,28 +502,37 @@ class QuotationSerializer(serializers.ModelSerializer):
         return quotation
 
     def update(self, instance, validated_data):
-        # Keep your existing update logic — it's good!
-        # (No email sending on update, so no Celery needed here)
         items_data = validated_data.pop("items", None)
         terms_data = validated_data.pop("terms", None)
 
+        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        # Handle terms update
         if terms_data is not None:
             if instance.terms:
+                # Update existing custom terms
                 for attr, value in terms_data.items():
                     setattr(instance.terms, attr, value)
                 instance.terms.save()
             else:
+                # Create new custom terms
                 instance.terms = QuotationTerms.objects.create(**terms_data)
+        elif 'terms' in validated_data and validated_data['terms'] is None:
+            # Explicitly setting terms to None - delete custom terms if they exist
+            if instance.terms:
+                instance.terms.delete()
+                instance.terms = None
 
+        # Update items if provided
         if items_data is not None:
             instance.items.all().delete()
-            QuotationItem.objects.bulk_create([
-                QuotationItem(quotation=instance, **item_data)
-                for item_data in items_data
-            ])
+            if items_data:  # Only create if there are items
+                QuotationItem.objects.bulk_create([
+                    QuotationItem(quotation=instance, **item_data)
+                    for item_data in items_data
+                ])
 
         instance.save()
         return instance
