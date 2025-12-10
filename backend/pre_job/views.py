@@ -217,6 +217,11 @@ class RFQViewSet(viewsets.ModelViewSet):
     
     
 
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status, viewsets
+from django.db import transaction
+
 class QuotationViewSet(viewsets.ModelViewSet):
     queryset = Quotation.objects.all()
     serializer_class = QuotationSerializer
@@ -241,7 +246,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
         if series_number and series_number.startswith('QUO-PRIME'):
             try:
                 prefix = series_number.rsplit('-', 1)[0] + '-'
-                remaining = RFQ.objects.filter(
+                remaining = Quotation.objects.filter(
                     series_number__startswith=prefix
                 ).order_by('series_number')
                 
@@ -252,17 +257,16 @@ class QuotationViewSet(viewsets.ModelViewSet):
                         rfq.series_number = expected
                         rfq.save(update_fields=['series_number'])
             except Exception as e:
-                # Log but don't crash delete
                 print(f"Re-sequencing failed: {e}")
         
         return Response(status=204)
 
-    # ✅ ADD THIS ACTION for updating terms
-    @action(detail=True, methods=['post', 'put', 'patch'], url_path='update-terms')
+    # ✅ NEW ACTION: Update terms for specific quotation
+    @action(detail=True, methods=['post'], url_path='update-terms')
     def update_terms(self, request, pk=None):
-        """Update terms for a specific quotation"""
+        """Create or update custom terms for a specific quotation"""
         quotation = self.get_object()
-        terms_content = request.data.get('content', '')
+        terms_content = request.data.get('content', '').strip()
         
         if not terms_content:
             return Response(
@@ -271,40 +275,60 @@ class QuotationViewSet(viewsets.ModelViewSet):
             )
         
         if quotation.terms:
-            # Update existing terms
+            # Update existing custom terms
             quotation.terms.content = terms_content
+            quotation.terms.is_default = False
             quotation.terms.save()
         else:
-            # Create new terms for this quotation
-            new_terms = QuotationTerms.objects.create(content=terms_content)
+            # Create new custom terms for this quotation
+            new_terms = QuotationTerms.objects.create(
+                content=terms_content,
+                is_default=False
+            )
             quotation.terms = new_terms
             quotation.save()
             
         serializer = self.get_serializer(quotation)
         return Response(serializer.data)
 
+    # ✅ NEW ACTION: Reset to default terms
+    @action(detail=True, methods=['post'], url_path='reset-to-default-terms')
+    def reset_to_default_terms(self, request, pk=None):
+        """Reset quotation to use default terms"""
+        quotation = self.get_object()
+        
+        # Delete custom terms if they exist
+        if quotation.terms and not quotation.terms.is_default:
+            quotation.terms.delete()
+        
+        quotation.terms = None
+        quotation.save()
+        
+        serializer = self.get_serializer(quotation)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['patch'], url_path='update_status')
     def update_status(self, request, pk=None):
         quotation = self.get_object()
-        status = request.data.get('status')
+        status_value = request.data.get('status')
         not_approved_reason_remark = request.data.get('not_approved_reason_remark')
         
         valid_statuses = [choice[0] for choice in Quotation._meta.get_field('quotation_status').choices]
-        if status not in valid_statuses:
+        if status_value not in valid_statuses:
             return Response({"detail": "Invalid status"}, status=400)
         
-        if status == 'Not Approved' and not not_approved_reason_remark:
+        if status_value == 'Not Approved' and not not_approved_reason_remark:
             return Response({"detail": "Reason is required when setting status to 'Not Approved'"}, status=400)
         
         was_not_approved = quotation.quotation_status == 'Not Approved'
-        quotation.quotation_status = status
-        if status == 'Not Approved':
+        quotation.quotation_status = status_value
+        if status_value == 'Not Approved':
             quotation.not_approved_reason_remark = not_approved_reason_remark
         else:
             quotation.not_approved_reason_remark = None
         quotation.save()
         
-        if status == 'Not Approved' and not was_not_approved:
+        if status_value == 'Not Approved' and not was_not_approved:
             serializer = self.get_serializer(quotation)
             serializer.send_not_approved_notification(quotation, quotation.assigned_sales_person)
         
@@ -317,19 +341,48 @@ class QuotationTermsViewSet(viewsets.ModelViewSet):
     serializer_class = QuotationTermsSerializer
     permission_classes = [AllowAny]
 
-    # REMOVED all singleton logic - now supports multiple terms instances
-    # Each quotation can have its own terms
+    # ✅ NEW ACTION: Get default terms
+    @action(detail=False, methods=['get'], url_path='default-terms')
+    def get_default_terms(self, request):
+        """Get the default terms"""
+        default_terms = QuotationTerms.objects.filter(is_default=True).first()
+        
+        if not default_terms:
+            # Create default if doesn't exist
+            default_content = """<h3 style="text-align: center; margin: 40px 0 20px; font-weight: bold; font-size: 18px;">
+  Terms & Conditions
+</h3>
+<h4 style="margin-bottom: 20px; font-weight: bold;">
+  Calibration Service General Terms and Conditions
+</h4>
 
-    # Optional: Keep this for backward compatibility if needed
+<ul style="list-style-type: disc; padding-left: 25px; line-height: 1.9; font-size: 14px;">
+  <li>Following the calibration of each instrument, a comprehensive calibration report will be generated...</li>
+  <!-- Add your full default terms here -->
+</ul>"""
+            
+            default_terms = QuotationTerms.objects.create(
+                content=default_content,
+                is_default=True
+            )
+        
+        serializer = self.get_serializer(default_terms)
+        return Response(serializer.data)
+
+    # Keep for backward compatibility
     @action(detail=False, methods=['get'], url_path='latest')
     def get_latest_terms(self, request):
         """Get the most recent terms (for template purposes only)"""
-        latest_terms = QuotationTerms.objects.order_by('-updated_at').first()
+        latest_terms = QuotationTerms.objects.filter(is_default=True).first()
+        if not latest_terms:
+            latest_terms = QuotationTerms.objects.order_by('-updated_at').first()
+        
         if latest_terms:
             serializer = self.get_serializer(latest_terms)
             return Response(serializer.data)
         return Response({"id": None, "content": "", "updated_at": None})
-
+    
+    
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
     queryset = PurchaseOrder.objects.all()
     serializer_class = PurchaseOrderSerializer

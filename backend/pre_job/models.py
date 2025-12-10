@@ -73,16 +73,28 @@ class RFQItem(models.Model):
     def __str__(self):
         return f"{self.item} - {self.rfq}"
 
-
+# models.py - Updated QuotationTerms model
 class QuotationTerms(models.Model):
     content = models.TextField(null=True, blank=True, default="")
     updated_at = models.DateTimeField(null=True, blank=True, auto_now=True)
-
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)  # ✅ ADD created_at field
+    is_default = models.BooleanField(default=False)
+    
     class Meta:
         verbose_name_plural = "Quotation Terms & Conditions"
+        ordering = ['-updated_at']  # ✅ ADDED: Show latest first
 
     def __str__(self):
-        return f"Terms ({self.updated_at.strftime('%Y-%m-%d')})"
+        if self.is_default:
+            return f"Default Terms ({self.updated_at.strftime('%Y-%m-%d') if self.updated_at else 'N/A'})"
+        return f"Custom Terms ({self.updated_at.strftime('%Y-%m-%d') if self.updated_at else 'N/A'})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default term exists
+        if self.is_default:
+            # Use pk instead of id for consistency (pk works before and after save)
+            QuotationTerms.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
 
 
 class Quotation(models.Model):

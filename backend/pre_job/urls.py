@@ -6,7 +6,7 @@ router = DefaultRouter()
 router.register(r'rfqs', RFQViewSet, basename='rfq')
 router.register(r'quotations', QuotationViewSet, basename='quotation')
 router.register(r'purchase-orders', PurchaseOrderViewSet, basename='purchase-order')
-router.register(r'quotation-terms', QuotationTermsViewSet, basename='quotation-terms')
+router.register(r'terms', QuotationTermsViewSet, basename='terms') 
 
 urlpatterns = [
     path('', include(router.urls)),

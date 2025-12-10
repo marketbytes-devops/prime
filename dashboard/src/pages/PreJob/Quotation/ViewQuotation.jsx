@@ -73,7 +73,6 @@ const ViewQuotation = () => {
     const perm = permissions.find((p) => p.page === page);
     return perm && perm[`can_${action}`];
   };
-
   const fetchQuotations = async () => {
     try {
       const [quotationsRes, channelsRes, teamsRes, itemsRes, unitsRes] =
@@ -92,16 +91,11 @@ const ViewQuotation = () => {
               `/purchase-orders/?quotation_id=${quotation.id}`
             );
 
-            // ✅ ADD THIS: Check if this quotation has custom terms
-            let hasCustomTerms = false;
-            if (quotation.terms && quotation.terms.id) {
-              hasCustomTerms = true;
-            }
-
+            // ✅ Use the has_custom_terms field from backend
             return {
               ...quotation,
               purchase_orders: poRes.data || [],
-              has_custom_terms: hasCustomTerms, // ✅ Add this line
+              has_custom_terms: quotation.has_custom_terms || false,
             };
           } catch (error) {
             console.error(
@@ -111,7 +105,7 @@ const ViewQuotation = () => {
             return {
               ...quotation,
               purchase_orders: [],
-              has_custom_terms: false, // ✅ Add this line
+              has_custom_terms: quotation.has_custom_terms || false,
             };
           }
         })
@@ -137,7 +131,6 @@ const ViewQuotation = () => {
       toast.error("Failed to load quotations.");
     }
   };
-
   useEffect(() => {
     fetchQuotations();
   }, []);
@@ -399,93 +392,108 @@ const ViewQuotation = () => {
     setIsSubmitting(false);
   };
 
-const handlePrint = async (quotation) => {
-  let termsContent = "";
-
-  if (quotation.terms?.content?.trim()) {
-    termsContent = quotation.terms.content.trim();
-  }
-  else {
+  const handlePrint = async (quotation) => {
     try {
-      const res = await apiClient.get("/quotation-terms/latest/");
-      if (res.data?.content?.trim()) {
-        termsContent = res.data.content.trim();
-      }
-    } catch (err) {
-      console.warn("No global terms found");
-    }
-  }
-  if (!termsContent) {
-    termsContent = DEFAULT_TERMS_HTML;
-  }
+      let termsContent = "";
 
-  const channelName =
-    state.channels.find((c) => c.id === quotation.rfq_channel)?.channel_name || "N/A";
-  const salesPersonName =
-    state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)?.name || "N/A";
-
-  const itemsData = (quotation.items || []).map((item) => ({
-    id: item.id,
-    name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
-    quantity: item.quantity || "",
-    unit: state.units.find((u) => u.id === item.unit)?.name || "N/A",
-    unit_price: item.unit_price || "",
-    total_price: item.quantity && item.unit_price
-      ? (item.quantity * item.unit_price).toFixed(2)
-      : "0.00",
-  }));
-
-  const data = {
-    ...quotation,
-    channelName,
-    salesPersonName,
-    items: itemsData,
-    terms: { content: termsContent }, // Always has content now
-    todayDate: new Date().toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).replace(/ /g, " "),
-  };
-
-  const htmlString = ReactDOMServer.renderToStaticMarkup(<Template1 data={data} />);
-
-  const printWindow = window.open("", "_blank", "width=1000,height=800");
-  if (!printWindow) {
-    toast.error("Please allow popups to print quotation");
-    return;
-  }
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <title>Quotation ${data.series_number}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .ql-editor { padding: 0; }
-        @media print { 
-          body { -webkit-print-color-adjust: exact; }
-          .ql-editor { padding: 0 !important; }
+      // Check if quotation has custom terms
+      if (quotation.has_custom_terms && quotation.terms?.content?.trim()) {
+        termsContent = quotation.terms.content.trim();
+      } else {
+        try {
+          // Fetch default terms from the new endpoint
+          const res = await apiClient.get("/terms/default/");
+          if (res.data?.content?.trim()) {
+            termsContent = res.data.content.trim();
+          } else {
+            // Use the hardcoded default if API fails
+            termsContent = DEFAULT_TERMS_HTML;
+          }
+        } catch (err) {
+          console.warn("Error fetching default terms:", err);
+          // Fallback to hardcoded default
+          termsContent = DEFAULT_TERMS_HTML;
         }
-      </style>
-    </head>
-    <body>
-      ${htmlString}
-    </body>
-    </html>
-  `);
+      }
 
-  printWindow.document.close();
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }, 800);
+      const channelName =
+        state.channels.find((c) => c.id === quotation.rfq_channel)
+          ?.channel_name || "N/A";
+      const salesPersonName =
+        state.teamMembers.find((m) => m.id === quotation.assigned_sales_person)
+          ?.name || "N/A";
+
+      const itemsData = (quotation.items || []).map((item) => ({
+        id: item.id,
+        name: state.itemsList.find((i) => i.id === item.item)?.name || "N/A",
+        quantity: item.quantity || "",
+        unit: state.units.find((u) => u.id === item.unit)?.name || "N/A",
+        unit_price: item.unit_price || "",
+        total_price:
+          item.quantity && item.unit_price
+            ? (item.quantity * item.unit_price).toFixed(2)
+            : "0.00",
+      }));
+
+      const data = {
+        ...quotation,
+        channelName,
+        salesPersonName,
+        items: itemsData,
+        terms: { content: termsContent },
+        todayDate: new Date()
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+          .replace(/ /g, " "),
+      };
+
+      const htmlString = ReactDOMServer.renderToStaticMarkup(
+        <Template1 data={data} />
+      );
+
+      const printWindow = window.open("", "_blank", "width=1000,height=800");
+      if (!printWindow) {
+        toast.error("Please allow popups to print quotation");
+        return;
+      }
+
+      printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Quotation ${data.series_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+          .ql-editor { padding: 0; }
+          @media print { 
+            body { -webkit-print-color-adjust: exact; }
+            .ql-editor { padding: 0 !important; }
+          }
+        </style>
+      </head>
+      <body>
+        ${htmlString}
+      </body>
+      </html>
+    `);
+
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        }, 800);
+      };
+    } catch (error) {
+      console.error("Error in handlePrint:", error);
+      toast.error("Failed to print quotation.");
+    }
   };
-};
 
   const handleNavigateToTerms = (quotationId, hasCustomTerms) => {
     if (quotationId) {
@@ -494,7 +502,6 @@ const handlePrint = async (quotation) => {
       navigate("/terms-and-conditions");
     }
   };
-
   const openModal = (quotation) => {
     setState((prev) => ({
       ...prev,
