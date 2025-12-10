@@ -15,48 +15,29 @@ const UpdateTermsAndConditions = () => {
   const [isDefaultTerms, setIsDefaultTerms] = useState(true);
   const [termsId, setTermsId] = useState(null);
 
-  const DEFAULT_TERMS = `
-<h3 style="text-align: center; margin: 40px 0 20px; font-weight: bold; font-size: 18px;">
-  Terms & Conditions
-</h3>
-<h4 style="margin-bottom: 20px; font-weight: bold;">
-  Calibration Service General Terms and Conditions
-</h4>
-
-<ul style="list-style-type: disc; padding-left: 25px; line-height: 1.9; font-size: 14px;">
-  <li>Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.</li>
-  
-  <li>Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer's tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.</li>
-  
-  <li>If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.</li>
-  
-  <li>Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.</li>
-  
-  <li>Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.</li>
-  
-  <li>Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.</li>
-  
-  <li>Customers purchase order or written approval is required to start calibration.</li>
-  
-  <li>Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.</li>
-  
-  <li>If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.</li>
-  
-  <li>Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.</li>
-  
-  <li><strong>PAYMENT:</strong> Payment to be made after 30 days</li>
-  
-  <li><strong>CONFIDENTIALITY:</strong> Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.</li>
-  
-  <li><strong>VAT is excluded from our quotation and will be charged at 15% extra.</strong></li>
+  // UPDATED DEFAULT TERMS WITH PROPER HTML STRUCTURE
+  const DEFAULT_TERMS = `<h3 style="text-align: center; margin-bottom: 20px;">Terms & Conditions</h3>
+<h4 style="margin-bottom: 15px; font-weight: bold;">Calibration Service General Terms and Conditions</h4>
+<ul style="list-style-type: disc; margin-left: 20px; line-height: 1.6;">
+<li>Following the calibration of each instrument, a comprehensive calibration report will be generated. Prime Innovation adheres to the fundamental principle governing the utilization of its accreditation logo. The accreditation logo serves as an assurance to the market that Prime Innovation complies with the applicable accreditation requirements. It is essential to note that the accreditation logo and the company logo of Prime Innovation are exclusively reserved for the sole use of Prime Innovation. Customers are expressly prohibited from utilizing these logos for profit, such as in advertisements on documents or commercial papers.</li>
+<li>Customers are required to communicate their tolerance limits to Prime Innovation through email, facilitated by the assigned Prime Innovation Sales representative. In instances where no tolerance limit is communicated to Prime Innovation, the manufacturer's tolerance limit will be implemented. In cases where customers fail to provide the tolerance limit before calibration and subsequently wish to re-calibrate with their specified tolerance, Prime Innovation will apply the same amount as originally quoted.</li>
+<li>If a unit is identified as defective and requires repair, such matters fall outside the scope of Prime Innovation's services. In such cases, you will be advised to reach out to the manufacturer or your respective vendor for necessary repairs. Following the completion of repairs, you are then encouraged to resubmit the unit to Prime Innovation for calibration.</li>
+<li>Prime Innovation is committed to employing calibration methods that are suitable for the specific calibration tasks undertaken. Whenever feasible, Prime Innovation will utilize methods outlined in the instrument's service manual. Alternatively, international, regional, or national standards will be referenced when appropriate. In some cases, Prime Innovation may also employ methods developed in-house. The method used for calibration will be clearly indicated on the test report. Nonstandard methods will only be employed with your explicit agreement. If the proposed method from your end is deemed inappropriate or outdated, Prime Innovation will promptly inform you of this determination.</li>
+<li>Normal turnaround time for Prime Innovation calibration services varies, depending on the type of Service requested and fluctuations in workload. However, 2-3 working days is normal for calibration services.</li>
+<li>Prime Innovation have free pick-up and delivery service from customer premises following to the availability of prime innovation sales team.</li>
+<li>Customers purchase order or written approval is required to start calibration.</li>
+<li>Prime Innovation will invoice completed and delivered instruments irrespective of total number of instruments in the PO. Hence customer is liable to accept the submitted partial invoices and proceed with payment.</li>
+<li>If the UUC (unit under Calibration) was found to be out of tolerance during calibration, and it will result to the rejection of the UUC, then 100% quoted rate for calibration shall be charged.</li>
+<li>Customer should provide written request in advance if conformity statement to a specification or standard (PASS/FAIL) is required and choose what decision rules to be applied.</li>
+<li><strong>PAYMENT:</strong> Payment to be made after 30 days</li>
+<li><strong>CONFIDENTIALITY:</strong> Unless the customer had made the information publicly available, or with agreement with the customer, all calibration results and documents created during the calibration of customer's equipment are considered proprietary information and treated as confidential. When required by law or by contractual agreement to release confidential information, Prime Innovation will inform the customer representative unless otherwise prohibited by law. Information about the customer obtained from sources other than the customer (e.g. complainant, regulators) is confidential between the customer and the laboratory. The provider (source) of this information is confidential to PRIME INNOVATION and do not share with the customer, unless agreed by the source.</li>
+<li><strong>VAT is excluded from our quotation and will be charged at 15% extra.</strong></li>
 </ul>
-
-<div style="margin-top: 60px; text-align: right; font-weight: bold; font-size: 15px;">
-  For Prime Innovation Company<br>
-  Hari Krishnan M<br>
-  <em style="font-size: 14px;">Head - Engineering and QA/QC</em>
-</div>
-`.trim();
+<div style="margin-top: 40px; text-align: right;">
+<p><strong>For Prime Innovation Company</strong></p>
+<p><strong>Hari Krishnan M</strong></p>
+<p><em>Head - Engineering and QA/QC</em></p>
+</div>`;
 
   const fetchQuotationWithTerms = async () => {
     try {
@@ -80,6 +61,12 @@ const UpdateTermsAndConditions = () => {
         const quotation = res.data;
         setQuotationData(quotation);
 
+        // Debug: Check what's coming from backend
+        console.log("Quotation data:", quotation);
+        console.log("Has custom terms:", quotation.has_custom_terms);
+        console.log("Terms content:", quotation.terms_content);
+        console.log("Terms object:", quotation.terms);
+
         if (quotation.has_custom_terms && quotation.terms) {
           // Quotation has custom terms
           setContent(quotation.terms.content || DEFAULT_TERMS);
@@ -89,7 +76,12 @@ const UpdateTermsAndConditions = () => {
           // Quotation uses default terms - fetch from backend
           try {
             const defaultRes = await apiClient.get("/terms/default-terms/");
-            setContent(defaultRes.data?.content?.trim() || DEFAULT_TERMS);
+            const defaultContent = defaultRes.data?.content?.trim() || DEFAULT_TERMS;
+            
+            // Check if default content has proper HTML
+            console.log("Default terms HTML:", defaultContent.substring(0, 200));
+            
+            setContent(defaultContent);
             setTermsId(defaultRes.data?.id || null);
           } catch (error) {
             console.warn("Failed to fetch default terms, using fallback");
@@ -159,11 +151,7 @@ const UpdateTermsAndConditions = () => {
       return;
     }
 
-    if (
-      !window.confirm(
-        "Are you sure you want to reset to default terms? This will delete custom terms for this quotation."
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to reset to default terms? This will delete custom terms for this quotation.")) {
       return;
     }
 
@@ -172,7 +160,28 @@ const UpdateTermsAndConditions = () => {
 
       // Refresh with default terms
       const defaultRes = await apiClient.get("/terms/default-terms/");
-      setContent(defaultRes.data?.content?.trim() || DEFAULT_TERMS);
+      const defaultContent = defaultRes.data?.content?.trim() || DEFAULT_TERMS;
+      
+      // Ensure it has proper HTML structure
+      if (!defaultContent.includes("<ul>") && !defaultContent.includes("<li>")) {
+        // If backend returns plain text, convert to HTML
+        const formattedContent = defaultContent
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            if (line.startsWith('•') || line.match(/^\d+\./)) {
+              return `<li>${line.replace(/^[•\d+\.\s]+/, '')}</li>`;
+            }
+            return `<p>${line}</p>`;
+          })
+          .join('');
+        
+        const fullHtml = `<h3>Terms & Conditions</h3><h4>Calibration Service General Terms and Conditions</h4><ul>${formattedContent}</ul>`;
+        setContent(fullHtml);
+      } else {
+        setContent(defaultContent);
+      }
+      
       setIsDefaultTerms(true);
       setIsEdit(false);
 
@@ -302,12 +311,16 @@ const UpdateTermsAndConditions = () => {
           </>
         ) : (
           <>
+            {/* Fixed display with proper HTML rendering */}
             <div
-              className="prose max-w-none border p-6 rounded bg-white min-h-96 shadow-sm ql-editor"
+              className="border p-6 rounded bg-white min-h-96 shadow-sm"
+              style={{ 
+                lineHeight: '1.6',
+                fontSize: '14px',
+                fontFamily: 'Arial, sans-serif'
+              }}
               dangerouslySetInnerHTML={{
-                __html:
-                  content ||
-                  '<p class="text-gray-500">No terms content available</p>',
+                __html: content || '<p class="text-gray-500">No terms content available</p>',
               }}
             />
             <div className="mt-6 text-sm text-gray-600">
