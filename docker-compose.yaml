@@ -46,7 +46,7 @@ services:
     depends_on:
       - mysql
     ports:
-      - "6370:8000" 
+      - "6370:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
@@ -65,7 +65,7 @@ services:
     volumes:
       - ./backend:/app
       - media_data:/app/media
-    command: ["sh", "-c", "sleep 15 && celery -A backend worker --loglevel=info --concurrency=4"]
+    command: ["sh", "-c", "sleep 15 && celery -A backend.celery worker --loglevel=info --concurrency=4"]
     networks:
       - prime_network
 
@@ -81,7 +81,7 @@ services:
     volumes:
       - ./backend:/app
       - media_data:/app/media
-    command: ["sh", "-c", "sleep 20 && celery -A backend beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"]
+    command: ["sh", "-c", "sleep 20 && celery -A backend.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"]
     networks:
       - prime_network
 
