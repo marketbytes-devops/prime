@@ -1,12 +1,11 @@
 from celery import shared_task
 from django.core.mail import send_mail
-from job_execution.models import Invoice  # Adjust if Invoice is in another app (e.g., pre_job/models)
+from job_execution.models import Invoice
 from django.conf import settings
 from authapp.models import Role, CustomUser
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_rfq_creation_email_task(self, rfq_data, recipients):
@@ -30,8 +29,8 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
         sent = False
         for email, name in recipients:
             try:
+                # ❌ REMOVE 'name=' parameter
                 send_mail(
-                    name=name,
                     subject=subject,
                     message=message,
                     from_email=settings.EMAIL_HOST_USER,
@@ -48,9 +47,6 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
     except Exception as exc:
         logger.error(f"RFQ email task failed: {exc}")
         raise self.retry(exc=exc)
-
-    # pre_job/tasks.py → ADD THIS NEW TASK
-
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_quotation_submission_email_task(self, quotation_data, recipients):
@@ -73,8 +69,8 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
 
     for email, name in recipients:
         try:
+            # ❌ REMOVE 'name=' parameter
             send_mail(
-                name=name,
                 subject=subject,
                 message=message,
                 from_email=settings.EMAIL_HOST_USER,
@@ -85,10 +81,6 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
         except Exception as e:
             logger.error(f"Failed to send quotation email to {email}: {e}")
             raise self.retry(exc=e)
-        
-        
-        
-        # pre_job/tasks.py → ADD THIS TASK
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_invoice_status_email_task(self, invoice_id, new_status):
@@ -114,9 +106,9 @@ def send_invoice_status_email_task(self, invoice_id, new_status):
         recipients = []
         if settings.ADMIN_EMAIL:
             recipients.append(settings.ADMIN_EMAIL)
-        # Optional: add finance team, manager, etc.
         
         for email in recipients:
+            # ❌ NO 'name=' parameter here either
             send_mail(
                 subject=subject,
                 message=message,
