@@ -12,7 +12,7 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
     try:
         subject = f"New RFQ Created: #{rfq_data['series_number']}"
         message = (
-            f"Dear Recipient,\n\n"
+            f"Dear {name},\n\n"
             f"A new Request for Quotation (RFQ) has been created in PrimeCRM:\n"
             f"------------------------------------------------------------\n"
             f"RFQ Number: {rfq_data['series_number']}\n"
@@ -29,7 +29,7 @@ def send_rfq_creation_email_task(self, rfq_data, recipients):
         sent = False
         for email, name in recipients:
             try:
-                # ❌ REMOVE 'name=' parameter
+
                 send_mail(
                     subject=subject,
                     message=message,
@@ -54,7 +54,7 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
 
     subject = f"New Quotation Submitted: #{quotation_data['series_number']}"
     message = (
-        f"Dear Team,\n\n"
+        f"Dear {name},\n\n"
         f"A new quotation has been submitted in PrimeCRM:\n"
         f"------------------------------------------------------------\n"
         f"Quotation No: {quotation_data['series_number']}\n"
@@ -69,7 +69,6 @@ def send_quotation_submission_email_task(self, quotation_data, recipients):
 
     for email, name in recipients:
         try:
-            # ❌ REMOVE 'name=' parameter
             send_mail(
                 subject=subject,
                 message=message,
@@ -108,7 +107,7 @@ def send_invoice_status_email_task(self, invoice_id, new_status):
             recipients.append(settings.ADMIN_EMAIL)
         
         for email in recipients:
-            # ❌ NO 'name=' parameter here either
+            # NO 'name=' parameter here either
             send_mail(
                 subject=subject,
                 message=message,
