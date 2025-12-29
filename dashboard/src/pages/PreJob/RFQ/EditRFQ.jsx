@@ -44,6 +44,186 @@ const EditRFQ = () => {
     submitting: false,
   });
 
+  // New states for quotation handling
+  const [hasExistingQuotation, setHasExistingQuotation] = useState(false);
+  const [quotationId, setQuotationId] = useState(null);
+
+  // ────────────────────────────────────────────────────────────────
+  // Local searchable dropdown component (copied from AddRFQ)
+  // Used for both Item and Unit selection with search + create new
+  // ────────────────────────────────────────────────────────────────
+  const EditSearchableDropdown = ({
+    options,
+    value,
+    onChange,
+    placeholder,
+    allowAddItem,
+    apiEndpoint,
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [newItemName, setNewItemName] = useState("");
+    const [addingItem, setAddingItem] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+      const selected = options.find((o) => o.id === value);
+      setSearchTerm(selected ? selected.name : "");
+    }, [value, options]);
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+          setIsOpen(false);
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const filteredOptions = options.filter((o) =>
+      o.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleSelect = (option) => {
+      onChange(option.id);
+      setSearchTerm(option.name);
+      setIsOpen(false);
+    };
+
+    const createAndSelect = async (name) => {
+      if (!name.trim()) return null;
+      const existing = options.find(
+        (o) => o.name.toLowerCase() === name.toLowerCase()
+      );
+      if (existing) return existing;
+
+      setAddingItem(true);
+      try {
+        const res = await apiClient.post(apiEndpoint, { name: name.trim() });
+        toast.success(
+          `${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`
+        );
+        return res.data;
+      } catch (err) {
+        toast.error(`Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`);
+        return null;
+      } finally {
+        setAddingItem(false);
+      }
+    };
+
+    const handleAddItem = async () => {
+      const newItem = await createAndSelect(newItemName);
+      if (newItem) {
+        setNewItemName("");
+        onChange(newItem.id);
+        setSearchTerm(newItem.name);
+      }
+    };
+
+    const handleKeyDown = async (e) => {
+      if (e.key === "Enter" && searchTerm.trim()) {
+        e.preventDefault();
+        const exact = filteredOptions.find(
+          (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (exact) {
+          handleSelect(exact);
+        } else if (allowAddItem) {
+          const newItem = await createAndSelect(searchTerm);
+          if (newItem) {
+            onChange(newItem.id);
+            setSearchTerm(newItem.name);
+          }
+        }
+      }
+    };
+
+    const handleBlur = async () => {
+      if (searchTerm.trim()) {
+        const exact = options.find(
+          (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (exact) {
+          onChange(exact.id);
+        } else if (allowAddItem) {
+          const newItem = await createAndSelect(searchTerm);
+          if (newItem) {
+            onChange(newItem.id);
+          }
+        }
+      }
+      setIsOpen(false);
+    };
+
+    return (
+      <div className="relative w-full" ref={dropdownRef}>
+        <InputField
+          type="text"
+          placeholder={placeholder}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          className="w-full p-2 border rounded focus:outline-indigo-500"
+          disabled={addingItem}
+        />
+        {isOpen && (
+          <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+            {allowAddItem && (
+              <div className="p-2 border-b flex gap-2">
+                <InputField
+                  placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  className="flex-1 p-2 border rounded text-sm"
+                  disabled={addingItem}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  disabled={addingItem || !newItemName.trim()}
+                  className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 ${
+                    addingItem || !newItemName.trim()
+                      ? "opacity-50 cursor-not-allowed"
+                      : "opacity-90 hover:opacity-100"
+                  }`}
+                >
+                  {addingItem ? "…" : "+"}
+                </button>
+              </div>
+            )}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((o) => (
+                <div
+                  key={o.id}
+                  className="p-2 hover:bg-indigo-100 cursor-pointer text-sm"
+                  onMouseDown={() => handleSelect(o)}
+                >
+                  {o.name}
+                </div>
+              ))
+            ) : (
+              <div className="p-2 text-gray-500 text-sm">
+                {searchTerm.trim()
+                  ? `Press Enter to create "${searchTerm}"`
+                  : "No options"}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ────────────────────────────────────────────────────────────────
+  // Rest of your original component code (only items section updated)
+  // ────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -94,6 +274,24 @@ const EditRFQ = () => {
 
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    const checkExistingQuotation = async () => {
+      if (!isQuotation) return;
+
+      try {
+        const response = await apiClient.get(`/quotations/?rfq=${id}`);
+        if (response.data && response.data.length > 0) {
+          setHasExistingQuotation(true);
+          setQuotationId(response.data[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to check existing quotation:", error);
+      }
+    };
+
+    checkExistingQuotation();
+  }, [id, isQuotation]);
 
   useEffect(() => {
     if (!state.loading && scrollToVat && vatSectionRef.current) {
@@ -186,14 +384,21 @@ const EditRFQ = () => {
     ]
   );
 
+  const allItemsHavePrice = useCallback(() => {
+    return state.items.every(
+      (item) =>
+        item.unit_price != null &&
+        item.unit_price !== "" &&
+        !isNaN(parseFloat(item.unit_price)) &&
+        parseFloat(item.unit_price) >= 0
+    );
+  }, [state.items]);
+
   const autosave = useCallback(
     debounce(async () => {
       try {
         const rfqPayload = buildRfqPayload();
-        const hasUnitPrices = state.items.every(
-          (item) => item.unit_price != null && item.unit_price !== ""
-        );
-        if (hasUnitPrices && rfqPayload.rfq_status !== "Completed") {
+        if (allItemsHavePrice() && rfqPayload.rfq_status !== "Completed") {
           rfqPayload.rfq_status = "Completed";
           setState((prev) => ({ ...prev, rfq_status: "Completed" }));
         }
@@ -203,7 +408,7 @@ const EditRFQ = () => {
         console.error("Error autosaving RFQ:", error);
       }
     }, 2000),
-    [buildRfqPayload, id, state.items]
+    [buildRfqPayload, id, allItemsHavePrice]
   );
 
   useEffect(() => {
@@ -253,37 +458,56 @@ const EditRFQ = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleUpdateRFQ = async () => {
     setState((prev) => ({ ...prev, submitting: true }));
     try {
       const rfqPayload = buildRfqPayload();
 
-      // Auto-complete RFQ if all items have unit prices (for quotation flow)
-      const hasUnitPrices = state.items.every(
-        (item) => item.unit_price != null && item.unit_price !== ""
-      );
-      if (hasUnitPrices && rfqPayload.rfq_status !== "Completed") {
+      if (allItemsHavePrice() && rfqPayload.rfq_status !== "Completed") {
         rfqPayload.rfq_status = "Completed";
+        setState((prev) => ({ ...prev, rfq_status: "Completed" }));
       }
 
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
 
-      if (isQuotation) {
-        const quotationPayload = buildQuotationPayload();
-        await apiClient.post("/quotations/", quotationPayload);
-      }
-
-      navigate(isQuotation ? "/view-quotation" : "/view-rfq");
-      toast.success(
-        isQuotation
-          ? "Quotation created successfully!"
-          : "RFQ updated successfully!"
-      );
+      setState((prev) => ({ ...prev, lastSaved: new Date() }));
+      toast.success("RFQ updated successfully!");
     } catch (error) {
-      console.error("Error submitting:", error);
-      toast.error("Failed to submit.");
+      console.error("Error updating RFQ:", error);
+      toast.error("Failed to update RFQ");
+    } finally {
+      setState((prev) => ({ ...prev, submitting: false }));
+    }
+  };
+
+  const handleCreateQuotation = async () => {
+    if (!allItemsHavePrice()) {
+      toast.error("All items must have valid unit prices to create quotation.");
+      return;
+    }
+
+    if (hasExistingQuotation) {
+      toast.info("Quotation already exists for this RFQ.");
+      return;
+    }
+
+    setState((prev) => ({ ...prev, submitting: true }));
+    try {
+      const rfqPayload = buildRfqPayload();
+      rfqPayload.rfq_status = "Completed";
+      await apiClient.patch(`rfqs/${id}/`, rfqPayload);
+
+      const quotationPayload = buildQuotationPayload();
+      const response = await apiClient.post("/quotations/", quotationPayload);
+
+      setHasExistingQuotation(true);
+      setQuotationId(response.data.id);
+
+      toast.success("Quotation created successfully!");
+      navigate("/view-quotation");
+    } catch (error) {
+      console.error("Error creating quotation:", error);
+      toast.error("Failed to create quotation");
     } finally {
       setState((prev) => ({ ...prev, submitting: false }));
     }
@@ -299,6 +523,7 @@ const EditRFQ = () => {
 
   const renderForm = () => (
     <div className="grid gap-6">
+      {/* Company Details */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Company Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -362,6 +587,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      {/* RFQ Channel */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">RFQ Channel</h3>
         <div>
@@ -385,6 +611,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      {/* Point of Contact */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Point of Contact</h3>
         <div className="grid grid-cols-1 gap-4">
@@ -443,6 +670,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      {/* Assignment & Due Date */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">
           Assignment & Due Date
@@ -488,6 +716,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      {/* RFQ Status */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">RFQ Status</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
@@ -510,6 +739,7 @@ const EditRFQ = () => {
         </div>
       </div>
 
+      {/* Items - with searchable dropdown */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Items</h3>
         {state.items.map((item, index) => (
@@ -519,25 +749,22 @@ const EditRFQ = () => {
           >
             <h4 className="text-sm font-semibold mb-2">Item {index + 1}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Item - Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item
                 </label>
-                <select
+                <EditSearchableDropdown
+                  options={state.itemsList}
                   value={item.item || ""}
-                  onChange={(e) =>
-                    handleItemChange(index, "item", e.target.value)
-                  }
-                  className="w-full p-2 border rounded-md focus:outline-indigo-600"
-                >
-                  <option value="">Select Item</option>
-                  {state.itemsList.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => handleItemChange(index, "item", val)}
+                  placeholder="Type or select item..."
+                  allowAddItem={true}
+                  apiEndpoint="items/"
+                />
               </div>
+
+              {/* Quantity */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Quantity
@@ -552,25 +779,23 @@ const EditRFQ = () => {
                   min={0}
                 />
               </div>
+
+              {/* Unit - Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unit
                 </label>
-                <select
+                <EditSearchableDropdown
+                  options={state.units}
                   value={item.unit || ""}
-                  onChange={(e) =>
-                    handleItemChange(index, "unit", e.target.value)
-                  }
-                  className="w-full p-2 border rounded-md focus:outline-indigo-600"
-                >
-                  <option value="">Select Unit</option>
-                  {state.units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => handleItemChange(index, "unit", val)}
+                  placeholder="Type or select unit..."
+                  allowAddItem={true}
+                  apiEndpoint="units/"
+                />
               </div>
+
+              {/* Unit Price */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unit Price
@@ -586,9 +811,11 @@ const EditRFQ = () => {
                   step="0.01"
                 />
               </div>
+
               {state.items.length > 1 && (
                 <div className="mt-6">
                   <button
+                    type="button"
                     onClick={() => removeItem(index)}
                     className="w-full bg-red-500 text-white rounded-md hover:bg-red-600"
                   >
@@ -599,7 +826,9 @@ const EditRFQ = () => {
             </div>
           </div>
         ))}
+
         <button
+          type="button"
           onClick={addItem}
           className="bg-blue-600 text-white rounded-md w-full hover:bg-blue-500"
         >
@@ -607,6 +836,7 @@ const EditRFQ = () => {
         </button>
       </div>
 
+      {/* VAT Section */}
       <div
         className="bg-white p-4 space-y-4 rounded-md shadow"
         ref={vatSectionRef}
@@ -645,21 +875,32 @@ const EditRFQ = () => {
           ? state.lastSaved.toLocaleTimeString()
           : "Not saved yet"}
       </div>
-      <form onSubmit={handleSubmit} className="mb-6">
+      <form className="mb-6">
         {renderForm()}
+
         <div className="flex justify-end mt-6">
           <button
-            type="submit"
-            disabled={state.submitting}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              state.submitting ? "opacity-50 cursor-not-allowed" : ""
+            type="button"
+            onClick={() => {
+              handleUpdateRFQ();
+              if (isQuotation && !hasExistingQuotation) {
+                handleCreateQuotation();
+              }
+            }}
+            disabled={state.submitting || (isQuotation && !allItemsHavePrice())}
+            className={`px-8 py-3 rounded-md text-white font-medium ${
+              state.submitting || (isQuotation && !allItemsHavePrice())
+                ? "bg-gray-400 cursor-not-allowed"
+                : isQuotation
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-indigo-600 hover:bg-indigo-700"
             }`}
           >
             {state.submitting
-              ? "Submitting..."
+              ? "Processing..."
               : isQuotation
               ? "Submit Quotation"
-              : "Update RFQ"}
+              : "Save RFQ"}
           </button>
         </div>
       </form>
