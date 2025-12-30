@@ -47,6 +47,7 @@ const EditRFQ = () => {
   // New states for quotation handling
   const [hasExistingQuotation, setHasExistingQuotation] = useState(false);
   const [quotationId, setQuotationId] = useState(null);
+  const [isManualEditing, setIsManualEditing] = useState(false);
 
   // ────────────────────────────────────────────────────────────────
   // Local searchable dropdown component (copied from AddRFQ)
@@ -77,18 +78,13 @@ const EditRFQ = () => {
           setIsOpen(false);
       };
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     const filteredOptions = options.filter((o) =>
       o.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    const handleSelect = (option) => {
-      onChange(option.id);
-      setSearchTerm(option.name);
-      setIsOpen(false);
-    };
 
     const createAndSelect = async (name) => {
       if (!name.trim()) return null;
@@ -105,18 +101,26 @@ const EditRFQ = () => {
         );
         return res.data;
       } catch (err) {
-        toast.error(`Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`);
+        toast.error(
+          `Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`
+        );
         return null;
       } finally {
         setAddingItem(false);
       }
     };
 
+    const handleSelect = (option) => {
+      onChange(option.id, options); // ← pass current options
+      setSearchTerm(option.name);
+      setIsOpen(false);
+    };
+
     const handleAddItem = async () => {
       const newItem = await createAndSelect(newItemName);
       if (newItem) {
         setNewItemName("");
-        onChange(newItem.id);
+        onChange(newItem.id, [...options, newItem]); // ← pass new list
         setSearchTerm(newItem.name);
       }
     };
@@ -132,7 +136,7 @@ const EditRFQ = () => {
         } else if (allowAddItem) {
           const newItem = await createAndSelect(searchTerm);
           if (newItem) {
-            onChange(newItem.id);
+            onChange(newItem.id, [...options, newItem]); // ← pass new list
             setSearchTerm(newItem.name);
           }
         }
@@ -145,11 +149,11 @@ const EditRFQ = () => {
           (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
         );
         if (exact) {
-          onChange(exact.id);
+          onChange(exact.id, options);
         } else if (allowAddItem) {
           const newItem = await createAndSelect(searchTerm);
           if (newItem) {
-            onChange(newItem.id);
+            onChange(newItem.id, [...options, newItem]); // ← pass new list
           }
         }
       }
@@ -177,7 +181,9 @@ const EditRFQ = () => {
             {allowAddItem && (
               <div className="p-2 border-b flex gap-2">
                 <InputField
-                  placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                  placeholder={`Add new ${
+                    apiEndpoint === "items/" ? "item" : "unit"
+                  }...`}
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   className="flex-1 p-2 border rounded text-sm"
@@ -412,7 +418,8 @@ const EditRFQ = () => {
   );
 
   useEffect(() => {
-    if (!state.loading) {
+    if (!state.loading && !isManualEditing) {
+      // ← only autosave when NOT manually editing
       autosave();
     }
   }, [
@@ -434,6 +441,7 @@ const EditRFQ = () => {
   ]);
 
   const addItem = () => {
+    setIsManualEditing(true); // ← activate mode
     setState((prev) => ({
       ...prev,
       items: [
@@ -444,16 +452,29 @@ const EditRFQ = () => {
   };
 
   const removeItem = (index) => {
+    setIsManualEditing(true); // ← activate mode
     setState((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
     }));
   };
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (index, field, value, newOptions = null) => {
+    setIsManualEditing(true); // ← activate mode when user types/selects
     setState((prev) => {
-      const newItems = [...prev.items];
-      newItems[index][field] = value;
+      const newItems = prev.items.map((it, i) =>
+        i === index ? { ...it, [field]: value } : it
+      );
+
+      if (newOptions) {
+        if (field === "item") {
+          return { ...prev, items: newItems, itemsList: newOptions };
+        }
+        if (field === "unit") {
+          return { ...prev, items: newItems, units: newOptions };
+        }
+      }
+
       return { ...prev, items: newItems };
     });
   };
@@ -472,6 +493,7 @@ const EditRFQ = () => {
 
       setState((prev) => ({ ...prev, lastSaved: new Date() }));
       toast.success("RFQ updated successfully!");
+      setIsManualEditing(false);
     } catch (error) {
       console.error("Error updating RFQ:", error);
       toast.error("Failed to update RFQ");
@@ -493,6 +515,7 @@ const EditRFQ = () => {
 
     setState((prev) => ({ ...prev, submitting: true }));
     try {
+      setIsManualEditing(false);
       const rfqPayload = buildRfqPayload();
       rfqPayload.rfq_status = "Completed";
       await apiClient.patch(`rfqs/${id}/`, rfqPayload);
@@ -757,7 +780,9 @@ const EditRFQ = () => {
                 <EditSearchableDropdown
                   options={state.itemsList}
                   value={item.item || ""}
-                  onChange={(val) => handleItemChange(index, "item", val)}
+                  onChange={(val, opts) =>
+                    handleItemChange(index, "item", val, opts)
+                  } // ← FIXED
                   placeholder="Type or select item..."
                   allowAddItem={true}
                   apiEndpoint="items/"
@@ -788,7 +813,9 @@ const EditRFQ = () => {
                 <EditSearchableDropdown
                   options={state.units}
                   value={item.unit || ""}
-                  onChange={(val) => handleItemChange(index, "unit", val)}
+                  onChange={(val, opts) =>
+                    handleItemChange(index, "unit", val, opts)
+                  } // ← FIXED
                   placeholder="Type or select unit..."
                   allowAddItem={true}
                   apiEndpoint="units/"
