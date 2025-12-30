@@ -829,9 +829,7 @@ const EditQuotation = () => {
           <button
             type="submit"
             disabled={state.submitting}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
-              state.submitting ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className="bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2"
           >
             {state.submitting ? "Updating..." : "Update Quotation"}
           </button>
