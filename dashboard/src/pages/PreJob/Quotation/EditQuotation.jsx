@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import apiClient from '../../../helpers/apiClient';
-import InputField from '../../../components/InputField';
-import Loading from '../../../components/Loading';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import apiClient from "../../../helpers/apiClient";
+import InputField from "../../../components/InputField";
+import Loading from "../../../components/Loading";
+import { toast } from "react-toastify";
 
 const debounce = (func, delay) => {
   let timeoutId;
@@ -16,82 +17,262 @@ const EditQuotation = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const itemsSectionRef = useRef(null);
+
   const [state, setState] = useState({
-    company_name: '',
-    company_address: '',
-    company_phone: '',
-    company_email: '',
-    rfq_channel: '',
-    point_of_contact_name: '',
-    point_of_contact_email: '',
-    point_of_contact_phone: '',
-    assigned_sales_person: '',
-    due_date_for_quotation: '',
-    quotation_status: '',
-    followup_frequency: '',
-    next_followup_date: '',
-    remarks: '',
-    vat_applicable: false, // Added vat_applicable to state
-    items: [{ item: '', quantity: '', unit: '', unit_price: '' }],
+    company_name: "",
+    company_address: "",
+    company_phone: "",
+    company_email: "",
+    rfq_channel: "",
+    point_of_contact_name: "",
+    point_of_contact_email: "",
+    point_of_contact_phone: "",
+    assigned_sales_person: "",
+    due_date_for_quotation: "",
+    quotation_status: "",
+    followup_frequency: "",
+    next_followup_date: "",
+    remarks: "",
+    vat_applicable: false,
+    items: [{ item: "", quantity: "", unit: "", unit_price: "" }],
     channels: [],
     teamMembers: [],
     itemsList: [],
     units: [],
     loading: true,
     lastSaved: null,
+    submitting: false,
   });
+
+  // Flag to disable autosave during manual item editing
+  const [isManualEditing, setIsManualEditing] = useState(false);
+
+  // Local searchable dropdown (same as EditRFQ / AddRFQ)
+  const EditSearchableDropdown = ({
+    options,
+    value,
+    onChange,
+    placeholder,
+    allowAddItem,
+    apiEndpoint,
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [newItemName, setNewItemName] = useState("");
+    const [addingItem, setAddingItem] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+      const selected = options.find((o) => o.id === value);
+      setSearchTerm(selected ? selected.name : "");
+    }, [value, options]);
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+          setIsOpen(false);
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const filteredOptions = options.filter((o) =>
+      o.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleSelect = (option) => {
+      onChange(option.id, options);
+      setSearchTerm(option.name);
+      setIsOpen(false);
+    };
+
+    const createAndSelect = async (name) => {
+      if (!name.trim()) return null;
+      const existing = options.find(
+        (o) => o.name.toLowerCase() === name.toLowerCase()
+      );
+      if (existing) return existing;
+
+      setAddingItem(true);
+      try {
+        const res = await apiClient.post(apiEndpoint, { name: name.trim() });
+        toast.success(
+          `${apiEndpoint === "items/" ? "Item" : "Unit"} created: ${name}`
+        );
+        return res.data;
+      } catch (err) {
+        toast.error(`Failed to create ${apiEndpoint === "items/" ? "item" : "unit"}`);
+        return null;
+      } finally {
+        setAddingItem(false);
+      }
+    };
+
+    const handleAddItem = async () => {
+      const newItem = await createAndSelect(newItemName);
+      if (newItem) {
+        setNewItemName("");
+        onChange(newItem.id, [...options, newItem]);
+        setSearchTerm(newItem.name);
+      }
+    };
+
+    const handleKeyDown = async (e) => {
+      if (e.key === "Enter" && searchTerm.trim()) {
+        e.preventDefault();
+        const exact = filteredOptions.find(
+          (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (exact) {
+          handleSelect(exact);
+        } else if (allowAddItem) {
+          const newItem = await createAndSelect(searchTerm);
+          if (newItem) {
+            onChange(newItem.id, [...options, newItem]);
+            setSearchTerm(newItem.name);
+          }
+        }
+      }
+    };
+
+    const handleBlur = async () => {
+      if (searchTerm.trim()) {
+        const exact = options.find(
+          (o) => o.name.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (exact) {
+          onChange(exact.id, options);
+        } else if (allowAddItem) {
+          const newItem = await createAndSelect(searchTerm);
+          if (newItem) {
+            onChange(newItem.id, [...options, newItem]);
+          }
+        }
+      }
+      setIsOpen(false);
+    };
+
+    return (
+      <div className="relative w-full" ref={dropdownRef}>
+        <InputField
+          type="text"
+          placeholder={placeholder}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          className="w-full p-2 border rounded focus:outline-indigo-500"
+          disabled={addingItem}
+        />
+        {isOpen && (
+          <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+            {allowAddItem && (
+              <div className="p-2 border-b flex gap-2">
+                <InputField
+                  placeholder={`Add new ${apiEndpoint === "items/" ? "item" : "unit"}...`}
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  className="flex-1 p-2 border rounded text-sm"
+                  disabled={addingItem}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  disabled={addingItem || !newItemName.trim()}
+                  className={`bg-green-600 text-white px-3 rounded hover:bg-green-700 text-sm transition-opacity duration-300 ${
+                    addingItem || !newItemName.trim()
+                      ? "opacity-50 cursor-not-allowed"
+                      : "opacity-90 hover:opacity-100"
+                  }`}
+                >
+                  {addingItem ? "…" : "+"}
+                </button>
+              </div>
+            )}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((o) => (
+                <div
+                  key={o.id}
+                  className="p-2 hover:bg-indigo-100 cursor-pointer text-sm"
+                  onMouseDown={() => handleSelect(o)}
+                >
+                  {o.name}
+                </div>
+              ))
+            ) : (
+              <div className="p-2 text-gray-500 text-sm">
+                {searchTerm.trim()
+                  ? `Press Enter to create "${searchTerm}"`
+                  : "No options"}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [quotationRes, channelsRes, teamsRes, itemsRes, unitsRes] = await Promise.all([
-          apiClient.get(`/quotations/${id}/`),
-          apiClient.get('/channels/'),
-          apiClient.get('/teams/'),
-          apiClient.get('/items/'),
-          apiClient.get('/units/'),
-        ]);
-        console.log('Quotation data:', quotationRes.data, 'Items:', quotationRes.data.items);
-        setState(prev => ({
+        const [quotationRes, channelsRes, teamsRes, itemsRes, unitsRes] =
+          await Promise.all([
+            apiClient.get(`/quotations/${id}/`),
+            apiClient.get("/channels/"),
+            apiClient.get("/teams/"),
+            apiClient.get("/items/"),
+            apiClient.get("/units/"),
+          ]);
+
+        const quotation = quotationRes.data;
+
+        setState((prev) => ({
           ...prev,
-          company_name: quotationRes.data.company_name || '',
-          company_address: quotationRes.data.company_address || '',
-          company_phone: quotationRes.data.company_phone || '',
-          company_email: quotationRes.data.company_email || '',
-          rfq_channel: quotationRes.data.rfq_channel || '',
-          point_of_contact_name: quotationRes.data.point_of_contact_name || '',
-          point_of_contact_email: quotationRes.data.point_of_contact_email || '',
-          point_of_contact_phone: quotationRes.data.point_of_contact_phone || '',
-          assigned_sales_person: quotationRes.data.assigned_sales_person || '',
-          due_date_for_quotation: quotationRes.data.due_date_for_quotation || '',
-          quotation_status: quotationRes.data.quotation_status || 'Pending',
-          followup_frequency: quotationRes.data.followup_frequency || '24_hours',
-          next_followup_date: quotationRes.data.next_followup_date || '',
-          remarks: quotationRes.data.remarks || '',
-          vat_applicable: quotationRes.data.vat_applicable || false, // Initialize vat_applicable
-          items: quotationRes.data.items && quotationRes.data.items.length
-            ? quotationRes.data.items.map(item => ({
-              item: item.item || '',
-              quantity: item.quantity || '',
-              unit: item.unit || '',
-              unit_price: item.unit_price || '',
-            }))
-            : [{ item: '', quantity: '', unit: '', unit_price: '' }],
+          company_name: quotation.company_name || "",
+          company_address: quotation.company_address || "",
+          company_phone: quotation.company_phone || "",
+          company_email: quotation.company_email || "",
+          rfq_channel: quotation.rfq_channel || "",
+          point_of_contact_name: quotation.point_of_contact_name || "",
+          point_of_contact_email: quotation.point_of_contact_email || "",
+          point_of_contact_phone: quotation.point_of_contact_phone || "",
+          assigned_sales_person: quotation.assigned_sales_person || "",
+          due_date_for_quotation: quotation.due_date_for_quotation || "",
+          quotation_status: quotation.quotation_status || "Pending",
+          followup_frequency: quotation.followup_frequency || "24_hours",
+          next_followup_date: quotation.next_followup_date || "",
+          remarks: quotation.remarks || "",
+          vat_applicable: quotation.vat_applicable || false,
+          items:
+            quotation.items && quotation.items.length
+              ? quotation.items.map((item) => ({
+                  item: item.item || "",
+                  quantity: item.quantity || "",
+                  unit: item.unit || "",
+                  unit_price: item.unit_price || "",
+                }))
+              : [{ item: "", quantity: "", unit: "", unit_price: "" }],
           channels: channelsRes.data || [],
           teamMembers: teamsRes.data || [],
           itemsList: itemsRes.data || [],
           units: unitsRes.data || [],
           loading: false,
         }));
+
         if (itemsSectionRef.current) {
-          itemsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+          itemsSectionRef.current.scrollIntoView({ behavior: "smooth" });
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        alert('Failed to load quotation data.');
-        setState(prev => ({ ...prev, loading: false }));
+        console.error("Error fetching data:", error);
+        toast.error("Failed to load quotation data.");
+        setState((prev) => ({ ...prev, loading: false }));
       }
     };
+
     fetchData();
   }, [id]);
 
@@ -109,47 +290,40 @@ const EditQuotation = () => {
     quotation_status: state.quotation_status || null,
     followup_frequency: state.followup_frequency || null,
     remarks: state.remarks || null,
-    vat_applicable: state.vat_applicable, // Include vat_applicable in payload
-    items: state.items.map(item => ({
+    vat_applicable: state.vat_applicable,
+    items: state.items.map((item) => ({
       item: item.item || null,
       quantity: item.quantity ? parseInt(item.quantity) : null,
       unit: item.unit || null,
       unit_price: item.unit_price ? parseFloat(item.unit_price) : null,
     })),
-  }), [
-    state.company_name,
-    state.company_address,
-    state.company_phone,
-    state.company_email,
-    state.rfq_channel,
-    state.point_of_contact_name,
-    state.point_of_contact_email,
-    state.point_of_contact_phone,
-    state.assigned_sales_person,
-    state.due_date_for_quotation,
-    state.quotation_status,
-    state.followup_frequency,
-    state.remarks,
-    state.vat_applicable, // Added to dependencies
-    state.items,
-  ]);
+  }), [state]);
+
+  const allItemsHavePrice = useCallback(() => {
+    return state.items.every(
+      (item) =>
+        item.unit_price != null &&
+        item.unit_price !== "" &&
+        !isNaN(parseFloat(item.unit_price)) &&
+        parseFloat(item.unit_price) >= 0
+    );
+  }, [state.items]);
 
   const autosave = useCallback(
     debounce(async () => {
       try {
-        const quotationPayload = buildQuotationPayload();
-        console.log('Autosaving Quotation:', quotationPayload);
-        await apiClient.patch(`/quotations/${id}/`, quotationPayload);
-        setState(prev => ({ ...prev, lastSaved: new Date() }));
+        const payload = buildQuotationPayload();
+        await apiClient.patch(`/quotations/${id}/`, payload);
+        setState((prev) => ({ ...prev, lastSaved: new Date() }));
       } catch (error) {
-        console.error('Error autosaving quotation:', error);
+        console.error("Error autosaving quotation:", error);
       }
     }, 2000),
     [buildQuotationPayload, id]
   );
 
   useEffect(() => {
-    if (!state.loading) {
+    if (!state.loading && !isManualEditing) {
       autosave();
     }
   }, [
@@ -165,31 +339,50 @@ const EditQuotation = () => {
     state.due_date_for_quotation,
     state.quotation_status,
     state.followup_frequency,
+    state.next_followup_date,
     state.remarks,
-    state.vat_applicable, 
+    state.vat_applicable,
     state.items,
     autosave,
+    isManualEditing,
     state.loading,
   ]);
 
   const addItem = () => {
-    setState(prev => ({
+    setIsManualEditing(true);
+    setState((prev) => ({
       ...prev,
-      items: [...prev.items, { item: '', quantity: '', unit: '', unit_price: '' }],
+      items: [
+        ...prev.items,
+        { item: "", quantity: "", unit: "", unit_price: "" },
+      ],
     }));
   };
 
-  const removeItem = index => {
-    setState(prev => ({
+  const removeItem = (index) => {
+    setIsManualEditing(true);
+    setState((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
     }));
   };
 
-  const handleItemChange = (index, field, value) => {
-    setState(prev => {
-      const newItems = [...prev.items];
-      newItems[index][field] = value;
+  const handleItemChange = (index, field, value, newOptions = null) => {
+    setIsManualEditing(true);
+    setState((prev) => {
+      const newItems = prev.items.map((it, i) =>
+        i === index ? { ...it, [field]: value } : it
+      );
+
+      if (newOptions) {
+        if (field === "item") {
+          return { ...prev, items: newItems, itemsList: newOptions };
+        }
+        if (field === "unit") {
+          return { ...prev, items: newItems, units: newOptions };
+        }
+      }
+
       return { ...prev, items: newItems };
     });
   };
@@ -210,31 +403,36 @@ const EditQuotation = () => {
       state.followup_frequency;
 
     const isItemsValid = state.items.every(
-      item => item.item && item.quantity && item.unit && item.unit_price
+      (item) => item.item && item.quantity && item.unit && item.unit_price
     );
 
     return isBasicInfoValid && isItemsValid;
   };
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isFormValid()) {
-      alert('Please fill all required fields.');
+      toast.error("Please fill all required fields.");
       return;
     }
+    setState((prev) => ({ ...prev, submitting: true }));
     try {
-      const quotationPayload = buildQuotationPayload();
-      console.log('Updating Quotation:', quotationPayload);
-      await apiClient.patch(`/quotations/${id}/`, quotationPayload);
-      navigate('/view-quotation');
+      const payload = buildQuotationPayload();
+      await apiClient.patch(`/quotations/${id}/`, payload);
+      setIsManualEditing(false); // Reset flag after submit
+      toast.success("Quotation updated successfully!");
+      navigate("/view-quotation");
     } catch (error) {
-      console.error('Error submitting:', error);
-      alert('Failed to submit.');
+      console.error("Error submitting:", error);
+      toast.error("Failed to update quotation.");
+    } finally {
+      setState((prev) => ({ ...prev, submitting: false }));
     }
   };
 
   const renderForm = () => (
     <div className="grid gap-6">
+      {/* Company Details */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Company Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -245,12 +443,11 @@ const EditQuotation = () => {
             <InputField
               type="text"
               placeholder="Enter company name"
-              value={state.company_name || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_name: e.target.value }))
+              value={state.company_name || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_name: e.target.value }))
               }
               maxLength={100}
-              required
             />
           </div>
           <div>
@@ -260,11 +457,10 @@ const EditQuotation = () => {
             <InputField
               type="text"
               placeholder="Enter company address"
-              value={state.company_address || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_address: e.target.value }))
+              value={state.company_address || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_address: e.target.value }))
               }
-              required
             />
           </div>
           <div>
@@ -274,12 +470,11 @@ const EditQuotation = () => {
             <InputField
               type="text"
               placeholder="Enter company phone"
-              value={state.company_phone || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_phone: e.target.value }))
+              value={state.company_phone || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_phone: e.target.value }))
               }
               maxLength={20}
-              required
             />
           </div>
           <div>
@@ -289,16 +484,16 @@ const EditQuotation = () => {
             <InputField
               type="email"
               placeholder="Enter company email"
-              value={state.company_email || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, company_email: e.target.value }))
+              value={state.company_email || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, company_email: e.target.value }))
               }
-              required
             />
           </div>
         </div>
       </div>
 
+      {/* Quotation Channel */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Quotation Channel</h3>
         <div>
@@ -306,15 +501,14 @@ const EditQuotation = () => {
             Quotation Channel
           </label>
           <select
-            value={state.rfq_channel || ''}
-            onChange={e =>
-              setState(prev => ({ ...prev, rfq_channel: e.target.value }))
+            value={state.rfq_channel || ""}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, rfq_channel: e.target.value }))
             }
             className="w-full p-2 border rounded-md focus:outline-indigo-600"
-            required
           >
             <option value="">Select Channel</option>
-            {state.channels.map(channel => (
+            {state.channels.map((channel) => (
               <option key={channel.id} value={channel.id}>
                 {channel.channel_name}
               </option>
@@ -323,6 +517,7 @@ const EditQuotation = () => {
         </div>
       </div>
 
+      {/* Point of Contact */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Point of Contact</h3>
         <div className="grid grid-cols-1 gap-4">
@@ -333,12 +528,14 @@ const EditQuotation = () => {
             <InputField
               type="text"
               placeholder="Enter contact name"
-              value={state.point_of_contact_name || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, point_of_contact_name: e.target.value }))
+              value={state.point_of_contact_name || ""}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  point_of_contact_name: e.target.value,
+                }))
               }
               maxLength={100}
-              required
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,11 +546,13 @@ const EditQuotation = () => {
               <InputField
                 type="email"
                 placeholder="Enter contact email"
-                value={state.point_of_contact_email || ''}
-                onChange={e =>
-                  setState(prev => ({ ...prev, point_of_contact_email: e.target.value }))
+                value={state.point_of_contact_email || ""}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    point_of_contact_email: e.target.value,
+                  }))
                 }
-                required
               />
             </div>
             <div>
@@ -363,37 +562,44 @@ const EditQuotation = () => {
               <InputField
                 type="text"
                 placeholder="Enter contact phone"
-                value={state.point_of_contact_phone || ''}
-                onChange={e =>
-                  setState(prev => ({ ...prev, point_of_contact_phone: e.target.value }))
+                value={state.point_of_contact_phone || ""}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    point_of_contact_phone: e.target.value,
+                  }))
                 }
                 maxLength={20}
-                required
               />
             </div>
           </div>
         </div>
       </div>
 
+      {/* Assignment & Due Date */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
-        <h3 className="text-xl font-semibold text-black">Assignment & Due Date</h3>
+        <h3 className="text-xl font-semibold text-black">
+          Assignment & Due Date
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Assigned Sales Person
             </label>
             <select
-              value={state.assigned_sales_person || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, assigned_sales_person: e.target.value }))
+              value={state.assigned_sales_person || ""}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  assigned_sales_person: e.target.value,
+                }))
               }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
-              required
             >
               <option value="">Select Team Member</option>
-              {state.teamMembers.map(member => (
+              {state.teamMembers.map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.name} ({member.designation || 'No designation'})
+                  {member.name} ({member.designation || "No designation"})
                 </option>
               ))}
             </select>
@@ -404,16 +610,19 @@ const EditQuotation = () => {
             </label>
             <InputField
               type="date"
-              value={state.due_date_for_quotation || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, due_date_for_quotation: e.target.value }))
+              value={state.due_date_for_quotation || ""}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  due_date_for_quotation: e.target.value,
+                }))
               }
-              required
             />
           </div>
         </div>
       </div>
 
+      {/* Quotation Details */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Quotation Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -422,12 +631,11 @@ const EditQuotation = () => {
               Quotation Status
             </label>
             <select
-              value={state.quotation_status || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, quotation_status: e.target.value }))
+              value={state.quotation_status || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, quotation_status: e.target.value }))
               }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
-              required
             >
               <option value="">Select Status</option>
               <option value="Pending">Pending</option>
@@ -440,12 +648,11 @@ const EditQuotation = () => {
               Follow-up Frequency
             </label>
             <select
-              value={state.followup_frequency || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, followup_frequency: e.target.value }))
+              value={state.followup_frequency || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, followup_frequency: e.target.value }))
               }
               className="w-full p-2 border rounded-md focus:outline-indigo-600"
-              required
             >
               <option value="">Select Frequency</option>
               <option value="24_hours">24 Hours</option>
@@ -460,7 +667,7 @@ const EditQuotation = () => {
             </label>
             <InputField
               type="date"
-              value={state.next_followup_date || ''}
+              value={state.next_followup_date || ""}
               readOnly
               className="w-full bg-gray-100"
             />
@@ -472,39 +679,41 @@ const EditQuotation = () => {
             <InputField
               type="text"
               placeholder="Enter remarks"
-              value={state.remarks || ''}
-              onChange={e =>
-                setState(prev => ({ ...prev, remarks: e.target.value }))
+              value={state.remarks || ""}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, remarks: e.target.value }))
               }
             />
           </div>
         </div>
       </div>
 
+      {/* Items Section */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow" ref={itemsSectionRef}>
         <h3 className="text-xl font-semibold text-black">Items</h3>
         {state.items.map((item, index) => (
-          <div key={index} className="border p-4 rounded-md bg-gray-50 shadow mb-4">
+          <div
+            key={index}
+            className="border p-4 rounded-md bg-gray-50 shadow mb-4"
+          >
             <h4 className="text-sm font-semibold mb-2">Item {index + 1}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Item - Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item
                 </label>
-                <select
-                  value={item.item || ''}
-                  onChange={e => handleItemChange(index, 'item', e.target.value)}
-                  className="w-full p-2 border rounded-md focus:outline-indigo-600"
-                  required
-                >
-                  <option value="">Select Item</option>
-                  {state.itemsList.map(i => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                <EditSearchableDropdown
+                  options={state.itemsList}
+                  value={item.item || ""}
+                  onChange={(val, opts) => handleItemChange(index, "item", val, opts)}
+                  placeholder="Type or select item..."
+                  allowAddItem={true}
+                  apiEndpoint="items/"
+                />
               </div>
+
+              {/* Quantity */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Quantity
@@ -512,30 +721,28 @@ const EditQuotation = () => {
                 <InputField
                   type="number"
                   placeholder="Enter quantity"
-                  value={item.quantity || ''}
-                  onChange={e => handleItemChange(index, 'quantity', e.target.value)}
+                  value={item.quantity || ""}
+                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
                   min={0}
-                  required
                 />
               </div>
+
+              {/* Unit - Searchable Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unit
                 </label>
-                <select
-                  value={item.unit || ''}
-                  onChange={e => handleItemChange(index, 'unit', e.target.value)}
-                  className="w-full p-2 border rounded-md focus:outline-indigo-600"
-                  required
-                >
-                  <option value="">Select Unit</option>
-                  {state.units.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                <EditSearchableDropdown
+                  options={state.units}
+                  value={item.unit || ""}
+                  onChange={(val, opts) => handleItemChange(index, "unit", val, opts)}
+                  placeholder="Type or select unit..."
+                  allowAddItem={true}
+                  apiEndpoint="units/"
+                />
               </div>
+
+              {/* Unit Price */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unit Price
@@ -543,16 +750,17 @@ const EditQuotation = () => {
                 <InputField
                   type="number"
                   placeholder="Enter unit price"
-                  value={item.unit_price || ''}
-                  onChange={e => handleItemChange(index, 'unit_price', e.target.value)}
+                  value={item.unit_price || ""}
+                  onChange={(e) => handleItemChange(index, "unit_price", e.target.value)}
                   min={0}
                   step="0.01"
-                  required
                 />
               </div>
+
               {state.items.length > 1 && (
                 <div className="mt-6">
                   <button
+                    type="button"
                     onClick={() => removeItem(index)}
                     className="w-full bg-red-500 text-white rounded-md hover:bg-red-600"
                   >
@@ -563,25 +771,32 @@ const EditQuotation = () => {
             </div>
           </div>
         ))}
+
         <button
+          type="button"
           onClick={addItem}
           className="bg-blue-600 text-white rounded-md w-full hover:bg-blue-500"
         >
           Add Item
         </button>
       </div>
+
+      {/* VAT Section */}
       <div className="bg-white p-4 space-y-4 rounded-md shadow">
         <h3 className="text-xl font-semibold text-black">Is VAT Applicable?</h3>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-          <div className='flex items-center'>
+          <div className="flex items-center">
             <label className="flex items-center text-sm font-medium text-gray-700">
               VAT Applicable (15%)
             </label>
             <input
               type="checkbox"
               checked={state.vat_applicable}
-              onChange={e =>
-                setState(prev => ({ ...prev, vat_applicable: e.target.checked }))
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  vat_applicable: e.target.checked,
+                }))
               }
               className="ml-2"
             />
@@ -592,26 +807,33 @@ const EditQuotation = () => {
   );
 
   if (state.loading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loading /></div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto p-4">
-      <h1 className="text-2xl font-semibold mb-4">Edit Quotation</h1>
-      <div className="text-sm text-gray-600 mb-4">
-        Last saved:{' '}
-        {state.lastSaved ? state.lastSaved.toLocaleTimeString() : 'Not saved yet'}
+      <h1 className="text-2xl text-center sm:text-left font-semibold mb-4">
+        Edit Quotation
+      </h1>
+      <div className="text-sm text-center sm:text-left text-gray-600 mb-4">
+        Last saved:{" "}
+        {state.lastSaved ? state.lastSaved.toLocaleTimeString() : "Not saved yet"}
       </div>
-      <form onSubmit={handleSubmit} className="mb-6">
+      <form className="mb-6" onSubmit={handleSubmit}>
         {renderForm()}
         <div className="flex justify-end mt-6">
           <button
             type="submit"
-            disabled={!isFormValid()}
-            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${!isFormValid() ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+            disabled={state.submitting}
+            className={`bg-indigo-600 text-white rounded-md hover:bg-indigo-700 px-4 py-2 ${
+              state.submitting ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            Update Quotation
+            {state.submitting ? "Updating..." : "Update Quotation"}
           </button>
         </div>
       </form>
