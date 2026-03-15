@@ -16,19 +16,6 @@ services:
       timeout: 10s
       retries: 3
 
-  mysql:
-    image: mysql:8.0
-    container_name: mysql_primedb
-    command: --default-authentication-plugin=mysql_native_password
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: prime_db
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - prime_network
-
   backend:
     build: ./backend
     container_name: prime_backend
@@ -36,27 +23,23 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: mysql
+      DB_HOST: shared-mysql
       DB_PORT: 3306
       REDIS_HOST: prime_redis
       REDIS_PORT: 6379
       CELERY_BROKER_URL: redis://prime_redis:6379/0
       CELERY_RESULT_BACKEND: redis://prime_redis:6379/1
       DJANGO_SETTINGS_MODULE: backend.settings
-      EMAIL_HOST: smtp.gmail.com
-      EMAIL_PORT: 587
-      EMAIL_USE_TLS: True
-      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
-      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
     depends_on:
-      - mysql
+      - redis
     ports:
-      - "6370:8000" 
+      - "6370:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
     networks:
       - prime_network
+      - shared-db-network
 
   celery-worker:
     build: ./backend
@@ -78,6 +61,7 @@ services:
     command: ["sh", "-c", "sleep 15 && celery -A backend worker --loglevel=info --concurrency=4"]
     networks:
       - prime_network
+      - shared-db-network
 
   celery-beat:
     build: ./backend
@@ -99,6 +83,7 @@ services:
     command: ["sh", "-c", "sleep 20 && celery -A backend beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"]
     networks:
       - prime_network
+      - shared-db-network
 
   cms:
     build: ./dashboard
@@ -112,8 +97,9 @@ services:
 networks:
   prime_network:
     driver: bridge
+  shared-db-network:
+    external: true
 
 volumes:
-  mysql_data:
   redis_data:
   media_data:
